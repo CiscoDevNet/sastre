@@ -10,7 +10,7 @@ import os.path
 import requests.exceptions
 from lib.config_items import *
 from lib.rest_api import Rest, LoginFailedException
-from lib.catalog import catalog_size, catalog_tags, catalog_items, CATALOG_TAG_ALL
+from lib.catalog import catalog_size, catalog_tags, catalog_items, CATALOG_TAG_ALL, ordered_tags
 
 
 __author__     = "Marcelo Reis"
@@ -87,66 +87,38 @@ def task_restore(base_url, work_dir, user, password, task_args):
     # Parse task_args
     restore_parser = argparse.ArgumentParser(prog='sastre.py restore', description='{header}\nRestore task:'.format(header=__doc__),
                                              formatter_class=argparse.RawDescriptionHelpFormatter)
-    restore_parser.add_argument('tags', metavar='<tag>', nargs='+', type=TagOptions.tag,
-                                help='''One or more tags matching items to be restored. 
-                                        Multiple tags should be separated by space.
-                                        Available tags: {tag_options}. Special tag '{all}' denotes backup of all items.
+    restore_parser.add_argument('tag', metavar='<tag>', type=TagOptions.tag,
+                                help='''Tag matching items to be restored. 
+                                        Items that are dependencies of the specified tag are automatically included.
+                                        Available tags: {tag_options}. Special tag '{all}' denotes restore all items.
                                      '''.format(tag_options=TagOptions.options(), all=CATALOG_TAG_ALL))
     restore_args = restore_parser.parse_args(task_args)
+
     logger.info('Starting restore task')
-
-    item_tracker_dict = load_cfg_items(work_dir)
-
     with Rest(base_url, user, password) as api:
-        # 1. Restore items with no dependencies
-        item_restore_list = [item_tracker for item_tracker in item_tracker_dict.values() if not item_tracker.has_dependencies]
-        for item in item_restore_list:
-            r = api.post(item.cfg_item.post_data, item.cfg_item.api_path.post)
-            print(r)
-            break
+        # id_mapping is {<old_id>: <new_id>}
+        id_mapping = dict()
 
-    for i in item_restore_list:
-        print('Name: {}, backpointers: {}, dependencies: {}'.format(i.cfg_item.get_name(), i._backpointers, i._dependency_set))
+        for tag in ordered_tags(restore_args.tag):
+            logger.info('Restoring {tag} items'.format(tag=tag))
+            for cfg_item_id, cfg_item in load_cfg_items(work_dir, tag).items():
+                reply_data = api.post(cfg_item.post_data(id_mapping, new_name='abc_{}'.format(cfg_item.name)), cfg_item.api_path.post)
+                if reply_data is not None:
+                    id_mapping[cfg_item_id] = reply_data[cfg_item.id_tag]
 
-
-    # 2. Update new IDs on all items listed in backpointers, delete dependency on those items.
-
-    # 3. Go back to 1. until all items have been uploaded
-
+                logger.info('Restored {tag} {name}'.format(tag=tag, name=cfg_item.name))
 
     logger.info('Restore task complete')
 
-
-class ItemTracker:
-    def __init__(self, cfg_item):
-        self.cfg_item = cfg_item
-        self.restored = False
-
-        self._backpointers = set()
-        self._dependency_set = cfg_item.get_dependencies()
-
-    @property
-    def has_dependencies(self):
-        return len(self._dependency_set) > 0
-
-    def del_dependency(self, item_id):
-        self._dependency_set.discard(item_id)
-
-    def dependency_iter(self):
-        return iter(self._dependency_set)
-
-    def add_backpointer(self, item_id):
-        self._backpointers.add(item_id)
-
-    def get_refcount(self):
-        return len(self._backpointers)
+# TODO: Restore verify if present before pushing, unless rename is provided
 
 
-def load_cfg_items(work_dir):
+def load_cfg_items(work_dir, tag):
     """
-    Load all config items from specified work_dir
-    :param work_dir: directory with all files from a vManage node
-    :return:
+    Load config items from work_dir matching tag
+    :param tag: Tag used to match which catalog entries to retrieve
+    :param work_dir: Directory containing the files from a vManage node
+    :return: Dict of {<cfg item id>: <cfg item>} containing the items that matched the specified tag
     """
     def item_list_exist(index_handler_tuple):
         """
@@ -155,18 +127,11 @@ def load_cfg_items(work_dir):
         """
         return index_handler_tuple[0] is not None
 
-    item_list_load = [(item.index_cls.load(work_dir), item.handler_cls) for item in catalog_items(CATALOG_TAG_ALL)]
+    item_list_index = [(item.index_cls.load(work_dir), item.handler_cls) for item in catalog_items(tag)]
 
-    item_tracker_dict = {item_id: ItemTracker(handler_cls.load(work_dir, template_name=item_name))
-                         for index_list, handler_cls in filter(item_list_exist, item_list_load)
-                         for item_id, item_name in index_list}
-
-    # Update item backpointers from dependencies
-    for item_id, item_tracker in item_tracker_dict.items():
-        for dependency_id in item_tracker.dependency_iter():
-            item_tracker_dict[dependency_id].add_backpointer(item_id)
-
-    return item_tracker_dict
+    return {item_id: item_cls.load(work_dir, template_name=item_name)
+            for index_list, item_cls in filter(item_list_exist, item_list_index)
+            for item_id, item_name in index_list}
 
 
 class TaskOptions:

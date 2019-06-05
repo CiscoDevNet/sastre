@@ -1,24 +1,18 @@
-from lib.catalog import ConfigItem, IndexConfigItem, RefInfo, ApiPath, register
+from lib.catalog import ConfigItem, IndexConfigItem, ApiPath, register
 
 
 #
 # Templates
 #
 class DeviceTemplate(ConfigItem):
-    api_path = ApiPath('template/device/object', 'template/device/feature', 'template/device', 'template/device')
+    api_path = ApiPath('template/device/object', 'template/device/feature', 'template/device')
     store_path = ('templates', 'device_template')
     store_file = '{template_name}.json'
     id_tag = 'templateId'
     name_tag = 'templateName'
 
-    dependency_info = (
-        RefInfo('generalTemplates', 'templateId'),
-        RefInfo('subTemplates', 'templateId'),
-        RefInfo('subTemplates', 'templateId')
-    )
 
-
-@register('template', 'device template', DeviceTemplate)
+@register('template_device', 'device template', DeviceTemplate)
 class DeviceTemplateIndex(IndexConfigItem):
     api_path = ApiPath('template/device', None, None, None)
     store_file = 'device_template_list.json'
@@ -50,14 +44,14 @@ class DeviceTemplateValues(ConfigItem):
 
 
 class FeatureTemplate(ConfigItem):
-    api_path = ApiPath('template/feature/object', 'template/feature', 'template/feature', 'template/feature')
+    api_path = ApiPath('template/feature/object', 'template/feature')
     store_path = ('templates', 'feature_template')
     store_file = '{template_name}.json'
     id_tag = 'templateId'
     name_tag = 'templateName'
 
 
-@register('template', 'feature template', FeatureTemplate)
+@register('template_feature', 'feature template', FeatureTemplate)
 class FeatureTemplateIndex(IndexConfigItem):
     api_path = ApiPath('template/feature', None, None, None)
     store_file = 'feature_template_list.json'
@@ -69,16 +63,10 @@ class FeatureTemplateIndex(IndexConfigItem):
 #
 
 class PolicyVsmart(ConfigItem):
-    api_path = ApiPath('template/policy/vsmart/definition', 'template/policy/vsmart', 'template/policy/vsmart', 'template/policy/vsmart')
+    api_path = ApiPath('template/policy/vsmart/definition', 'template/policy/vsmart')
     store_path = ('templates', 'vsmart_policy')
     store_file = '{template_name}.json'
     name_tag = 'policyName'
-
-    dependency_info = (
-        RefInfo('assembly', 'definitionId'),
-        RefInfo('entries', 'siteLists'),
-        RefInfo('subTemplates', 'templateId')
-    )
 
 
 @register('policy_apply', 'VSMART policy', PolicyVsmart)
@@ -89,7 +77,7 @@ class PolicyVsmartIndex(IndexConfigItem):
 
 
 class PolicyVedge(ConfigItem):
-    api_path = ApiPath('template/policy/vedge/definition', 'template/policy/vedge', 'template/policy/vedge', 'template/policy/vedge')
+    api_path = ApiPath('template/policy/vedge/definition', 'template/policy/vedge')
     store_path = ('templates', 'vedge_policy')
     store_file = '{template_name}.json'
     name_tag = 'policyName'
@@ -107,7 +95,7 @@ class PolicyVedgeIndex(IndexConfigItem):
 #
 
 class PolicyDefData(ConfigItem):
-    api_path = ApiPath(*('template/policy/definition/data',)*4)
+    api_path = ApiPath('template/policy/definition/data')
     store_path = ('templates', 'policy_definition_data')
     store_file = '{template_name}.json'
     id_tag = 'definitionId'
@@ -122,7 +110,7 @@ class PolicyDefDataIndex(IndexConfigItem):
 
 
 class PolicyDefMesh(ConfigItem):
-    api_path = ApiPath(*('template/policy/definition/mesh',)*4)
+    api_path = ApiPath('template/policy/definition/mesh')
     store_path = ('templates', 'policy_definition_mesh')
     store_file = '{template_name}.json'
     id_tag = 'definitionId'
@@ -137,7 +125,7 @@ class PolicyDefMeshIndex(IndexConfigItem):
 
 
 class PolicyDefRewriteRule(ConfigItem):
-    api_path = ApiPath(*('template/policy/definition/rewriterule',)*4)
+    api_path = ApiPath('template/policy/definition/rewriterule')
     store_path = ('templates', 'policy_definition_rewriterule')
     store_file = '{template_name}.json'
     id_tag = 'definitionId'
@@ -152,7 +140,7 @@ class PolicyDefRewriteRuleIndex(IndexConfigItem):
 
 
 class PolicyDefAclv6(ConfigItem):
-    api_path = ApiPath(*('template/policy/definition/aclv6',)*4)
+    api_path = ApiPath('template/policy/definition/aclv6')
     store_path = ('templates', 'policy_definition_aclv6')
     store_file = '{template_name}.json'
     id_tag = 'definitionId'
@@ -167,7 +155,7 @@ class PolicyDefAclv6Index(IndexConfigItem):
 
 
 class PolicyDefQosmap(ConfigItem):
-    api_path = ApiPath(*('template/policy/definition/qosmap',)*4)
+    api_path = ApiPath('template/policy/definition/qosmap')
     store_path = ('templates', 'policy_definition_qosmap')
     store_file = '{template_name}.json'
     id_tag = 'definitionId'
@@ -182,7 +170,7 @@ class PolicyDefQosmapIndex(IndexConfigItem):
 
 
 class PolicyDefUrlfiltering(ConfigItem):
-    api_path = ApiPath(*('template/policy/definition/urlfiltering',)*4)
+    api_path = ApiPath('template/policy/definition/urlfiltering')
     store_path = ('templates', 'policy_definition_urlfiltering')
     store_file = '{template_name}.json'
     id_tag = 'definitionId'
@@ -197,7 +185,7 @@ class PolicyDefUrlfilteringIndex(IndexConfigItem):
 
 
 class PolicyDefZonebasedfw(ConfigItem):
-    api_path = ApiPath(*('template/policy/definition/zonebasedfw',)*4)
+    api_path = ApiPath('template/policy/definition/zonebasedfw')
     store_path = ('templates', 'policy_definition_zonebasedfw')
     store_file = '{template_name}.json'
     id_tag = 'definitionId'
@@ -211,12 +199,27 @@ class PolicyDefZonebasedfwIndex(IndexConfigItem):
     iter_fields = ('definitionId', 'name')
 
 
+class PolicyDefApproute(ConfigItem):
+    api_path = ApiPath('template/policy/definition/approute')
+    store_path = ('templates', 'policy_definition_approute')
+    store_file = '{template_name}.json'
+    id_tag = 'definitionId'
+    name_tag = 'name'
+
+
+@register('policy_definition', 'AppRoute policy definition', PolicyDefApproute)
+class PolicyDefApprouteIndex(IndexConfigItem):
+    api_path = ApiPath('template/policy/definition/approute', None, None, None)
+    store_file = 'approute_policy_list.json'
+    iter_fields = ('definitionId', 'name')
+
+
 #
 # Policy lists
 #
 
 class PolicyListVpn(ConfigItem):
-    api_path = ApiPath(*('template/policy/list/vpn',)*4)
+    api_path = ApiPath('template/policy/list/vpn')
     store_path = ('templates', 'policy_list_vpn')
     store_file = '{template_name}.json'
     id_tag = 'listId'
@@ -231,7 +234,7 @@ class PolicyListVpnIndex(IndexConfigItem):
 
 
 class PolicyListUrlWhiteList(ConfigItem):
-    api_path = ApiPath(*('template/policy/list/urlwhitelist',)*4)
+    api_path = ApiPath('template/policy/list/urlwhitelist')
     store_path = ('templates', 'policy_list_urlwhitelist')
     store_file = '{template_name}.json'
     id_tag = 'listId'
@@ -246,7 +249,7 @@ class PolicyListUrlWhileListIndex(IndexConfigItem):
 
 
 class PolicyListUrlBlackList(ConfigItem):
-    api_path = ApiPath(*('template/policy/list/urlblacklist',)*4)
+    api_path = ApiPath('template/policy/list/urlblacklist')
     store_path = ('templates', 'policy_list_urlblacklist')
     store_file = '{template_name}.json'
     id_tag = 'listId'
@@ -261,7 +264,7 @@ class PolicyListUrlBlackListIndex(IndexConfigItem):
 
 
 class PolicyListPolicer(ConfigItem):
-    api_path = ApiPath(*('template/policy/list/policer',)*4)
+    api_path = ApiPath('template/policy/list/policer')
     store_path = ('templates', 'policy_list_policer')
     store_file = '{template_name}.json'
     id_tag = 'listId'
@@ -276,7 +279,7 @@ class PolicyListPolicerIndex(IndexConfigItem):
 
 
 class PolicyListDataPrefixAll(ConfigItem):
-    api_path = ApiPath(*('template/policy/list/dataprefixall',)*4)
+    api_path = ApiPath('template/policy/list/dataprefixall')
     store_path = ('templates', 'policy_list_dataprefixall')
     store_file = '{template_name}.json'
     id_tag = 'listId'
@@ -291,7 +294,7 @@ class PolicyListDataPrefixAllIndex(IndexConfigItem):
 
 
 class PolicyListIpsSignature(ConfigItem):
-    api_path = ApiPath(*('template/policy/list/ipssignature',)*4)
+    api_path = ApiPath('template/policy/list/ipssignature')
     store_path = ('templates', 'policy_list_ipssignature')
     store_file = '{template_name}.json'
     id_tag = 'listId'
@@ -306,7 +309,7 @@ class PolicyListIpsSignatureIndex(IndexConfigItem):
 
 
 class PolicyListClass(ConfigItem):
-    api_path = ApiPath(*('template/policy/list/class',)*4)
+    api_path = ApiPath('template/policy/list/class')
     store_path = ('templates', 'policy_list_class')
     store_file = '{template_name}.json'
     id_tag = 'listId'
@@ -321,7 +324,7 @@ class PolicyListClassIndex(IndexConfigItem):
 
 
 class PolicyListUmbrellaData(ConfigItem):
-    api_path = ApiPath(*('template/policy/list/umbrelladata',)*4)
+    api_path = ApiPath('template/policy/list/umbrelladata')
     store_path = ('templates', 'policy_list_umbrelladata')
     store_file = '{template_name}.json'
     id_tag = 'listId'
@@ -336,7 +339,7 @@ class PolicyListUmbrellaDataIndex(IndexConfigItem):
 
 
 class PolicyListPrefix(ConfigItem):
-    api_path = ApiPath(*('template/policy/list/prefix',)*4)
+    api_path = ApiPath('template/policy/list/prefix')
     store_path = ('templates', 'policy_list_prefix')
     store_file = '{template_name}.json'
     id_tag = 'listId'
@@ -351,7 +354,7 @@ class PolicyListPrefixIndex(IndexConfigItem):
 
 
 class PolicyListPrefixAll(ConfigItem):
-    api_path = ApiPath(*('template/policy/list/ipprefixall',)*4)
+    api_path = ApiPath('template/policy/list/ipprefixall')
     store_path = ('templates', 'policy_list_ipprefixall')
     store_file = '{template_name}.json'
     id_tag = 'listId'
@@ -365,5 +368,125 @@ class PolicyListPrefixAllIndex(IndexConfigItem):
     iter_fields = ('listId', 'name')
 
 
-# TODO: Policy AppRoute Definition Builder - approute  next
-# TODO: Remember to remove comments from catalog.ConfigItem.save()
+class PolicyListSite(ConfigItem):
+    api_path = ApiPath('template/policy/list/site')
+    store_path = ('templates', 'policy_list_site')
+    store_file = '{template_name}.json'
+    id_tag = 'listId'
+    name_tag = 'name'
+
+
+@register('policy_list', 'Site-list', PolicyListSite)
+class PolicyListSiteIndex(IndexConfigItem):
+    api_path = ApiPath('template/policy/list/site', None, None, None)
+    store_file = 'site_policy_list.json'
+    iter_fields = ('listId', 'name')
+
+
+class PolicyListExtcommunity(ConfigItem):
+    api_path = ApiPath('template/policy/list/extcommunity')
+    store_path = ('templates', 'policy_list_extcommunity')
+    store_file = '{template_name}.json'
+    id_tag = 'listId'
+    name_tag = 'name'
+
+
+@register('policy_list', 'Extended community list', PolicyListExtcommunity)
+class PolicyListExtcommunityIndex(IndexConfigItem):
+    api_path = ApiPath('template/policy/list/extcommunity', None, None, None)
+    store_file = 'extcommunity_policy_list.json'
+    iter_fields = ('listId', 'name')
+
+
+class PolicyListDataprefix(ConfigItem):
+    api_path = ApiPath('template/policy/list/dataprefix')
+    store_path = ('templates', 'policy_list_dataprefix')
+    store_file = '{template_name}.json'
+    id_tag = 'listId'
+    name_tag = 'name'
+
+
+@register('policy_list', 'Data prefix list', PolicyListDataprefix)
+class PolicyListDataprefixIndex(IndexConfigItem):
+    api_path = ApiPath('template/policy/list/dataprefix', None, None, None)
+    store_file = 'dataprefix_policy_list.json'
+    iter_fields = ('listId', 'name')
+
+
+class PolicyListMirror(ConfigItem):
+    api_path = ApiPath('template/policy/list/mirror')
+    store_path = ('templates', 'policy_list_mirror')
+    store_file = '{template_name}.json'
+    id_tag = 'listId'
+    name_tag = 'name'
+
+
+@register('policy_list', 'Mirror list', PolicyListMirror)
+class PolicyListMirrorIndex(IndexConfigItem):
+    api_path = ApiPath('template/policy/list/mirror', None, None, None)
+    store_file = 'mirror_policy_list.json'
+    iter_fields = ('listId', 'name')
+
+
+class PolicyListApplication(ConfigItem):
+    api_path = ApiPath('template/policy/list/app')
+    store_path = ('templates', 'policy_list_app')
+    store_file = '{template_name}.json'
+    id_tag = 'listId'
+    name_tag = 'name'
+
+
+@register('policy_list', 'Application list', PolicyListApplication)
+class PolicyListApplicationIndex(IndexConfigItem):
+    api_path = ApiPath('template/policy/list/app', None, None, None)
+    store_file = 'app_policy_list.json'
+    iter_fields = ('listId', 'name')
+
+
+class PolicyListLocalApplication(ConfigItem):
+    api_path = ApiPath('template/policy/list/localapp')
+    store_path = ('templates', 'policy_list_localapp')
+    store_file = '{template_name}.json'
+    id_tag = 'listId'
+    name_tag = 'name'
+
+
+@register('policy_list', 'Local application list', PolicyListLocalApplication)
+class PolicyListLocalApplicationIndex(IndexConfigItem):
+    api_path = ApiPath('template/policy/list/localapp', None, None, None)
+    store_file = 'localapp_policy_list.json'
+    iter_fields = ('listId', 'name')
+
+
+class PolicyListSla(ConfigItem):
+    api_path = ApiPath('template/policy/list/sla')
+    store_path = ('templates', 'policy_list_sla')
+    store_file = '{template_name}.json'
+    id_tag = 'listId'
+    name_tag = 'name'
+
+
+@register('policy_list', 'SLA class list', PolicyListSla)
+class PolicyListSlaIndex(IndexConfigItem):
+    api_path = ApiPath('template/policy/list/sla', None, None, None)
+    store_file = 'sla_policy_list.json'
+    iter_fields = ('listId', 'name')
+
+
+class PolicyListColor(ConfigItem):
+    api_path = ApiPath('template/policy/list/color')
+    store_path = ('templates', 'policy_list_color')
+    store_file = '{template_name}.json'
+    id_tag = 'listId'
+    name_tag = 'name'
+
+
+@register('policy_list', 'SLA class list', PolicyListColor)
+class PolicyListColorIndex(IndexConfigItem):
+    api_path = ApiPath('template/policy/list/color', None, None, None)
+    store_file = 'color_policy_list.json'
+    iter_fields = ('listId', 'name')
+
+
+# TODO: Policy Zone list Builder - zone  next
+

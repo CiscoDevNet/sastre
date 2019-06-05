@@ -56,7 +56,9 @@ class Rest:
         response = self.session.post(self._url(*path_entries), json=input_data,
                                      timeout=self.timeout, verify=self.verify)
         response.raise_for_status()
-        return response.json()
+
+        # Some POST calls return an empty string, return None in this case
+        return response.json() if response.text else None
 
     def put(self, input_data, resource, key_value):
         response = self.session.put(self._url(resource, key_value), json=input_data,
