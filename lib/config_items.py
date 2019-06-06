@@ -102,7 +102,7 @@ class PolicyDefData(ConfigItem):
     name_tag = 'name'
 
 
-@register('policy_definition', 'DATA policy definition', PolicyDefData)
+@register('policy_definition', 'data policy definition', PolicyDefData)
 class PolicyDefDataIndex(IndexConfigItem):
     api_path = ApiPath('template/policy/definition/data', None, None, None)
     store_file = 'data_policy_list.json'
@@ -117,7 +117,7 @@ class PolicyDefMesh(ConfigItem):
     name_tag = 'name'
 
 
-@register('policy_definition', 'MESH policy definition', PolicyDefMesh)
+@register('policy_definition', 'mesh policy definition', PolicyDefMesh)
 class PolicyDefMeshIndex(IndexConfigItem):
     api_path = ApiPath('template/policy/definition/mesh', None, None, None)
     store_file = 'mesh_policy_list.json'
@@ -132,7 +132,7 @@ class PolicyDefRewriteRule(ConfigItem):
     name_tag = 'name'
 
 
-@register('policy_definition', 'REWRITE RULE policy definition', PolicyDefRewriteRule)
+@register('policy_definition', 'rewrite-rule policy definition', PolicyDefRewriteRule)
 class PolicyDefRewriteRuleIndex(IndexConfigItem):
     api_path = ApiPath('template/policy/definition/rewriterule', None, None, None)
     store_file = 'rewrite_rule_policy_list.json'
@@ -162,7 +162,7 @@ class PolicyDefQosmap(ConfigItem):
     name_tag = 'name'
 
 
-@register('policy_definition', 'QOS Map policy definition', PolicyDefQosmap)
+@register('policy_definition', 'QOS-map policy definition', PolicyDefQosmap)
 class PolicyDefQosmapIndex(IndexConfigItem):
     api_path = ApiPath('template/policy/definition/qosmap', None, None, None)
     store_file = 'qosmap_policy_list.json'
@@ -177,7 +177,7 @@ class PolicyDefUrlfiltering(ConfigItem):
     name_tag = 'name'
 
 
-@register('policy_definition', 'URL filtering policy definition', PolicyDefUrlfiltering)
+@register('policy_definition', 'URL-filtering policy definition', PolicyDefUrlfiltering)
 class PolicyDefUrlfilteringIndex(IndexConfigItem):
     api_path = ApiPath('template/policy/definition/urlfiltering', None, None, None)
     store_file = 'urlfiltering_policy_list.json'
@@ -192,7 +192,7 @@ class PolicyDefZonebasedfw(ConfigItem):
     name_tag = 'name'
 
 
-@register('policy_definition', 'Zone-based firewall policy definition', PolicyDefZonebasedfw)
+@register('policy_definition', 'zone-based firewall policy definition', PolicyDefZonebasedfw)
 class PolicyDefZonebasedfwIndex(IndexConfigItem):
     api_path = ApiPath('template/policy/definition/zonebasedfw', None, None, None)
     store_file = 'zonebasedfw_policy_list.json'
@@ -207,7 +207,7 @@ class PolicyDefApproute(ConfigItem):
     name_tag = 'name'
 
 
-@register('policy_definition', 'AppRoute policy definition', PolicyDefApproute)
+@register('policy_definition', 'appRoute policy definition', PolicyDefApproute)
 class PolicyDefApprouteIndex(IndexConfigItem):
     api_path = ApiPath('template/policy/definition/approute', None, None, None)
     store_file = 'approute_policy_list.json'
@@ -226,7 +226,7 @@ class PolicyListVpn(ConfigItem):
     name_tag = 'name'
 
 
-@register('policy_list', 'VPN-list', PolicyListVpn)
+@register('policy_list', 'VPN list', PolicyListVpn)
 class PolicyListVpnIndex(IndexConfigItem):
     api_path = ApiPath('template/policy/list/vpn', None, None, None)
     store_file = 'vpn_list_policy_list.json'
@@ -241,7 +241,7 @@ class PolicyListUrlWhiteList(ConfigItem):
     name_tag = 'name'
 
 
-@register('policy_list', 'URL-Whitelist', PolicyListUrlWhiteList)
+@register('policy_list', 'URL-whitelist list', PolicyListUrlWhiteList)
 class PolicyListUrlWhileListIndex(IndexConfigItem):
     api_path = ApiPath('template/policy/list/urlwhitelist', None, None, None)
     store_file = 'urlwhitelist_policy_list.json'
@@ -256,7 +256,7 @@ class PolicyListUrlBlackList(ConfigItem):
     name_tag = 'name'
 
 
-@register('policy_list', 'URL-Blacklist', PolicyListUrlBlackList)
+@register('policy_list', 'URL-blacklist list', PolicyListUrlBlackList)
 class PolicyListUrlBlackListIndex(IndexConfigItem):
     api_path = ApiPath('template/policy/list/urlblacklist', None, None, None)
     store_file = 'urlblacklist_policy_list.json'
@@ -271,7 +271,7 @@ class PolicyListPolicer(ConfigItem):
     name_tag = 'name'
 
 
-@register('policy_list', 'Policer-list', PolicyListPolicer)
+@register('policy_list', 'policer list', PolicyListPolicer)
 class PolicyListPolicerIndex(IndexConfigItem):
     api_path = ApiPath('template/policy/list/policer', None, None, None)
     store_file = 'policer_policy_list.json'
@@ -286,7 +286,7 @@ class PolicyListDataPrefixAll(ConfigItem):
     name_tag = 'name'
 
 
-@register('policy_list', 'Data-prefix-all-list', PolicyListDataPrefixAll)
+@register('policy_list', 'data-prefix-all list', PolicyListDataPrefixAll)
 class PolicyListDataPrefixAllIndex(IndexConfigItem):
     api_path = ApiPath('template/policy/list/dataprefixall', None, None, None)
     store_file = 'dataprefixall_policy_list.json'
@@ -301,7 +301,7 @@ class PolicyListIpsSignature(ConfigItem):
     name_tag = 'name'
 
 
-@register('policy_list', 'IPS-Signature-list', PolicyListIpsSignature)
+@register('policy_list', 'IPS-signature list', PolicyListIpsSignature)
 class PolicyListIpsSignatureIndex(IndexConfigItem):
     api_path = ApiPath('template/policy/list/ipssignature', None, None, None)
     store_file = 'ipssignature_policy_list.json'
@@ -316,7 +316,7 @@ class PolicyListClass(ConfigItem):
     name_tag = 'name'
 
 
-@register('policy_list', 'Class-list', PolicyListClass)
+@register('policy_list', 'class list', PolicyListClass)
 class PolicyListClassIndex(IndexConfigItem):
     api_path = ApiPath('template/policy/list/class', None, None, None)
     store_file = 'class_policy_list.json'
@@ -331,7 +331,7 @@ class PolicyListUmbrellaData(ConfigItem):
     name_tag = 'name'
 
 
-@register('policy_list', 'Umbrella-data-list', PolicyListUmbrellaData)
+@register('policy_list', 'umbrella-data list', PolicyListUmbrellaData)
 class PolicyListUmbrellaDataIndex(IndexConfigItem):
     api_path = ApiPath('template/policy/list/umbrelladata', None, None, None)
     store_file = 'umbrelladata_policy_list.json'
@@ -346,25 +346,10 @@ class PolicyListPrefix(ConfigItem):
     name_tag = 'name'
 
 
-@register('policy_list', 'Prefix-list', PolicyListPrefix)
+@register('policy_list', 'prefix list', PolicyListPrefix)
 class PolicyListPrefixIndex(IndexConfigItem):
     api_path = ApiPath('template/policy/list/prefix', None, None, None)
     store_file = 'prefix_policy_list.json'
-    iter_fields = ('listId', 'name')
-
-
-class PolicyListPrefixAll(ConfigItem):
-    api_path = ApiPath('template/policy/list/ipprefixall')
-    store_path = ('templates', 'policy_list_ipprefixall')
-    store_file = '{template_name}.json'
-    id_tag = 'listId'
-    name_tag = 'name'
-
-
-@register('policy_list', 'IP prefix-list all', PolicyListPrefixAll)
-class PolicyListPrefixAllIndex(IndexConfigItem):
-    api_path = ApiPath('template/policy/list/ipprefixall', None, None, None)
-    store_file = 'ipprefixall_policy_list.json'
     iter_fields = ('listId', 'name')
 
 
@@ -376,7 +361,7 @@ class PolicyListSite(ConfigItem):
     name_tag = 'name'
 
 
-@register('policy_list', 'Site-list', PolicyListSite)
+@register('policy_list', 'site list', PolicyListSite)
 class PolicyListSiteIndex(IndexConfigItem):
     api_path = ApiPath('template/policy/list/site', None, None, None)
     store_file = 'site_policy_list.json'
@@ -391,7 +376,7 @@ class PolicyListExtcommunity(ConfigItem):
     name_tag = 'name'
 
 
-@register('policy_list', 'Extended community list', PolicyListExtcommunity)
+@register('policy_list', 'extended-community list', PolicyListExtcommunity)
 class PolicyListExtcommunityIndex(IndexConfigItem):
     api_path = ApiPath('template/policy/list/extcommunity', None, None, None)
     store_file = 'extcommunity_policy_list.json'
@@ -406,7 +391,7 @@ class PolicyListDataprefix(ConfigItem):
     name_tag = 'name'
 
 
-@register('policy_list', 'Data prefix list', PolicyListDataprefix)
+@register('policy_list', 'data-prefix list', PolicyListDataprefix)
 class PolicyListDataprefixIndex(IndexConfigItem):
     api_path = ApiPath('template/policy/list/dataprefix', None, None, None)
     store_file = 'dataprefix_policy_list.json'
@@ -421,7 +406,7 @@ class PolicyListMirror(ConfigItem):
     name_tag = 'name'
 
 
-@register('policy_list', 'Mirror list', PolicyListMirror)
+@register('policy_list', 'mirror list', PolicyListMirror)
 class PolicyListMirrorIndex(IndexConfigItem):
     api_path = ApiPath('template/policy/list/mirror', None, None, None)
     store_file = 'mirror_policy_list.json'
@@ -436,7 +421,7 @@ class PolicyListApplication(ConfigItem):
     name_tag = 'name'
 
 
-@register('policy_list', 'Application list', PolicyListApplication)
+@register('policy_list', 'application list', PolicyListApplication)
 class PolicyListApplicationIndex(IndexConfigItem):
     api_path = ApiPath('template/policy/list/app', None, None, None)
     store_file = 'app_policy_list.json'
@@ -451,7 +436,7 @@ class PolicyListLocalApplication(ConfigItem):
     name_tag = 'name'
 
 
-@register('policy_list', 'Local application list', PolicyListLocalApplication)
+@register('policy_list', 'local-application list', PolicyListLocalApplication)
 class PolicyListLocalApplicationIndex(IndexConfigItem):
     api_path = ApiPath('template/policy/list/localapp', None, None, None)
     store_file = 'localapp_policy_list.json'
@@ -466,7 +451,7 @@ class PolicyListSla(ConfigItem):
     name_tag = 'name'
 
 
-@register('policy_list', 'SLA class list', PolicyListSla)
+@register('policy_list', 'SLA-class list', PolicyListSla)
 class PolicyListSlaIndex(IndexConfigItem):
     api_path = ApiPath('template/policy/list/sla', None, None, None)
     store_file = 'sla_policy_list.json'
@@ -481,7 +466,7 @@ class PolicyListColor(ConfigItem):
     name_tag = 'name'
 
 
-@register('policy_list', 'SLA class list', PolicyListColor)
+@register('policy_list', 'color list', PolicyListColor)
 class PolicyListColorIndex(IndexConfigItem):
     api_path = ApiPath('template/policy/list/color', None, None, None)
     store_file = 'color_policy_list.json'

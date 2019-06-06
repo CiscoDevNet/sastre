@@ -9,7 +9,7 @@ from collections import namedtuple
 # Each entry in _catalog is a tuple (<tag>, <title>, <index_cls>, <handler_cls>)
 _catalog = list()
 
-CatalogEntry = namedtuple('CatalogEntry', ['tag', 'title', 'index_cls', 'handler_cls'])
+CatalogEntry = namedtuple('CatalogEntry', ['tag', 'title', 'index_cls', 'item_cls'])
 
 CATALOG_TAG_ALL = 'all'
 
@@ -37,26 +37,26 @@ def ordered_tags(tag):
             break
 
 
-def register(tag, title, handler_cls):
+def register(tag, title, item_cls):
     """
     Decorator used for registering config item index/handler classes with the catalog.
     The class being decorated needs to be a subclass of IndexConfigItem.
     :param tag: Tag string associated with this item. String 'all' is reserved and cannot be used.
     :param title: Item title used for logging purposes
-    :param handler_cls: The config item handler class, needs to be a subclass of ConfigItem
+    :param item_cls: The config item handler class, needs to be a subclass of ConfigItem
     :return: decorator
     """
     def decorator(index_cls):
         if not isinstance(index_cls, type) or not issubclass(index_cls, IndexConfigItem):
             raise CatalogException('Attempt to register an invalid config item index class: {}'.format(index_cls.__name__))
 
-        if not isinstance(handler_cls, type) or not issubclass(handler_cls, ConfigItem):
-            raise CatalogException('Attempt to register an invalid config item class with {}: {}'.format(index_cls.__name__, handler_cls.__name__))
+        if not isinstance(item_cls, type) or not issubclass(item_cls, ConfigItem):
+            raise CatalogException('Attempt to register an invalid config item class with {}: {}'.format(index_cls.__name__, item_cls.__name__))
 
         if not isinstance(tag, str) or tag.lower() == CATALOG_TAG_ALL:
             raise CatalogException('Invalid tag provided for class {}: {}'.format(index_cls.__name__, tag))
 
-        _catalog.append(CatalogEntry(tag, title, index_cls, handler_cls))
+        _catalog.append(CatalogEntry(tag, title, index_cls, item_cls))
 
         return index_cls
 
@@ -71,11 +71,11 @@ def catalog_size():
     return len(_catalog)
 
 
-def catalog_items(*tags):
+def catalog_entries(*tags):
     """
-    Return an iterator of catalog items matching the specified tag
-    :param tags:
-    :return:
+    Return an iterator of CatalogEntry matching the specified tag
+    :param tags: tags indicating catalog entries to return
+    :return: iterator of CatalogEntry
     """
     def match_tags(catalog_entry):
         return True if (CATALOG_TAG_ALL in tags) or (catalog_entry.tag in tags) else False
@@ -116,6 +116,8 @@ class ConfigItem:
 
     id_tag = None
     name_tag = None
+    factory_default_tag = 'factoryDefault'
+    readonly_tag = 'readOnly'
 
     root_dir = 'data'
 
@@ -173,6 +175,10 @@ class ConfigItem:
     @property
     def name(self):
         return self.data[self.name_tag] if self.name_tag is not None else None
+
+    @property
+    def is_readonly(self):
+        return self.data.get(self.factory_default_tag, False) or self.data.get(self.readonly_tag, False)
 
     def post_data(self, id_mapping_dict, new_name=None):
         """
