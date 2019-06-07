@@ -5,6 +5,7 @@ from functools import partial
 from itertools import zip_longest
 from collections import namedtuple
 
+# TODO: Escape filename on load/save when item_name is used
 
 # Each entry in _catalog is a tuple (<tag>, <title>, <index_cls>, <handler_cls>)
 _catalog = list()

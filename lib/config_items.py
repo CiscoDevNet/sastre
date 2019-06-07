@@ -194,6 +194,105 @@ class PolicyDefApprouteIndex(PolicyDefIndex):
     store_file = 'approute_policy_list.json'
 
 
+class PolicyDefVpnmembershipgroup(PolicyDef):
+    api_path = ApiPath('template/policy/definition/vpnmembershipgroup')
+    store_path = ('templates', 'policy_definition_vpnmembershipgroup')
+
+
+@register('policy_definition', 'VPN-membership-group policy definition', PolicyDefVpnmembershipgroup)
+class PolicyDefVpnmembershipgroupIndex(PolicyDefIndex):
+    api_path = ApiPath('template/policy/definition/vpnmembershipgroup', None, None, None)
+    store_file = 'vpnmembershipgroup_policy_list.json'
+
+
+class PolicyDefAcl(PolicyDef):
+    api_path = ApiPath('template/policy/definition/acl')
+    store_path = ('templates', 'policy_definition_acl')
+
+
+@register('policy_definition', 'ACL policy definition', PolicyDefAcl)
+class PolicyDefAclIndex(PolicyDefIndex):
+    api_path = ApiPath('template/policy/definition/acl', None, None, None)
+    store_file = 'acl_policy_list.json'
+
+
+class PolicyDefHubandspoke(PolicyDef):
+    api_path = ApiPath('template/policy/definition/hubandspoke')
+    store_path = ('templates', 'policy_definition_hubandspoke')
+
+
+@register('policy_definition', 'Hub-and-spoke policy definition', PolicyDefHubandspoke)
+class PolicyDefHubandspokeIndex(PolicyDefIndex):
+    api_path = ApiPath('template/policy/definition/hubandspoke', None, None, None)
+    store_file = 'hubandspoke_policy_list.json'
+
+
+class PolicyDefVedgeroute(PolicyDef):
+    api_path = ApiPath('template/policy/definition/vedgeroute')
+    store_path = ('templates', 'policy_definition_vedgeroute')
+
+
+@register('policy_definition', 'vedge-route policy definition', PolicyDefVedgeroute)
+class PolicyDefVedgerouteIndex(PolicyDefIndex):
+    api_path = ApiPath('template/policy/definition/vedgeroute', None, None, None)
+    store_file = 'vedgeroute_policy_list.json'
+
+
+class PolicyDefIntrusionprevention(PolicyDef):
+    api_path = ApiPath('template/policy/definition/intrusionprevention')
+    store_path = ('templates', 'policy_definition_intrusionprevention')
+
+
+@register('policy_definition', 'intrusion-prevention policy definition', PolicyDefIntrusionprevention)
+class PolicyDefIntrusionpreventionIndex(PolicyDefIndex):
+    api_path = ApiPath('template/policy/definition/intrusionprevention', None, None, None)
+    store_file = 'intrusionprevention_policy_list.json'
+
+
+class PolicyDefControl(PolicyDef):
+    api_path = ApiPath('template/policy/definition/control')
+    store_path = ('templates', 'policy_definition_control')
+
+
+@register('policy_definition', 'control policy definition', PolicyDefControl)
+class PolicyDefControlIndex(PolicyDefIndex):
+    api_path = ApiPath('template/policy/definition/control', None, None, None)
+    store_file = 'control_policy_list.json'
+
+
+class PolicyDefAdvancedMalwareProtection(PolicyDef):
+    api_path = ApiPath('template/policy/definition/advancedMalwareProtection')
+    store_path = ('templates', 'policy_definition_advancedmalwareprotection')
+
+
+@register('policy_definition', 'advanced-malware-protection definition', PolicyDefAdvancedMalwareProtection)
+class PolicyDefAdvancedMalwareProtectionIndex(PolicyDefIndex):
+    api_path = ApiPath('template/policy/definition/advancedMalwareProtection', None, None, None)
+    store_file = 'advancedmalwareprotection_policy_list.json'
+
+
+class PolicyDefDnssecurity(PolicyDef):
+    api_path = ApiPath('template/policy/definition/dnssecurity')
+    store_path = ('templates', 'policy_definition_dnssecurity')
+
+
+@register('policy_definition', 'dns-security definition', PolicyDefDnssecurity)
+class PolicyDefDnssecurityIndex(PolicyDefIndex):
+    api_path = ApiPath('template/policy/definition/dnssecurity', None, None, None)
+    store_file = 'dnssecurity_policy_list.json'
+
+
+class PolicyDefCflowd(PolicyDef):
+    api_path = ApiPath('template/policy/definition/cflowd')
+    store_path = ('templates', 'policy_definition_cflowd')
+
+
+@register('policy_definition', 'cflowd definition', PolicyDefCflowd)
+class PolicyDefCflowdIndex(PolicyDefIndex):
+    api_path = ApiPath('template/policy/definition/cflowd', None, None, None)
+    store_file = 'cflowd_policy_list.json'
+
+
 #
 # Policy lists
 #
@@ -397,5 +496,78 @@ class PolicyListColorIndex(PolicyListIndex):
     store_file = 'color_policy_list.json'
 
 
-# TODO: Policy Zone list Builder - zone  next
+class PolicyListZone(PolicyList):
+    api_path = ApiPath('template/policy/list/zone')
+    store_path = ('templates', 'policy_list_zone')
 
+
+@register('policy_list', 'zone list', PolicyListZone)
+class PolicyListZoneIndex(PolicyListIndex):
+    api_path = ApiPath('template/policy/list/zone', None, None, None)
+    store_file = 'zone_policy_list.json'
+
+
+class PolicyListAspath(PolicyList):
+    api_path = ApiPath('template/policy/list/aspath')
+    store_path = ('templates', 'policy_list_aspath')
+
+
+@register('policy_list', 'as-path list', PolicyListAspath)
+class PolicyListAspathIndex(PolicyListIndex):
+    api_path = ApiPath('template/policy/list/aspath', None, None, None)
+    store_file = 'aspath_policy_list.json'
+
+
+class PolicyListTloc(PolicyList):
+    api_path = ApiPath('template/policy/list/tloc')
+    store_path = ('templates', 'policy_list_tloc')
+
+
+@register('policy_list', 'TLOC list', PolicyListTloc)
+class PolicyListTlocIndex(PolicyListIndex):
+    api_path = ApiPath('template/policy/list/tloc', None, None, None)
+    store_file = 'tloc_policy_list.json'
+
+
+class PolicyListDataipv6prefix(PolicyList):
+    api_path = ApiPath('template/policy/list/dataipv6prefix')
+    store_path = ('templates', 'policy_list_dataipv6prefix')
+
+
+@register('policy_list', 'data-ipv6-prefix list', PolicyListDataipv6prefix)
+class PolicyListDataipv6prefixIndex(PolicyListIndex):
+    api_path = ApiPath('template/policy/list/dataipv6prefix', None, None, None)
+    store_file = 'dataipv6prefix_policy_list.json'
+
+
+class PolicyListIpv6prefix(PolicyList):
+    api_path = ApiPath('template/policy/list/ipv6prefix')
+    store_path = ('templates', 'policy_list_ipv6prefix')
+
+
+@register('policy_list', 'ipv6-prefix list', PolicyListIpv6prefix)
+class PolicyListIpv6prefixIndex(PolicyListIndex):
+    api_path = ApiPath('template/policy/list/ipv6prefix', None, None, None)
+    store_file = 'ipv6prefix_policy_list.json'
+
+
+class PolicyListLocaldomain(PolicyList):
+    api_path = ApiPath('template/policy/list/localdomain')
+    store_path = ('templates', 'policy_list_localdomain')
+
+
+@register('policy_list', 'local-domain list', PolicyListLocaldomain)
+class PolicyListLocaldomainIndex(PolicyListIndex):
+    api_path = ApiPath('template/policy/list/localdomain', None, None, None)
+    store_file = 'localdomain_policy_list.json'
+
+
+class PolicyListCommunity(PolicyList):
+    api_path = ApiPath('template/policy/list/community')
+    store_path = ('templates', 'policy_list_community')
+
+
+@register('policy_list', 'community list', PolicyListCommunity)
+class PolicyListCommunityIndex(PolicyListIndex):
+    api_path = ApiPath('template/policy/list/community', None, None, None)
+    store_file = 'community_policy_list.json'
