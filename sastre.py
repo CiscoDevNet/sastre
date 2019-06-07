@@ -73,19 +73,19 @@ def task_backup(api, work_dir, task_args):
                 if item_obj.is_readonly:
                     # Skip backing up factory default and readonly items
                     continue
-                if item_obj.save(work_dir, template_name=item_name):
+                if item_obj.save(work_dir, item_name=item_name, item_id=item_id):
                     logger.info('Backup {title} {name}'.format(title=title, name=item_name))
 
                 # Special case for DeviceTemplateAttached/DeviceTemplateValues
                 if isinstance(item_obj, DeviceTemplate):
                     t_attached = DeviceTemplateAttached(api.get(DeviceTemplateAttached.api_path.get, item_id)['data'])
-                    if t_attached.save(work_dir, template_name=item_name):
+                    if t_attached.save(work_dir, item_name=item_name, item_id=item_id):
                         logger.info('Backup {title} {name} attached devices'.format(title=title, name=item_name))
 
                     uuids = list(t_attached)
                     template_values = DeviceTemplateValues(api.post(DeviceTemplateValues.api_params(item_id, uuids),
                                                                     DeviceTemplateValues.api_path.post))
-                    if template_values.save(work_dir, template_name=item_name):
+                    if template_values.save(work_dir, item_name=item_name, item_id=item_id):
                         logger.info('Backup {title} {name} values'.format(title=title, name=item_name))
             except requests.exceptions.HTTPError as ex:
                 logger.error('Failed backup {title} {name}: {err}'.format(title=title, name=item_name, err=ex))
@@ -151,7 +151,7 @@ def iter_saved_items(work_dir, tag):
         return index_list_entry[0] is not None
 
     def saved_items_entry(index_list, catalog_entry):
-        items = ((item_id, catalog_entry.item_cls.load(work_dir, template_name=item_name))
+        items = ((item_id, catalog_entry.item_cls.load(work_dir, item_name=item_name, item_id=item_id))
                  for item_id, item_name in index_list)
         loaded_items = {item_id: item_obj
                         for item_id, item_obj in items if item_obj is not None}
