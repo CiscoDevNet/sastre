@@ -24,7 +24,7 @@ _tag_dependency_list = [
 ]
 
 
-def ordered_tags(tag):
+def sequenced_tags(tag):
     """
     Generator that yield the provided tag and any previous tags (i.e. dependent tags). If tag
     is not in _tag_dependency_list (i.e. tag='all'), it yields all items of the list
@@ -119,6 +119,7 @@ class ConfigItem:
     name_tag = None
     factory_default_tag = 'factoryDefault'
     readonly_tag = 'readOnly'
+    post_filtered_tags = None
 
     root_dir = 'data'
 
@@ -194,10 +195,12 @@ class ConfigItem:
             matched_id = match.group(0)
             return id_mapping_dict.get(matched_id, matched_id)
 
-        # Remove item id
+        # Delete keys that shouldn't be on post requests
         filtered_keys = {
             self.id_tag,
         }
+        if self.post_filtered_tags is not None:
+            filtered_keys.update(self.post_filtered_tags)
         post_dict = {k: v for k, v in self.data.items() if k not in filtered_keys}
 
         # Rename item
@@ -218,6 +221,7 @@ class ConfigItem:
 
 
 class IndexConfigItem(ConfigItem):
+    # Iter fields is (<id_tag>, <name_tag>) in this order
     iter_fields = None
 
     store_path = ('index', )

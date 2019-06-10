@@ -4,12 +4,28 @@ from lib.catalog import ConfigItem, IndexConfigItem, ApiPath, register
 #
 # Templates
 #
+class ConditionalApiPath:
+    def __init__(self, api_path_feature, api_path_cli):
+        self.api_path_feature = api_path_feature
+        self.api_path_cli = api_path_cli
+
+    def __get__(self, instance, owner):
+        # If called from class, assume its a feature template
+        is_cli_template = instance is not None and instance.data.get('configType', 'template') == 'file'
+
+        return self.api_path_cli if is_cli_template else self.api_path_feature
+
+
 class DeviceTemplate(ConfigItem):
-    api_path = ApiPath('template/device/object', 'template/device/feature', 'template/device')
+    api_path = ConditionalApiPath(
+        ApiPath('template/device/object', 'template/device/feature', 'template/device'),
+        ApiPath(None, 'template/device/cli', None)
+    )
     store_path = ('templates', 'device_template')
     store_file = '{item_id}.json'
     id_tag = 'templateId'
     name_tag = 'templateName'
+    post_filtered_tags = ('feature', )
 
 
 @register('template_device', 'device template', DeviceTemplate)
@@ -265,7 +281,7 @@ class PolicyDefAdvancedMalwareProtection(PolicyDef):
     store_path = ('templates', 'policy_definition_advancedmalwareprotection')
 
 
-@register('policy_definition', 'advanced-malware-protection definition', PolicyDefAdvancedMalwareProtection)
+@register('policy_definition', 'advanced-malware-protection policy definition', PolicyDefAdvancedMalwareProtection)
 class PolicyDefAdvancedMalwareProtectionIndex(PolicyDefIndex):
     api_path = ApiPath('template/policy/definition/advancedMalwareProtection', None, None, None)
     store_file = 'advancedmalwareprotection_policy_list.json'
@@ -276,7 +292,7 @@ class PolicyDefDnssecurity(PolicyDef):
     store_path = ('templates', 'policy_definition_dnssecurity')
 
 
-@register('policy_definition', 'dns-security definition', PolicyDefDnssecurity)
+@register('policy_definition', 'dns-security policy definition', PolicyDefDnssecurity)
 class PolicyDefDnssecurityIndex(PolicyDefIndex):
     api_path = ApiPath('template/policy/definition/dnssecurity', None, None, None)
     store_file = 'dnssecurity_policy_list.json'
@@ -287,7 +303,7 @@ class PolicyDefCflowd(PolicyDef):
     store_path = ('templates', 'policy_definition_cflowd')
 
 
-@register('policy_definition', 'cflowd definition', PolicyDefCflowd)
+@register('policy_definition', 'cflowd policy definition', PolicyDefCflowd)
 class PolicyDefCflowdIndex(PolicyDefIndex):
     api_path = ApiPath('template/policy/definition/cflowd', None, None, None)
     store_file = 'cflowd_policy_list.json'
@@ -353,15 +369,16 @@ class PolicyListPolicerIndex(PolicyListIndex):
     store_file = 'policer_policy_list.json'
 
 
-class PolicyListDataPrefixAll(PolicyList):
-    api_path = ApiPath('template/policy/list/dataprefixall')
-    store_path = ('templates', 'policy_list_dataprefixall')
-
-
-@register('policy_list', 'data-prefix-all list', PolicyListDataPrefixAll)
-class PolicyListDataPrefixAllIndex(PolicyListIndex):
-    api_path = ApiPath('template/policy/list/dataprefixall', None, None, None)
-    store_file = 'dataprefixall_policy_list.json'
+# Not supported well before 19.1
+#class PolicyListDataPrefixAll(PolicyList):
+#    api_path = ApiPath('template/policy/list/dataprefixall')
+#    store_path = ('templates', 'policy_list_dataprefixall')
+#
+#
+#@register('policy_list', 'data-prefix-all list', PolicyListDataPrefixAll)
+#class PolicyListDataPrefixAllIndex(PolicyListIndex):
+#    api_path = ApiPath('template/policy/list/dataprefixall', None, None, None)
+#    store_file = 'dataprefixall_policy_list.json'
 
 
 class PolicyListIpsSignature(PolicyList):
