@@ -13,12 +13,11 @@ import requests.exceptions
 from lib.config_items import *
 from lib.rest_api import Rest, LoginFailedException
 from lib.catalog import catalog_size, catalog_tags, catalog_entries, CATALOG_TAG_ALL, sequenced_tags
-import json
 
 
 __author__     = "Marcelo Reis"
 __copyright__  = "Copyright (c) 2019 by Cisco Systems, Inc. All rights reserved."
-__version__    = "0.1"
+__version__    = "0.3"
 __maintainer__ = "Marcelo Reis"
 __email__      = "mareis@cisco.com"
 __status__     = "Development"
@@ -29,7 +28,6 @@ class Config:
     REST_DEFAULT_TIMEOUT = 300
 
 
-# TODO: Add support for CLI templates
 # TODO: Batch add users
 def main(cli_args):
     logger = logging.getLogger('main')
@@ -53,9 +51,9 @@ def task_backup(api, work_dir, task_args):
     task_parser = argparse.ArgumentParser(prog='sastre.py backup', description='{header}\nBackup task:'.format(header=__doc__),
                                           formatter_class=argparse.RawDescriptionHelpFormatter)
     task_parser.add_argument('tags', metavar='<tag>', nargs='+', type=TagOptions.tag,
-                             help='''One or more tags matching items to be backed up. 
+                             help='''One or more tags for selecting items to be backed up. 
                                      Multiple tags should be separated by space.
-                                     Available tags: {tag_options}. Special tag '{all}' denotes backup of all items.
+                                     Available tags: {tag_options}. Special tag '{all}' selects all items.
                                   '''.format(tag_options=TagOptions.options(), all=CATALOG_TAG_ALL))
     backup_args = task_parser.parse_args(task_args)
 
@@ -96,24 +94,27 @@ def task_backup(api, work_dir, task_args):
 
 # TODO: Restore device attachments and values
 # TODO: Option to restore only templates with some reference
-# TODO: Look at last-updated to decide whether to push a new template or not
+# TODO: Look at last-updated to decide whether to push a new item or not. Keep skip by default but include option to ovewrite
 def task_restore(api, default_work_dir, task_args):
     logger = logging.getLogger('task_restore')
 
     # Parse task_args
     task_parser = argparse.ArgumentParser(prog='sastre.py restore', description='{header}\nRestore task:'.format(header=__doc__),
                                           formatter_class=argparse.RawDescriptionHelpFormatter)
+    task_parser.add_argument('--dryrun', action='store_true',
+                             help='Restore dry-run mode. Items to be restored are only listed, not pushed to vManage.')
     task_parser.add_argument('--workdir', metavar='<workdir>', nargs='?', default=default_work_dir, const=default_work_dir,
                              help='''Directory used to source items to be restored (default will be "{default_dir}").
                                   '''.format(default_dir=default_work_dir))
     task_parser.add_argument('tag', metavar='<tag>', type=TagOptions.tag,
-                             help='''Tag matching items to be restored. 
+                             help='''Tag for selecting items to be restored. 
                                      Items that are dependencies of the specified tag are automatically included.
-                                     Available tags: {tag_options}. Special tag '{all}' denotes restore all items.
+                                     Available tags: {tag_options}. Special tag '{all}' selects all items.
                                   '''.format(tag_options=TagOptions.options(), all=CATALOG_TAG_ALL))
     restore_args = task_parser.parse_args(task_args)
 
-    logger.info('Starting restore task: Work_dir: "%s" > vManage URL: "%s"', restore_args.workdir, api.base_url)
+    logger.info('Starting restore task%s: Work_dir: "%s" > vManage URL: "%s"',
+                ', DRY-RUN mode' if restore_args.dryrun else '', restore_args.workdir, api.base_url)
 
     logger.info('Loading existing items from target vManage')
     # existing_items is {<hash of index_cls>: {<item_name>: <item_id>}}
@@ -126,10 +127,11 @@ def task_restore(api, default_work_dir, task_args):
             continue
         existing_items[hash(index_cls)] = {item_name: item_id for item_id, item_name in item_index}
 
-    logger.info('Preparing items to be pushed')
-    # id_mapping is {<old_id>: <new_id>}
+    # id_mapping is {<old_id>: <new_id>}, used to replace old item ids with new ids
     id_mapping = {}
-    # restore_list is [(<title>, <item_id>, <item_obj>, <index_cls>), ...]
+
+    logger.info('Identifying items to be pushed')
+    # restore_list is [ (<title>, <index_cls>, [(<item_id>, <item_obj>), ...]), ...]
     restore_list = []
     for tag in sequenced_tags(restore_args.tag):
         logger.info('Inspecting %s items', tag)
@@ -140,6 +142,7 @@ def task_restore(api, default_work_dir, task_args):
                 logger.warning('Skipping %s, item not supported by target vManage', title)
                 continue
 
+            restore_item_list = []
             for item_id, item_obj in item_dict.items():
                 target_item_id = target_items.get(item_obj.name)
                 if target_item_id is not None:
@@ -152,23 +155,32 @@ def task_restore(api, default_work_dir, task_args):
                     logger.warning('Skipping %s %s, factory default item should not be restored', title, item_obj.name)
                     continue
 
-                restore_list.append((title, item_id, item_obj, index_cls))
+                restore_item_list.append((item_id, item_obj))
+
+            if len(restore_item_list) > 0:
+                restore_list.append((title, index_cls, restore_item_list))
 
     logger.info('Pushing items to vManage')
-    for title, item_id, item_obj, index_cls in restore_list:
-        try:
-            reply_data = api.post(item_obj.post_data(id_mapping), item_obj.api_path.post)
-            if reply_data is not None:
-                id_mapping[item_id] = reply_data[item_obj.id_tag]
-            else:
-                # Reply didn't provide an item_id, need to query vManage in order to find out the new id
-                target_index = {target_name: target_id
-                                for target_id, target_name in index_cls(api.get(index_cls.api_path.get)['data'])}
-                id_mapping[item_id] = target_index[item_obj.name]
+    for title, index_cls, item_list in restore_list:
+        pushed_item_dict = {}
+        for item_id, item_obj in item_list:
+            if restore_args.dryrun:
+                logger.info('DRY-RUN: %s %s', title, item_obj.name)
+                continue
 
-            logger.info('Done %s %s', title, item_obj.name)
-        except requests.exceptions.HTTPError as ex:
-            logger.error('Failed restoring %s %s: %s', title, item_obj.name, ex)
+            try:
+                # Not using item id returned from post because some items' post return empty (e.g. local policies)
+                api.post(item_obj.post_data(id_mapping), item_obj.api_path.post)
+                pushed_item_dict[item_obj.name] = item_id
+                logger.info('Done %s %s', title, item_obj.name)
+            except requests.exceptions.HTTPError as ex:
+                logger.error('Failed restoring %s %s: %s', title, item_obj.name, ex)
+
+        # Update id_mapping with new ids
+        target_index = {target_name: target_id
+                        for target_id, target_name in index_cls(api.get(index_cls.api_path.get)['data'])}
+        for item_name, old_item_id in pushed_item_dict.items():
+            id_mapping[old_item_id] = target_index[item_name]
 
     logger.info('Restore task complete')
 
@@ -206,12 +218,13 @@ def task_delete(api, work_dir, task_args):
     task_parser.add_argument('--dryrun', action='store_true',
                              help='Delete dry-run mode. Items matched for removal are only listed, not deleted.')
     task_parser.add_argument('tag', metavar='<tag>', type=TagOptions.tag,
-                             help='''Tag selecting items to be deleted. 
-                                     Available tags: {tag_options}. Special tag '{all}' denotes selecting all items.
+                             help='''Tag for selecting items to be deleted. 
+                                     Available tags: {tag_options}. Special tag '{all}' selects all items.
                                   '''.format(tag_options=TagOptions.options(), all=CATALOG_TAG_ALL))
     delete_args = task_parser.parse_args(task_args)
 
-    logger.info('Starting delete task: vManage URL: "%s"', api.base_url)
+    logger.info('Starting delete task%s: vManage URL: "%s"',
+                ', DRY-RUN mode' if delete_args.dryrun else '', api.base_url)
 
     tag_list = list(sequenced_tags(delete_args.tag)) if delete_args.tag == CATALOG_TAG_ALL else [delete_args.tag, ]
     for tag in reversed(tag_list):
