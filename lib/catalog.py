@@ -7,8 +7,7 @@ from collections import namedtuple
 
 # TODO: Escape filename on load/save when item_name is used
 
-# Each entry in _catalog is a tuple (<tag>, <title>, <index_cls>, <handler_cls>)
-_catalog = list()
+_catalog = list()   # [(<tag>, <title>, <index_cls>, <handler_cls>), ...]
 
 CatalogEntry = namedtuple('CatalogEntry', ['tag', 'title', 'index_cls', 'item_cls'])
 
@@ -49,14 +48,17 @@ def register(tag, title, item_cls):
     """
     def decorator(index_cls):
         if not isinstance(index_cls, type) or not issubclass(index_cls, IndexConfigItem):
-            raise CatalogException('Attempt to register an invalid config item index class: {}'.format(index_cls.__name__))
-
+            raise CatalogException(
+                'Invalid config item index class register attempt: {}'.format(index_cls.__name__)
+            )
         if not isinstance(item_cls, type) or not issubclass(item_cls, ConfigItem):
-            raise CatalogException('Attempt to register an invalid config item class with {}: {}'.format(index_cls.__name__, item_cls.__name__))
-
+            raise CatalogException(
+                'invalid config item class register attempt {}: {}'.format(index_cls.__name__, item_cls.__name__)
+            )
         if not isinstance(tag, str) or tag.lower() == CATALOG_TAG_ALL:
-            raise CatalogException('Invalid tag provided for class {}: {}'.format(index_cls.__name__, tag))
-
+            raise CatalogException(
+                'Invalid tag provided for class {}: {}'.format(index_cls.__name__, tag)
+            )
         _catalog.append(CatalogEntry(tag, title, index_cls, item_cls))
 
         return index_cls
@@ -93,8 +95,9 @@ def catalog_tags():
 
 
 class ApiPath:
-    """ Groups the API path for different operations available in an API item (i.e. get, post, put, delete).
-        Each field contains a str with the API path, or None if the particular operations is not supported on this item.
+    """
+    Groups the API path for different operations available in an API item (i.e. get, post, put, delete).
+    Each field contains a str with the API path, or None if the particular operations is not supported on this item.
     """
     __slots__ = ('get', 'post', 'put', 'delete')
 
@@ -110,24 +113,72 @@ class ApiPath:
             setattr(self, field, value)
 
 
-class ConfigItem:
-    api_path = None
-    store_path = None
-    store_file = None
+class ConditionalApiPath:
+    def __init__(self, api_path_feature, api_path_cli):
+        self.api_path_feature = api_path_feature
+        self.api_path_cli = api_path_cli
 
+    def __get__(self, instance, owner):
+        # If called from class, assume its a feature template
+        is_cli_template = instance is not None and instance.data.get('configType', 'template') == 'file'
+
+        return self.api_path_cli if is_cli_template else self.api_path_feature
+
+
+class ApiItem:
+    """
+    ApiItem represents a vManage API element defined by an ApiPath with GET, POST, PUT and DELETE paths. An instance
+    of this class can be created to store the contents of that vManage API element (self.data field).
+    """
+    api_path = None     # An ApiPath instance
     id_tag = None
     name_tag = None
+
+    def __init__(self, data):
+        """
+        :param data: dict containing the information to be associated with this api item
+        """
+        self.data = data
+
+    @property
+    def uuid(self):
+        return self.data[self.id_tag] if self.id_tag is not None else None
+
+    @property
+    def name(self):
+        return self.data[self.name_tag] if self.name_tag is not None else None
+
+    @property
+    def is_empty(self):
+        return self.data is None or len(self.data) == 0
+
+    def __str__(self):
+        return json.dumps(self.data, indent=2)
+
+    def __repr__(self):
+        return json.dumps(self.data)
+
+
+class ConfigItem(ApiItem):
+    """
+    ConfigItem is an ApiItem that can be backed up and restored
+    """
+    store_path = None
+    store_file = None
+    root_dir = 'data'
     factory_default_tag = 'factoryDefault'
     readonly_tag = 'readOnly'
     post_filtered_tags = None
-
-    root_dir = 'data'
 
     def __init__(self, data):
         """
         :param data: dict containing the information to be associated with this configuration item
         """
-        self.data = data
+        super().__init__(data)
+
+    @property
+    def is_readonly(self):
+        return self.data.get(self.factory_default_tag, False) or self.data.get(self.readonly_tag, False)
 
     @classmethod
     def load(cls, node_dir, **kwargs):
@@ -157,7 +208,7 @@ class ConfigItem:
         :param kwargs: kwargs passed to str.format for variable substitution on the filename.
         :return: True indicates data has been saved. False indicates no data to save (and no file has been created).
         """
-        if self.data is None or len(self.data) == 0:
+        if self.is_empty:
             return False
 
         dir_path = os.path.join(self.root_dir, node_dir, *self.store_path)
@@ -170,31 +221,15 @@ class ConfigItem:
 
         return True
 
-    @property
-    def uuid(self):
-        return self.data[self.id_tag] if self.id_tag is not None else None
-
-    @property
-    def name(self):
-        return self.data[self.name_tag] if self.name_tag is not None else None
-
-    @property
-    def is_readonly(self):
-        return self.data.get(self.factory_default_tag, False) or self.data.get(self.readonly_tag, False)
-
     def post_data(self, id_mapping_dict, new_name=None):
         """
-        Build payload to be used for POST requests against this config item. From self.data, perform replacements
-        defined in replacemnts_dict, remove item id and rename item with new_name (if provided).
+        Build payload to be used for POST requests against this config item. From self.data, perform item id
+        replacements defined in id_mapping_dict, also remove item id and rename item with new_name (if provided).
         :param id_mapping_dict: {<old item id>: <new item id>} dict. Matches of <old item id> are replaced with
         <new item id>
         :param new_name: String containing new name
-        :return: dict containing payload for POST requests
+        :return: Dict containing payload for POST requests
         """
-        def replace_id(match):
-            matched_id = match.group(0)
-            return id_mapping_dict.get(matched_id, matched_id)
-
         # Delete keys that shouldn't be on post requests
         filtered_keys = {
             self.id_tag,
@@ -207,34 +242,54 @@ class ConfigItem:
         if new_name is not None:
             post_dict[self.name_tag] = new_name
 
-        # Perform id replacements
-        post_dict_json = re.sub(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}',
-                                replace_id, json.dumps(post_dict))
+        return self._update_ids(id_mapping_dict, post_dict)
 
-        return json.loads(post_dict_json)
+    def put_data(self, id_mapping_dict):
+        """
+        Build payload to be used for PUT requests against this config item. From self.data, perform item id
+        replacements defined in id_mapping_dict.
+        :param id_mapping_dict: {<old item id>: <new item id>} dict. Matches of <old item id> are replaced with
+        <new item id>
+        :return: Dict containing payload for PUT requests
+        """
+        return self._update_ids(id_mapping_dict, self.data)
 
-    def __str__(self):
-        return json.dumps(self.data, indent=2)
+    @staticmethod
+    def _update_ids(id_mapping_dict, data_dict):
+        def replace_id(match):
+            matched_id = match.group(0)
+            return id_mapping_dict.get(matched_id, matched_id)
 
-    def __repr__(self):
-        return json.dumps(self.data)
+        dict_json = re.sub(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}',
+                           replace_id, json.dumps(data_dict))
+
+        return json.loads(dict_json)
 
 
 class IndexConfigItem(ConfigItem):
-    # Iter fields is (<id_tag>, <name_tag>) in this order
+    """
+    IndexConfigItem is an index-type ConfigItem that can be iterated over, returning iter_fields
+    """
+    def __init__(self, data):
+        """
+        :param data: dict containing the information to be associated with this configuration item.
+        """
+        super().__init__(data.get('data') if isinstance(data, dict) else data)
+
+    # Iter_fields should be defined in subclasses and generally follow the format: (<id_tag>, <name_tag>, <ts_tag>)
     iter_fields = None
 
     store_path = ('index', )
 
     def __iter__(self):
-        return map(partial(fields, self.iter_fields), self.data)
+        return self.iter(*self.iter_fields)
+
+    def iter(self, *iter_fields):
+        return map(partial(fields, iter_fields), self.data)
 
 
-def fields(field_keys, item):
-    if isinstance(field_keys, str):
-        return item[field_keys]
-
-    return tuple(item[field] for field in field_keys)
+def fields(keys, item):
+    return tuple(item[key] for key in keys) if len(keys) > 1 else item[keys[0]]
 
 
 class CatalogException(Exception):

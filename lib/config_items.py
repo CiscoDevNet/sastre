@@ -1,25 +1,54 @@
-from lib.catalog import ConfigItem, IndexConfigItem, ApiPath, register
+from lib.catalog import ApiItem, ConfigItem, IndexConfigItem, ApiPath, ConditionalApiPath, register
+
+
+#
+# Non-config items
+#
+class DeviceModeCli(ApiItem):
+    api_path = ApiPath(None, 'template/config/device/mode/cli', None, None)
+    id_tag = 'id'
+
+    @staticmethod
+    def api_params(device_type, *device_ids):
+        return {
+            "deviceType": device_type,
+            "devices": [{"deviceId": device_id} for device_id in device_ids]
+        }
+
+
+class VedgeDeviceModeVmanageIndex(ApiItem):
+    api_path = ApiPath('template/config/device/mode/cli?type=vedge', None, None, None)
+    id_tag = 'uuid'
+
+
+class ActionStatus(ApiItem):
+    api_path = ApiPath('device/action/status', None, None, None)
+
+    @property
+    def status(self):
+        return self.data.get('summary', {}).get('status', None)
+
+    @property
+    def is_completed(self):
+        return self.status == 'done'
+
+    @property
+    def is_successful(self):
+        def task_success(task_entry):
+            return task_entry['status'] == 'Success'
+
+        data_list = self.data.get('data', [])
+        # When action validation fails, returned data is empty
+        return all(map(task_success, data_list)) if len(data_list) > 0 else False
 
 
 #
 # Templates
 #
-class ConditionalApiPath:
-    def __init__(self, api_path_feature, api_path_cli):
-        self.api_path_feature = api_path_feature
-        self.api_path_cli = api_path_cli
-
-    def __get__(self, instance, owner):
-        # If called from class, assume its a feature template
-        is_cli_template = instance is not None and instance.data.get('configType', 'template') == 'file'
-
-        return self.api_path_cli if is_cli_template else self.api_path_feature
-
-
 class DeviceTemplate(ConfigItem):
     api_path = ConditionalApiPath(
         ApiPath('template/device/object', 'template/device/feature', 'template/device'),
-        ApiPath(None, 'template/device/cli', None)
+        ApiPath('template/device/object', 'template/device/cli', 'template/device')
     )
     store_path = ('templates', 'device_template')
     store_file = '{item_id}.json'
@@ -40,7 +69,7 @@ class DeviceTemplateAttached(IndexConfigItem):
     api_path = ApiPath('template/device/config/attached', 'template/device/config/attachfeature', None, None)
     store_path = ('templates', 'device_template_attached')
     store_file = '{item_id}.json'
-    iter_fields = 'uuid'
+    iter_fields = ('uuid', )
 
 
 # This is a special case handled under DeviceTemplate
@@ -370,13 +399,13 @@ class PolicyListPolicerIndex(PolicyListIndex):
 
 
 # Not supported well before 19.1
-#class PolicyListDataPrefixAll(PolicyList):
+# class PolicyListDataPrefixAll(PolicyList):
 #    api_path = ApiPath('template/policy/list/dataprefixall')
 #    store_path = ('templates', 'policy_list_dataprefixall')
 #
 #
-#@register('policy_list', 'data-prefix-all list', PolicyListDataPrefixAll)
-#class PolicyListDataPrefixAllIndex(PolicyListIndex):
+# @register('policy_list', 'data-prefix-all list', PolicyListDataPrefixAll)
+# class PolicyListDataPrefixAllIndex(PolicyListIndex):
 #    api_path = ApiPath('template/policy/list/dataprefixall', None, None, None)
 #    store_file = 'dataprefixall_policy_list.json'
 

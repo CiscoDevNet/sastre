@@ -63,6 +63,8 @@ class Rest:
     def put(self, input_data, resource, key_value):
         response = self.session.put(self._url(resource, key_value), json=input_data,
                                     timeout=self.timeout, verify=self.verify)
+        response.raise_for_status()
+
         return response.status_code == requests.codes.ok
 
     def delete(self, resource, key_value):
