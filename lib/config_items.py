@@ -16,9 +16,9 @@ class DeviceModeCli(ApiItem):
         }
 
 
-class VedgeDeviceModeVmanageIndex(ApiItem):
-    api_path = ApiPath('template/config/device/mode/cli?type=vedge', None, None, None)
-    id_tag = 'uuid'
+class PolicyVsmartDeactivate(ApiItem):
+    api_path = ApiPath(None, 'template/policy/vsmart/deactivate', None, None)
+    id_tag = 'id'
 
 
 class ActionStatus(ApiItem):
@@ -63,13 +63,27 @@ class DeviceTemplateIndex(IndexConfigItem):
     store_file = 'device_template_list.json'
     iter_fields = ('templateId', 'templateName')
 
+    @staticmethod
+    def is_vsmart(device_type):
+        return device_type == 'vsmart'
+
+    @staticmethod
+    def is_not_vsmart(device_type):
+        return device_type != 'vsmart'
+
+    def filtered_iter(self, filter_fn):
+        return (
+            (item_id, item_name)
+            for item_type, item_id, item_name in self.iter('deviceType', *self.iter_fields) if filter_fn(item_type)
+        )
+
 
 # This is a special case handled under DeviceTemplate
 class DeviceTemplateAttached(IndexConfigItem):
     api_path = ApiPath('template/device/config/attached', 'template/device/config/attachfeature', None, None)
     store_path = ('templates', 'device_template_attached')
     store_file = '{item_id}.json'
-    iter_fields = ('uuid', )
+    iter_fields = ('uuid', 'personality')
 
 
 # This is a special case handled under DeviceTemplate
@@ -119,6 +133,12 @@ class PolicyVsmartIndex(IndexConfigItem):
     api_path = ApiPath('template/policy/vsmart', None, None, None)
     store_file = 'vsmart_policy_list.json'
     iter_fields = ('policyId', 'policyName')
+
+    def active_policy_iter(self):
+        return (
+            (item_id, item_name)
+            for is_active, item_id, item_name in self.iter('isPolicyActivated', *self.iter_fields) if is_active
+        )
 
 
 class PolicyVedge(ConfigItem):

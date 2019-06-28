@@ -26,8 +26,8 @@ __status__     = "Development"
 class Config:
     VMANAGE_DEFAULT_PORT = '8443'
     REST_DEFAULT_TIMEOUT = 300
-    ACTION_INTERVAL = 5
-    ACTION_TIMEOUT = 300
+    ACTION_INTERVAL = 10
+    ACTION_TIMEOUT = 600
 
 
 # TODO: Batch add users
@@ -85,7 +85,7 @@ def task_backup(api, work_dir, task_args):
                         logger.info('Skipped %s %s attached devices, none found', title, item_name)
                         continue
 
-                    uuids = list(devices_attached)
+                    uuids = [uuid for uuid, personality in devices_attached]
                     template_values = DeviceTemplateValues(
                         api.post(DeviceTemplateValues.api_params(item_id, uuids), DeviceTemplateValues.api_path.post)
                     )
@@ -97,9 +97,9 @@ def task_backup(api, work_dir, task_args):
     logger.info('Backup task complete')
 
 
-# TODO: Restore device attachments and values
+# TODO: Restore device attachments, values and vsmart activated policy
 # TODO: Option to restore only templates with some reference
-# TODO: Look at last-updated to decide whether to push a new item or not. Keep skip by default but include option to ovewrite
+# TODO: Look at diff to decide whether to push a new item or not. Keep skip by default but include option to ovewrite
 def task_restore(api, default_work_dir, task_args):
     logger = logging.getLogger('task_restore')
     # Parse task_args
@@ -107,8 +107,9 @@ def task_restore(api, default_work_dir, task_args):
                                           formatter_class=argparse.RawDescriptionHelpFormatter)
     task_parser.add_argument('--dryrun', action='store_true',
                              help='Restore dry-run mode. Items to be restored are only listed, not pushed to vManage.')
-    task_parser.add_argument('--update', action='store_true',
-                             help='Update vManage item if it is different than a saved item with the same name. By default items with the same name are not restored.')
+    # task_parser.add_argument('--update', action='store_true',
+    #                          help='Update vManage item if it is different than a saved item with the same name. '
+    #                               'By default items with the same name are not restored.')
     task_parser.add_argument('--workdir', metavar='<workdir>', nargs='?', default=default_work_dir, const=default_work_dir,
                              help='''Directory used to source items to be restored (default will be "{default_dir}").
                                   '''.format(default_dir=default_work_dir))
@@ -158,7 +159,7 @@ def task_restore(api, default_work_dir, task_args):
                     if item_id != target_id:
                         id_mapping[item_id] = target_id
                     # TODO: Implement diff check
-                    if restore_args.update and False and not item_obj.is_readonly:
+                    if False and not item_obj.is_readonly:
                         # Existing item on target vManage will be updated
                         id_on_target = target_id
                         logger.info('Will update %s %s', title, item_obj.name)
@@ -230,7 +231,7 @@ def iter_saved_items(work_dir, tag):
     return starmap(saved_items_entry, filter(index_list_exist, index_list_entries))
 
 
-def task_delete(api, work_dir, task_args):
+def task_delete(api, _, task_args):
     logger = logging.getLogger('task_delete')
     # Parse task_args
     task_parser = argparse.ArgumentParser(prog='sastre.py delete', description='{header}\nDelete task:'.format(header=__doc__),
@@ -240,7 +241,8 @@ def task_delete(api, work_dir, task_args):
     task_parser.add_argument('--dryrun', action='store_true',
                              help='Delete dry-run mode. Items matched for removal are only listed, not deleted.')
     task_parser.add_argument('--detach', action='store_true',
-                             help='Detach devices from templates before deleting items.')
+                             help='USE WITH CAUTION! Detach devices from templates and deactivate vSmart policy '
+                                  'before deleting items. This allows deleting items that are dependencies.')
     task_parser.add_argument('tag', metavar='<tag>', type=TagOptions.tag,
                              help='''Tag for selecting items to be deleted. 
                                      Available tags: {tag_options}. Special tag '{all}' selects all items.
@@ -250,34 +252,42 @@ def task_delete(api, work_dir, task_args):
     logger.info('Starting delete task%s: vManage URL: "%s"',
                 ', DRY-RUN mode' if delete_args.dryrun else '', api.base_url)
 
-    # Need to detach vEdges first, then vSmart, if all vEdges are detached
-    # From index, separate vsmart from other deviceTypes Detatch end wait non-vsmart first, then vsmart
-    if delete_args.detach:
-        action_list = []    # [(<action_worker>, <title>, <item_name>), ...]
-        for _, title, index_cls, item_cls in catalog_entries('template_device'):
-            if not issubclass(item_cls, DeviceTemplate):
-                continue
-
-            try:
-                item_index = index_cls(api.get(index_cls.api_path.get))
-            except requests.exceptions.HTTPError:
-                # Item not supported by this vManage, just move on
-                continue
-
-            for item_id, item_name in item_index:
-                t_attached = DeviceTemplateAttached(api.get(DeviceTemplateAttached.api_path.get, item_id))
-
-                if t_attached.is_empty:
-                    continue
-
-                uuids, personalities = zip(*t_attached)
-                # Personalities for all devices attached to the same template are always the same
-                action_worker = DeviceModeCli(api.post(DeviceModeCli.api_params(personalities[0], *uuids),
-                                                       DeviceModeCli.api_path.post)) if not delete_args.dryrun else None
-
-                action_list.append((action_worker, title, item_name))
-
-        wait_actions(api, action_list, 'detach devices', delete_args.dryrun)
+    if delete_args.detach and not delete_args.dryrun:
+        template_index = DeviceTemplateIndex(api.get(DeviceTemplateIndex.api_path.get))
+        # Detach WAN Edges
+        action_list = detach_template(api, template_index, DeviceTemplateIndex.is_not_vsmart)
+        if len(action_list) == 0:
+            logger.info('No WAN Edge attached')
+        else:
+            logger.info('Detaching WAN Edges')
+            if wait_actions(api, action_list):
+                logger.info('Done detaching WAN Edges')
+            else:
+                logger.warning('Failed detaching WAN Edges')
+        # Deactivate vSmart policy
+        action_list = []
+        for item_id, item_name in PolicyVsmartIndex(api.get(PolicyVsmartIndex.api_path.get)).active_policy_iter():
+            action_list.append(
+                (PolicyVsmartDeactivate(api.post({}, PolicyVsmartDeactivate.api_path.post, item_id)), item_name)
+            )
+        if len(action_list) == 0:
+            logger.info('No vSmart policy activated')
+        else:
+            logger.info('Deactivating vSmart policy')
+            if wait_actions(api, action_list):
+                logger.info('Done deactivating vSmart policy')
+            else:
+                logger.warning('Failed deactivating vSmart policy')
+        # Detach vSmarts
+        action_list = detach_template(api, template_index, DeviceTemplateIndex.is_vsmart)
+        if len(action_list) == 0:
+            logger.info('No vSmart attached')
+        else:
+            logger.info('Detaching vSmarts')
+            if wait_actions(api, action_list):
+                logger.info('Done detaching vSmarts')
+            else:
+                logger.warning('Failed detaching vSmarts')
 
     # Tag list is visited in reverse order from sequenced_tags so that top-level items are removed first
     tag_list = list(sequenced_tags(delete_args.tag)) if delete_args.tag == CATALOG_TAG_ALL else [delete_args.tag, ]
@@ -308,40 +318,59 @@ def task_delete(api, work_dir, task_args):
     logger.info('Delete task complete')
 
 
-def wait_actions(api, action_list, action_info, is_dryrun=False):
+def detach_template(api, template_index, filter_fn):
+    """
+    :param api: Instance of Rest API
+    :param template_index: Instance of DeviceTemplateIndex
+    :param filter_fn: Function used to filter elements to be returned
+    :return: List of worker actions to monitor [(<action_worker>, <template_name>), ...]
+    """
+    action_list = []
+    for item_id, item_name in template_index.filtered_iter(filter_fn):
+        devices_attached = DeviceTemplateAttached(api.get(DeviceTemplateAttached.api_path.get, item_id))
+
+        if devices_attached.is_empty:
+            continue
+
+        uuids, personalities = zip(*devices_attached)
+        # Personalities for all devices attached to the same template are always the same
+        action_worker = DeviceModeCli(
+            api.post(DeviceModeCli.api_params(personalities[0], *uuids), DeviceModeCli.api_path.post)
+        )
+        action_list.append((action_worker, item_name))
+
+    return action_list
+
+
+def wait_actions(api, action_list):
     """
     Wait for actions in action_list to complete
     :param api: Instance of Rest API
-    :param action_list: [(<action_worker>, <title>, <item_name>), ...]
-    :param action_info: String with details to be added to the logging messages
-    :param is_dryrun: True if in dry-run mode, False otherwise
+    :param action_list: [(<action_worker>, <action_info>), ...]. Where <action_worker> is an instance of ApiItem and
+                        <action_info> is a str with information about the action.
     :return: True if all actions completed with success. False otherwise.
     """
     logger = logging.getLogger('wait_actions')
     result_list = []
     time_budget = Config.ACTION_TIMEOUT
-    for action_worker, title, item_name in action_list:
-        if is_dryrun:
-            logger.info('DRY-RUN: %s %s %s', title, item_name, action_info)
-            continue
-
+    for action_worker, action_info in action_list:
         while True:
             action = ActionStatus(api.get(ActionStatus.api_path.get, action_worker.uuid))
             if action.is_completed:
                 if action.is_successful:
-                    logger.info('Done %s %s %s', title, item_name, action_info)
+                    logger.info('Done %s', action_info)
                     result_list.append(True)
                 else:
-                    logger.warning('Failed %s %s %s', title, item_name, action_info)
+                    logger.warning('Failed %s', action_info)
                     result_list.append(False)
                 break
 
             time_budget -= Config.ACTION_INTERVAL
             if time_budget > 0:
-                logger.info('Waiting %s', action_info)
+                logger.info('Waiting...')
                 time.sleep(Config.ACTION_INTERVAL)
             else:
-                logger.warning('Time limit expired while waiting %s %s %s', title, item_name, action_info)
+                logger.warning('Wait time limit expired')
                 result_list.append(False)
                 break
 
