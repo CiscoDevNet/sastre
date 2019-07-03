@@ -17,7 +17,7 @@ from lib.catalog import catalog_size, catalog_tags, catalog_entries, CATALOG_TAG
 
 __author__     = "Marcelo Reis"
 __copyright__  = "Copyright (c) 2019 by Cisco Systems, Inc. All rights reserved."
-__version__    = "0.4"
+__version__    = "0.5"
 __maintainer__ = "Marcelo Reis"
 __email__      = "mareis@cisco.com"
 __status__     = "Development"
@@ -236,7 +236,7 @@ def task_delete(api, _, task_args):
     # Parse task_args
     task_parser = argparse.ArgumentParser(prog='sastre.py delete', description='{header}\nDelete task:'.format(header=__doc__),
                                           formatter_class=argparse.RawDescriptionHelpFormatter)
-    task_parser.add_argument('--regexp', metavar='<regexp>', nargs='?',
+    task_parser.add_argument('--regexp', metavar='<regexp>', nargs='?', type=regexp_type,
                              help='Regular expression used to match item names to be deleted, within selected tags.')
     task_parser.add_argument('--dryrun', action='store_true',
                              help='Delete dry-run mode. Items matched for removal are only listed, not deleted.')
@@ -405,13 +405,22 @@ class TagOptions:
     def tag(cls, tag_string):
         if tag_string not in cls.tag_options:
             raise argparse.ArgumentTypeError(
-                '"{}" is not a valid tag. Available tags: {}.'.format(tag_string, cls.options())
+                '"{tag}" is not a valid tag. Available tags: {options}.'.format(tag=tag_string, options=cls.options())
             )
         return tag_string
 
     @classmethod
     def options(cls):
         return ', '.join([CATALOG_TAG_ALL] + sorted(catalog_tags()))
+
+
+def regexp_type(regexp_string):
+    try:
+        re.compile(regexp_string)
+    except re.error:
+        raise argparse.ArgumentTypeError('"{regexp}" is not a valid regular expression.'.format(regexp=regexp_string))
+
+    return regexp_string
 
 
 class EnvVar(argparse.Action):
