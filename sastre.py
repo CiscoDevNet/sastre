@@ -4,6 +4,8 @@ Sastre - Automation Tools for Cisco SD-WAN Powered by Viptela
 
 """
 import logging
+import logging.config
+import logging.handlers
 import argparse
 import os
 import os.path
@@ -17,7 +19,7 @@ from lib.catalog import catalog_size, catalog_tags, catalog_entries, CATALOG_TAG
 
 __author__     = "Marcelo Reis"
 __copyright__  = "Copyright (c) 2019 by Cisco Systems, Inc. All rights reserved."
-__version__    = "0.5"
+__version__    = "0.6"
 __maintainer__ = "Marcelo Reis"
 __email__      = "mareis@cisco.com"
 __status__     = "Development"
@@ -30,9 +32,8 @@ class Config:
     ACTION_TIMEOUT = 600
 
 
-# TODO: Batch add users
 def main(cli_args):
-    logger = logging.getLogger('main')
+    logger = logging.getLogger(__name__)
 
     base_url = 'https://{address}:{port}'.format(address=cli_args.address, port=cli_args.port)
     default_work_dir = 'node_{address}'.format(address=cli_args.address)
@@ -98,6 +99,8 @@ def task_backup(api, work_dir, task_args):
 
 
 # TODO: Restore device attachments, values and vsmart activated policy
+# TODO: Be able to provide external csv files for the attachment
+# TODO: Include regexp match to restore
 # TODO: Option to restore only templates with some reference
 # TODO: Look at diff to decide whether to push a new item or not. Keep skip by default but include option to ovewrite
 def task_restore(api, default_work_dir, task_args):
@@ -462,7 +465,39 @@ if __name__ == '__main__':
     args = cli_parser.parse_args()
 
     # Logging setup
-    logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO if args.verbose else logging.WARN)
+    LOGGING_CONFIG = {
+        'version': 1,
+        'formatters': {
+            'simple': {
+                'format': '%(levelname)s: %(message)s',
+            },
+            'detailed': {
+                'format': '%(name)s: %(asctime)s: %(levelname)s: %(message)s',
+            }
+        },
+        'handlers': {
+            'console': {
+                'class': 'logging.StreamHandler',
+                'level': 'INFO' if args.verbose else 'WARN',
+                'formatter': 'simple',
+            },
+            'file': {
+                'class': 'logging.handlers.RotatingFileHandler',
+                'filename': 'logs/sastre.log',
+                'backupCount': 5,
+                'maxBytes': 102400,
+                'level': 'DEBUG',
+                'formatter': 'detailed',
+            },
+        },
+        'root': {
+            'handlers': ['console', 'file'],
+            'level': 'DEBUG',
+        },
+
+    }
+    os.makedirs('logs', exist_ok=True)
+    logging.config.dictConfig(LOGGING_CONFIG)
 
     # Entry point
     main(args)

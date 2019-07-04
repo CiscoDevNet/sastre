@@ -2,6 +2,7 @@
 
 data/
 rc/
+logs/
 
 # IntelliJ project files
 .idea
