@@ -12,28 +12,32 @@ CatalogEntry = namedtuple('CatalogEntry', ['tag', 'title', 'index_cls', 'item_cl
 
 CATALOG_TAG_ALL = 'all'
 
-# Order in which config items need to be configured considering their dependencies
+# Reverse order in which config items need to be pushed, considering their high-level dependencies
 _tag_dependency_list = [
-    'policy_list',
-    'policy_definition',
-    'policy_apply',
+    'template_device',
     'template_feature',
-    'template_device'
+    'policy_vsmart',
+    'policy_vedge',
+    'policy_definition',
+    'policy_list',
 ]
 
 
 def sequenced_tags(tag):
     """
-    Generator that yield the provided tag and any previous tags (i.e. dependent tags). If tag
-    is not in _tag_dependency_list (i.e. tag='all'), it yields all items of the list
-    :param tag: tag string identifying
-    :return: tag items in order
+    Generator which yields the specified tag plus any 'child' tags (i.e. dependent tags), as defined by
+    _tag_dependency_list. If special tag 'all' is used, all items from _tag_dependency_list are yielded.
+    :param tag: tag string or 'all'
+    :return: Selected tags in order, as per _tag_dependency_list
     """
-    for tag_item in _tag_dependency_list:
-        yield tag_item
-
-        if tag_item == tag:
-            break
+    find_tag = (tag == CATALOG_TAG_ALL)
+    for item in _tag_dependency_list:
+        if not find_tag:
+            if item == tag:
+                find_tag = True
+            else:
+                continue
+        yield item
 
 
 def register(tag, title, item_cls):
@@ -263,6 +267,20 @@ class ConfigItem(ApiItem):
                            replace_id, json.dumps(data_dict))
 
         return json.loads(dict_json)
+
+    @property
+    def id_references_set(self):
+        """
+        Return all references to other item ids by this item
+        :return: Set containing id-based references
+        """
+        filtered_keys = {
+            self.id_tag,
+        }
+        filtered_data = {k: v for k, v in self.data.items() if k not in filtered_keys}
+
+        return set(re.findall(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}',
+                              json.dumps(filtered_data)))
 
 
 class IndexConfigItem(ConfigItem):

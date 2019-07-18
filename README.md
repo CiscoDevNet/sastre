@@ -94,6 +94,14 @@ Deleting items:
     INFO: Done feature template VPN1_Interface5_v01
     <snip>
     INFO: Delete task complete
+    
+## Logs
+
+Sastre logs messages to the terminal and to log files (under the logs directory).
+
+Debug-level and higher severity messages are always saved to the log files.
+
+The --verbose flag controls the severity of messages printed to the terminal. If --verbose is not specified, only warning-level and higher messages are logged. When --verbose is specified, informational-level and higher messages are printed. 
 
 ## Installing Requirements
 

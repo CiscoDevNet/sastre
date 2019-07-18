@@ -19,7 +19,7 @@ from lib.catalog import catalog_size, catalog_tags, catalog_entries, CATALOG_TAG
 
 __author__     = "Marcelo Reis"
 __copyright__  = "Copyright (c) 2019 by Cisco Systems, Inc. All rights reserved."
-__version__    = "0.6"
+__version__    = "0.7"
 __maintainer__ = "Marcelo Reis"
 __email__      = "mareis@cisco.com"
 __status__     = "Development"
@@ -100,9 +100,8 @@ def task_backup(api, work_dir, task_args):
 
 # TODO: Restore device attachments, values and vsmart activated policy
 # TODO: Be able to provide external csv files for the attachment
-# TODO: Include regexp match to restore
 # TODO: Option to restore only templates with some reference
-# TODO: Look at diff to decide whether to push a new item or not. Keep skip by default but include option to ovewrite
+# TODO: Look at diff to decide whether to push a new item or not. Keep skip by default but include option to overwrite
 def task_restore(api, default_work_dir, task_args):
     logger = logging.getLogger('task_restore')
     # Parse task_args
@@ -110,6 +109,8 @@ def task_restore(api, default_work_dir, task_args):
                                           formatter_class=argparse.RawDescriptionHelpFormatter)
     task_parser.add_argument('--dryrun', action='store_true',
                              help='Restore dry-run mode. Items to be restored are only listed, not pushed to vManage.')
+    task_parser.add_argument('--regexp', metavar='<regexp>', nargs='?', type=regexp_type,
+                             help='Regular expression used to match item names to be restored, within selected tags.')
     # task_parser.add_argument('--update', action='store_true',
     #                          help='Update vManage item if it is different than a saved item with the same name. '
     #                               'By default items with the same name are not restored.')
@@ -141,8 +142,8 @@ def task_restore(api, default_work_dir, task_args):
     id_mapping = {}
 
     logger.info('Identifying items to be pushed')
-    # restore_list is [ (<title>, <index_cls>, [(<item_id>, <item_obj>, <id_on_target>), ...]), ...]
-    restore_list = []
+    restore_list = []       # [ (<title>, <index_cls>, [(<item_id>, <item_obj>, <id_on_target>), ...]), ...]
+    dependency_set = set()  # {<item_id>, ...}
     for tag in sequenced_tags(restore_args.tag):
         logger.info('Inspecting %s items', tag)
 
@@ -152,37 +153,38 @@ def task_restore(api, default_work_dir, task_args):
                 logger.warning('Will skip %s, item not supported by target vManage', title)
                 continue
 
-            restore_items = []
+            item_list = []
             for item_id, item_obj in loaded_items:
                 id_on_target = None
                 target_id = target_items.get(item_obj.name)
 
                 if target_id is not None:
-                    # Item already exists on target vManage, item id on target will be used
+                    # Item already exists on target vManage, item id from target will be used
                     if item_id != target_id:
                         id_mapping[item_id] = target_id
-                    # TODO: Implement diff check
-                    if False and not item_obj.is_readonly:
-                        # Existing item on target vManage will be updated
-                        id_on_target = target_id
-                        logger.info('Will update %s %s', title, item_obj.name)
-                    else:
-                        # Existing item on target vManage will be used as is
-                        logger.info('Will skip %s %s', title, item_obj.name)
-                        continue
+
+                    # Existing item on target vManage will be used as is
+                    logger.debug('Will skip %s %s, item already on target vManage', title, item_obj.name)
+                    continue
 
                 if item_obj.is_readonly:
                     logger.warning('Will skip %s %s, factory default item', title, item_obj.name)
                     continue
 
-                restore_items.append((item_id, item_obj, id_on_target))
+                item_matches = (
+                    (restore_args.tag == CATALOG_TAG_ALL or restore_args.tag == tag) and
+                    (restore_args.regexp is None or re.match(restore_args.regexp, item_obj.name))
+                )
+                if item_matches or item_id in dependency_set:
+                    item_list.append((item_id, item_obj, id_on_target))
+                    dependency_set.update(item_obj.id_references_set)
 
-            if len(restore_items) > 0:
-                restore_list.append((title, index_cls, restore_items))
+            if len(item_list) > 0:
+                restore_list.append((title, index_cls, item_list))
 
     if len(restore_list) > 0:
         logger.info('%sPushing items to vManage', 'DRY-RUN: ' if restore_args.dryrun else '')
-        for title, index_cls, item_list in restore_list:
+        for title, index_cls, item_list in reversed(restore_list):
             pushed_item_dict = {}
             for item_id, item_obj, id_on_target in item_list:
                 op_info = 'Update' if id_on_target is not None else 'Create'
@@ -292,9 +294,8 @@ def task_delete(api, _, task_args):
             else:
                 logger.warning('Failed detaching vSmarts')
 
-    # Tag list is visited in reverse order from sequenced_tags so that top-level items are removed first
-    tag_list = list(sequenced_tags(delete_args.tag)) if delete_args.tag == CATALOG_TAG_ALL else [delete_args.tag, ]
-    for tag in reversed(tag_list):
+    tags = sequenced_tags(delete_args.tag) if delete_args.tag == CATALOG_TAG_ALL else [delete_args.tag, ]
+    for tag in tags:
         logger.info('Inspecting %s items', tag)
         for _, title, index_cls, item_cls in catalog_entries(tag):
             try:

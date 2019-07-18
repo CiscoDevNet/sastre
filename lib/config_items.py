@@ -118,7 +118,7 @@ class FeatureTemplateIndex(IndexConfigItem):
 
 
 #
-# Policy apply
+# Policy vSmart
 #
 
 class PolicyVsmart(ConfigItem):
@@ -128,7 +128,7 @@ class PolicyVsmart(ConfigItem):
     name_tag = 'policyName'
 
 
-@register('policy_apply', 'VSMART policy', PolicyVsmart)
+@register('policy_vsmart', 'VSMART policy', PolicyVsmart)
 class PolicyVsmartIndex(IndexConfigItem):
     api_path = ApiPath('template/policy/vsmart', None, None, None)
     store_file = 'vsmart_policy_list.json'
@@ -141,6 +141,10 @@ class PolicyVsmartIndex(IndexConfigItem):
         )
 
 
+#
+# Policy vEdge
+#
+
 class PolicyVedge(ConfigItem):
     api_path = ApiPath('template/policy/vedge/definition', 'template/policy/vedge')
     store_path = ('templates', 'vedge_policy')
@@ -148,7 +152,7 @@ class PolicyVedge(ConfigItem):
     name_tag = 'policyName'
 
 
-@register('policy_apply', 'VEDGE policy', PolicyVedge)
+@register('policy_vedge', 'VEDGE policy', PolicyVedge)
 class PolicyVedgeIndex(IndexConfigItem):
     api_path = ApiPath('template/policy/vedge', None, None, None)
     store_file = 'vedge_policy_list.json'
