@@ -15,11 +15,11 @@ from itertools import starmap
 import requests.exceptions
 from lib.config_items import *
 from lib.rest_api import Rest, LoginFailedException
-from lib.catalog import catalog_size, catalog_tags, catalog_entries, CATALOG_TAG_ALL, sequenced_tags
+from lib.catalog import catalog_size, catalog_tags, catalog_entries, CATALOG_TAG_ALL, ordered_tags
 
 __author__     = "Marcelo Reis"
 __copyright__  = "Copyright (c) 2019 by Cisco Systems, Inc. All rights reserved."
-__version__    = "0.7"
+__version__    = "0.8"
 __maintainer__ = "Marcelo Reis"
 __email__      = "mareis@cisco.com"
 __status__     = "Development"
@@ -109,8 +109,8 @@ def task_restore(api, default_work_dir, task_args):
                                           formatter_class=argparse.RawDescriptionHelpFormatter)
     task_parser.add_argument('--dryrun', action='store_true',
                              help='Restore dry-run mode. Items to be restored are only listed, not pushed to vManage.')
-    task_parser.add_argument('--regexp', metavar='<regexp>', nargs='?', type=regexp_type,
-                             help='Regular expression used to match item names to be restored, within selected tags.')
+    task_parser.add_argument('--regex', metavar='<regex>', nargs='?', type=regex_type,
+                             help='Regular expression used to match item names, within selected tags, to be restored.')
     # task_parser.add_argument('--update', action='store_true',
     #                          help='Update vManage item if it is different than a saved item with the same name. '
     #                               'By default items with the same name are not restored.')
@@ -144,7 +144,7 @@ def task_restore(api, default_work_dir, task_args):
     logger.info('Identifying items to be pushed')
     restore_list = []       # [ (<title>, <index_cls>, [(<item_id>, <item_obj>, <id_on_target>), ...]), ...]
     dependency_set = set()  # {<item_id>, ...}
-    for tag in sequenced_tags(restore_args.tag):
+    for tag in ordered_tags(restore_args.tag):
         logger.info('Inspecting %s items', tag)
 
         for title, index_cls, loaded_items in iter_saved_items(restore_args.workdir, tag):
@@ -173,7 +173,7 @@ def task_restore(api, default_work_dir, task_args):
 
                 item_matches = (
                     (restore_args.tag == CATALOG_TAG_ALL or restore_args.tag == tag) and
-                    (restore_args.regexp is None or re.match(restore_args.regexp, item_obj.name))
+                    (restore_args.regex is None or re.match(restore_args.regex, item_obj.name))
                 )
                 if item_matches or item_id in dependency_set:
                     item_list.append((item_id, item_obj, id_on_target))
@@ -241,8 +241,8 @@ def task_delete(api, _, task_args):
     # Parse task_args
     task_parser = argparse.ArgumentParser(prog='sastre.py delete', description='{header}\nDelete task:'.format(header=__doc__),
                                           formatter_class=argparse.RawDescriptionHelpFormatter)
-    task_parser.add_argument('--regexp', metavar='<regexp>', nargs='?', type=regexp_type,
-                             help='Regular expression used to match item names to be deleted, within selected tags.')
+    task_parser.add_argument('--regex', metavar='<regex>', nargs='?', type=regex_type,
+                             help='Regular expression used to match item names, within selected tags, to be deleted.')
     task_parser.add_argument('--dryrun', action='store_true',
                              help='Delete dry-run mode. Items matched for removal are only listed, not deleted.')
     task_parser.add_argument('--detach', action='store_true',
@@ -294,8 +294,7 @@ def task_delete(api, _, task_args):
             else:
                 logger.warning('Failed detaching vSmarts')
 
-    tags = sequenced_tags(delete_args.tag) if delete_args.tag == CATALOG_TAG_ALL else [delete_args.tag, ]
-    for tag in tags:
+    for tag in ordered_tags(delete_args.tag, delete_args.tag != CATALOG_TAG_ALL):
         logger.info('Inspecting %s items', tag)
         for _, title, index_cls, item_cls in catalog_entries(tag):
             try:
@@ -305,7 +304,7 @@ def task_delete(api, _, task_args):
                 continue
 
             for item_id, item_name in item_index:
-                if delete_args.regexp is None or re.match(delete_args.regexp, item_name):
+                if delete_args.regex is None or re.match(delete_args.regex, item_name):
                     item_obj = item_cls(api.get(item_cls.api_path.get, item_id))
                     if item_obj.is_readonly:
                         continue
@@ -418,13 +417,13 @@ class TagOptions:
         return ', '.join([CATALOG_TAG_ALL] + sorted(catalog_tags()))
 
 
-def regexp_type(regexp_string):
+def regex_type(regex_string):
     try:
-        re.compile(regexp_string)
+        re.compile(regex_string)
     except re.error:
-        raise argparse.ArgumentTypeError('"{regexp}" is not a valid regular expression.'.format(regexp=regexp_string))
+        raise argparse.ArgumentTypeError('"{regex}" is not a valid regular expression.'.format(regex=regex_string))
 
-    return regexp_string
+    return regex_string
 
 
 class EnvVar(argparse.Action):

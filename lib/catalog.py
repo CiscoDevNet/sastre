@@ -12,7 +12,8 @@ CatalogEntry = namedtuple('CatalogEntry', ['tag', 'title', 'index_cls', 'item_cl
 
 CATALOG_TAG_ALL = 'all'
 
-# Reverse order in which config items need to be pushed, considering their high-level dependencies
+# Order in which config items need to be deleted (i.e. reverse order in which they need to be pushed), considering
+# their high-level dependencies.
 _tag_dependency_list = [
     'template_device',
     'template_feature',
@@ -23,11 +24,14 @@ _tag_dependency_list = [
 ]
 
 
-def sequenced_tags(tag):
+def ordered_tags(tag, single=False):
     """
-    Generator which yields the specified tag plus any 'child' tags (i.e. dependent tags), as defined by
-    _tag_dependency_list. If special tag 'all' is used, all items from _tag_dependency_list are yielded.
+    Generator which yields the specified tag plus any 'child' tags (i.e. dependent tags), following the order in which
+    items need to be removed based on their dependencies (e.g. template_device before template_feature). The overall
+    order is defined by _tag_dependency_list.
+    If special tag 'all' is used, all items from _tag_dependency_list are yielded.
     :param tag: tag string or 'all'
+    :param single: Optional, when True only a the one (first) tag is yielded. Used mainly for convenience of the caller.
     :return: Selected tags in order, as per _tag_dependency_list
     """
     find_tag = (tag == CATALOG_TAG_ALL)
@@ -38,6 +42,9 @@ def sequenced_tags(tag):
             else:
                 continue
         yield item
+
+        if single:
+            break
 
 
 def register(tag, title, item_cls):
@@ -62,6 +69,10 @@ def register(tag, title, item_cls):
             raise CatalogException(
                 'Invalid tag provided for class {}: {}'.format(index_cls.__name__, tag)
             )
+        if tag not in _tag_dependency_list:
+            raise CatalogException(
+                'Unknown tag provided: {}'.format(tag)
+            )
         _catalog.append(CatalogEntry(tag, title, index_cls, item_cls))
 
         return index_cls
@@ -79,7 +90,7 @@ def catalog_size():
 
 def catalog_entries(*tags):
     """
-    Return an iterator of CatalogEntry matching the specified tag
+    Return an iterator of CatalogEntry matching the specified tag(s)
     :param tags: tags indicating catalog entries to return
     :return: iterator of CatalogEntry
     """

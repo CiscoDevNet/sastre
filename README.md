@@ -77,7 +77,7 @@ Edit sastre-rc-example.sh to include vManage details and source that file:
 
 Just list the items matching the specified tag and regular expression:
 
-    ./sastre.py --verbose delete all --regexp "VPN1.*" --dryrun
+    ./sastre.py --verbose delete all --regex "VPN1.*" --dryrun
     INFO: Starting delete task: vManage URL: "https://10.85.136.253:8443"
     INFO: Inspecting template_device items
     INFO: Inspecting template_feature items
@@ -87,7 +87,7 @@ Just list the items matching the specified tag and regular expression:
     
 Deleting items:
 
-    ./sastre.py --verbose delete all --regexp "VPN1.*"
+    ./sastre.py --verbose delete all --regex "VPN1.*"
     INFO: Starting delete task: vManage URL: "https://10.85.136.253:8443"
     INFO: Inspecting template_device items
     INFO: Inspecting template_feature items
