@@ -64,17 +64,17 @@ class DeviceTemplateIndex(IndexConfigItem):
     iter_fields = ('templateId', 'templateName')
 
     @staticmethod
-    def is_vsmart(device_type):
-        return device_type == 'vsmart'
+    def is_vsmart(device_type, num_attached):
+        return device_type == 'vsmart' and num_attached > 0
 
     @staticmethod
-    def is_not_vsmart(device_type):
-        return device_type != 'vsmart'
+    def is_not_vsmart(device_type, num_attached):
+        return device_type != 'vsmart' and num_attached > 0
 
     def filtered_iter(self, filter_fn):
         return (
-            (item_id, item_name)
-            for item_type, item_id, item_name in self.iter('deviceType', *self.iter_fields) if filter_fn(item_type)
+            (item_id, item_name) for item_type, item_attached, item_id, item_name
+            in self.iter('deviceType', 'devicesAttached', *self.iter_fields) if filter_fn(item_type, item_attached)
         )
 
 

@@ -19,7 +19,7 @@ from lib.catalog import catalog_size, catalog_tags, catalog_entries, CATALOG_TAG
 
 __author__     = "Marcelo Reis"
 __copyright__  = "Copyright (c) 2019 by Cisco Systems, Inc. All rights reserved."
-__version__    = "0.8"
+__version__    = "0.9"
 __maintainer__ = "Marcelo Reis"
 __email__      = "mareis@cisco.com"
 __status__     = "Development"
@@ -47,11 +47,14 @@ def main(cli_args):
         logger.critical(ex)
 
 
-def task_backup(api, work_dir, task_args):
+def task_backup(api, default_work_dir, task_args):
     logger = logging.getLogger('task_backup')
     # Parse task_args
     task_parser = argparse.ArgumentParser(prog='sastre.py backup', description='{header}\nBackup task:'.format(header=__doc__),
                                           formatter_class=argparse.RawDescriptionHelpFormatter)
+    task_parser.add_argument('--workdir', metavar='<workdir>', nargs='?', default=default_work_dir, const=default_work_dir,
+                             help='''Directory used to save the backup (default will be "{default_dir}").
+                                  '''.format(default_dir=default_work_dir))
     task_parser.add_argument('tags', metavar='<tag>', nargs='+', type=TagOptions.tag,
                              help='''One or more tags for selecting items to be backed up. 
                                      Multiple tags should be separated by space.
@@ -59,12 +62,12 @@ def task_backup(api, work_dir, task_args):
                                   '''.format(tag_options=TagOptions.options(), all=CATALOG_TAG_ALL))
     backup_args = task_parser.parse_args(task_args)
 
-    logger.info('Starting backup task: vManage URL: "%s" > Work_dir: "%s"', api.base_url, work_dir)
+    logger.info('Starting backup task: vManage URL: "%s" > Work_dir: "%s"', api.base_url, backup_args.workdir)
     for _, title, index_cls, item_cls in catalog_entries(*backup_args.tags):
         try:
             # Process index class
             item_index = index_cls(api.get(index_cls.api_path.get))
-            if item_index.save(work_dir):
+            if item_index.save(backup_args.workdir):
                 logger.info('Saved %s index', title)
         except requests.exceptions.HTTPError:
             logger.info('Skipped %s, item not supported by this vManage', title)
@@ -74,13 +77,13 @@ def task_backup(api, work_dir, task_args):
             try:
                 # Process item class
                 item_obj = item_cls(api.get(item_cls.api_path.get, item_id))
-                if item_obj.save(work_dir, item_name=item_name, item_id=item_id):
+                if item_obj.save(backup_args.workdir, item_name=item_name, item_id=item_id):
                     logger.info('Done %s %s', title, item_name)
 
                 # Special case for DeviceTemplateAttached/DeviceTemplateValues
                 if isinstance(item_obj, DeviceTemplate):
                     devices_attached = DeviceTemplateAttached(api.get(DeviceTemplateAttached.api_path.get, item_id))
-                    if devices_attached.save(work_dir, item_name=item_name, item_id=item_id):
+                    if devices_attached.save(backup_args.workdir, item_name=item_name, item_id=item_id):
                         logger.info('Done %s %s attached devices', title, item_name)
                     else:
                         logger.info('Skipped %s %s attached devices, none found', title, item_name)
@@ -90,7 +93,7 @@ def task_backup(api, work_dir, task_args):
                     template_values = DeviceTemplateValues(
                         api.post(DeviceTemplateValues.api_params(item_id, uuids), DeviceTemplateValues.api_path.post)
                     )
-                    if template_values.save(work_dir, item_name=item_name, item_id=item_id):
+                    if template_values.save(backup_args.workdir, item_name=item_name, item_id=item_id):
                         logger.info('Done %s %s values', title, item_name)
             except requests.exceptions.HTTPError as ex:
                 logger.error('Failed backup %s %s: %s', title, item_name, ex)
@@ -100,7 +103,6 @@ def task_backup(api, work_dir, task_args):
 
 # TODO: Restore device attachments, values and vsmart activated policy
 # TODO: Be able to provide external csv files for the attachment
-# TODO: Option to restore only templates with some reference
 # TODO: Look at diff to decide whether to push a new item or not. Keep skip by default but include option to overwrite
 def task_restore(api, default_work_dir, task_args):
     logger = logging.getLogger('task_restore')
@@ -114,6 +116,8 @@ def task_restore(api, default_work_dir, task_args):
     # task_parser.add_argument('--update', action='store_true',
     #                          help='Update vManage item if it is different than a saved item with the same name. '
     #                               'By default items with the same name are not restored.')
+    task_parser.add_argument('--attach', action='store_true',
+                             help='Attach devices to templates and activate vSmart policy after restoring items.')
     task_parser.add_argument('--workdir', metavar='<workdir>', nargs='?', default=default_work_dir, const=default_work_dir,
                              help='''Directory used to source items to be restored (default will be "{default_dir}").
                                   '''.format(default_dir=default_work_dir))
@@ -212,6 +216,9 @@ def task_restore(api, default_work_dir, task_args):
     else:
         logger.info('%sNo items to push to vManage', 'DRY-RUN: ' if restore_args.dryrun else '')
 
+    if restore_args.attach and not restore_args.dryrun:
+        template_index = DeviceTemplateIndex(api.get(DeviceTemplateIndex.api_path.get))
+
     logger.info('Restore task complete')
 
 
@@ -241,10 +248,10 @@ def task_delete(api, _, task_args):
     # Parse task_args
     task_parser = argparse.ArgumentParser(prog='sastre.py delete', description='{header}\nDelete task:'.format(header=__doc__),
                                           formatter_class=argparse.RawDescriptionHelpFormatter)
-    task_parser.add_argument('--regex', metavar='<regex>', nargs='?', type=regex_type,
-                             help='Regular expression used to match item names, within selected tags, to be deleted.')
     task_parser.add_argument('--dryrun', action='store_true',
                              help='Delete dry-run mode. Items matched for removal are only listed, not deleted.')
+    task_parser.add_argument('--regex', metavar='<regex>', nargs='?', type=regex_type,
+                             help='Regular expression used to match item names, within selected tags, to be deleted.')
     task_parser.add_argument('--detach', action='store_true',
                              help='USE WITH CAUTION! Detach devices from templates and deactivate vSmart policy '
                                   'before deleting items. This allows deleting items that are dependencies.')
@@ -321,7 +328,7 @@ def task_delete(api, _, task_args):
     logger.info('Delete task complete')
 
 
-def detach_template(api, template_index, filter_fn):
+def attach_template(api, template_index, filter_fn):
     """
     :param api: Instance of Rest API
     :param template_index: Instance of DeviceTemplateIndex
@@ -332,8 +339,26 @@ def detach_template(api, template_index, filter_fn):
     for item_id, item_name in template_index.filtered_iter(filter_fn):
         devices_attached = DeviceTemplateAttached(api.get(DeviceTemplateAttached.api_path.get, item_id))
 
-        if devices_attached.is_empty:
-            continue
+        uuids, personalities = zip(*devices_attached)
+        # Personalities for all devices attached to the same template are always the same
+        action_worker = DeviceModeCli(
+            api.post(DeviceModeCli.api_params(personalities[0], *uuids), DeviceModeCli.api_path.post)
+        )
+        action_list.append((action_worker, item_name))
+
+    return action_list
+
+
+def detach_template(api, template_index, filter_fn):
+    """
+    :param api: Instance of Rest API
+    :param template_index: Instance of DeviceTemplateIndex
+    :param filter_fn: Function used to filter elements to be returned
+    :return: List of worker actions to monitor [(<action_worker>, <template_name>), ...]
+    """
+    action_list = []
+    for item_id, item_name in template_index.filtered_iter(filter_fn):
+        devices_attached = DeviceTemplateAttached(api.get(DeviceTemplateAttached.api_path.get, item_id))
 
         uuids, personalities = zip(*devices_attached)
         # Personalities for all devices attached to the same template are always the same
