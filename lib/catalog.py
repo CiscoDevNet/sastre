@@ -1,3 +1,7 @@
+"""
+vManage API Catalog and base elements
+
+"""
 import os.path
 import json
 import re
@@ -11,6 +15,8 @@ _catalog = list()   # [(<tag>, <title>, <index_cls>, <item_cls>), ...]
 CatalogEntry = namedtuple('CatalogEntry', ['tag', 'title', 'index_cls', 'item_cls'])
 
 CATALOG_TAG_ALL = 'all'
+
+BASE_DATA_DIR = 'data'
 
 # Order in which config items need to be deleted (i.e. reverse order in which they need to be pushed), considering
 # their high-level dependencies.
@@ -173,13 +179,33 @@ class ApiItem:
         return json.dumps(self.data)
 
 
+class IndexApiItem(ApiItem):
+    """
+    IndexApiItem is an index-type ApiItem that can be iterated over, returning iter_fields
+    """
+    def __init__(self, data):
+        """
+        :param data: dict containing the information to be associated with this API item.
+        """
+        super().__init__(data.get('data') if isinstance(data, dict) else data)
+
+    # Iter_fields should be defined in subclasses and generally follow the format: (<id_tag>, <name_tag>)
+    iter_fields = None
+
+    def __iter__(self):
+        return self.iter(*self.iter_fields)
+
+    def iter(self, *iter_fields):
+        return map(partial(fields, iter_fields), self.data)
+
+
 class ConfigItem(ApiItem):
     """
     ConfigItem is an ApiItem that can be backed up and restored
     """
     store_path = None
     store_file = None
-    root_dir = 'data'
+    root_dir = BASE_DATA_DIR
     factory_default_tag = 'factoryDefault'
     readonly_tag = 'readOnly'
     post_filtered_tags = None
@@ -304,7 +330,7 @@ class IndexConfigItem(ConfigItem):
         """
         super().__init__(data.get('data') if isinstance(data, dict) else data)
 
-    # Iter_fields should be defined in subclasses and generally follow the format: (<id_tag>, <name_tag>, <ts_tag>)
+    # Iter_fields should be defined in subclasses and generally follow the format: (<id_tag>, <name_tag>)
     iter_fields = None
 
     store_path = ('index', )
@@ -321,5 +347,5 @@ def fields(keys, item):
 
 
 class CatalogException(Exception):
-    """ Exception config item catalog errors """
+    """ Exception for config item catalog errors """
     pass

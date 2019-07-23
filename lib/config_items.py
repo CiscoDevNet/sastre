@@ -1,4 +1,8 @@
-from lib.catalog import ApiItem, ConfigItem, IndexConfigItem, ApiPath, ConditionalApiPath, register
+"""
+vManage API elements
+
+"""
+from lib.catalog import ApiItem, IndexApiItem, ConfigItem, IndexConfigItem, ApiPath, ConditionalApiPath, register
 
 
 #
@@ -16,9 +20,56 @@ class DeviceModeCli(ApiItem):
         }
 
 
+class DeviceTemplateAttach(ApiItem):
+    api_path = ApiPath(None, 'template/device/config/attachfeature', None, None)
+    id_tag = 'id'
+
+    @staticmethod
+    def api_params(template_id, input_list):
+        """
+        Build dictionary used to provide input parameters for api POST call
+        :param template_id: String containing the template ID
+        :param input_list: List where each entry represents one attached device and is a dictionary of input
+                           variable names and values.
+        :return: Dictionary used to provide POST input parameters
+        """
+        return {
+            "deviceTemplateList": [
+                {
+                    "templateId": template_id,
+                    "device": input_list,
+                    "isEdited": False,
+                    "isMasterEdited": False,
+                },
+            ],
+        }
+
+
 class PolicyVsmartDeactivate(ApiItem):
     api_path = ApiPath(None, 'template/policy/vsmart/deactivate', None, None)
     id_tag = 'id'
+
+
+class PolicyVsmartActivate(ApiItem):
+    api_path = ApiPath(None, 'template/policy/vsmart/activate', None, None)
+    id_tag = 'id'
+
+
+class PolicyVsmartStatus(ApiItem):
+    api_path = ApiPath('template/policy/vsmart/connectivity/status', None, None, None)
+
+    def raise_for_status(self):
+        def vsmart_ready(vsmart_entry):
+            return vsmart_entry['operationMode'] == 'vmanage' and vsmart_entry['isOnline']
+
+        data_list = self.data.get('data', [])
+        if len(data_list) == 0 or not all(map(vsmart_ready, data_list)):
+            raise PolicyVsmartStatusException()
+
+
+class PolicyVsmartStatusException(Exception):
+    """ Exception indicating Vsmart status is not ready """
+    pass
 
 
 class ActionStatus(ApiItem):
@@ -40,6 +91,37 @@ class ActionStatus(ApiItem):
         data_list = self.data.get('data', [])
         # When action validation fails, returned data is empty
         return all(map(task_success, data_list)) if len(data_list) > 0 else False
+
+
+#
+# Device Inventory
+#
+class EdgeInventory(IndexApiItem):
+    api_path = ApiPath('/system/device/vedges', None, None, None)
+    iter_fields = ('uuid', 'host-name')
+
+
+class ControlInventory(IndexApiItem):
+    api_path = ApiPath('/system/device/controllers', None, None, None)
+    iter_fields = ('uuid', 'host-name')
+
+    @staticmethod
+    def is_vsmart(device_type):
+        return device_type == 'vsmart'
+
+    @staticmethod
+    def is_vbond(device_type):
+        return device_type == 'vbond'
+
+    @staticmethod
+    def is_manage(device_type):
+        return device_type == 'vmanage'
+
+    def filtered_iter(self, filter_fn):
+        return (
+            (item_id, item_name) for item_type, item_id, item_name
+            in self.iter('deviceType', *self.iter_fields) if filter_fn(item_type)
+        )
 
 
 #
@@ -80,7 +162,7 @@ class DeviceTemplateIndex(IndexConfigItem):
 
 # This is a special case handled under DeviceTemplate
 class DeviceTemplateAttached(IndexConfigItem):
-    api_path = ApiPath('template/device/config/attached', 'template/device/config/attachfeature', None, None)
+    api_path = ApiPath('template/device/config/attached', None, None, None)
     store_path = ('templates', 'device_template_attached')
     store_file = '{item_id}.json'
     iter_fields = ('uuid', 'personality')
@@ -93,13 +175,29 @@ class DeviceTemplateValues(ConfigItem):
     store_file = '{item_id}.json'
 
     @staticmethod
-    def api_params(template_id, device_id_list):
+    def api_params(template_id, device_uuid_list):
+        """
+        Build dictionary used to provide input parameters for api POST call
+        :param template_id: String containing the template ID
+        :param device_uuid_list: List of device UUIDs
+        :return: Dictionary used to provide POST input parameters
+        """
         return {
-            "deviceIds": device_id_list,
+            "deviceIds": device_uuid_list,
             "isEdited": False,
             "isMasterEdited": False,
             "templateId": template_id
         }
+
+    def input_list(self, allowed_uuid_set=None):
+        """
+        Return list of device input entries. Each entry represents one attached device and is a dictionary of input
+        variable names and values.
+        :param allowed_uuid_set: Optional, set of uuids. If provided, only input entries for those uuids are returned
+        :return: [{<input_var_name>: <input_var_value>, ...}, ...]
+        """
+        return [entry for entry in self.data.get('data', [])
+                if allowed_uuid_set is None or entry.get('csv-deviceId') in allowed_uuid_set]
 
 
 class FeatureTemplate(ConfigItem):

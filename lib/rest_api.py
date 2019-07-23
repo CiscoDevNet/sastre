@@ -2,7 +2,6 @@
 vManage REST API
 
 """
-
 import requests
 import urllib3
 
