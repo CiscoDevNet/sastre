@@ -19,12 +19,13 @@ from lib.utils import Task, TaskOptions, TagOptions, existing_workdir_type, rege
 
 __author__     = "Marcelo Reis"
 __copyright__  = "Copyright (c) 2019 by Cisco Systems, Inc. All rights reserved."
-__version__    = "0.9"
+__version__    = "0.10"
 __maintainer__ = "Marcelo Reis"
 __email__      = "mareis@cisco.com"
 __status__     = "Development"
 
 
+# TODO: Add support to re-attach cli templates
 # TODO: Allow renaming of backed up items before uploading
 # TODO: Be able to provide external csv files for the attachment
 # TODO: Look at diff to decide whether to push a new item or not. Keep skip by default but include option to overwrite

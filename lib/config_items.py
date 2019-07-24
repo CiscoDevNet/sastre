@@ -98,12 +98,12 @@ class ActionStatus(ApiItem):
 #
 class EdgeInventory(IndexApiItem):
     api_path = ApiPath('/system/device/vedges', None, None, None)
-    iter_fields = ('uuid', 'host-name')
+    iter_fields = ('uuid', 'vedgeCertificateState')
 
 
 class ControlInventory(IndexApiItem):
     api_path = ApiPath('/system/device/controllers', None, None, None)
-    iter_fields = ('uuid', 'host-name')
+    iter_fields = ('uuid', 'validity')
 
     @staticmethod
     def is_vsmart(device_type):
