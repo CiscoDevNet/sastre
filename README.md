@@ -77,7 +77,7 @@ Edit sastre-rc-example.sh to include vManage details and source that file:
 
 Just list the items matching the specified tag and regular expression:
 
-    ./sastre.py --verbose delete all --regex "VPN1.*" --dryrun
+    ./sastre.py --verbose delete all --regex "VPN1" --dryrun
     INFO: Starting delete task: vManage URL: "https://10.85.136.253:8443"
     INFO: Inspecting template_device items
     INFO: Inspecting template_feature items
@@ -87,7 +87,7 @@ Just list the items matching the specified tag and regular expression:
     
 Deleting items:
 
-    ./sastre.py --verbose delete all --regex "VPN1.*"
+    ./sastre.py --verbose delete all --regex "VPN1"
     INFO: Starting delete task: vManage URL: "https://10.85.136.253:8443"
     INFO: Inspecting template_device items
     INFO: Inspecting template_feature items
@@ -95,6 +95,18 @@ Deleting items:
     <snip>
     INFO: Delete task complete
     
+## Regular Expressions
+
+It is recommended to always use double quotes when specifying a regular expression to --regex option:
+
+    ./sastre.py --verbose restore all --regex "VPN1"
+     
+This is to prevent the shell from interpreting special characters that could be part of the pattern provided.
+
+Matching done by the --regex is un-anchored. That is, unless anchor marks are provided (e.g. ^ or $), the pattern matches if present anywhere in the string. In other words, this is a search function.
+
+The regular expression syntax is described here: https://docs.python.org/3/library/re.html
+
 ## Logs
 
 Sastre logs messages to the terminal and to log files (under the logs directory).

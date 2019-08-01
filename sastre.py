@@ -19,12 +19,15 @@ from lib.utils import Task, TaskOptions, TagOptions, existing_workdir_type, rege
 
 __author__     = "Marcelo Reis"
 __copyright__  = "Copyright (c) 2019 by Cisco Systems, Inc. All rights reserved."
-__version__    = "0.10"
+__version__    = "0.11"
 __maintainer__ = "Marcelo Reis"
 __email__      = "mareis@cisco.com"
 __status__     = "Development"
 
 
+# TODO: Add tally to task completion messages indicating count of warnings and above items
+# TODO: Allow for selective attach/detach
+# TODO: Add logging decorator to rest api calls.
 # TODO: Add support to re-attach cli templates
 # TODO: Allow renaming of backed up items before uploading
 # TODO: Be able to provide external csv files for the attachment
@@ -162,6 +165,7 @@ class TaskRestore(Task):
         logger.info('Identifying items to be pushed')
         restore_list = []       # [ (<title>, <index_cls>, [(<item_id>, <item_obj>, <id_on_target>), ...]), ...]
         dependency_set = set()  # {<item_id>, ...}
+        match_set = set()       # {<item_id>, ...}
         for tag in ordered_tags(restore_args.tag):
             logger.info('Inspecting %s items', tag)
 
@@ -193,8 +197,10 @@ class TaskRestore(Task):
 
                     item_matches = (
                         (restore_args.tag == CATALOG_TAG_ALL or restore_args.tag == tag) and
-                        (restore_args.regex is None or re.match(restore_args.regex, item_obj.name))
+                        (restore_args.regex is None or re.search(restore_args.regex, item_obj.name))
                     )
+                    if item_matches:
+                        match_set.add(item_id)
                     if item_matches or item_id in dependency_set:
                         item_list.append((item_id, item_obj, id_on_target))
                         dependency_set.update(item_obj.id_references_set)
@@ -208,9 +214,10 @@ class TaskRestore(Task):
                 pushed_item_dict = {}
                 for item_id, item_obj, id_on_target in item_list:
                     op_info = 'Update' if id_on_target is not None else 'Create'
+                    reason = ' (dependency)' if item_id in dependency_set - match_set else ''
 
                     if restore_args.dryrun:
-                        logger.info('DRY-RUN: %s %s %s', op_info, title, item_obj.name)
+                        logger.info('DRY-RUN: %s %s %s%s', op_info, title, item_obj.name, reason)
                         continue
 
                     try:
@@ -221,9 +228,9 @@ class TaskRestore(Task):
                         else:
                             api.put(item_obj.put_data(id_mapping, id_on_target), item_obj.api_path.put, id_on_target)
 
-                        logger.info('Done: %s %s %s', op_info, title, item_obj.name)
+                        logger.info('Done: %s %s %s%s', op_info, title, item_obj.name, reason)
                     except requests.exceptions.HTTPError as ex:
-                        logger.error('Failed %s %s %s: %s', op_info, title, item_obj.name, ex)
+                        logger.error('Failed %s %s %s%s: %s', op_info, title, item_obj.name, reason, ex)
 
                 # Read new ids on target and update id_mapping
                 target_index = {item_name: item_id for item_id, item_name in index_cls(api.get(index_cls.api_path.get))}
@@ -338,7 +345,7 @@ class TaskDelete(Task):
                     continue
 
                 for item_id, item_name in item_index:
-                    if delete_args.regex is None or re.match(delete_args.regex, item_name):
+                    if delete_args.regex is None or re.search(delete_args.regex, item_name):
                         item_obj = item_cls(api.get(item_cls.api_path.get, item_id))
                         if item_obj.is_readonly:
                             continue
