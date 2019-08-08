@@ -24,6 +24,7 @@ class Rest:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self.session is not None:
+            self.logout()
             self.session.close()
 
         return False
@@ -44,6 +45,10 @@ class Rest:
 
         self.session = session
         return True
+
+    def logout(self):
+        response = self.session.get('{base_url}/logout?nocache'.format(base_url=self.base_url))
+        return response.status_code == requests.codes.ok
 
     def get(self, *path_entries):
         response = self.session.get(self._url(*path_entries),

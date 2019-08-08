@@ -5,17 +5,8 @@ Utility classes and functions
 import os
 import re
 import argparse
+from lib.task_common import Task
 from lib.catalog import catalog_tags, CATALOG_TAG_ALL, BASE_DATA_DIR
-
-
-class Task:
-    @staticmethod
-    def parser(default_work_dir, task_args):
-        raise NotImplementedError()
-
-    @staticmethod
-    def runner(api, parsed_args):
-        raise NotImplementedError()
 
 
 class TaskOptions:
@@ -76,7 +67,7 @@ def regex_type(regex_string):
     return regex_string
 
 
-def existing_workdir_type(workdir_string):
+def directory_type(workdir_string):
     if not os.path.exists(os.path.join(BASE_DATA_DIR, workdir_string)):
         raise argparse.ArgumentTypeError('Work directory "{directory}" not found.'.format(directory=workdir_string))
 
