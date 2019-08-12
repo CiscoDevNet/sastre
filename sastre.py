@@ -15,11 +15,11 @@ from lib.config_items import *
 from lib.rest_api import Rest, LoginFailedException
 from lib.catalog import catalog_size, catalog_entries, CATALOG_TAG_ALL, ordered_tags
 from lib.utils import TaskOptions, TagOptions, directory_type, regex_type, EnvVar
-from lib.task_common import Task
+from lib.task_common import Task, Table
 
 __author__     = "Marcelo Reis"
 __copyright__  = "Copyright (c) 2019 by Cisco Systems, Inc. All rights reserved."
-__version__    = "0.12"
+__version__    = "0.13"
 __maintainer__ = "Marcelo Reis"
 __email__      = "mareis@cisco.com"
 __status__     = "Development"
@@ -29,7 +29,6 @@ __status__     = "Development"
 # TODO: Allow renaming of backed up items before uploading
 # TODO: Be able to provide external csv files for the attachment
 # TODO: Look at diff to decide whether to push a new item or not. Keep skip by default but include option to overwrite
-# TODO: Search task, including option to export results to csv files.
 
 
 class Config:
@@ -117,7 +116,7 @@ class TaskRestore(Task):
         task_parser.add_argument('--dryrun', action='store_true',
                                  help='Restore dry-run mode. Items to be restored are only listed, not pushed to vManage.')
         task_parser.add_argument('--regex', metavar='<regex>', nargs='?', type=regex_type,
-                                 help='Regular expression used to match item names, within selected tags, to be restored.')
+                                 help='Regular expression used to match item names to be restored, within selected tags.')
         # task_parser.add_argument('--update', action='store_true',
         #                          help='Update vManage item if it is different than a saved item with the same name. '
         #                               'By default items with the same name are not restored.')
@@ -285,7 +284,7 @@ class TaskDelete(Task):
         task_parser.add_argument('--dryrun', action='store_true',
                                  help='Delete dry-run mode. Items matched for removal are only listed, not deleted.')
         task_parser.add_argument('--regex', metavar='<regex>', nargs='?', type=regex_type,
-                                 help='Regular expression used to match item names, within selected tags, to be deleted.')
+                                 help='Regular expression used to match item names to be deleted, within selected tags.')
         task_parser.add_argument('--detach', action='store_true',
                                  help='USE WITH CAUTION! Detach devices from templates and deactivate vSmart policy '
                                       'before deleting items. This allows deleting items that are dependencies.')
@@ -350,6 +349,59 @@ class TaskDelete(Task):
                             cls.log_warning('Failed deleting %s %s', title, item_name)
 
         cls.log_info('Delete task completed %s', cls.outcome('successfully', 'with caveats: {tally}'))
+
+
+@TaskOptions.register('list')
+class TaskList(Task):
+    @staticmethod
+    def parser(default_work_dir, task_args):
+        task_parser = argparse.ArgumentParser(prog='sastre.py list', description='{header}\nList task:'.format(header=__doc__),
+                                              formatter_class=argparse.RawDescriptionHelpFormatter)
+        task_parser.add_argument('--workdir', metavar='<workdir>', nargs='?', type=directory_type,
+                                 help='''If specified the list task will operate locally, on items from this directory,
+                                         instead of on target vManage.
+                                      '''.format(default_dir=default_work_dir))
+        task_parser.add_argument('--regex', metavar='<regex>', nargs='?', type=regex_type,
+                                 help='Regular expression used to match item names to retrieve, within selected tags.')
+        task_parser.add_argument('tags', metavar='<tag>', nargs='+', type=TagOptions.tag,
+                                 help='''One or more tags for selecting groups of items. 
+                                         Multiple tags should be separated by space.
+                                         Available tags: {tag_options}. Special tag '{all}' selects all items.
+                                      '''.format(tag_options=TagOptions.options(), all=CATALOG_TAG_ALL))
+        return task_parser.parse_args(task_args)
+
+    @classmethod
+    def runner(cls, api, list_args):
+        target_info = 'vManage URL: "{url}"'.format(url=api.base_url) if list_args.workdir is None \
+                 else 'Work_dir: "{workdir}"'.format(workdir=list_args.workdir)
+        cls.log_info('Starting list task: %s', target_info)
+
+        results = Table('Tag', 'Name', 'ID', 'Description')
+        for tag, title, index_cls, item_cls in catalog_entries(*list_args.tags):
+            cls.log_debug('Inspecting %s items', title)
+
+            if list_args.workdir is None:
+                try:
+                    item_index = index_cls(api.get(index_cls.api_path.get))
+                except requests.exceptions.HTTPError:
+                    cls.log_debug('Skipped %s, item not supported by this vManage', title)
+                    continue
+            else:
+                item_index = index_cls.load(list_args.workdir)
+                if item_index is None:
+                    continue
+
+            for item_id, item_name in item_index:
+                if list_args.regex is None or re.search(list_args.regex, item_name):
+                    results.add_row(tag, item_name, item_id, title)
+
+        cls.log_info('List criteria matched %s items', len(results))
+
+        if len(results) > 0:
+            for line in results.pretty_iter():
+                print(line)
+
+        cls.log_info('List task completed %s', cls.outcome('successfully', 'with caveats: {tally}'))
 
 
 def saved_items_iter(work_dir, tag):

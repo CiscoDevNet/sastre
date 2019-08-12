@@ -3,7 +3,8 @@ Supporting classes and functions for tasks
 
 """
 
-from itertools import repeat
+from itertools import repeat, starmap
+from collections import namedtuple
 import logging
 import time
 from lib.config_items import (DeviceTemplateValues, DeviceTemplateAttached, DeviceTemplateAttach, DeviceModeCli,
@@ -185,3 +186,39 @@ class Task:
             cls.log_warning('Failed %s', log_context)
 
         return result
+
+
+class Table:
+    def __init__(self, *columns):
+        self.header = tuple(columns)
+        self._row_class = namedtuple('Row', columns)
+        self._rows = list()
+
+    def add_row(self, *values):
+        self._rows.append(self._row_class(*values))
+
+    def __iter__(self):
+        return iter(self._rows)
+
+    def __len__(self):
+        return len(self._rows)
+
+    def _column_max_width(self, index):
+        return max(
+            len(self.header[index]),
+            max((len(row[index]) for row in self._rows)) if len(self._rows) > 0 else 0
+        )
+
+    def pretty_iter(self):
+        def cell_format(width, value):
+            return ' {value:{width}} '.format(value=value, width=width-2)
+
+        col_width_list = [2+self._column_max_width(index) for index in range(len(self.header))]
+        border_line = '+' + '+'.join(('-'*col_width for col_width in col_width_list)) + '+'
+
+        yield border_line
+        yield '|' + '|'.join(starmap(cell_format, zip(col_width_list, self.header))) + '|'
+        yield border_line
+        for row in self._rows:
+            yield '|' + '|'.join(starmap(cell_format, zip(col_width_list, row))) + '|'
+        yield border_line

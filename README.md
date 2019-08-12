@@ -30,7 +30,7 @@ The vManage address (-a), username (-u) and password (-p) can also be provided v
 
 The 'sastre-rc-example.sh' file is provided as an example of a file that can be sourced to set those variables.
 
-One of the following tasks can be specified: backup, restore or delete. Adding -h after the task displays help on the additional arguments for the specified task.
+One of the following tasks can be specified: backup, restore, delete or list. Adding -h after the task displays help on the additional arguments for the specified task.
 
 Important concepts:
 - vManage URL: Built from the provided vManage IP address and TCP port (default 8443). All operations target this vManage.
@@ -75,7 +75,7 @@ Edit sastre-rc-example.sh to include vManage details and source that file:
 
 ### Delete templates from vManage:
 
-Just list the items matching the specified tag and regular expression:
+Dry-run, just list the items matching the specified tag and regular expression:
 
     ./sastre.py --verbose delete all --regex "VPN1" --dryrun
     INFO: Starting delete task: vManage URL: "https://10.85.136.253:8443"
@@ -95,6 +95,50 @@ Deleting items:
     <snip>
     INFO: Delete task complete
     
+### List items from vManage or from backup:
+
+The list task can be used to list items from a target vManage, or a backup directory, matching a criteria of item tag(s) and regular expression.
+
+List device templates and feature templates from target vManage:
+
+    ./sastre.py --verbose list template_device template_feature
+    INFO: Starting list task: vManage URL: "https://10.85.136.253:8443"
+    INFO: List criteria matched 355 items
+    +------------------+--------------------------------------------------------------------+--------------------------------------+------------------+
+    | Tag              | Name                                                               | ID                                   | Description      |
+    +------------------+--------------------------------------------------------------------+--------------------------------------+------------------+
+    | template_device  | BRANCH_ADVANCED                                                    | 61b3b608-8ce5-4f9a-bdb2-7d23f759cd9f | device template  |
+    <snip>
+    | template_feature | VPN1_Interface1_v01                                                | 3768c2b8-65cb-4306-a1a7-f345ed789758 | feature template |
+    | template_feature | VPN0_Parent_Interface2_v01                                         | e5db93c7-ffd6-45eb-bbd4-29caab0f3d70 | feature template |
+    +------------------+--------------------------------------------------------------------+--------------------------------------+------------------+
+    INFO: List task completed successfully    
+ 
+ List all items from target vManage with name starting with 'DC':
+ 
+     ./sastre.py list all --regex "^DC"
+    +-------------------+------------------+--------------------------------------+---------------------------+
+    | Tag               | Name             | ID                                   | Description               |
+    +-------------------+------------------+--------------------------------------+---------------------------+
+    | template_device   | DC_BASIC         | 64fc7226-2047-4fee-8460-a6df30ed7479 | device template           |
+    | template_device   | DC_ADVANCED      | 68bdd855-2c26-40ea-8c39-b50bf5bcebe4 | device template           |
+    | policy_definition | DC_Reject_DC_Out | 26b8bb45-6191-4a71-828f-b1d2d0a6ecff | control policy definition |
+    | policy_list       | DC_All           | d9b1f339-c914-4f0c-a2c3-610b4f6e6c2d | site list                 |
+    +-------------------+------------------+--------------------------------------+---------------------------+
+
+List all items from backup directory with name starting with 'DC':
+
+    ./sastre.py --verbose list all --regex "^DC" --workdir node_10.85.136.253_02072019
+    INFO: Starting list task: Work_dir: "node_10.85.136.253_02072019"
+    INFO: List criteria matched 2 items
+    +-----------------+-------------+--------------------------------------+-----------------+
+    | Tag             | Name        | ID                                   | Description     |
+    +-----------------+-------------+--------------------------------------+-----------------+
+    | template_device | DC_ADVANCED | 8845bbdd-31c3-4fd7-b3c3-17fe13c1fcb4 | device template |
+    | template_device | DC_BASIC    | 1cd6a025-a7e8-48e8-8757-dc00de06e4b9 | device template |
+    +-----------------+-------------+--------------------------------------+-----------------+
+    INFO: List task completed successfully
+
 ## Regular Expressions
 
 It is recommended to always use double quotes when specifying a regular expression to --regex option:
