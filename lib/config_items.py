@@ -199,6 +199,14 @@ class DeviceTemplateValues(ConfigItem):
         return [entry for entry in self.data.get('data', [])
                 if allowed_uuid_set is None or entry.get('csv-deviceId') in allowed_uuid_set]
 
+    def values_iter(self):
+        return (
+            (entry.get('csv-deviceId'), entry.get('csv-host-name'), entry) for entry in self.data.get('data', [])
+        )
+
+    def __iter__(self):
+        return self.values_iter()
+
 
 class FeatureTemplate(ConfigItem):
     api_path = ApiPath('template/feature/object', 'template/feature')

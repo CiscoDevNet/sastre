@@ -14,12 +14,12 @@ import requests.exceptions
 from lib.config_items import *
 from lib.rest_api import Rest, LoginFailedException
 from lib.catalog import catalog_size, catalog_entries, CATALOG_TAG_ALL, ordered_tags
-from lib.utils import TaskOptions, TagOptions, directory_type, regex_type, EnvVar
+from lib.utils import TaskOptions, TagOptions, ShowOptions, directory_type, regex_type, uuid_type, EnvVar
 from lib.task_common import Task, Table
 
 __author__     = "Marcelo Reis"
 __copyright__  = "Copyright (c) 2019 by Cisco Systems, Inc. All rights reserved."
-__version__    = "0.13"
+__version__    = "0.14"
 __maintainer__ = "Marcelo Reis"
 __email__      = "mareis@cisco.com"
 __status__     = "Development"
@@ -54,9 +54,11 @@ def main(cli_args):
 class TaskBackup(Task):
     @staticmethod
     def parser(default_work_dir, task_args):
-        task_parser = argparse.ArgumentParser(prog='sastre.py backup', description='{header}\nBackup task:'.format(header=__doc__),
+        task_parser = argparse.ArgumentParser(prog='sastre.py backup',
+                                              description='{header}\nBackup task:'.format(header=__doc__),
                                               formatter_class=argparse.RawDescriptionHelpFormatter)
-        task_parser.add_argument('--workdir', metavar='<workdir>', nargs='?', default=default_work_dir, const=default_work_dir,
+        task_parser.add_argument('--workdir', metavar='<workdir>', nargs='?',
+                                 default=default_work_dir, const=default_work_dir,
                                  help='''Directory used to save the backup (default will be "{default_dir}").
                                       '''.format(default_dir=default_work_dir))
         task_parser.add_argument('tags', metavar='<tag>', nargs='+', type=TagOptions.tag,
@@ -80,19 +82,20 @@ class TaskBackup(Task):
                 continue
 
             for item_id, item_name in item_index:
+                log_params = (title, item_name)
                 try:
                     # Process item class
                     item_obj = item_cls(api.get(item_cls.api_path.get, item_id))
                     if item_obj.save(backup_args.workdir, item_name=item_name, item_id=item_id):
-                        cls.log_info('Done %s %s', title, item_name)
+                        cls.log_info('Done %s %s', *log_params)
 
                     # Special case for DeviceTemplateAttached/DeviceTemplateValues
                     if isinstance(item_obj, DeviceTemplate):
                         devices_attached = DeviceTemplateAttached(api.get(DeviceTemplateAttached.api_path.get, item_id))
                         if devices_attached.save(backup_args.workdir, item_name=item_name, item_id=item_id):
-                            cls.log_info('Done %s %s attached devices', title, item_name)
+                            cls.log_info('Done %s %s attached devices', *log_params)
                         else:
-                            cls.log_debug('Skipped %s %s attached devices, none found', title, item_name)
+                            cls.log_debug('Skipped %s %s attached devices, none found', *log_params)
                             continue
 
                         uuids = [uuid for uuid, personality in devices_attached]
@@ -100,9 +103,9 @@ class TaskBackup(Task):
                             api.post(DeviceTemplateValues.api_params(item_id, uuids), DeviceTemplateValues.api_path.post)
                         )
                         if template_values.save(backup_args.workdir, item_name=item_name, item_id=item_id):
-                            cls.log_info('Done %s %s values', title, item_name)
+                            cls.log_info('Done %s %s values', *log_params)
                 except requests.exceptions.HTTPError as ex:
-                    cls.log_error('Failed backup %s %s: %s', title, item_name, ex)
+                    cls.log_error('Failed backup %s %s: %s', *log_params, ex)
 
         cls.log_info('Backup task completed %s', cls.outcome('successfully', 'with caveats: {tally}'))
 
@@ -111,7 +114,8 @@ class TaskBackup(Task):
 class TaskRestore(Task):
     @staticmethod
     def parser(default_work_dir, task_args):
-        task_parser = argparse.ArgumentParser(prog='sastre.py restore', description='{header}\nRestore task:'.format(header=__doc__),
+        task_parser = argparse.ArgumentParser(prog='sastre.py restore',
+                                              description='{header}\nRestore task:'.format(header=__doc__),
                                               formatter_class=argparse.RawDescriptionHelpFormatter)
         task_parser.add_argument('--dryrun', action='store_true',
                                  help='Restore dry-run mode. Items to be restored are only listed, not pushed to vManage.')
@@ -139,15 +143,11 @@ class TaskRestore(Task):
                     ', DRY-RUN mode' if restore_args.dryrun else '', restore_args.workdir, api.base_url)
 
         cls.log_info('Loading existing items from target vManage')
-        # existing_items is {<hash of index_cls>: {<item_name>: (<item_id>,<item_ts)}}
-        existing_items = {}
-        for _, _, index_cls, item_cls in catalog_entries(CATALOG_TAG_ALL):
-            try:
-                item_index = index_cls(api.get(index_cls.api_path.get))
-            except requests.exceptions.HTTPError:
-                # Item not supported by this vManage, just move on
-                continue
-            existing_items[hash(index_cls)] = {item_name: item_id for item_id, item_name in item_index}
+        # existing_items is {<hash of index_cls>: {<item_name>: <item_id>}}
+        existing_items = {
+            hash(type(index)): {item_name: item_id for item_id, item_name in index}
+            for _, title, index, item_cls in cls.index_iter(catalog_entries(CATALOG_TAG_ALL), api)
+        }
 
         # id_mapping is {<old_id>: <new_id>}, used to replace old item ids with new ids
         id_mapping = {}
@@ -279,7 +279,8 @@ class TaskRestore(Task):
 class TaskDelete(Task):
     @staticmethod
     def parser(default_work_dir, task_args):
-        task_parser = argparse.ArgumentParser(prog='sastre.py delete', description='{header}\nDelete task:'.format(header=__doc__),
+        task_parser = argparse.ArgumentParser(prog='sastre.py delete',
+                                              description='{header}\nDelete task:'.format(header=__doc__),
                                               formatter_class=argparse.RawDescriptionHelpFormatter)
         task_parser.add_argument('--dryrun', action='store_true',
                                  help='Delete dry-run mode. Items matched for removal are only listed, not deleted.')
@@ -326,27 +327,28 @@ class TaskDelete(Task):
 
         for tag in ordered_tags(delete_args.tag, delete_args.tag != CATALOG_TAG_ALL):
             cls.log_info('Inspecting %s items', tag)
-            for _, title, index_cls, item_cls in catalog_entries(tag):
-                try:
-                    item_index = index_cls(api.get(index_cls.api_path.get))
-                except requests.exceptions.HTTPError:
-                    cls.log_debug('Skipped %s, item not supported by this vManage', title)
+            matched_item_iter = (
+                (item_name, item_id, item_cls, title)
+                for _, title, index, item_cls in cls.index_iter(catalog_entries(tag), api)
+                for item_id, item_name in index
+                if delete_args.regex is None or re.search(delete_args.regex, item_name)
+            )
+            for item_name, item_id, item_cls, title in matched_item_iter:
+                item_obj = cls.get_item(item_name, item_id, item_cls, api)
+                log_params = (title, item_name)
+                if item_obj is None:
+                    cls.log_warning('Failed retrieving %s %s', *log_params)
+                    continue
+                if item_obj.is_readonly:
+                    continue
+                if delete_args.dryrun:
+                    cls.log_info('DRY-RUN: %s %s', *log_params)
                     continue
 
-                for item_id, item_name in item_index:
-                    if delete_args.regex is None or re.search(delete_args.regex, item_name):
-                        item_obj = item_cls(api.get(item_cls.api_path.get, item_id))
-                        if item_obj.is_readonly:
-                            continue
-
-                        if delete_args.dryrun:
-                            cls.log_info('DRY-RUN: %s %s', title, item_name)
-                            continue
-
-                        if api.delete(item_cls.api_path.delete, item_id):
-                            cls.log_info('Done %s %s', title, item_name)
-                        else:
-                            cls.log_warning('Failed deleting %s %s', title, item_name)
+                if api.delete(item_cls.api_path.delete, item_id):
+                    cls.log_info('Done %s %s', *log_params)
+                else:
+                    cls.log_warning('Failed deleting %s %s', *log_params)
 
         cls.log_info('Delete task completed %s', cls.outcome('successfully', 'with caveats: {tally}'))
 
@@ -355,7 +357,8 @@ class TaskDelete(Task):
 class TaskList(Task):
     @staticmethod
     def parser(default_work_dir, task_args):
-        task_parser = argparse.ArgumentParser(prog='sastre.py list', description='{header}\nList task:'.format(header=__doc__),
+        task_parser = argparse.ArgumentParser(prog='sastre.py list',
+                                              description='{header}\nList task:'.format(header=__doc__),
                                               formatter_class=argparse.RawDescriptionHelpFormatter)
         task_parser.add_argument('--workdir', metavar='<workdir>', nargs='?', type=directory_type,
                                  help='''If specified the list task will operate locally, on items from this directory,
@@ -376,32 +379,112 @@ class TaskList(Task):
                  else 'Work_dir: "{workdir}"'.format(workdir=list_args.workdir)
         cls.log_info('Starting list task: %s', target_info)
 
-        results = Table('Tag', 'Name', 'ID', 'Description')
-        for tag, title, index_cls, item_cls in catalog_entries(*list_args.tags):
-            cls.log_debug('Inspecting %s items', title)
-
-            if list_args.workdir is None:
-                try:
-                    item_index = index_cls(api.get(index_cls.api_path.get))
-                except requests.exceptions.HTTPError:
-                    cls.log_debug('Skipped %s, item not supported by this vManage', title)
-                    continue
-            else:
-                item_index = index_cls.load(list_args.workdir)
-                if item_index is None:
-                    continue
-
-            for item_id, item_name in item_index:
-                if list_args.regex is None or re.search(list_args.regex, item_name):
-                    results.add_row(tag, item_name, item_id, title)
-
+        matched_item_iter = (
+            (item_name, item_id, tag, title)
+            for tag, title, index, item_cls in cls.index_iter(catalog_entries(*list_args.tags), api, list_args.workdir)
+            for item_id, item_name in index
+            if list_args.regex is None or re.search(list_args.regex, item_name)
+        )
+        results = Table('Name', 'ID', 'Tag', 'Description')
+        results.extend(matched_item_iter)
         cls.log_info('List criteria matched %s items', len(results))
 
         if len(results) > 0:
-            for line in results.pretty_iter():
-                print(line)
+            print_buffer = []
+            print_buffer.extend(results.pretty_iter())
+            print('\n'.join(print_buffer))
 
         cls.log_info('List task completed %s', cls.outcome('successfully', 'with caveats: {tally}'))
+
+
+@TaskOptions.register('show-template')
+class TaskShowTemplate(Task):
+    @staticmethod
+    def parser(default_work_dir, task_args):
+        task_parser = argparse.ArgumentParser(prog='sastre.py show-template',
+                                              description='{header}\nShow template task:'.format(header=__doc__),
+                                              formatter_class=argparse.RawDescriptionHelpFormatter)
+        task_parser.add_argument('option', metavar='<option>', type=ShowOptions.option,
+                                 help='''Attributes to show. Available options: {show_options}.
+                                      '''.format(show_options=ShowOptions.options()))
+        task_parser.add_argument('--workdir', metavar='<workdir>', nargs='?', type=directory_type,
+                                 help='''If specified the show task will operate locally, on items from this directory,
+                                         instead of on target vManage.
+                                      '''.format(default_dir=default_work_dir))
+        xor_group = task_parser.add_mutually_exclusive_group(required=True)
+        xor_group.add_argument('--name', metavar='<name>', help='Device template name.')
+        xor_group.add_argument('--id', metavar='<id>', type=uuid_type, help='Device template ID.')
+        xor_group.add_argument('--regex', metavar='<regex>', type=regex_type,
+                               help='Regular expression used to match device template names.')
+        return task_parser.parse_args(task_args)
+
+    @classmethod
+    def runner(cls, api, show_args):
+        target_info = 'vManage URL: "{url}"'.format(url=api.base_url) if show_args.workdir is None \
+            else 'Work_dir: "{workdir}"'.format(workdir=show_args.workdir)
+        cls.log_info('Starting show task: %s', target_info)
+        # Dispatch to the appropriate show handler
+        show_args.option(cls, api, show_args)
+
+        cls.log_info('Show task completed %s', cls.outcome('successfully', 'with caveats: {tally}'))
+
+    @classmethod
+    @ShowOptions.register('values')
+    def device_template_values(cls, api, show_args):
+        def item_matches(item_name, item_id):
+            if show_args.id is not None:
+                return item_id == show_args.id
+            if show_args.name is not None:
+                return item_name == show_args.name
+            return re.search(show_args.regex, item_name) is not None
+
+        def template_values(template_name, template_id):
+            if show_args.workdir is None:
+                try:
+                    devices_attached = DeviceTemplateAttached(api.get(DeviceTemplateAttached.api_path.get, template_id))
+                    uuids = [uuid for uuid, personality in devices_attached]
+                    values = DeviceTemplateValues(
+                        api.post(DeviceTemplateValues.api_params(template_id, uuids), DeviceTemplateValues.api_path.post)
+                    )
+                except requests.exceptions.HTTPError as ex:
+                    cls.log_error('Failed to retrieve %s values: %s', item_name, ex)
+                    values = None
+            else:
+                values = DeviceTemplateValues.load(show_args.workdir, item_name=template_name, item_id=template_id)
+                if values is None:
+                    cls.log_debug('Skipped %s. No template values file found.', item_name)
+
+            return values
+
+        matched_item_iter = (
+            (item_name, item_id, tag, title)
+            for tag, title, index, item_cls in cls.index_iter(catalog_entries('template_device'), api, show_args.workdir)
+            for item_id, item_name in index
+            if item_matches(item_name, item_id) and issubclass(item_cls, DeviceTemplate)
+        )
+
+        print_buffer = []
+        for item_name, item_id, tag, title in matched_item_iter:
+            attached_values = template_values(item_name, item_id)
+            if attached_values is None:
+                continue
+
+            cls.log_info('Inspecting %s %s values', title, item_name)
+            for csv_id, csv_name, entry in attached_values:
+                print_grp = [
+                    'Device template {name}, values for {device}:'.format(name=item_name, device=csv_name or csv_id)
+                ]
+                results = Table('Variable', 'Value')
+                results.extend(entry.items())
+                if len(results) > 0:
+                    print_grp.extend(results.pretty_iter())
+                print_buffer.append('\n'.join(print_grp))
+
+        if len(print_buffer) > 0:
+            print('\n\n'.join(print_buffer))
+        else:
+            match_type = 'ID' if show_args.id is not None else 'name' if show_args.name is not None else 'regex'
+            cls.log_warning('No items found with the %s provided', match_type)
 
 
 def saved_items_iter(work_dir, tag):

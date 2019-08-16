@@ -3,10 +3,11 @@ Supporting classes and functions for tasks
 
 """
 
-from itertools import repeat, starmap
-from collections import namedtuple
 import logging
 import time
+import requests.exceptions
+from itertools import repeat, starmap
+from collections import namedtuple
 from lib.config_items import (DeviceTemplateValues, DeviceTemplateAttached, DeviceTemplateAttach, DeviceModeCli,
                               ActionStatus)
 
@@ -75,6 +76,39 @@ class Task:
     @classmethod
     def runner(cls, api, parsed_args):
         raise NotImplementedError()
+
+    @classmethod
+    def index_iter(cls, catalog_entry_iter, api, work_dir=None):
+        def api_get(index_cls):
+            try:
+                index_obj = index_cls(api.get(index_cls.api_path.get))
+            except requests.exceptions.HTTPError:
+                index_obj = None
+            return index_obj
+
+        def get_index(tag, title, index_cls, item_cls):
+            cls.log_debug('Inspecting %s items', title)
+            index_obj = api_get(index_cls) if work_dir is None else index_cls.load(work_dir)
+            if index_obj is None:
+                cls.log_debug('Skipped %s index', title)
+            return tag, title, index_obj, item_cls
+
+        return (
+            (tag, title, index_obj, item_cls)
+            for tag, title, index_obj, item_cls in starmap(get_index, catalog_entry_iter)
+            if index_obj is not None
+        )
+
+    @staticmethod
+    def get_item(item_name, item_id, item_cls, api, work_dir=None):
+        if work_dir is None:
+            try:
+                item = item_cls(api.get(item_cls.api_path.get, item_id))
+            except requests.exceptions.HTTPError:
+                item = None
+        else:
+            item = item_cls.load(work_dir, item_name=item_name, item_id=item_id)
+        return item
 
     @classmethod
     def attach_template(cls, api, saved_template_iter, work_dir, target_template_dict, target_uuid_set):
@@ -194,8 +228,11 @@ class Table:
         self._row_class = namedtuple('Row', columns)
         self._rows = list()
 
-    def add_row(self, *values):
+    def add(self, *values):
         self._rows.append(self._row_class(*values))
+
+    def extend(self, row_values_iter):
+        self._rows.extend(starmap(self._row_class, row_values_iter))
 
     def __iter__(self):
         return iter(self._rows)

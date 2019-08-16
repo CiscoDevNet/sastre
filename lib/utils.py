@@ -14,11 +14,10 @@ class TaskOptions:
 
     @classmethod
     def task(cls, task_string):
-        if task_string not in cls._task_options:
-            raise argparse.ArgumentTypeError(
-                'Invalid task. Options are: {options}'.format(options=cls.options())
-            )
-        return cls._task_options.get(task_string)
+        task_cls = cls._task_options.get(task_string)
+        if task_cls is None:
+            raise argparse.ArgumentTypeError('Invalid task. Options are: {options}.'.format(options=cls.options()))
+        return task_cls
 
     @classmethod
     def options(cls):
@@ -29,7 +28,7 @@ class TaskOptions:
         """
         Decorator used for registering tasks.
         The class being decorated needs to be a subclass of Task.
-        :param task_name:
+        :param task_name: String presented to the user in order to select a task
         :return: decorator
         """
         def decorator(task_cls):
@@ -58,6 +57,34 @@ class TagOptions:
         return ', '.join([CATALOG_TAG_ALL] + sorted(catalog_tags()))
 
 
+class ShowOptions:
+    _show_options = {}
+
+    @classmethod
+    def option(cls, option_string):
+        option_fn = cls._show_options.get(option_string)
+        if option_fn is None:
+            raise argparse.ArgumentTypeError('Invalid show option. Options are: {ops}.'.format(ops=cls.options()))
+        return option_fn
+
+    @classmethod
+    def options(cls):
+        return ', '.join(cls._show_options)
+
+    @classmethod
+    def register(cls, option_string):
+        """
+        Decorator used for registering show task options.
+        :param option_string: String presented to the user in order to select a show option
+        :return: decorator
+        """
+        def decorator(option_fn):
+            cls._show_options[option_string] = option_fn
+            return option_fn
+
+        return decorator
+
+
 def regex_type(regex_string):
     try:
         re.compile(regex_string)
@@ -72,6 +99,13 @@ def directory_type(workdir_string):
         raise argparse.ArgumentTypeError('Work directory "{directory}" not found.'.format(directory=workdir_string))
 
     return workdir_string
+
+
+def uuid_type(uuid_string):
+    if re.match(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', uuid_string) is None:
+        raise argparse.ArgumentTypeError('"{uuid}" is not a valid item ID.'.format(uuid=uuid_string))
+
+    return uuid_string
 
 
 class EnvVar(argparse.Action):
