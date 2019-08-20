@@ -204,6 +204,9 @@ class DeviceTemplateValues(ConfigItem):
             (entry.get('csv-deviceId'), entry.get('csv-host-name'), entry) for entry in self.data.get('data', [])
         )
 
+    def title_dict(self):
+        return {column['property']: column['title'] for column in self.data.get('header', {}).get('columns', [])}
+
     def __iter__(self):
         return self.values_iter()
 

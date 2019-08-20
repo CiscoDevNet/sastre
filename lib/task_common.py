@@ -6,6 +6,7 @@ Supporting classes and functions for tasks
 import logging
 import time
 import requests.exceptions
+import csv
 from itertools import repeat, starmap
 from collections import namedtuple
 from lib.config_items import (DeviceTemplateValues, DeviceTemplateAttached, DeviceTemplateAttach, DeviceModeCli,
@@ -259,3 +260,9 @@ class Table:
         for row in self._rows:
             yield '|' + '|'.join(starmap(cell_format, zip(col_width_list, row))) + '|'
         yield border_line
+
+    def save(self, filename):
+        with open(filename, 'w', newline='') as csv_file:
+            writer = csv.writer(csv_file)
+            writer.writerow(self.header)
+            writer.writerows(self._rows)

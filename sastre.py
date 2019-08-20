@@ -149,10 +149,8 @@ class TaskRestore(Task):
             for _, title, index, item_cls in cls.index_iter(catalog_entries(CATALOG_TAG_ALL), api)
         }
 
-        # id_mapping is {<old_id>: <new_id>}, used to replace old item ids with new ids
-        id_mapping = {}
-
         cls.log_info('Identifying items to be pushed')
+        id_mapping = {}         # {<old_id>: <new_id>}, used to replace old item ids with new ids
         restore_list = []       # [ (<title>, <index_cls>, [(<item_id>, <item_obj>, <id_on_target>), ...]), ...]
         dependency_set = set()  # {<item_id>, ...}
         match_set = set()       # {<item_id>, ...}
@@ -366,6 +364,9 @@ class TaskList(Task):
                                       '''.format(default_dir=default_work_dir))
         task_parser.add_argument('--regex', metavar='<regex>', nargs='?', type=regex_type,
                                  help='Regular expression used to match item names to retrieve, within selected tags.')
+        task_parser.add_argument('--csv', metavar='<filename>',
+                                 help='''Instead of printing a table with the list results, export as csv file with
+                                         the filename provided.''')
         task_parser.add_argument('tags', metavar='<tag>', nargs='+', type=TagOptions.tag,
                                  help='''One or more tags for selecting groups of items. 
                                          Multiple tags should be separated by space.
@@ -392,7 +393,12 @@ class TaskList(Task):
         if len(results) > 0:
             print_buffer = []
             print_buffer.extend(results.pretty_iter())
-            print('\n'.join(print_buffer))
+
+            if list_args.csv is not None:
+                results.save(list_args.csv)
+                cls.log_info('Table exported as %s', list_args.csv)
+            else:
+                print('\n'.join(print_buffer))
 
         cls.log_info('List task completed %s', cls.outcome('successfully', 'with caveats: {tally}'))
 
@@ -411,6 +417,9 @@ class TaskShowTemplate(Task):
                                  help='''If specified the show task will operate locally, on items from this directory,
                                          instead of on target vManage.
                                       '''.format(default_dir=default_work_dir))
+        task_parser.add_argument('--csv', metavar='<directory>',
+                                 help='''Instead of printing tables with the results, export as csv files.
+                                         Exported files are saved under the specified directory.''')
         xor_group = task_parser.add_mutually_exclusive_group(required=True)
         xor_group.add_argument('--name', metavar='<name>', help='Device template name.')
         xor_group.add_argument('--id', metavar='<id>', type=uuid_type, help='Device template ID.')
@@ -423,6 +432,10 @@ class TaskShowTemplate(Task):
         target_info = 'vManage URL: "{url}"'.format(url=api.base_url) if show_args.workdir is None \
             else 'Work_dir: "{workdir}"'.format(workdir=show_args.workdir)
         cls.log_info('Starting show task: %s', target_info)
+
+        if show_args.csv is not None:
+            os.makedirs(show_args.csv, exist_ok=True)
+
         # Dispatch to the appropriate show handler
         show_args.option(cls, api, show_args)
 
@@ -456,32 +469,40 @@ class TaskShowTemplate(Task):
 
             return values
 
+        print_buffer = []
         matched_item_iter = (
             (item_name, item_id, tag, title)
             for tag, title, index, item_cls in cls.index_iter(catalog_entries('template_device'), api, show_args.workdir)
             for item_id, item_name in index
             if item_matches(item_name, item_id) and issubclass(item_cls, DeviceTemplate)
         )
-
-        print_buffer = []
         for item_name, item_id, tag, title in matched_item_iter:
             attached_values = template_values(item_name, item_id)
             if attached_values is None:
                 continue
 
             cls.log_info('Inspecting %s %s values', title, item_name)
+            var_names = attached_values.title_dict()
             for csv_id, csv_name, entry in attached_values:
                 print_grp = [
                     'Device template {name}, values for {device}:'.format(name=item_name, device=csv_name or csv_id)
                 ]
-                results = Table('Variable', 'Value')
-                results.extend(entry.items())
+                results = Table('Name', 'Variable', 'Value')
+                results.extend(
+                    (var_names.get(variable, '<not found>'), variable, value) for variable, value in entry.items()
+                )
                 if len(results) > 0:
+                    if show_args.csv is not None:
+                        filename = 'template_values_{name}_{id}.csv'.format(name=item_name, id=csv_name or csv_id)
+                        results.save(os.path.join(show_args.csv, filename))
                     print_grp.extend(results.pretty_iter())
                 print_buffer.append('\n'.join(print_grp))
 
         if len(print_buffer) > 0:
-            print('\n\n'.join(print_buffer))
+            if show_args.csv is not None:
+                cls.log_info('Exported csv files saved under %s', show_args.csv)
+            else:
+                print('\n\n'.join(print_buffer))
         else:
             match_type = 'ID' if show_args.id is not None else 'name' if show_args.name is not None else 'regex'
             cls.log_warning('No items found with the %s provided', match_type)
