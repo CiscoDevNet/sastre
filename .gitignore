@@ -4,6 +4,8 @@ data/
 rc/
 logs/
 
+*.csv
+
 # IntelliJ project files
 .idea
 *.iml

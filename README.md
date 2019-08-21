@@ -17,12 +17,11 @@ If 'ALL GOOD' is printed it means all requirements are met. Otherwise additional
 Sastre has a set of basic options as well as task-specific arguments.
  
 The general command line structure is as follows:
- 
-    sastre.py [-h] [-a <vmanage-ip>] [-u <user>] [-p <password>]
-                   [--port [<port>]] [--timeout [<timeout>]] [--verbose]
-                   [--version]
-                   <task> ...
- 
+
+     sastre.py [-h] [-a <vmanage-ip>] [-u <user>] [-p <password>]
+                 [--port <port>] [--timeout <timeout>] [--verbose] [--version]
+                 <task> ...
+
 The vManage address (-a), username (-u) and password (-p) can also be provided via environmental variables:
 - VMANAGE_IP
 - VMANAGE_USER
@@ -30,11 +29,33 @@ The vManage address (-a), username (-u) and password (-p) can also be provided v
 
 The 'sastre-rc-example.sh' file is provided as an example of a file that can be sourced to set those variables.
 
-One of the following tasks can be specified: backup, restore, delete or list. Adding -h after the task displays help on the additional arguments for the specified task.
+Tasks currently available: backup, restore, delete, list or show-template. Adding -h after the task displays help on the additional arguments for the specified task.
+
+Task-specific parameters and options (including help) are provided after the task:
+
+    ./sastre.py backup --help
+    usage: sastre.py backup [-h] [--workdir <directory>] <tag> [<tag> ...]
+    
+    Sastre - Automation Tools for Cisco SD-WAN Powered by Viptela
+    
+    Backup task:
+    
+    positional arguments:
+      <tag>                 One or more tags for selecting items to be backed up.
+                            Multiple tags should be separated by space. Available
+                            tags: all, policy_definition, policy_list,
+                            policy_vedge, policy_vsmart, template_device,
+                            template_feature. Special tag 'all' selects all items.
+    
+    optional arguments:
+      -h, --help            show this help message and exit
+      --workdir <directory>
+                            Directory used to save the backup (default will be
+                            "node_10.85.136.253").
 
 Important concepts:
 - vManage URL: Built from the provided vManage IP address and TCP port (default 8443). All operations target this vManage.
-- Work dir: Defines the location (in the local machine) where vManage data files are located. By default it follows the format "node_<vmanage-ip>". With the restore task, the --workdir parameter can be used to provide the location of data files to be used. This scenario is used to transfer data files from one vManage to another. Workdir is under the 'data' directory. 
+- Workdir: Defines the location (in the local machine) where vManage data files are located. By default it follows the format "node_<vmanage-ip>". With the restore task, the --workdir parameter can be used to provide the location of data files to be used. This scenario is used to transfer data files from one vManage to another. Workdir is under the 'data' directory. 
 - Tag: vManage configuration items are grouped by tags, such as policy_apply, policy_definition, policy_list, template_device, etc. The special tag 'all' is used to refer to all configuration elements. Depending on the task, one or more tags can be specified in order to select specific configuration elements.
 
 ## Examples
@@ -138,6 +159,50 @@ List all items from backup directory with name starting with 'DC':
     | template_device | DC_BASIC    | 1cd6a025-a7e8-48e8-8757-dc00de06e4b9 | device template |
     +-----------------+-------------+--------------------------------------+-----------------+
     INFO: List task completed successfully
+
+### Show items from vManage or from backup
+
+Similarly to list, show tasks can be used to show items from a target vManage, or a backup directory. With show tasks, additional details about the selected items are displayed. The item id, name or a regular expression can be used to identify which item(s) to display.
+
+     ./sastre.py show-template values --name DC_BASIC
+    Device template DC_BASIC, values for vedge-dc1:
+    +-----------------------------------+--------------------------------------+--------------------------------------------------------------------+
+    | Name                              | Value                                | Variable                                                           |
+    +-----------------------------------+--------------------------------------+--------------------------------------------------------------------+
+    | Status                            | complete                             | csv-status                                                         |
+    | Chassis Number                    | b693be59-c03f-62d0-f9a4-2675374536b8 | csv-deviceId                                                       |
+    | System IP                         | 10.255.101.1                         | csv-deviceIP                                                       |
+    | Hostname                          | vedge-dc1                            | csv-host-name                                                      |
+    | Hostname(system_host_name)        | vedge-dc1                            | //system/host-name                                                 |
+    | System IP(system_system_ip)       | 10.255.101.1                         | //system/system-ip                                                 |
+    | Site ID(system_site_id)           | 101                                  | //system/site-id                                                   |
+    | IPv4 Address(vpn_if_ipv4_address) | 10.101.1.4/24                        | /10/ge0/2/interface/ip/address                                     |
+    | IPv4 Address(vpn_if_ipv4_address) | 5.254.4.110/24                       | /20/ge0/3/interface/ip/address                                     |
+    | AS Number(bgp_as_num)             | 65001                                | /20//router/bgp/as-num                                             |
+    | Address(bgp_neighbor_address)     | 5.254.4.1                            | /20//router/bgp/neighbor/bgp_neighbor_address/address              |
+    | Remote AS(bgp_neighbor_remote_as) | 65111                                | /20//router/bgp/neighbor/bgp_neighbor_address/remote-as            |
+    | Preference(transport1_preference) | 100                                  | /0/ge0/0/interface/tunnel-interface/encapsulation/ipsec/preference |
+    +-----------------------------------+--------------------------------------+--------------------------------------------------------------------+
+    
+    Device template DC_BASIC, values for vedge-dc2:
+    +-----------------------------------+--------------------------------------+--------------------------------------------------------------------+
+    | Name                              | Value                                | Variable                                                           |
+    +-----------------------------------+--------------------------------------+--------------------------------------------------------------------+
+    | Status                            | complete                             | csv-status                                                         |
+    | Chassis Number                    | 0dd49ace-f6de-ce86-5d73-ca74d6db1747 | csv-deviceId                                                       |
+    | System IP                         | 10.255.102.1                         | csv-deviceIP                                                       |
+    | Hostname                          | vedge-dc2                            | csv-host-name                                                      |
+    | Hostname(system_host_name)        | vedge-dc2                            | //system/host-name                                                 |
+    | System IP(system_system_ip)       | 10.255.102.1                         | //system/system-ip                                                 |
+    | Site ID(system_site_id)           | 102                                  | //system/site-id                                                   |
+    | IPv4 Address(vpn_if_ipv4_address) | 10.102.1.3/24                        | /10/ge0/2/interface/ip/address                                     |
+    | IPv4 Address(vpn_if_ipv4_address) | 5.254.5.105/24                       | /20/ge0/3/interface/ip/address                                     |
+    | AS Number(bgp_as_num)             | 65002                                | /20//router/bgp/as-num                                             |
+    | Address(bgp_neighbor_address)     | 5.254.5.1                            | /20//router/bgp/neighbor/bgp_neighbor_address/address              |
+    | Remote AS(bgp_neighbor_remote_as) | 65222                                | /20//router/bgp/neighbor/bgp_neighbor_address/remote-as            |
+    | Preference(transport1_preference) | 0                                    | /0/ge0/0/interface/tunnel-interface/encapsulation/ipsec/preference |
+    +-----------------------------------+--------------------------------------+--------------------------------------------------------------------+
+
 
 ## Regular Expressions
 

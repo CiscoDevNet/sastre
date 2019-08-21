@@ -24,6 +24,7 @@ __maintainer__ = "Marcelo Reis"
 __email__      = "mareis@cisco.com"
 __status__     = "Development"
 
+# TODO: 19.2 support
 # TODO: Allow for selective attach/detach
 # TODO: Add support to re-attach cli templates
 # TODO: Allow renaming of backed up items before uploading
@@ -57,8 +58,7 @@ class TaskBackup(Task):
         task_parser = argparse.ArgumentParser(prog='sastre.py backup',
                                               description='{header}\nBackup task:'.format(header=__doc__),
                                               formatter_class=argparse.RawDescriptionHelpFormatter)
-        task_parser.add_argument('--workdir', metavar='<workdir>', nargs='?',
-                                 default=default_work_dir, const=default_work_dir,
+        task_parser.add_argument('--workdir', metavar='<directory>', default=default_work_dir,
                                  help='''Directory used to save the backup (default will be "{default_dir}").
                                       '''.format(default_dir=default_work_dir))
         task_parser.add_argument('tags', metavar='<tag>', nargs='+', type=TagOptions.tag,
@@ -117,19 +117,19 @@ class TaskRestore(Task):
         task_parser = argparse.ArgumentParser(prog='sastre.py restore',
                                               description='{header}\nRestore task:'.format(header=__doc__),
                                               formatter_class=argparse.RawDescriptionHelpFormatter)
+        task_parser.add_argument('--workdir', metavar='<directory>', type=directory_type,
+                                 default=default_work_dir,
+                                 help='''Directory used to source items to be restored (default will be "{default_dir}").
+                                      '''.format(default_dir=default_work_dir))
         task_parser.add_argument('--dryrun', action='store_true',
                                  help='Restore dry-run mode. Items to be restored are only listed, not pushed to vManage.')
-        task_parser.add_argument('--regex', metavar='<regex>', nargs='?', type=regex_type,
+        task_parser.add_argument('--regex', metavar='<regex>', type=regex_type,
                                  help='Regular expression used to match item names to be restored, within selected tags.')
         # task_parser.add_argument('--update', action='store_true',
         #                          help='Update vManage item if it is different than a saved item with the same name. '
         #                               'By default items with the same name are not restored.')
         task_parser.add_argument('--attach', action='store_true',
                                  help='Attach devices to templates and activate vSmart policy after restoring items.')
-        task_parser.add_argument('--workdir', metavar='<workdir>', nargs='?', type=directory_type,
-                                 default=default_work_dir, const=default_work_dir,
-                                 help='''Directory used to source items to be restored (default will be "{default_dir}").
-                                      '''.format(default_dir=default_work_dir))
         task_parser.add_argument('tag', metavar='<tag>', type=TagOptions.tag,
                                  help='''Tag for selecting items to be restored. 
                                          Items that are dependencies of the specified tag are automatically included.
@@ -282,7 +282,7 @@ class TaskDelete(Task):
                                               formatter_class=argparse.RawDescriptionHelpFormatter)
         task_parser.add_argument('--dryrun', action='store_true',
                                  help='Delete dry-run mode. Items matched for removal are only listed, not deleted.')
-        task_parser.add_argument('--regex', metavar='<regex>', nargs='?', type=regex_type,
+        task_parser.add_argument('--regex', metavar='<regex>', type=regex_type,
                                  help='Regular expression used to match item names to be deleted, within selected tags.')
         task_parser.add_argument('--detach', action='store_true',
                                  help='USE WITH CAUTION! Detach devices from templates and deactivate vSmart policy '
@@ -358,11 +358,11 @@ class TaskList(Task):
         task_parser = argparse.ArgumentParser(prog='sastre.py list',
                                               description='{header}\nList task:'.format(header=__doc__),
                                               formatter_class=argparse.RawDescriptionHelpFormatter)
-        task_parser.add_argument('--workdir', metavar='<workdir>', nargs='?', type=directory_type,
+        task_parser.add_argument('--workdir', metavar='<directory>', type=directory_type,
                                  help='''If specified the list task will operate locally, on items from this directory,
                                          instead of on target vManage.
                                       '''.format(default_dir=default_work_dir))
-        task_parser.add_argument('--regex', metavar='<regex>', nargs='?', type=regex_type,
+        task_parser.add_argument('--regex', metavar='<regex>', type=regex_type,
                                  help='Regular expression used to match item names to retrieve, within selected tags.')
         task_parser.add_argument('--csv', metavar='<filename>',
                                  help='''Instead of printing a table with the list results, export as csv file with
@@ -413,7 +413,7 @@ class TaskShowTemplate(Task):
         task_parser.add_argument('option', metavar='<option>', type=ShowOptions.option,
                                  help='''Attributes to show. Available options: {show_options}.
                                       '''.format(show_options=ShowOptions.options()))
-        task_parser.add_argument('--workdir', metavar='<workdir>', nargs='?', type=directory_type,
+        task_parser.add_argument('--workdir', metavar='<directory>', type=directory_type,
                                  help='''If specified the show task will operate locally, on items from this directory,
                                          instead of on target vManage.
                                       '''.format(default_dir=default_work_dir))
@@ -485,11 +485,11 @@ class TaskShowTemplate(Task):
             var_names = attached_values.title_dict()
             for csv_id, csv_name, entry in attached_values:
                 print_grp = [
-                    'Device template {name}, values for {device}:'.format(name=item_name, device=csv_name or csv_id)
+                    'Template {name}, device {device}:'.format(name=item_name, device=csv_name or csv_id)
                 ]
-                results = Table('Name', 'Variable', 'Value')
+                results = Table('Name', 'Value', 'Variable')
                 results.extend(
-                    (var_names.get(variable, '<not found>'), variable, value) for variable, value in entry.items()
+                    (var_names.get(var, '<not found>'), value, var) for var, value in entry.items()
                 )
                 if len(results) > 0:
                     if show_args.csv is not None:
@@ -537,11 +537,9 @@ if __name__ == '__main__':
                             help='username, can also be provided via VMANAGE_USER environment variable')
     cli_parser.add_argument('-p', '--password', metavar='<password>', action=EnvVar, envvar='VMANAGE_PASSWORD',
                             help='password, can also be provided via VMANAGE_PASSWORD environment variable')
-    cli_parser.add_argument('--port', metavar='<port>', nargs='?',
-                            default=Config.VMANAGE_DEFAULT_PORT, const=Config.VMANAGE_DEFAULT_PORT,
+    cli_parser.add_argument('--port', metavar='<port>', default=Config.VMANAGE_DEFAULT_PORT,
                             help='vManage TCP port number (default is {port})'.format(port=Config.VMANAGE_DEFAULT_PORT))
-    cli_parser.add_argument('--timeout', metavar='<timeout>', nargs='?', type=int,
-                            default=Config.REST_DEFAULT_TIMEOUT, const=Config.REST_DEFAULT_TIMEOUT,
+    cli_parser.add_argument('--timeout', metavar='<timeout>', type=int, default=Config.REST_DEFAULT_TIMEOUT,
                             help='REST API timeout (default is {timeout}s)'.format(timeout=Config.REST_DEFAULT_TIMEOUT))
     cli_parser.add_argument('--verbose', action='store_true',
                             help='increase output verbosity')
