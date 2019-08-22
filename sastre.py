@@ -21,6 +21,7 @@ __author__     = "Marcelo Reis"
 __copyright__  = "Copyright (c) 2019 by Cisco Systems, Inc. All rights reserved."
 __version__    = "0.14"
 __maintainer__ = "Marcelo Reis"
+__email__      = "mareis@cisco.com"
 __status__     = "Development"
 
 # TODO: 19.2 support
