@@ -5,10 +5,11 @@ Supporting classes and functions for tasks
 
 import logging
 import time
-import requests.exceptions
 import csv
+import requests.exceptions
 from itertools import repeat, starmap
 from collections import namedtuple
+from lib.rest_api import Rest
 from lib.config_items import (DeviceTemplateValues, DeviceTemplateAttached, DeviceTemplateAttach, DeviceModeCli,
                               ActionStatus)
 
@@ -79,37 +80,28 @@ class Task:
         raise NotImplementedError()
 
     @classmethod
-    def index_iter(cls, catalog_entry_iter, api, work_dir=None):
-        def api_get(index_cls):
-            try:
-                index_obj = index_cls(api.get(index_cls.api_path.get))
-            except requests.exceptions.HTTPError:
-                index_obj = None
-            return index_obj
+    def index_iter(cls, backend, catalog_entry_iter):
+        """
+        Return an iterator of indexes loaded from backend. If backend is a Rest API instance, indexes are loaded
+        from remote vManage via API. Otherwise items are loaded from local backup under the backend directory.
+        :param backend: Rest api instance or directory name
+        :param catalog_entry_iter: An iterator of CatalogEntry
+        :return: Iterator of (<tag>, <title>, <index>, <item_cls>)
+        """
+        is_api = isinstance(backend, Rest)
 
         def get_index(tag, title, index_cls, item_cls):
             cls.log_debug('Inspecting %s items', title)
-            index_obj = api_get(index_cls) if work_dir is None else index_cls.load(work_dir)
-            if index_obj is None:
+            index = index_cls.get(backend) if is_api else index_cls.load(backend)
+            if index is None:
                 cls.log_debug('Skipped %s index', title)
-            return tag, title, index_obj, item_cls
+            return tag, title, index, item_cls
 
         return (
-            (tag, title, index_obj, item_cls)
-            for tag, title, index_obj, item_cls in starmap(get_index, catalog_entry_iter)
-            if index_obj is not None
+            (tag, title, index, item_cls)
+            for tag, title, index, item_cls in starmap(get_index, catalog_entry_iter)
+            if index is not None
         )
-
-    @staticmethod
-    def get_item(item_name, item_id, item_cls, api, work_dir=None):
-        if work_dir is None:
-            try:
-                item = item_cls(api.get(item_cls.api_path.get, item_id))
-            except requests.exceptions.HTTPError:
-                item = None
-        else:
-            item = item_cls.load(work_dir, item_name=item_name, item_id=item_id)
-        return item
 
     @classmethod
     def attach_template(cls, api, saved_template_iter, work_dir, target_template_dict, target_uuid_set):
@@ -137,9 +129,11 @@ class Task:
                 cls.log_debug('Skip, saved template is not on target node')
                 continue
 
-            target_attached_uuid_set = {
-                uuid for uuid, _ in DeviceTemplateAttached(api.get(DeviceTemplateAttached.api_path.get, target_id))
-            }
+            try:
+                target_attached_uuid_set = {uuid for uuid, _ in DeviceTemplateAttached.get_raise(api, target_id)}
+            except requests.exceptions.HTTPError:
+                cls.log_warning('Failed to retrieve %s attached devices from vManage', saved_name)
+                continue
 
             # Limit input values to uuids on target vManage that are not yet attached
             input_values = saved_values.input_list(target_uuid_set - target_attached_uuid_set)
@@ -155,8 +149,8 @@ class Task:
 
         return action_list
 
-    @staticmethod
-    def detach_template(api, template_index, filter_fn):
+    @classmethod
+    def detach_template(cls, api, template_index, filter_fn):
         """
         :param api: Instance of Rest API
         :param template_index: Instance of DeviceTemplateIndex
@@ -165,7 +159,10 @@ class Task:
         """
         action_list = []
         for item_id, item_name in template_index.filtered_iter(filter_fn):
-            devices_attached = DeviceTemplateAttached(api.get(DeviceTemplateAttached.api_path.get, item_id))
+            devices_attached = DeviceTemplateAttached.get(api, item_id)
+            if devices_attached is None:
+                cls.log_warning('Failed to retrieve %s attached devices from vManage', item_name)
+                continue
 
             uuids, personalities = zip(*devices_attached)
             # Personalities for all devices attached to the same template are always the same
@@ -195,7 +192,12 @@ class Task:
         time_budget = cls.ACTION_TIMEOUT
         for action_worker, action_info in action_list:
             while True:
-                action = ActionStatus(api.get(ActionStatus.api_path.get, action_worker.uuid))
+                action = ActionStatus.get(api, action_worker.uuid)
+                if action is None:
+                    cls.log_warning('Failed to retrieve action status from vManage')
+                    result_list.append(False)
+                    break
+
                 if action.is_completed:
                     if action.is_successful:
                         cls.log_info('Done %s', action_info)

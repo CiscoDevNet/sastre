@@ -5,6 +5,7 @@ vManage API Catalog and base elements
 import os.path
 import json
 import re
+import requests.exceptions
 from functools import partial
 from itertools import zip_longest
 from collections import namedtuple
@@ -172,6 +173,17 @@ class ApiItem:
     def is_empty(self):
         return self.data is None or len(self.data) == 0
 
+    @classmethod
+    def get(cls, api, *path_entries):
+        try:
+            return cls.get_raise(api, *path_entries)
+        except requests.exceptions.HTTPError:
+            return None
+
+    @classmethod
+    def get_raise(cls, api, *path_entries):
+        return cls(api.get(cls.api_path.get, *path_entries))
+
     def __str__(self):
         return json.dumps(self.data, indent=2)
 
@@ -232,13 +244,13 @@ class ConfigItem(ApiItem):
         file = os.path.join(os.path.join(cls.root_dir, node_dir, *cls.store_path),
                             cls.store_file.format(**kwargs) if len(kwargs) > 0 else cls.store_file)
 
-        if not os.path.exists(file):
+        try:
+            with open(file, 'r') as read_f:
+                data = json.load(read_f)
+        except FileNotFoundError:
             return None
-
-        with open(file, 'r') as read_f:
-            data = json.load(read_f)
-
-        return cls(data)
+        else:
+            return cls(data)
 
     def save(self, node_dir, **kwargs):
         """
