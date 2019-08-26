@@ -12,6 +12,7 @@ class Rest:
         self.timeout = timeout
         self.verify = verify
         self.session = None
+        self.server_facts = None
 
         if not verify:
             urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -44,11 +45,24 @@ class Rest:
             return False
 
         self.session = session
+
+        self.server_facts = self.get('client/server').get('data')
+        if self.server_facts is None:
+            raise RestAPIException('Could not retrieve vManage server information')
+
+        # Token mechanism introduced in 19.2
+        token = self.server_facts.get('CSRFToken')
+        if token is not None:
+            self.session.headers['X-XSRF-TOKEN'] = token
+
         return True
 
     def logout(self):
         response = self.session.get('{base_url}/logout?nocache'.format(base_url=self.base_url))
         return response.status_code == requests.codes.ok
+
+    def server_version(self):
+        return self.server_facts.get('platformVersion')
 
     def get(self, *path_entries):
         response = self.session.get(self._url(*path_entries),

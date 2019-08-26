@@ -19,11 +19,11 @@ from lib.task_common import Task, Table
 
 __author__     = "Marcelo Reis"
 __copyright__  = "Copyright (c) 2019 by Cisco Systems, Inc. All rights reserved."
-__version__    = "0.15"
+__version__    = "0.16"
 __maintainer__ = "Marcelo Reis"
 __status__     = "Development"
 
-# TODO: 19.2 support
+# TODO: 19.2 support phase 2 - Include new API endpoints
 # TODO: Allow for selective attach/detach
 # TODO: Add support to re-attach cli templates
 # TODO: Allow renaming of backed up items before uploading
@@ -69,7 +69,7 @@ class TaskBackup(Task):
 
     @classmethod
     def runner(cls, api, parsed_args):
-        cls.log_info('Starting backup task: vManage URL: "%s" > Local workdir: "%s"', api.base_url, parsed_args.workdir)
+        cls.log_info('Starting backup: vManage URL: "%s" > Local workdir: "%s"', api.base_url, parsed_args.workdir)
         for _, title, index_cls, item_cls in catalog_entries(*parsed_args.tags):
             item_index = index_cls.get(api)
             if item_index is None:
@@ -145,7 +145,7 @@ class TaskRestore(Task):
             )
             return title, index, filter(lambda item_entry: item_entry[1] is not None, item_iter)
 
-        cls.log_info('Starting restore task%s: Local workdir: "%s" > vManage URL: "%s"',
+        cls.log_info('Starting restore%s: Local workdir: "%s" > vManage URL: "%s"',
                      ', DRY-RUN mode' if parsed_args.dryrun else '', parsed_args.workdir, api.base_url)
 
         cls.log_info('Loading existing items from target vManage')
@@ -306,7 +306,7 @@ class TaskDelete(Task):
 
     @classmethod
     def runner(cls, api, parsed_args):
-        cls.log_info('Starting delete task%s: vManage URL: "%s"',
+        cls.log_info('Starting delete%s: vManage URL: "%s"',
                      ', DRY-RUN mode' if parsed_args.dryrun else '', api.base_url)
 
         if parsed_args.detach and not parsed_args.dryrun:
@@ -349,8 +349,8 @@ class TaskDelete(Task):
                 if item is None:
                     cls.log_warning('Failed retrieving %s %s', title, item_name)
                     continue
-                if item.is_readonly:
-                    cls.log_debug('Skipped read-only %s %s', title, item_name)
+                if item.is_readonly or item.is_system:
+                    cls.log_debug('Skipped %s %s %s', 'read-only' if item.is_readonly else 'system', title, item_name)
                     continue
                 if parsed_args.dryrun:
                     cls.log_info('DRY-RUN: %s %s', title, item_name)
@@ -389,7 +389,7 @@ class TaskList(Task):
     def runner(cls, api, parsed_args):
         target_info = 'vManage URL: "{url}"'.format(url=api.base_url) if parsed_args.workdir is None \
                  else 'Local workdir: "{workdir}"'.format(workdir=parsed_args.workdir)
-        cls.log_info('Starting list task: %s', target_info)
+        cls.log_info('Starting list: %s', target_info)
 
         backend = parsed_args.workdir if parsed_args.workdir is not None else api
         matched_item_iter = (
@@ -441,7 +441,7 @@ class TaskShowTemplate(Task):
     def runner(cls, api, parsed_args):
         target_info = 'vManage URL: "{url}"'.format(url=api.base_url) if parsed_args.workdir is None \
             else 'Local workdir: "{workdir}"'.format(workdir=parsed_args.workdir)
-        cls.log_info('Starting show task: %s', target_info)
+        cls.log_info('Starting show: %s', target_info)
 
         if parsed_args.csv is not None:
             os.makedirs(parsed_args.csv, exist_ok=True)
@@ -512,7 +512,7 @@ class TaskShowTemplate(Task):
 
         if len(print_buffer) > 0:
             if show_args.csv is not None:
-                cls.log_info('Exported csv files saved under %s', show_args.csv)
+                cls.log_info('Exported files saved under %s', show_args.csv)
             else:
                 print('\n\n'.join(print_buffer))
         else:

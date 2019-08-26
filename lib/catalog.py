@@ -220,6 +220,7 @@ class ConfigItem(ApiItem):
     root_dir = BASE_DATA_DIR
     factory_default_tag = 'factoryDefault'
     readonly_tag = 'readOnly'
+    owner_tag = 'owner'
     post_filtered_tags = None
 
     def __init__(self, data):
@@ -231,6 +232,10 @@ class ConfigItem(ApiItem):
     @property
     def is_readonly(self):
         return self.data.get(self.factory_default_tag, False) or self.data.get(self.readonly_tag, False)
+
+    @property
+    def is_system(self):
+        return self.data.get(self.owner_tag, '') == 'system'
 
     @classmethod
     def load(cls, node_dir, **kwargs):
