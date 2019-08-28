@@ -11,6 +11,7 @@ import os.path
 import re
 import requests.exceptions
 from itertools import starmap
+from datetime import date
 from lib.config_items import *
 from lib.rest_api import Rest, LoginFailedException
 from lib.catalog import catalog_size, catalog_entries, CATALOG_TAG_ALL, ordered_tags
@@ -19,7 +20,7 @@ from lib.task_common import Task, Table
 
 __author__     = "Marcelo Reis"
 __copyright__  = "Copyright (c) 2019 by Cisco Systems, Inc. All rights reserved."
-__version__    = "0.16"
+__version__    = "0.17"
 __maintainer__ = "Marcelo Reis"
 __status__     = "Development"
 
@@ -38,9 +39,9 @@ class Config:
 
 def main(cli_args):
     base_url = 'https://{address}:{port}'.format(address=cli_args.address, port=cli_args.port)
-    default_work_dir = 'node_{address}'.format(address=cli_args.address)
+    default_workdir = 'backup_{address}_{date:%Y%m%d}'.format(address=cli_args.address, date=date.today())
 
-    parsed_task_args = cli_args.task.parser(default_work_dir, cli_args.task_args)
+    parsed_task_args = cli_args.task.parser(default_workdir, cli_args.task_args)
     try:
         with Rest(base_url, cli_args.user, cli_args.password, timeout=cli_args.timeout) as api:
             # Dispatch to the appropriate task handler
@@ -53,13 +54,13 @@ def main(cli_args):
 @TaskOptions.register('backup')
 class TaskBackup(Task):
     @staticmethod
-    def parser(default_work_dir, task_args):
+    def parser(default_workdir, task_args):
         task_parser = argparse.ArgumentParser(prog='sastre.py backup',
                                               description='{header}\nBackup task:'.format(header=__doc__),
                                               formatter_class=argparse.RawDescriptionHelpFormatter)
-        task_parser.add_argument('--workdir', metavar='<directory>', default=default_work_dir,
+        task_parser.add_argument('--workdir', metavar='<directory>', default=default_workdir,
                                  help='''Directory used to save the backup (default will be "{default_dir}").
-                                      '''.format(default_dir=default_work_dir))
+                                      '''.format(default_dir=default_workdir))
         task_parser.add_argument('tags', metavar='<tag>', nargs='+', type=TagOptions.tag,
                                  help='''One or more tags for selecting items to be backed up. 
                                          Multiple tags should be separated by space.
@@ -113,13 +114,13 @@ class TaskBackup(Task):
 @TaskOptions.register('restore')
 class TaskRestore(Task):
     @staticmethod
-    def parser(default_work_dir, task_args):
+    def parser(default_workdir, task_args):
         task_parser = argparse.ArgumentParser(prog='sastre.py restore',
                                               description='{header}\nRestore task:'.format(header=__doc__),
                                               formatter_class=argparse.RawDescriptionHelpFormatter)
-        task_parser.add_argument('--workdir', metavar='<directory>', type=directory_type, default=default_work_dir,
+        task_parser.add_argument('--workdir', metavar='<directory>', type=directory_type, default=default_workdir,
                                  help='''Source of items to be restored (default will be "{default_dir}").
-                                      '''.format(default_dir=default_work_dir))
+                                      '''.format(default_dir=default_workdir))
         task_parser.add_argument('--dryrun', action='store_true',
                                  help='Dry-run mode. Items to be restored are listed but not pushed to vManage.')
         task_parser.add_argument('--regex', metavar='<regex>', type=regex_type,
@@ -287,7 +288,7 @@ class TaskRestore(Task):
 @TaskOptions.register('delete')
 class TaskDelete(Task):
     @staticmethod
-    def parser(default_work_dir, task_args):
+    def parser(default_workdir, task_args):
         task_parser = argparse.ArgumentParser(prog='sastre.py delete',
                                               description='{header}\nDelete task:'.format(header=__doc__),
                                               formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -365,14 +366,14 @@ class TaskDelete(Task):
 @TaskOptions.register('list')
 class TaskList(Task):
     @staticmethod
-    def parser(default_work_dir, task_args):
+    def parser(default_workdir, task_args):
         task_parser = argparse.ArgumentParser(prog='sastre.py list',
                                               description='{header}\nList task:'.format(header=__doc__),
                                               formatter_class=argparse.RawDescriptionHelpFormatter)
         task_parser.add_argument('--workdir', metavar='<directory>', type=directory_type,
                                  help='''If specified the list task will operate locally, on items from this directory,
                                          instead of on target vManage.
-                                      '''.format(default_dir=default_work_dir))
+                                      '''.format(default_dir=default_workdir))
         task_parser.add_argument('--regex', metavar='<regex>', type=regex_type,
                                  help='Regular expression matching item names to list, within selected tags.')
         task_parser.add_argument('--csv', metavar='<filename>',
@@ -416,7 +417,7 @@ class TaskList(Task):
 @TaskOptions.register('show-template')
 class TaskShowTemplate(Task):
     @staticmethod
-    def parser(default_work_dir, task_args):
+    def parser(default_workdir, task_args):
         task_parser = argparse.ArgumentParser(prog='sastre.py show-template',
                                               description='{header}\nShow template task:'.format(header=__doc__),
                                               formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -426,7 +427,7 @@ class TaskShowTemplate(Task):
         task_parser.add_argument('--workdir', metavar='<directory>', type=directory_type,
                                  help='''If specified the show task will operate locally, on items from this directory,
                                          instead of on target vManage.
-                                      '''.format(default_dir=default_work_dir))
+                                      '''.format(default_dir=default_workdir))
         task_parser.add_argument('--csv', metavar='<directory>',
                                  help='''Instead of printing tables with the results, export as csv files.
                                          Exported files are saved under the specified directory.''')

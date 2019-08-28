@@ -72,7 +72,7 @@ class Task:
         return msg.format(tally=', '.join(msg_list))
 
     @staticmethod
-    def parser(default_work_dir, task_args):
+    def parser(default_workdir, task_args):
         raise NotImplementedError()
 
     @classmethod
