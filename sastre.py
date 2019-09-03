@@ -19,7 +19,7 @@ from lib.utils import TaskOptions, TagOptions, ShowOptions, directory_type, rege
 from lib.task_common import Task, Table
 
 __author__     = "Marcelo Reis"
-__copyright__  = "Copyright (c) 2019 by Cisco Systems, Inc. All rights reserved."
+__copyright__  = "Copyright (c) 2019 Cisco Systems, Inc. and/or its affiliates"
 __version__    = "0.17"
 __maintainer__ = "Marcelo Reis"
 __status__     = "Development"
