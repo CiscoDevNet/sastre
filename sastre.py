@@ -20,7 +20,7 @@ from lib.task_common import Task, Table
 
 __author__     = "Marcelo Reis"
 __copyright__  = "Copyright (c) 2019 Cisco Systems, Inc. and/or its affiliates"
-__version__    = "0.17"
+__version__    = "0.18"
 __maintainer__ = "Marcelo Reis"
 __status__     = "Development"
 
