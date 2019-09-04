@@ -1,3 +1,5 @@
+[![published](https://static.production.devnetcloud.com/codeexchange/assets/images/devnet-published.svg)](https://developer.cisco.com/codeexchange/github/repo/reismarcelo/sastre)
+
 # Sastre - Automation Tools for Cisco SD-WAN Powered by Viptela
 
 Sastre provides utility functions to assist with managing configuration elements in vManage. This includes backup, restore and delete vManage configuration items.
