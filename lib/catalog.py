@@ -26,6 +26,7 @@ _tag_dependency_list = [
     'template_feature',
     'policy_vsmart',
     'policy_vedge',
+    'policy_security',
     'policy_definition',
     'policy_list',
 ]

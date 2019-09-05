@@ -269,6 +269,23 @@ class PolicyVedgeIndex(IndexConfigItem):
 
 
 #
+# Policy Security
+#
+class PolicySecurity(ConfigItem):
+    api_path = ApiPath('template/policy/security/definition', 'template/policy/security')
+    store_path = ('templates', 'security_policy')
+    store_file = '{item_id}.json'
+    name_tag = 'policyName'
+
+
+@register('policy_security', 'security policy', PolicySecurity)
+class PolicySecurityIndex(IndexConfigItem):
+    api_path = ApiPath('template/policy/security', None, None, None)
+    store_file = 'security_policy_list.json'
+    iter_fields = ('policyId', 'policyName')
+
+
+#
 # Policy definitions
 #
 
@@ -438,17 +455,6 @@ class PolicyDefControlIndex(PolicyDefIndex):
     store_file = 'control_policy_list.json'
 
 
-class PolicyDefAdvancedMalwareProtection(PolicyDef):
-    api_path = ApiPath('template/policy/definition/advancedMalwareProtection')
-    store_path = ('templates', 'policy_definition_advancedmalwareprotection')
-
-
-@register('policy_definition', 'advanced-malware-protection policy definition', PolicyDefAdvancedMalwareProtection)
-class PolicyDefAdvancedMalwareProtectionIndex(PolicyDefIndex):
-    api_path = ApiPath('template/policy/definition/advancedMalwareProtection', None, None, None)
-    store_file = 'advancedmalwareprotection_policy_list.json'
-
-
 class PolicyDefDnssecurity(PolicyDef):
     api_path = ApiPath('template/policy/definition/dnssecurity')
     store_path = ('templates', 'policy_definition_dnssecurity')
@@ -469,6 +475,17 @@ class PolicyDefCflowd(PolicyDef):
 class PolicyDefCflowdIndex(PolicyDefIndex):
     api_path = ApiPath('template/policy/definition/cflowd', None, None, None)
     store_file = 'cflowd_policy_list.json'
+
+
+class PolicyDefAMP(PolicyDef):
+    api_path = ApiPath('template/policy/definition/advancedMalwareProtection')
+    store_path = ('templates', 'policy_definition_amp')
+
+
+@register('policy_definition', 'advanced-malware-protection policy definition', PolicyDefAMP)
+class PolicyDefAMPIndex(PolicyDefIndex):
+    api_path = ApiPath('template/policy/definition/advancedMalwareProtection', None, None, None)
+    store_file = 'amp_policy_list.json'
 
 
 #
@@ -750,3 +767,25 @@ class PolicyListCommunity(PolicyList):
 class PolicyListCommunityIndex(PolicyListIndex):
     api_path = ApiPath('template/policy/list/community', None, None, None)
     store_file = 'community_policy_list.json'
+
+
+class PolicyListUmbrellaSecret(PolicyList):
+    api_path = ApiPath('template/policy/list/umbrellasecret')
+    store_path = ('templates', 'policy_list_umbrellasecret')
+
+
+@register('policy_list', 'umbrella secret list', PolicyListUmbrellaSecret)
+class PolicyListUmbrellaSecretIndex(PolicyListIndex):
+    api_path = ApiPath('template/policy/list/umbrellasecret', None, None, None)
+    store_file = 'umbrellasecret_policy_list.json'
+
+
+class PolicyListTGApiKey(PolicyList):
+    api_path = ApiPath('template/policy/list/tgapikey')
+    store_path = ('templates', 'policy_list_tgapikey')
+
+
+@register('policy_list', 'threat grid api key list', PolicyListTGApiKey)
+class PolicyListTGApiKeyIndex(PolicyListIndex):
+    api_path = ApiPath('template/policy/list/tgapikey', None, None, None)
+    store_file = 'tgapikey_policy_list.json'

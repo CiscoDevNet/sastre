@@ -20,11 +20,10 @@ from lib.task_common import Task, Table
 
 __author__     = "Marcelo Reis"
 __copyright__  = "Copyright (c) 2019 Cisco Systems, Inc. and/or its affiliates"
-__version__    = "0.18"
+__version__    = "0.19"
 __maintainer__ = "Marcelo Reis"
 __status__     = "Development"
 
-# TODO: 19.2 support phase 2 - Include new API endpoints
 # TODO: Allow for selective attach/detach
 # TODO: Add support to re-attach cli templates
 # TODO: Allow renaming of backed up items before uploading
