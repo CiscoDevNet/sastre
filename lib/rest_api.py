@@ -92,7 +92,7 @@ class Rest:
 
     def _url(self, *path_entries):
         return '{base_url}/dataservice/{path}'.format(base_url=self.base_url,
-                                                      path='/'.join(map(lambda x: x.strip('/'), path_entries)))
+                                                      path='/'.join(path.strip('/') for path in path_entries))
 
 
 class RestAPIException(Exception):
