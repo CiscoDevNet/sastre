@@ -8,19 +8,17 @@ import logging.config
 import logging.handlers
 import argparse
 import os.path
-import re
 import requests.exceptions
-from itertools import starmap
 from datetime import date
 from lib.config_items import *
 from lib.rest_api import Rest, LoginFailedException
 from lib.catalog import catalog_size, catalog_entries, CATALOG_TAG_ALL, ordered_tags
 from lib.utils import TaskOptions, TagOptions, ShowOptions, directory_type, regex_type, uuid_type, EnvVar
-from lib.task_common import Task, Table
+from lib.task_common import regex_search, Task, Table
 
 __author__     = "Marcelo Reis"
 __copyright__  = "Copyright (c) 2019 Cisco Systems, Inc. and/or its affiliates"
-__version__    = "0.19"
+__version__    = "0.20"
 __maintainer__ = "Marcelo Reis"
 __status__     = "Development"
 
@@ -124,9 +122,10 @@ class TaskRestore(Task):
                                  help='Dry-run mode. Items to be restored are listed but not pushed to vManage.')
         task_parser.add_argument('--regex', metavar='<regex>', type=regex_type,
                                  help='Regular expression matching item names to be restored, within selected tags.')
-        # task_parser.add_argument('--update', action='store_true',
-        #                          help='Update vManage item if it is different than a saved item with the same name.'
-        #                               'By default items with the same name are not restored.')
+        task_parser.add_argument('--force', action='store_true',
+                                 help='''Target vManage items with the same name as the corresponding item in workdir
+                                         are updated with the contents from workdir. Without this option, those items
+                                         are skipped and not overwritten. ''')
         task_parser.add_argument('--attach', action='store_true',
                                  help='Attach devices to templates and activate vSmart policy after restoring items.')
         task_parser.add_argument('tag', metavar='<tag>', type=TagOptions.tag,
@@ -138,19 +137,19 @@ class TaskRestore(Task):
 
     @classmethod
     def runner(cls, api, parsed_args):
-        def add_loaded_items(_, title, index, item_cls):
+        def load_items(index, item_cls):
             item_iter = (
                 (item_id, item_cls.load(parsed_args.workdir, item_name=item_name, item_id=item_id))
                 for item_id, item_name in index
             )
-            return title, index, filter(lambda item_entry: item_entry[1] is not None, item_iter)
+            return ((item_id, item_obj) for item_id, item_obj in item_iter if item_obj is not None)
 
         cls.log_info('Starting restore%s: Local workdir: "%s" > vManage URL: "%s"',
                      ', DRY-RUN mode' if parsed_args.dryrun else '', parsed_args.workdir, api.base_url)
 
         cls.log_info('Loading existing items from target vManage')
-        # existing_items is {<hash of index_cls>: {<item_name>: <item_id>}}
-        existing_items = {
+        # target_all_item_maps is {<hash of index_cls>: {<item_name>: <item_id>}}
+        target_all_item_maps = {
             hash(type(index)): {item_name: item_id for item_id, item_name in index}
             for _, title, index, item_cls in cls.index_iter(api, catalog_entries(CATALOG_TAG_ALL))
         }
@@ -162,51 +161,57 @@ class TaskRestore(Task):
         match_set = set()       # {<item_id>, ...}
         for tag in ordered_tags(parsed_args.tag):
             cls.log_info('Inspecting %s items', tag)
-            for title, index, loaded_items in starmap(add_loaded_items,
-                                                      cls.index_iter(parsed_args.workdir, catalog_entries(tag))):
-                target_items = existing_items.get(hash(type(index)))
-                if target_items is None:
+            tag_iter = (
+                (title, index, load_items(index, item_cls))
+                for tag, title, index, item_cls in cls.index_iter(parsed_args.workdir, catalog_entries(tag))
+            )
+            for title, index, loaded_items_iter in tag_iter:
+                target_item_map = target_all_item_maps.get(hash(type(index)))
+                if target_item_map is None:
                     # Logging at warning level because the backup files did have this item
                     cls.log_warning('Will skip %s, item not supported by target vManage', title)
                     continue
 
-                item_list = []
-                for item_id, item in loaded_items:
-                    # id_on_target will be used in the future for the --update function
-                    id_on_target = None
-                    target_id = target_items.get(item.name)
+                restore_item_list = []
+                for item_id, item in loaded_items_iter:
+                    target_id = target_item_map.get(item.name)
                     if target_id is not None:
-                        # Item already exists on target vManage, item id from target will be used
+                        # Item already exists on target vManage, record item id from target
                         if item_id != target_id:
                             id_mapping[item_id] = target_id
 
-                        # Existing item on target vManage will be used as is
-                        cls.log_debug('Will skip %s %s, item already on target vManage', title, item.name)
-                        continue
+                        if not parsed_args.force:
+                            # Existing item on target vManage will be used as is
+                            cls.log_debug('Will skip %s %s, item already on target vManage', title, item.name)
+                            continue
 
                     if item.is_readonly:
-                        cls.log_warning('Will skip %s %s, factory default item', title, item.name)
+                        cls.log_debug('Will skip read-only %s %s', title, item.name)
                         continue
 
                     item_matches = (
                         (parsed_args.tag == CATALOG_TAG_ALL or parsed_args.tag == tag) and
-                        (parsed_args.regex is None or re.search(parsed_args.regex, item.name))
+                        (parsed_args.regex is None or regex_search(parsed_args.regex, item.name))
                     )
                     if item_matches:
                         match_set.add(item_id)
                     if item_matches or item_id in dependency_set:
-                        item_list.append((item_id, item, id_on_target))
+                        # A target_id that is not None indicates a push operation, as opposed to post.
+                        # target_id will be None unless --force is specified and item name is on target
+                        restore_item_list.append((item_id, item, target_id))
                         dependency_set.update(item.id_references_set)
 
-                if len(item_list) > 0:
-                    restore_list.append((title, index, item_list))
+                if len(restore_item_list) > 0:
+                    restore_list.append((title, index, restore_item_list))
 
         if len(restore_list) > 0:
             cls.log_info('%sPushing items to vManage', 'DRY-RUN: ' if parsed_args.dryrun else '')
-            for title, index, item_list in reversed(restore_list):
+            # Items were added to restore_list following ordered_tags() order (i.e. higher level items before lower
+            # level items). The reverse order needs to be followed on restore.
+            for title, index, restore_item_list in reversed(restore_list):
                 pushed_item_dict = {}
-                for item_id, item, id_on_target in item_list:
-                    op_info = 'Update' if id_on_target is not None else 'Create'
+                for item_id, item, update_target_id in restore_item_list:
+                    op_info = 'Create' if update_target_id is None else 'Update'
                     reason = ' (dependency)' if item_id in dependency_set - match_set else ''
 
                     if parsed_args.dryrun:
@@ -214,22 +219,22 @@ class TaskRestore(Task):
                         continue
 
                     try:
-                        if id_on_target is None:
+                        if update_target_id is None:
                             # Not using item id returned from post because post can return empty (e.g. local policies)
                             api.post(item.post_data(id_mapping), item.api_path.post)
                             pushed_item_dict[item.name] = item_id
                         else:
-                            api.put(item.put_data(id_mapping, id_on_target), item.api_path.put, id_on_target)
+                            api.put(item.put_data(id_mapping), item.api_path.put, update_target_id)
                     except requests.exceptions.HTTPError as ex:
                         cls.log_error('Failed %s %s %s%s: %s', op_info, title, item.name, reason, ex)
                     else:
                         cls.log_info('Done: %s %s %s%s', op_info, title, item.name, reason)
 
-                # Read new ids on target and update id_mapping
+                # Read new ids from target and update id_mapping
                 try:
-                    target_index = {item_name: item_id for item_id, item_name in index.get_raise(api)}
+                    new_target_item_map = {item_name: item_id for item_id, item_name in index.get_raise(api)}
                     for item_name, old_item_id in pushed_item_dict.items():
-                        id_mapping[old_item_id] = target_index[item_name]
+                        id_mapping[old_item_id] = new_target_item_map[item_name]
                 except requests.exceptions.HTTPError as ex:
                     cls.log_critical('Failed retrieving %s: %s', title, ex)
                     break
@@ -342,7 +347,7 @@ class TaskDelete(Task):
                 (item_name, item_id, item_cls, title)
                 for _, title, index, item_cls in cls.index_iter(api, catalog_entries(tag))
                 for item_id, item_name in index
-                if parsed_args.regex is None or re.search(parsed_args.regex, item_name)
+                if parsed_args.regex is None or regex_search(parsed_args.regex, item_name)
             )
             for item_name, item_id, item_cls, title in matched_item_iter:
                 item = item_cls.get(api, item_id)
@@ -374,7 +379,8 @@ class TaskList(Task):
                                          instead of on target vManage.
                                       '''.format(default_dir=default_workdir))
         task_parser.add_argument('--regex', metavar='<regex>', type=regex_type,
-                                 help='Regular expression matching item names to list, within selected tags.')
+                                 help='''Regular expression matching item names or item IDs to list, 
+                                         within selected tags.''')
         task_parser.add_argument('--csv', metavar='<filename>',
                                  help='''Instead of printing a table with the list results, export as csv file with
                                          the filename provided.''')
@@ -396,7 +402,7 @@ class TaskList(Task):
             (item_name, item_id, tag, title)
             for tag, title, index, item_cls in cls.index_iter(backend, catalog_entries(*parsed_args.tags))
             for item_id, item_name in index
-            if parsed_args.regex is None or re.search(parsed_args.regex, item_name)
+            if parsed_args.regex is None or regex_search(parsed_args.regex, item_name, item_id)
         )
         results = Table('Name', 'ID', 'Tag', 'Description')
         results.extend(matched_item_iter)
@@ -457,7 +463,7 @@ class TaskShowTemplate(Task):
                 return item_id == show_args.id
             if show_args.name is not None:
                 return item_name == show_args.name
-            return re.search(show_args.regex, item_name) is not None
+            return regex_search(show_args.regex, item_name)
 
         def template_values(template_name, template_id):
             if show_args.workdir is None:
@@ -512,7 +518,7 @@ class TaskShowTemplate(Task):
 
         if len(print_buffer) > 0:
             if show_args.csv is not None:
-                cls.log_info('Exported files saved under %s', show_args.csv)
+                cls.log_info('Files saved under directory %s', show_args.csv)
             else:
                 print('\n\n'.join(print_buffer))
         else:
