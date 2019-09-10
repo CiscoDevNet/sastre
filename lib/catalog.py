@@ -222,6 +222,7 @@ class ConfigItem(ApiItem):
     factory_default_tag = 'factoryDefault'
     readonly_tag = 'readOnly'
     owner_tag = 'owner'
+    info_tag = 'infoTag'
     post_filtered_tags = None
 
     def __init__(self, data):
@@ -236,7 +237,7 @@ class ConfigItem(ApiItem):
 
     @property
     def is_system(self):
-        return self.data.get(self.owner_tag, '') == 'system'
+        return self.data.get(self.owner_tag, '') == 'system' or self.data.get(self.info_tag, '') == 'aci'
 
     @classmethod
     def load(cls, node_dir, **kwargs):
@@ -310,7 +311,15 @@ class ConfigItem(ApiItem):
         <new item id>
         :return: Dict containing payload for PUT requests
         """
-        return self._update_ids(id_mapping_dict, self.data)
+        # Delete keys that shouldn't be on put requests
+        filtered_keys = {
+            self.id_tag,
+        }
+        if self.post_filtered_tags is not None:
+            filtered_keys.update(self.post_filtered_tags)
+        put_dict = {k: v for k, v in self.data.items() if k not in filtered_keys}
+
+        return self._update_ids(id_mapping_dict, put_dict)
 
     @staticmethod
     def _update_ids(id_mapping_dict, data_dict):

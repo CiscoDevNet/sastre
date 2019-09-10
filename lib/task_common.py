@@ -7,11 +7,25 @@ import logging
 import time
 import csv
 import requests.exceptions
+import re
 from itertools import repeat, starmap
 from collections import namedtuple
 from lib.rest_api import Rest
 from lib.config_items import (DeviceTemplateValues, DeviceTemplateAttached, DeviceTemplateAttach, DeviceModeCli,
                               ActionStatus)
+
+
+def regex_search(regex, *fields):
+    """
+    Execute regular expression search on provided fields. Match fields in the order provided, stop on first match.
+    :param regex: Pattern to match
+    :param fields: One or more strings to match
+    :return: True if a match is found on any field, False otherwise.
+    """
+    for match_field in fields:
+        if re.search(regex, match_field):
+            return True
+    return False
 
 
 class Tally:
@@ -90,18 +104,17 @@ class Task:
         """
         is_api = isinstance(backend, Rest)
 
-        def get_index(tag, title, index_cls, item_cls):
-            cls.log_debug('Inspecting %s items', title)
+        def load_index(index_cls, title):
             index = index_cls.get(backend) if is_api else index_cls.load(backend)
-            if index is None:
-                cls.log_debug('Skipped %s index', title)
-            return tag, title, index, item_cls
+            cls.log_debug('No %s %s index' if index is None else 'Loaded %s %s index',
+                          'remote' if is_api else 'local', title)
+            return index
 
-        return (
-            (tag, title, index, item_cls)
-            for tag, title, index, item_cls in starmap(get_index, catalog_entry_iter)
-            if index is not None
+        all_index_iter = (
+            (tag, title, load_index(index_cls, title), item_cls)
+            for tag, title, index_cls, item_cls in catalog_entry_iter
         )
+        return ((tag, title, index, item_cls) for tag, title, index, item_cls in all_index_iter if index is not None)
 
     @classmethod
     def attach_template(cls, api, saved_template_iter, work_dir, target_template_dict, target_uuid_set):
