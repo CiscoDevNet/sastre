@@ -6,7 +6,7 @@ import os
 import re
 import argparse
 from lib.task_common import Task
-from lib.catalog import catalog_tags, CATALOG_TAG_ALL, BASE_DATA_DIR
+from lib.catalog import catalog_tags, CATALOG_TAG_ALL, Defaults
 
 
 class TaskOptions:
@@ -16,7 +16,7 @@ class TaskOptions:
     def task(cls, task_string):
         task_cls = cls._task_options.get(task_string)
         if task_cls is None:
-            raise argparse.ArgumentTypeError('Invalid task. Options are: {options}.'.format(options=cls.options()))
+            raise argparse.ArgumentTypeError('Invalid task. Options are: {ops}.'.format(ops=cls.options()))
         return task_cls
 
     @classmethod
@@ -33,7 +33,7 @@ class TaskOptions:
         """
         def decorator(task_cls):
             if not isinstance(task_cls, type) or not issubclass(task_cls, Task):
-                raise SastreException('Invalid task registration attempt: {}'.format(task_cls.__name__))
+                raise SastreException('Invalid task registration attempt: {name}'.format(name=task_cls.__name__))
 
             cls._task_options[task_name] = task_cls
             return task_cls
@@ -48,7 +48,7 @@ class TagOptions:
     def tag(cls, tag_string):
         if tag_string not in cls.tag_options:
             raise argparse.ArgumentTypeError(
-                '"{tag}" is not a valid tag. Available tags: {options}.'.format(tag=tag_string, options=cls.options())
+                '"{tag}" is not a valid tag. Available tags: {ops}.'.format(tag=tag_string, ops=cls.options())
             )
         return tag_string
 
@@ -95,7 +95,7 @@ def regex_type(regex_string):
 
 
 def directory_type(workdir_string):
-    if not os.path.exists(os.path.join(BASE_DATA_DIR, workdir_string)):
+    if not os.path.exists(os.path.join(Defaults.DATA_DIR, workdir_string)):
         raise argparse.ArgumentTypeError('Work directory "{directory}" not found.'.format(directory=workdir_string))
 
     return workdir_string
