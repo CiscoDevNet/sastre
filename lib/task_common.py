@@ -8,7 +8,7 @@ import time
 import csv
 import requests.exceptions
 import re
-from itertools import repeat, starmap
+from itertools import repeat
 from collections import namedtuple
 from lib.rest_api import Rest
 from lib.config_items import (DeviceTemplateValues, DeviceTemplateAttached, DeviceTemplateAttach, DeviceModeCli,
@@ -244,11 +244,11 @@ class Table:
         self._row_class = namedtuple('Row', columns)
         self._rows = list()
 
-    def add(self, *values):
-        self._rows.append(self._row_class(*values))
+    def add(self, *row_values):
+        self._rows.append(self._row_class(*row_values))
 
     def extend(self, row_values_iter):
-        self._rows.extend(starmap(self._row_class, row_values_iter))
+        self._rows.extend(self._row_class(*row_values) for row_values in row_values_iter)
 
     def __iter__(self):
         return iter(self._rows)
@@ -270,10 +270,10 @@ class Table:
         border_line = '+' + '+'.join(('-'*col_width for col_width in col_width_list)) + '+'
 
         yield border_line
-        yield '|' + '|'.join(starmap(cell_format, zip(col_width_list, self.header))) + '|'
+        yield '|' + '|'.join(cell_format(width, value) for width, value in zip(col_width_list, self.header)) + '|'
         yield border_line
         for row in self._rows:
-            yield '|' + '|'.join(starmap(cell_format, zip(col_width_list, row))) + '|'
+            yield '|' + '|'.join(cell_format(width, value) for width, value in zip(col_width_list, row)) + '|'
         yield border_line
 
     def save(self, filename):

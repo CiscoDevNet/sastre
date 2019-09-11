@@ -29,14 +29,16 @@ __status__     = "Development"
 # TODO: Look at diff to decide whether to push a new item or not. Keep skip by default but include option to overwrite
 
 
-class Config:
-    VMANAGE_DEFAULT_PORT = '8443'
-    REST_DEFAULT_TIMEOUT = 300
+class Defaults:
+    VMANAGE_PORT = '8443'
+    REST_TIMEOUT = 300
+    BASE_URL = 'https://{address}:{port}'
+    WORK_DIR = 'backup_{address}_{date:%Y%m%d}'
 
 
 def main(cli_args):
-    base_url = 'https://{address}:{port}'.format(address=cli_args.address, port=cli_args.port)
-    default_workdir = 'backup_{address}_{date:%Y%m%d}'.format(address=cli_args.address, date=date.today())
+    base_url = Defaults.BASE_URL.format(address=cli_args.address, port=cli_args.port)
+    default_workdir = Defaults.WORK_DIR.format(address=cli_args.address, date=date.today())
 
     parsed_task_args = cli_args.task.parser(default_workdir, cli_args.task_args)
     try:
@@ -534,10 +536,10 @@ if __name__ == '__main__':
                             help='username, can also be provided via VMANAGE_USER environment variable')
     cli_parser.add_argument('-p', '--password', metavar='<password>', action=EnvVar, envvar='VMANAGE_PASSWORD',
                             help='password, can also be provided via VMANAGE_PASSWORD environment variable')
-    cli_parser.add_argument('--port', metavar='<port>', default=Config.VMANAGE_DEFAULT_PORT,
-                            help='vManage TCP port number (default is {port})'.format(port=Config.VMANAGE_DEFAULT_PORT))
-    cli_parser.add_argument('--timeout', metavar='<timeout>', type=int, default=Config.REST_DEFAULT_TIMEOUT,
-                            help='REST API timeout (default is {timeout}s)'.format(timeout=Config.REST_DEFAULT_TIMEOUT))
+    cli_parser.add_argument('--port', metavar='<port>', default=Defaults.VMANAGE_PORT,
+                            help='vManage TCP port number (default is {port})'.format(port=Defaults.VMANAGE_PORT))
+    cli_parser.add_argument('--timeout', metavar='<timeout>', type=int, default=Defaults.REST_TIMEOUT,
+                            help='REST API timeout (default is {timeout}s)'.format(timeout=Defaults.REST_TIMEOUT))
     cli_parser.add_argument('--verbose', action='store_true',
                             help='increase output verbosity')
     cli_parser.add_argument('--version', action='version',

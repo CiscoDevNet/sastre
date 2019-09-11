@@ -11,13 +11,15 @@ from itertools import zip_longest
 from collections import namedtuple
 
 
+class Defaults:
+    DATA_DIR = 'data'
+
+
 _catalog = list()   # [(<tag>, <title>, <index_cls>, <item_cls>), ...]
 
 CatalogEntry = namedtuple('CatalogEntry', ['tag', 'title', 'index_cls', 'item_cls'])
 
 CATALOG_TAG_ALL = 'all'
-
-BASE_DATA_DIR = 'data'
 
 # Order in which config items need to be deleted (i.e. reverse order in which they need to be pushed), considering
 # their high-level dependencies.
@@ -218,7 +220,7 @@ class ConfigItem(ApiItem):
     """
     store_path = None
     store_file = None
-    root_dir = BASE_DATA_DIR
+    root_dir = Defaults.DATA_DIR
     factory_default_tag = 'factoryDefault'
     readonly_tag = 'readOnly'
     owner_tag = 'owner'
