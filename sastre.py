@@ -80,6 +80,8 @@ class TaskBackup(Task):
                 if item is None:
                     cls.log_error('Failed backup %s %s', title, item_name)
                     continue
+                if item.save(parsed_args.workdir, item_name=item_name, item_id=item_id):
+                    cls.log_info('Done %s %s', title, item_name)
 
                 # Special case for DeviceTemplateAttached and DeviceTemplateValues
                 if isinstance(item, DeviceTemplate):
