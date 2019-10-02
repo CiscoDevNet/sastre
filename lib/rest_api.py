@@ -67,23 +67,24 @@ class Rest:
     def get(self, *path_entries):
         response = self.session.get(self._url(*path_entries),
                                     timeout=self.timeout, verify=self.verify)
-        response.raise_for_status()
+        raise_for_status(response)
         return response.json()
 
     def post(self, input_data, *path_entries):
         response = self.session.post(self._url(*path_entries), json=input_data,
                                      timeout=self.timeout, verify=self.verify)
-        response.raise_for_status()
+        raise_for_status(response)
 
-        # Some POST calls return an empty string, return None in this case
+        # POST may return an empty string, return None in this case
         return response.json() if response.text else None
 
     def put(self, input_data, resource, key_value):
         response = self.session.put(self._url(resource, key_value), json=input_data,
                                     timeout=self.timeout, verify=self.verify)
-        response.raise_for_status()
+        raise_for_status(response)
 
-        return response.status_code == requests.codes.ok
+        # PUT may return an empty string, return None in this case
+        return response.json() if response.text else None
 
     def delete(self, resource, key_value):
         response = self.session.delete(self._url(resource, key_value),
@@ -93,6 +94,13 @@ class Rest:
     def _url(self, *path_entries):
         return '{base_url}/dataservice/{path}'.format(base_url=self.base_url,
                                                       path='/'.join(path.strip('/') for path in path_entries))
+
+
+def raise_for_status(response_obj):
+    if response_obj.status_code != requests.codes.ok:
+        reply_data = response_obj.json() if response_obj.text else {}
+        raise RestAPIException('{r.reason} ({r.status_code}): {error} [{r.request.method} {r.url}]'.format(
+            r=response_obj, error=reply_data.get('error', {}).get('message', 'Unspecified error message')))
 
 
 class RestAPIException(Exception):

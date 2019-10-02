@@ -6,7 +6,8 @@ logs/
 
 *.csv
 
-# IntelliJ project files
+# IDE project files
+.vscode/
 .idea
 *.iml
 out
