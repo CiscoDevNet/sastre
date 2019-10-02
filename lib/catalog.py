@@ -5,10 +5,10 @@ vManage API Catalog and base elements
 import os.path
 import json
 import re
-import requests.exceptions
 from functools import partial
 from itertools import zip_longest
 from collections import namedtuple
+from lib.rest_api import RestAPIException
 
 
 class Defaults:
@@ -118,6 +118,33 @@ def catalog_tags():
     return set(map(lambda x: x.tag, _catalog))
 
 
+class UpdateEval:
+    def __init__(self, data):
+        self.is_policy = isinstance(data, list)
+        # Master template updates (PUT requests) return a dict containing 'data' key. Non-master templates don't.
+        self.is_master = isinstance(data, dict) and 'data' in data
+
+        # This is to homogenize the response payload variants
+        self.data = data.get('data') if self.is_master else data
+
+    @property
+    def need_reattach(self):
+        return not self.is_policy and 'processId' in self.data
+
+    @property
+    def need_reactivate(self):
+        return self.is_policy and len(self.data) > 0
+
+    def templates_affected_iter(self):
+        return iter(self.data.get('masterTemplatesAffected', []))
+
+    def __str__(self):
+        return json.dumps(self.data, indent=2)
+
+    def __repr__(self):
+        return json.dumps(self.data)
+
+
 class ApiPath:
     """
     Groups the API path for different operations available in an API item (i.e. get, post, put, delete).
@@ -180,7 +207,7 @@ class ApiItem:
     def get(cls, api, *path_entries):
         try:
             return cls.get_raise(api, *path_entries)
-        except requests.exceptions.HTTPError:
+        except RestAPIException:
             return None
 
     @classmethod
@@ -313,15 +340,7 @@ class ConfigItem(ApiItem):
         <new item id>
         :return: Dict containing payload for PUT requests
         """
-        # Delete keys that shouldn't be on put requests
-        filtered_keys = {
-            self.id_tag,
-        }
-        if self.post_filtered_tags is not None:
-            filtered_keys.update(self.post_filtered_tags)
-        put_dict = {k: v for k, v in self.data.items() if k not in filtered_keys}
-
-        return self._update_ids(id_mapping_dict, put_dict)
+        return self._update_ids(id_mapping_dict, self.data)
 
     @staticmethod
     def _update_ids(id_mapping_dict, data_dict):

@@ -25,23 +25,27 @@ class DeviceTemplateAttach(ApiItem):
     id_tag = 'id'
 
     @staticmethod
-    def api_params(template_id, input_list):
+    def api_params(template_input_iter, is_edited):
         """
         Build dictionary used to provide input parameters for api POST call
-        :param template_id: String containing the template ID
-        :param input_list: List where each entry represents one attached device and is a dictionary of input
-                           variable names and values.
+        :param template_input_iter: An iterable of (<template_id>, <input_list>) tuples. Input_list is a list where
+                                    each entry represents one attached device and is a dictionary of input
+                                    variable names and values.
+        :param is_edited: True if this is an in-place re-attach, False if this is a template attach.
         :return: Dictionary used to provide POST input parameters
         """
+        def template_entry(template_id, template_input_list):
+            return {
+                "templateId": template_id,
+                "device": template_input_list,
+                "isEdited": is_edited,
+                "isMasterEdited": False,
+            }
+
         return {
             "deviceTemplateList": [
-                {
-                    "templateId": template_id,
-                    "device": input_list,
-                    "isEdited": False,
-                    "isMasterEdited": False,
-                },
-            ],
+                template_entry(item_id, input_list) for item_id, input_list in template_input_iter
+            ]
         }
 
 
@@ -53,6 +57,10 @@ class PolicyVsmartDeactivate(ApiItem):
 class PolicyVsmartActivate(ApiItem):
     api_path = ApiPath(None, 'template/policy/vsmart/activate', None, None)
     id_tag = 'id'
+
+    @staticmethod
+    def api_params(is_edited):
+        return {"isEdited": True} if is_edited else {}
 
 
 class PolicyVsmartStatus(ApiItem):
@@ -90,19 +98,35 @@ class ActionStatus(ApiItem):
 
         data_list = self.data.get('data', [])
         # When action validation fails, returned data is empty
-        return all(map(task_success, data_list)) if len(data_list) > 0 else False
+        if len(data_list) == 0:
+            return False
+
+        return all(map(task_success, data_list))
+
+    @property
+    def activity_details(self):
+        def device_details(task_entry):
+            return '{hostname}: {activity}'.format(hostname=task_entry.get('host-name', '<unknown>'),
+                                                   activity=', '.join(task_entry.get('activity', [])))
+
+        data_list = self.data.get('data', [])
+        # When action validation fails, returned data is empty
+        if len(data_list) == 0:
+            return 'No data in action status'
+
+        return ', '.join(map(device_details, data_list))
 
 
 #
 # Device Inventory
 #
 class EdgeInventory(IndexApiItem):
-    api_path = ApiPath('/system/device/vedges', None, None, None)
+    api_path = ApiPath('system/device/vedges', None, None, None)
     iter_fields = ('uuid', 'vedgeCertificateState')
 
 
 class ControlInventory(IndexApiItem):
-    api_path = ApiPath('/system/device/controllers', None, None, None)
+    api_path = ApiPath('system/device/controllers', None, None, None)
     iter_fields = ('uuid', 'validity')
 
     @staticmethod

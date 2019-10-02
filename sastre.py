@@ -8,13 +8,12 @@ import logging.config
 import logging.handlers
 import argparse
 import os.path
-import requests.exceptions
 from datetime import date
 from lib.config_items import *
-from lib.rest_api import Rest, LoginFailedException
-from lib.catalog import catalog_size, catalog_entries, CATALOG_TAG_ALL, ordered_tags
+from lib.rest_api import Rest, LoginFailedException, RestAPIException
+from lib.catalog import catalog_size, catalog_entries, CATALOG_TAG_ALL, ordered_tags, UpdateEval
 from lib.utils import TaskOptions, TagOptions, ShowOptions, directory_type, regex_type, uuid_type, EnvVar
-from lib.task_common import regex_search, Task, Table
+from lib.task_common import regex_search, Task, Table, WaitActionsException
 
 __author__     = "Marcelo Reis"
 __copyright__  = "Copyright (c) 2019 Cisco Systems, Inc. and/or its affiliates"
@@ -22,11 +21,9 @@ __version__    = "0.20"
 __maintainer__ = "Marcelo Reis"
 __status__     = "Development"
 
-# TODO: Allow for selective attach/detach
+# TODO: Create attach/detach tasks, allowing for selective attach/detach and allow external csv files
 # TODO: Add support to re-attach cli templates
 # TODO: Allow renaming of backed up items before uploading
-# TODO: Be able to provide external csv files for the attachment
-# TODO: Look at diff to decide whether to push a new item or not. Keep skip by default but include option to overwrite
 
 
 class Defaults:
@@ -84,9 +81,6 @@ class TaskBackup(Task):
                     cls.log_error('Failed backup %s %s', title, item_name)
                     continue
 
-                if item.save(parsed_args.workdir, item_name=item_name, item_id=item_id):
-                    cls.log_info('Done %s %s', title, item_name)
-
                 # Special case for DeviceTemplateAttached and DeviceTemplateValues
                 if isinstance(item, DeviceTemplate):
                     devices_attached = DeviceTemplateAttached.get(api, item_id)
@@ -103,11 +97,10 @@ class TaskBackup(Task):
                         uuid_list = [uuid for uuid, _ in devices_attached]
                         values = DeviceTemplateValues(api.post(DeviceTemplateValues.api_params(item_id, uuid_list),
                                                                DeviceTemplateValues.api_path.post))
-                    except requests.exceptions.HTTPError:
-                        cls.log_error('Failed backup %s %s values', title, item_name)
-                    else:
                         if values.save(parsed_args.workdir, item_name=item_name, item_id=item_id):
                             cls.log_info('Done %s %s values', title, item_name)
+                    except RestAPIException as ex:
+                        cls.log_error('Failed backup %s %s values: %s', title, item_name, ex)
 
 
 @TaskOptions.register('restore')
@@ -120,16 +113,17 @@ class TaskRestore(Task):
         task_parser.add_argument('--workdir', metavar='<directory>', type=directory_type, default=default_workdir,
                                  help='''Source of items to be restored (default will be "{default_dir}").
                                       '''.format(default_dir=default_workdir))
-        task_parser.add_argument('--dryrun', action='store_true',
-                                 help='Dry-run mode. Items to be restored are listed but not pushed to vManage.')
         task_parser.add_argument('--regex', metavar='<regex>', type=regex_type,
                                  help='Regular expression matching item names to be restored, within selected tags.')
+        xor_group = task_parser.add_mutually_exclusive_group(required=False)
+        xor_group.add_argument('--dryrun', action='store_true',
+                               help='Dry-run mode. Items to be restored are listed but not pushed to vManage.')
+        xor_group.add_argument('--attach', action='store_true',
+                               help='Attach devices to templates and activate vSmart policy after restoring items.')
         task_parser.add_argument('--force', action='store_true',
                                  help='''Target vManage items with the same name as the corresponding item in workdir
                                          are updated with the contents from workdir. Without this option, those items
-                                         are skipped and not overwritten. ''')
-        task_parser.add_argument('--attach', action='store_true',
-                                 help='Attach devices to templates and activate vSmart policy after restoring items.')
+                                         are skipped and not overwritten.''')
         task_parser.add_argument('tag', metavar='<tag>', type=TagOptions.tag,
                                  help='''Tag for selecting items to be restored. 
                                          Items that are dependencies of the specified tag are automatically included.
@@ -150,14 +144,13 @@ class TaskRestore(Task):
                      ', DRY-RUN mode' if parsed_args.dryrun else '', parsed_args.workdir, api.base_url)
 
         cls.log_info('Loading existing items from target vManage')
-        # target_all_item_maps is {<hash of index_cls>: {<item_name>: <item_id>}}
-        target_all_item_maps = {
+        target_all_items_map = {
             hash(type(index)): {item_name: item_id for item_id, item_name in index}
             for _, title, index, item_cls in cls.index_iter(api, catalog_entries(CATALOG_TAG_ALL))
         }
 
         cls.log_info('Identifying items to be pushed')
-        id_mapping = {}         # {<old_id>: <new_id>}, used to replace old item ids with new ids
+        id_mapping = {}         # {<old_id>: <new_id>}, used to replace old (saved) item ids with new (target) ids
         restore_list = []       # [ (<title>, <index_cls>, [(<item_id>, <item>, <id_on_target>), ...]), ...]
         dependency_set = set()  # {<item_id>, ...}
         match_set = set()       # {<item_id>, ...}
@@ -168,7 +161,7 @@ class TaskRestore(Task):
                 for tag, title, index, item_cls in cls.index_iter(parsed_args.workdir, catalog_entries(tag))
             )
             for title, index, loaded_items_iter in tag_iter:
-                target_item_map = target_all_item_maps.get(hash(type(index)))
+                target_item_map = target_all_items_map.get(hash(type(index)))
                 if target_item_map is None:
                     # Logging at warning level because the backup files did have this item
                     cls.log_warning('Will skip %s, item not supported by target vManage', title)
@@ -183,7 +176,7 @@ class TaskRestore(Task):
                             id_mapping[item_id] = target_id
 
                         if not parsed_args.force:
-                            # Existing item on target vManage will be used as is
+                            # Existing item on target vManage will be used, i.e. will not overwrite it
                             cls.log_debug('Will skip %s %s, item already on target vManage', title, item.name)
                             continue
 
@@ -198,7 +191,7 @@ class TaskRestore(Task):
                     if item_matches:
                         match_set.add(item_id)
                     if item_matches or item_id in dependency_set:
-                        # A target_id that is not None indicates a push operation, as opposed to post.
+                        # A target_id that is not None signals a push operation, as opposed to post.
                         # target_id will be None unless --force is specified and item name is on target
                         restore_item_list.append((item_id, item, target_id))
                         dependency_set.update(item.id_references_set)
@@ -212,8 +205,8 @@ class TaskRestore(Task):
             # level items). The reverse order needs to be followed on restore.
             for title, index, restore_item_list in reversed(restore_list):
                 pushed_item_dict = {}
-                for item_id, item, update_target_id in restore_item_list:
-                    op_info = 'Create' if update_target_id is None else 'Update'
+                for item_id, item, target_id in restore_item_list:
+                    op_info = 'Create' if target_id is None else 'Update'
                     reason = ' (dependency)' if item_id in dependency_set - match_set else ''
 
                     if parsed_args.dryrun:
@@ -221,13 +214,37 @@ class TaskRestore(Task):
                         continue
 
                     try:
-                        if update_target_id is None:
+                        if target_id is None:
+                            # Create new item
                             # Not using item id returned from post because post can return empty (e.g. local policies)
                             api.post(item.post_data(id_mapping), item.api_path.post)
                             pushed_item_dict[item.name] = item_id
                         else:
-                            api.put(item.put_data(id_mapping), item.api_path.put, update_target_id)
-                    except requests.exceptions.HTTPError as ex:
+                            # Update existing item
+                            put_eval = UpdateEval(api.put(item.put_data(id_mapping), item.api_path.put, target_id))
+                            if put_eval.need_reattach:
+                                if put_eval.is_master:
+                                    cls.log_info('Updating %s %s requires reattach', title, item.name)
+                                    action_list = cls.attach_template(api, parsed_args.workdir,
+                                                                      [(item.name, item_id, target_id)])
+                                else:
+                                    cls.log_info('Updating %s %s requires reattach of affected templates',
+                                                 title, item.name)
+                                    target_templates = {item_id: item_name
+                                                        for item_id, item_name in DeviceTemplateIndex.get_raise(api)}
+                                    templates_iter = (
+                                        (target_templates[tgt_id], tgt_id)
+                                        for tgt_id in put_eval.templates_affected_iter()
+                                    )
+                                    action_list = cls.reattach_template(api, templates_iter)
+                                cls.wait_actions(api, action_list, 'reattaching templates', raise_on_failure=True)
+                            elif put_eval.need_reactivate:
+                                cls.log_info('Updating %s %s requires vSmart policy reactivate', title, item.name)
+                                action_list = cls.activate_policy(
+                                    api, PolicyVsmartIndex.get_raise(api).active_policy_iter(), is_edited=True
+                                )
+                                cls.wait_actions(api, action_list, 'reactivating vSmart policy', raise_on_failure=True)
+                    except (RestAPIException, WaitActionsException) as ex:
                         cls.log_error('Failed %s %s %s%s: %s', op_info, title, item.name, reason, ex)
                     else:
                         cls.log_info('Done: %s %s %s%s', op_info, title, item.name, reason)
@@ -237,57 +254,57 @@ class TaskRestore(Task):
                     new_target_item_map = {item_name: item_id for item_id, item_name in index.get_raise(api)}
                     for item_name, old_item_id in pushed_item_dict.items():
                         id_mapping[old_item_id] = new_target_item_map[item_name]
-                except requests.exceptions.HTTPError as ex:
+                except RestAPIException as ex:
                     cls.log_critical('Failed retrieving %s: %s', title, ex)
                     break
         else:
             cls.log_info('%sNo items to push', 'DRY-RUN: ' if parsed_args.dryrun else '')
 
-        if parsed_args.attach and not parsed_args.dryrun:
+        if parsed_args.attach:
+            saved_template_index = DeviceTemplateIndex.load(parsed_args.workdir)
+            if saved_template_index is None:
+                raise FileNotFoundError('DeviceTemplateIndex file not found')
             try:
                 target_templates = {item_name: item_id for item_id, item_name in DeviceTemplateIndex.get_raise(api)}
-                saved_template_index = DeviceTemplateIndex.load(parsed_args.workdir)
-                if saved_template_index is None:
-                    raise FileNotFoundError('DeviceTemplateIndex file not found')
-                # Attach WAN Edges
+                target_policies = {item_name: item_id for item_id, item_name in PolicyVsmartIndex.get_raise(api)}
+                # Attach WAN Edge templates
+                edge_templates_iter = (
+                    (saved_name, saved_id, target_templates.get(saved_name))
+                    for saved_id, saved_name in saved_template_index.filtered_iter(DeviceTemplateIndex.is_not_vsmart)
+                )
                 wan_edge_set = {uuid for uuid, _ in EdgeInventory.get_raise(api)}
-                action_list = cls.attach_template(api,
-                                                  saved_template_index.filtered_iter(DeviceTemplateIndex.is_not_vsmart),
-                                                  parsed_args.workdir, target_templates, wan_edge_set)
+                action_list = cls.attach_template(api, parsed_args.workdir, edge_templates_iter, wan_edge_set)
                 if len(action_list) == 0:
                     cls.log_info('No WAN Edge attachments needed')
                 else:
-                    cls.wait_actions(api, action_list, 'attaching WAN Edges')
-                # Attach vSmarts
+                    cls.wait_actions(api, action_list, 'attaching WAN Edge templates')
+                # Attach vSmart template
+                vsmart_templates_iter = (
+                    (saved_name, saved_id, target_templates.get(saved_name))
+                    for saved_id, saved_name in saved_template_index.filtered_iter(DeviceTemplateIndex.is_vsmart)
+                )
                 vsmart_set = {
                     uuid for uuid, _ in ControlInventory.get_raise(api).filtered_iter(ControlInventory.is_vsmart)
                 }
-                action_list = cls.attach_template(api,
-                                                  saved_template_index.filtered_iter(DeviceTemplateIndex.is_vsmart),
-                                                  parsed_args.workdir, target_templates, vsmart_set)
+                action_list = cls.attach_template(api, parsed_args.workdir, vsmart_templates_iter, vsmart_set)
                 if len(action_list) == 0:
                     cls.log_info('No vSmart attachments needed')
                 else:
-                    cls.wait_actions(api, action_list, 'attaching vSmarts')
+                    cls.wait_actions(api, action_list, 'attaching vSmart template')
                 # Activate vSmart policy
-                action_list = []
-                try:
-                    PolicyVsmartStatus.get_raise(api).raise_for_status()
-                except (requests.exceptions.HTTPError, PolicyVsmartStatusException):
-                    cls.log_debug('vSmarts not in vManage mode or otherwise not ready to have policy activated')
-                else:
-                    vsmart_policies = {item_name: item_id for item_id, item_name in PolicyVsmartIndex.get_raise(api)}
-                    for saved_id, saved_name in PolicyVsmartIndex.load(parsed_args.workdir).active_policy_iter():
-                        target_id = vsmart_policies.get(saved_name)
-                        if target_id is None:
-                            continue
-                        activate_data = api.post({}, PolicyVsmartActivate.api_path.post, target_id)
-                        action_list.append((PolicyVsmartActivate(activate_data), saved_name))
+                saved_policy_index = PolicyVsmartIndex.load(parsed_args.workdir)
+                if saved_policy_index is None:
+                    raise FileNotFoundError('PolicyVsmartIndex file not found')
+                policy_iter = (
+                    (target_policies.get(saved_name), saved_name)
+                    for saved_id, saved_name in saved_policy_index.active_policy_iter()
+                )
+                action_list = cls.activate_policy(api, policy_iter)
                 if len(action_list) == 0:
                     cls.log_info('No vSmart policy to activate')
                 else:
                     cls.wait_actions(api, action_list, 'activating vSmart policy')
-            except requests.exceptions.HTTPError as ex:
+            except RestAPIException as ex:
                 cls.log_critical('Attach failed: %s', ex)
 
 
@@ -298,13 +315,14 @@ class TaskDelete(Task):
         task_parser = argparse.ArgumentParser(prog='sastre.py delete',
                                               description='{header}\nDelete task:'.format(header=__doc__),
                                               formatter_class=argparse.RawDescriptionHelpFormatter)
-        task_parser.add_argument('--dryrun', action='store_true',
-                                 help='Dry-run mode. Items matched for removal are listed but not deleted.')
         task_parser.add_argument('--regex', metavar='<regex>', type=regex_type,
                                  help='Regular expression matching item names to be deleted, within selected tags.')
-        task_parser.add_argument('--detach', action='store_true',
-                                 help='USE WITH CAUTION! Detach devices from templates and deactivate vSmart policy '
-                                      'before deleting items. This allows deleting items that are dependencies.')
+        xor_group = task_parser.add_mutually_exclusive_group(required=False)
+        xor_group.add_argument('--dryrun', action='store_true',
+                               help='Dry-run mode. Items matched for removal are listed but not deleted.')
+        xor_group.add_argument('--detach', action='store_true',
+                               help='USE WITH CAUTION! Detach devices from templates and deactivate vSmart policy '
+                                    'before deleting items. This allows deleting items that are dependencies.')
         task_parser.add_argument('tag', metavar='<tag>', type=TagOptions.tag,
                                  help='''Tag for selecting items to be deleted. 
                                          Available tags: {tag_options}. Special tag '{all}' selects all items.
@@ -316,31 +334,28 @@ class TaskDelete(Task):
         cls.log_info('Starting delete%s: vManage URL: "%s"',
                      ', DRY-RUN mode' if parsed_args.dryrun else '', api.base_url)
 
-        if parsed_args.detach and not parsed_args.dryrun:
+        if parsed_args.detach:
             try:
                 template_index = DeviceTemplateIndex.get_raise(api)
-                # Detach WAN Edges
+                # Detach WAN Edge templates
                 action_list = cls.detach_template(api, template_index, DeviceTemplateIndex.is_not_vsmart)
                 if len(action_list) == 0:
                     cls.log_info('No WAN Edge attached')
                 else:
-                    cls.wait_actions(api, action_list, 'detaching WAN Edges')
+                    cls.wait_actions(api, action_list, 'detaching WAN Edge templates')
                 # Deactivate vSmart policy
-                action_list = []
-                for item_id, item_name in PolicyVsmartIndex.get_raise(api).active_policy_iter():
-                    deactivate_data = api.post({}, PolicyVsmartDeactivate.api_path.post, item_id)
-                    action_list.append((PolicyVsmartDeactivate(deactivate_data), item_name))
+                action_list = cls.deactivate_policy(api)
                 if len(action_list) == 0:
                     cls.log_info('No vSmart policy activated')
                 else:
                     cls.wait_actions(api, action_list, 'deactivating vSmart policy')
-                # Detach vSmarts
+                # Detach vSmart template
                 action_list = cls.detach_template(api, template_index, DeviceTemplateIndex.is_vsmart)
                 if len(action_list) == 0:
                     cls.log_info('No vSmart attached')
                 else:
-                    cls.wait_actions(api, action_list, 'detaching vSmarts')
-            except requests.exceptions.HTTPError as ex:
+                    cls.wait_actions(api, action_list, 'detaching vSmart template')
+            except RestAPIException as ex:
                 cls.log_critical('Detach failed: %s', ex)
 
         for tag in ordered_tags(parsed_args.tag, parsed_args.tag != CATALOG_TAG_ALL):
@@ -360,11 +375,11 @@ class TaskDelete(Task):
                     cls.log_debug('Skipped %s %s %s', 'read-only' if item.is_readonly else 'system', title, item_name)
                     continue
                 if parsed_args.dryrun:
-                    cls.log_info('DRY-RUN: %s %s', title, item_name)
+                    cls.log_info('DRY-RUN: Delete %s %s', title, item_name)
                     continue
 
                 if api.delete(item_cls.api_path.delete, item_id):
-                    cls.log_info('Done %s %s', title, item_name)
+                    cls.log_info('Done: Delete %s %s', title, item_name)
                 else:
                     cls.log_warning('Failed deleting %s %s', title, item_name)
 
@@ -478,7 +493,7 @@ class TaskShowTemplate(Task):
                     uuid_list = [uuid for uuid, _ in devices_attached]
                     values = DeviceTemplateValues(api.post(DeviceTemplateValues.api_params(template_id, uuid_list),
                                                            DeviceTemplateValues.api_path.post))
-                except requests.exceptions.HTTPError:
+                except RestAPIException:
                     cls.log_error('Failed to retrieve %s values', template_name)
                     return None
             else:
@@ -571,8 +586,8 @@ if __name__ == '__main__':
             'file': {
                 'class': 'logging.handlers.RotatingFileHandler',
                 'filename': 'logs/sastre.log',
-                'backupCount': 5,
-                'maxBytes': 102400,
+                'backupCount': 3,
+                'maxBytes': 204800,
                 'level': 'DEBUG',
                 'formatter': 'detailed',
             },
