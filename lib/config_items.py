@@ -320,7 +320,7 @@ class PolicyDef(ConfigItem):
     store_file = '{item_id}.json'
     id_tag = 'definitionId'
     name_tag = 'name'
-    skip_cmp_tag_set = {'lastUpdated', 'referenceCount'}
+    skip_cmp_tag_set = {'lastUpdated', 'referenceCount', 'references'}
 
 
 # Policy definition index base class
@@ -524,7 +524,7 @@ class PolicyList(ConfigItem):
     store_file = '{item_id}.json'
     id_tag = 'listId'
     name_tag = 'name'
-    skip_cmp_tag_set = {'lastUpdated', 'referenceCount'}
+    skip_cmp_tag_set = {'lastUpdated', 'referenceCount', 'references'}
 
 
 # Policy list index base class
