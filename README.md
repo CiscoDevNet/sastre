@@ -135,7 +135,7 @@ Edit sastre-rc-example.sh to include vManage details and source that file:
 - Sastre only tries to update when the item payload is actually different.
 - If the item is associated with attached templates or activated policies, all necessary re-attach/re-activate actions are automatically performed.
 
-
+Example:
 
     ./sastre.py --verbose restore all --workdir state_b --force
     INFO: Starting restore: Local workdir: "state_b" > vManage URL: "https://10.85.136.253:8443"
@@ -197,6 +197,7 @@ Deleting items:
 - When vSmart policies are activated and device templates are attached, the associated items cannot be deleted. 
 - The --detach option performs the necessary template detach and vSmart policy deactivate before proceeding with the delete.
 
+Example:
 
     ./sastre.py --verbose delete all --detach
     INFO: Starting delete: vManage URL: "https://10.85.136.253:8443"
