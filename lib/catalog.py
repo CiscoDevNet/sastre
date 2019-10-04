@@ -253,12 +253,19 @@ class ConfigItem(ApiItem):
     owner_tag = 'owner'
     info_tag = 'infoTag'
     post_filtered_tags = None
+    skip_cmp_tag_set = set()
 
     def __init__(self, data):
         """
         :param data: dict containing the information to be associated with this configuration item
         """
         super().__init__(data)
+
+    def is_equal(self, other):
+        local_cmp_dict = {k: v for k, v in self.data.items() if k not in self.skip_cmp_tag_set}
+        other_cmt_dict = {k: v for k, v in other.items() if k not in self.skip_cmp_tag_set}
+
+        return sorted(json.dumps(local_cmp_dict)) == sorted(json.dumps(other_cmt_dict))
 
     @property
     def is_readonly(self):

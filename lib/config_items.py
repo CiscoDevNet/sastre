@@ -161,6 +161,7 @@ class DeviceTemplate(ConfigItem):
     id_tag = 'templateId'
     name_tag = 'templateName'
     post_filtered_tags = ('feature', )
+    skip_cmp_tag_set = {'createdOn', '@rid', 'lastUpdatedOn', 'templateAttached'}
 
 
 @register('template_device', 'device template', DeviceTemplate)
@@ -241,6 +242,7 @@ class FeatureTemplate(ConfigItem):
     store_file = '{item_id}.json'
     id_tag = 'templateId'
     name_tag = 'templateName'
+    skip_cmp_tag_set = {'attachedMastersCount', 'createdOn', '@rid', 'devicesAttached', 'lastUpdatedOn'}
 
 
 @register('template_feature', 'feature template', FeatureTemplate)
@@ -318,6 +320,7 @@ class PolicyDef(ConfigItem):
     store_file = '{item_id}.json'
     id_tag = 'definitionId'
     name_tag = 'name'
+    skip_cmp_tag_set = {'lastUpdated', 'referenceCount'}
 
 
 # Policy definition index base class
@@ -521,6 +524,7 @@ class PolicyList(ConfigItem):
     store_file = '{item_id}.json'
     id_tag = 'listId'
     name_tag = 'name'
+    skip_cmp_tag_set = {'lastUpdated', 'referenceCount'}
 
 
 # Policy list index base class

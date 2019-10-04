@@ -201,8 +201,9 @@ class TaskRestore(Task):
                 if len(restore_item_list) > 0:
                     restore_list.append((title, index, restore_item_list))
 
+        log_prefix = 'DRY-RUN: ' if parsed_args.dryrun else ''
         if len(restore_list) > 0:
-            cls.log_info('%sPushing items to vManage', 'DRY-RUN: ' if parsed_args.dryrun else '')
+            cls.log_info('%sPushing items to vManage', log_prefix)
             # Items were added to restore_list following ordered_tags() order (i.e. higher level items before lower
             # level items). The reverse order needs to be followed on restore.
             for title, index, restore_item_list in reversed(restore_list):
@@ -211,19 +212,27 @@ class TaskRestore(Task):
                     op_info = 'Create' if target_id is None else 'Update'
                     reason = ' (dependency)' if item_id in dependency_set - match_set else ''
 
-                    if parsed_args.dryrun:
-                        cls.log_info('DRY-RUN: %s %s %s%s', op_info, title, item.name, reason)
-                        continue
-
                     try:
                         if target_id is None:
                             # Create new item
+                            if parsed_args.dryrun:
+                                cls.log_info('%s%s %s %s%s', log_prefix, op_info, title, item.name, reason)
+                                continue
                             # Not using item id returned from post because post can return empty (e.g. local policies)
                             api.post(item.post_data(id_mapping), item.api_path.post)
                             pushed_item_dict[item.name] = item_id
                         else:
                             # Update existing item
-                            put_eval = UpdateEval(api.put(item.put_data(id_mapping), item.api_path.put, target_id))
+                            update_data = item.put_data(id_mapping)
+                            if item.get_raise(api, target_id).is_equal(update_data):
+                                cls.log_debug('%s%s skipped (no diffs) %s %s', log_prefix, op_info, title, item.name)
+                                continue
+
+                            if parsed_args.dryrun:
+                                cls.log_info('%s%s %s %s%s', log_prefix, op_info, title, item.name, reason)
+                                continue
+
+                            put_eval = UpdateEval(api.put(update_data, item.api_path.put, target_id))
                             if put_eval.need_reattach:
                                 if put_eval.is_master:
                                     cls.log_info('Updating %s %s requires reattach', title, item.name)
@@ -260,7 +269,7 @@ class TaskRestore(Task):
                     cls.log_critical('Failed retrieving %s: %s', title, ex)
                     break
         else:
-            cls.log_info('%sNo items to push', 'DRY-RUN: ' if parsed_args.dryrun else '')
+            cls.log_info('%sNo items to push', log_prefix)
 
         if parsed_args.attach:
             saved_template_index = DeviceTemplateIndex.load(parsed_args.workdir)
