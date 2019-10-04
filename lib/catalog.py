@@ -263,9 +263,9 @@ class ConfigItem(ApiItem):
 
     def is_equal(self, other):
         local_cmp_dict = {k: v for k, v in self.data.items() if k not in self.skip_cmp_tag_set}
-        other_cmt_dict = {k: v for k, v in other.items() if k not in self.skip_cmp_tag_set}
+        other_cmp_dict = {k: v for k, v in other.items() if k not in self.skip_cmp_tag_set}
 
-        return sorted(json.dumps(local_cmp_dict)) == sorted(json.dumps(other_cmt_dict))
+        return sorted(json.dumps(local_cmp_dict)) == sorted(json.dumps(other_cmp_dict))
 
     @property
     def is_readonly(self):
