@@ -35,7 +35,7 @@ Tasks currently available: backup, restore, delete, list or show-template. Addin
 
 Task-specific parameters and options (including help) are provided after the task:
 
-    ./sastre.py backup --help
+    ./sastre.py --verbose backup --help
     usage: sastre.py backup [-h] [--workdir <directory>] <tag> [<tag> ...]
     
     Sastre - Automation Tools for Cisco SD-WAN Powered by Viptela
@@ -46,18 +46,19 @@ Task-specific parameters and options (including help) are provided after the tas
       <tag>                 One or more tags for selecting items to be backed up.
                             Multiple tags should be separated by space. Available
                             tags: all, policy_definition, policy_list,
-                            policy_vedge, policy_vsmart, template_device,
-                            template_feature. Special tag 'all' selects all items.
+                            policy_security, policy_vedge, policy_vsmart,
+                            template_device, template_feature. Special tag 'all'
+                            selects all items.
     
     optional arguments:
       -h, --help            show this help message and exit
       --workdir <directory>
                             Directory used to save the backup (default will be
-                            "node_10.85.136.253").
+                            "backup_10.85.136.253_20191004").
 
 Important concepts:
 - vManage URL: Built from the provided vManage IP address and TCP port (default 8443). All operations target this vManage.
-- Workdir: Defines the location (in the local machine) where vManage data files are located. By default it follows the format "node_<vmanage-ip>". With the restore task, the --workdir parameter can be used to provide the location of data files to be used. This scenario is used to transfer data files from one vManage to another. Workdir is under the 'data' directory. 
+- Workdir: Defines the location (in the local machine) where vManage data files are located. By default it follows the format "backup_\<vmanage-ip\>_\<yyyymmdd\>". With the restore task, the --workdir parameter can be used to provide the location of data files to be used. This scenario is used to transfer data files from one vManage to another. Workdir is under the 'data' directory. 
 - Tag: vManage configuration items are grouped by tags, such as policy_apply, policy_definition, policy_list, template_device, etc. The special tag 'all' is used to refer to all configuration elements. Depending on the task, one or more tags can be specified in order to select specific configuration elements.
 
 ## Examples
@@ -78,46 +79,144 @@ Edit sastre-rc-example.sh to include vManage details and source that file:
 ### Backup vManage:
 
     ./sastre.py --verbose backup all
-    INFO: Starting backup task: vManage URL: "https://10.85.136.253:8443" > Work_dir: "node_10.85.136.253"
+    INFO: Starting backup: vManage URL: "https://10.85.136.253:8443" > Local workdir: "backup_10.85.136.253_20191004"
     <snip>
-    INFO: Backup task complete
+    INFO: Task completed successfully
 
-### Restore to the same vMmanage:
+#### Customize backup directory:
 
-     ./sastre.py --verbose restore all
-    INFO: Starting restore task: Work_dir: "node_10.85.136.253" > vManage URL: "https://10.85.136.253:8443"
+    ./sastre.py --verbose backup all --workdir "my_custom_directory"
+    INFO: Starting backup: vManage URL: "https://10.85.136.253:8443" > Local workdir: "my_custom_directory"
     <snip>
-    INFO: Restore task complete
+    INFO: Task completed successfully
 
-### Restore files that were backed-up from a different vManage:
+### Restore vMmanage:
 
-    ./sastre.py --verbose restore all --workdir node_10.200.200.8
-    INFO: Starting restore task: Work_dir: "node_10.200.200.8" > vManage URL: "https://10.85.136.253:8443"
+    ./sastre.py --verbose restore all
+    INFO: Starting restore: Local workdir: "backup_10.85.136.253_20191004" > vManage URL: "https://10.85.136.253:8443"
+    INFO: Loading existing items from target vManage
+    INFO: Identifying items to be pushed
+    INFO: Inspecting template_device items
+    INFO: Inspecting template_feature items
+    INFO: Inspecting policy_vsmart items
+    INFO: Inspecting policy_vedge items
+    INFO: Inspecting policy_security items
+    INFO: Inspecting policy_definition items
+    INFO: Inspecting policy_list items
+    INFO: Pushing items to vManage
+    INFO: Done: Create SLA-class list Best_Effort
     <snip>
-    INFO: Restore task complete
+    INFO: Task completed successfully
+    
+#### Including template attachments and policy activation with the restore:
+    
+    ./sastre.py --verbose restore all --attach
+    INFO: Starting restore: Local workdir: "backup_10.85.136.253_20191004" > vManage URL: "https://10.85.136.253:8443"
+    <snip>
+    INFO: Done: Create device template BRANCH_BASIC
+    INFO: Attaching WAN Edge templates
+    INFO: Waiting...
+    INFO: Completed DC_BASIC,BRANCH_BASIC
+    INFO: Completed attaching WAN Edge templates
+    INFO: Attaching vSmart template
+    INFO: Waiting...
+    INFO: Completed VSMART_v1
+    INFO: Completed attaching vSmart template
+    INFO: Activating vSmart policy
+    INFO: Waiting...
+    INFO: Completed Central_policy_v1
+    INFO: Completed activating vSmart policy
+    INFO: Task completed successfully
+
+#### Overwriting items with the --force option:
+- By default, when an item from backup has the same name as an existing item in vManage, restore will skip this item and leave the existing one intact.
+- When an item, say a device template, is modified in vManage. Performing a restore from a backup taken before the modification will skip that item.
+- With the --force option, items with the same name are updated with the info found in the backup.
+- Sastre only tries to update when the item payload is actually different.
+- If the item is associated with attached templates or activated policies, all necessary re-attach/re-activate actions are automatically performed.
+
+
+    ./sastre.py --verbose restore all --workdir state_b --force
+    INFO: Starting restore: Local workdir: "state_b" > vManage URL: "https://10.85.136.253:8443"
+    INFO: Loading existing items from target vManage
+    INFO: Identifying items to be pushed
+    INFO: Inspecting template_device items
+    INFO: Inspecting template_feature items
+    INFO: Inspecting policy_vsmart items
+    INFO: Inspecting policy_vedge items
+    INFO: Inspecting policy_security items
+    INFO: Inspecting policy_definition items
+    INFO: Inspecting policy_list items
+    INFO: Pushing items to vManage
+    INFO: Done: Create community list LOCAL_DC_PREFIXES
+    INFO: Done: Create community list REMAINING_PREFIXES
+    INFO: Updating SLA-class list Best_Effort requires reattach of affected templates
+    INFO: Reattaching templates
+    INFO: Waiting...
+    INFO: Waiting...
+    INFO: Completed VSMART_v1
+    INFO: Completed reattaching templates
+    INFO: Done: Update SLA-class list Best_Effort
+    <snip>
+    INFO: Done: Update device template DC_BASIC
+    INFO: Task completed successfully
+
+#### Specifying a different directory to source from:
+
+    ./sastre.py --verbose restore all --workdir node_10.85.136.253_22082019
+    INFO: Starting restore: Local workdir: "node_10.85.136.253_22082019" > vManage URL: "https://10.85.136.253:8443"
+    INFO: Loading existing items from target vManage
+    <snip>
+    INFO: Task completed successfully
 
 ### Delete templates from vManage:
 
 Dry-run, just list the items matching the specified tag and regular expression:
 
     ./sastre.py --verbose delete all --regex "VPN1" --dryrun
-    INFO: Starting delete task: vManage URL: "https://10.85.136.253:8443"
+    INFO: Starting delete, DRY-RUN mode: vManage URL: "https://10.85.136.253:8443"
     INFO: Inspecting template_device items
     INFO: Inspecting template_feature items
-    INFO: DRY-RUN: feature template VPN1_Interface5_v01
+    INFO: DRY-RUN: Delete feature template VPN1_Interface4_v01
     <snip>
-    INFO: Delete task complete
+    INFO: Task completed successfully
     
 Deleting items:
 
     ./sastre.py --verbose delete all --regex "VPN1"
-    INFO: Starting delete task: vManage URL: "https://10.85.136.253:8443"
+    INFO: Starting delete: vManage URL: "https://10.85.136.253:8443"
     INFO: Inspecting template_device items
     INFO: Inspecting template_feature items
-    INFO: Done feature template VPN1_Interface5_v01
+    INFO: Done: Delete feature template VPN1_Interface4_v01
     <snip>
-    INFO: Delete task complete
+    INFO: Task completed successfully
+
     
+#### Delete with detach:
+- When vSmart policies are activated and device templates are attached, the associated items cannot be deleted. 
+- The --detach option performs the necessary template detach and vSmart policy deactivate before proceeding with the delete.
+
+
+    ./sastre.py --verbose delete all --detach
+    INFO: Starting delete: vManage URL: "https://10.85.136.253:8443"
+    INFO: Detaching WAN Edge templates
+    INFO: Waiting...
+    INFO: Completed BRANCH_BASIC
+    INFO: Completed DC_BASIC
+    INFO: Completed detaching WAN Edge templates
+    INFO: Deactivating vSmart policy
+    INFO: Waiting...
+    INFO: Completed Central_policy_v1
+    INFO: Completed deactivating vSmart policy
+    INFO: Detaching vSmart template
+    INFO: Waiting...
+    INFO: Completed VSMART_v1
+    INFO: Completed detaching vSmart template
+    INFO: Inspecting template_device items
+    INFO: Done: Delete device template vManage_template
+    <snip>
+    INFO: Task completed successfully
+
 ### List items from vManage or from backup:
 
 The list task can be used to list items from a target vManage, or a backup directory, matching a criteria of item tag(s) and regular expression.
