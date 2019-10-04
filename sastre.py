@@ -21,10 +21,6 @@ __version__    = "0.20"
 __maintainer__ = "Marcelo Reis"
 __status__     = "Development"
 
-# TODO: Create attach/detach tasks, allowing for selective attach/detach and allow external csv files
-# TODO: Add support to re-attach cli templates
-# TODO: Allow renaming of backed up items before uploading
-
 
 class Defaults:
     VMANAGE_PORT = '8443'
