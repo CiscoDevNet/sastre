@@ -262,8 +262,8 @@ class ConfigItem(ApiItem):
         super().__init__(data)
 
     def is_equal(self, other):
-        local_cmp_dict = {k: v for k, v in self.data.items() if k not in self.skip_cmp_tag_set}
-        other_cmp_dict = {k: v for k, v in other.items() if k not in self.skip_cmp_tag_set}
+        local_cmp_dict = {k: v for k, v in self.data.items() if k not in self.skip_cmp_tag_set | {self.id_tag}}
+        other_cmp_dict = {k: v for k, v in other.items() if k not in self.skip_cmp_tag_set | {self.id_tag}}
 
         return sorted(json.dumps(local_cmp_dict)) == sorted(json.dumps(other_cmp_dict))
 

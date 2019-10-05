@@ -161,7 +161,7 @@ class DeviceTemplate(ConfigItem):
     id_tag = 'templateId'
     name_tag = 'templateName'
     post_filtered_tags = ('feature', )
-    skip_cmp_tag_set = {'createdOn', '@rid', 'lastUpdatedOn', 'templateAttached'}
+    skip_cmp_tag_set = {'createdOn', '@rid', 'lastUpdatedOn', 'templateAttached', 'owner', 'infoTag'}
 
 
 @register('template_device', 'device template', DeviceTemplate)
@@ -242,7 +242,8 @@ class FeatureTemplate(ConfigItem):
     store_file = '{item_id}.json'
     id_tag = 'templateId'
     name_tag = 'templateName'
-    skip_cmp_tag_set = {'attachedMastersCount', 'createdOn', '@rid', 'devicesAttached', 'lastUpdatedOn'}
+    skip_cmp_tag_set = {'createdOn', 'createdBy', 'lastUpdatedBy', 'lastUpdatedOn', '@rid', 'owner', 'infoTag',
+                        'devicesAttached', 'attachedMastersCount'}
 
 
 @register('template_feature', 'feature template', FeatureTemplate)
@@ -261,6 +262,7 @@ class PolicyVsmart(ConfigItem):
     store_path = ('templates', 'vsmart_policy')
     store_file = '{item_id}.json'
     name_tag = 'policyName'
+    skip_cmp_tag_set = {'isPolicyActivated', }
 
 
 @register('policy_vsmart', 'VSMART policy', PolicyVsmart)
@@ -320,7 +322,8 @@ class PolicyDef(ConfigItem):
     store_file = '{item_id}.json'
     id_tag = 'definitionId'
     name_tag = 'name'
-    skip_cmp_tag_set = {'lastUpdated', 'referenceCount', 'references'}
+    skip_cmp_tag_set = {'lastUpdated', 'referenceCount', 'references', 'activatedId', 'isActivatedByVsmart',
+                        'owner', 'infoTag'}
 
 
 # Policy definition index base class
@@ -524,7 +527,8 @@ class PolicyList(ConfigItem):
     store_file = '{item_id}.json'
     id_tag = 'listId'
     name_tag = 'name'
-    skip_cmp_tag_set = {'lastUpdated', 'referenceCount', 'references'}
+    skip_cmp_tag_set = {'lastUpdated', 'referenceCount', 'references', 'activatedId', 'isActivatedByVsmart',
+                        'owner', 'infoTag'}
 
 
 # Policy list index base class
