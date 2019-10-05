@@ -17,7 +17,7 @@ from lib.task_common import regex_search, Task, Table, WaitActionsException
 
 __author__     = "Marcelo Reis"
 __copyright__  = "Copyright (c) 2019 Cisco Systems, Inc. and/or its affiliates"
-__version__    = "0.20"
+__version__    = "0.21"
 __maintainer__ = "Marcelo Reis"
 __status__     = "Development"
 
