@@ -292,6 +292,8 @@ class ConfigItem(ApiItem):
                 data = json.load(read_f)
         except FileNotFoundError:
             return None
+        except json.decoder.JSONDecodeError as ex:
+            raise ModelException('Invalid JSON file: {filename}: {msg}'.format(filename=file, msg=ex))
         else:
             return cls(data)
 
@@ -403,4 +405,9 @@ def fields(keys, item):
 
 class CatalogException(Exception):
     """ Exception for config item catalog errors """
+    pass
+
+
+class ModelException(Exception):
+    """ Exception for REST API model errors """
     pass
