@@ -11,13 +11,13 @@ import os.path
 from datetime import date
 from lib.config_items import *
 from lib.rest_api import Rest, LoginFailedException, RestAPIException
-from lib.catalog import catalog_size, catalog_entries, CATALOG_TAG_ALL, ordered_tags, UpdateEval
+from lib.catalog import catalog_size, catalog_entries, CATALOG_TAG_ALL, ordered_tags, UpdateEval, ModelException
 from lib.utils import TaskOptions, TagOptions, ShowOptions, directory_type, regex_type, uuid_type, EnvVar
 from lib.task_common import regex_search, Task, Table, WaitActionsException
 
 __author__     = "Marcelo Reis"
 __copyright__  = "Copyright (c) 2019 Cisco Systems, Inc. and/or its affiliates"
-__version__    = "0.21"
+__version__    = "0.22"
 __maintainer__ = "Marcelo Reis"
 __status__     = "Development"
 
@@ -39,7 +39,7 @@ def main(cli_args):
             # Dispatch to the appropriate task handler
             cli_args.task.runner(api, parsed_task_args)
         cli_args.task.log_info('Task completed %s', cli_args.task.outcome('successfully', 'with caveats: {tally}'))
-    except (LoginFailedException, FileNotFoundError) as ex:
+    except (LoginFailedException, FileNotFoundError, ModelException) as ex:
         logging.getLogger(__name__).critical(ex)
 
 
