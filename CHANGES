@@ -1,0 +1,34 @@
+Sastre 0.30 [Oct 25, 2019]
+==========================
+
+Enhancements:
+    - Backups now always create a new workdir. If the target workdir is already present, Sastre will save it with a
+      number extension. For instance, if the target workdir is 'backup_production_20191022' and there is already a
+      backup under this directory, this existing backup is moved to 'backup_production_20191022_1'. The number extension
+      can go up to 99. At this point Sastre starts deleting the previous backup.
+
+Non-backwards compatible enhancements:
+    - Backup database is changed in release 0.30. Individual items (e.g. device templates, feature templates, etc) are
+      now stored with a filename containing the actual item name, as opposed to the item uuid. The directories where
+      items are saved were also changed.
+      In order to guarantee a filesystem safe filename, item name characters other than a-z, A-Z, ' ', '-' or '_' are
+      replaced with an underscore '_' in the filename. In case of name collision, Sastre falls back to using filenames
+      in the format <item name>_<item id>. For instance, if there is one device template named VEDGE_1K_v1 and another
+      VEDGE/1K/v1, both will have the same filename-safe name (i.e. VEDGE_1K_v1). Sastre will save them as
+      VEDGE_1K_v1_<uuid item 1>.json and VEDGE_1K_v1_<uuid item 2>.json.
+
+
+Sastre 0.22 [Oct 10, 2019]
+==========================
+
+Enhancements:
+    - Improved error handling for malformed json files in the backup. When backup json files fail to be loaded
+      (i.e. parsed) additional details are now provided in the log message.
+
+
+Sastre 0.21 [Oct 5, 2019]
+==========================
+
+Enhancements:
+    - Added --force option to restore task. vManage items with the same name as backup items but with differences in
+      their contents are updated with data from the backup. README file contains additional details.
