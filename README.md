@@ -4,6 +4,18 @@
 
 Sastre provides utility functions to assist with managing configuration elements in vManage. This includes backup, restore and delete vManage configuration items.
 
+## Important note on backup format changes in v0.30
+
+The backup database format was changed in Sastre 0.30. Backups taken with previous releases cannot be restored using the new release. Please check the CHANGES file for further details.
+
+The latest release using the old backup format was tagged as 'v0.2'. If there is a need to use older backups, just git checkout this tag:
+
+    git checkout v0.2
+
+In order to return to the latest release:
+
+    git checkout master
+
 ## Requirements
 
 Sastre requires Python 3.6 or newer and the requests pip package.
@@ -134,6 +146,7 @@ Edit sastre-rc-example.sh to include vManage details and source that file:
 - With the --force option, items with the same name are updated with the info found in the backup.
 - Sastre only tries to update when the item payload is actually different.
 - If the item is associated with attached templates or activated policies, all necessary re-attach/re-activate actions are automatically performed.
+- Currently, the --force option does not apply to changes in template values. 
 
 Example:
 
@@ -307,7 +320,9 @@ Similarly to list, show tasks can be used to show items from a target vManage, o
     +-----------------------------------+--------------------------------------+--------------------------------------------------------------------+
 
 
-## Regular Expressions
+## Notes
+
+### Regular Expressions
 
 It is recommended to always use double quotes when specifying a regular expression to --regex option:
 
@@ -319,13 +334,26 @@ Matching done by the --regex is un-anchored. That is, unless anchor marks are pr
 
 The regular expression syntax is described here: https://docs.python.org/3/library/re.html
 
-## Logs
+### Logs
 
 Sastre logs messages to the terminal and to log files (under the logs directory).
 
 Debug-level and higher severity messages are always saved to the log files.
 
 The --verbose flag controls the severity of messages printed to the terminal. If --verbose is not specified, only warning-level and higher messages are logged. When --verbose is specified, informational-level and higher messages are printed. 
+
+### Restore behavior
+
+By default restore will skip items with the same name. If an existing item in vManage has the same name as an item in the backup, this item is skipped from restore. Any references/dependencies on that item are properly updated. For instanve, if a feature template is not pushed to vManage because an item with the sama name is already present. Device templates being pushed will now point to the feature template which was already in vManage.
+
+Adding the --force option to restore modifies the default behavior. In this case Sastre will update existing items containing the same name as in the backup if their content is different. 
+
+When an existing vManage item is modified, device templates may need to be reattached or vSmart policies may need to be re-activated. This is handled by Sastre as follows:
+- On updates to a master template (e.g. device template) containing attached devices, Sastre will re-attach this device template using attachment values (variables) from the backup to feed the attach request.
+- On Updates to a child template (e.g. feature template) associated with a master template containing attached devices, Sastre will re-attach the affected master template(s). In this case, Sastre will use the existing values in vManage to feed the attach request.
+- The implication is that if the modified child template (e.g. feature template) defines new variables, re-attaching its master template will fail because not all variables will have values assigned. In this case, the recommended procedure is to detach the master template (i.e. change device to CLI mode in vManage), re-run the restore --force task and then re-attach the device-template from vManage, where one would have a chance to supply all missing variable values.
+- Updating items associated with an active vSmart policy may require this policy to be re-activated. In this case, Sastre will request the policy reactivate as well.
+
 
 ## Installing Requirements
 

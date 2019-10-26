@@ -7,31 +7,29 @@ import logging
 import logging.config
 import logging.handlers
 import argparse
-import os.path
+from pathlib import Path
+from shutil import rmtree
 from datetime import date
-from lib.config_items import *
 from lib.rest_api import Rest, LoginFailedException, RestAPIException
-from lib.catalog import catalog_size, catalog_entries, CATALOG_TAG_ALL, ordered_tags, UpdateEval, ModelException
-from lib.utils import TaskOptions, TagOptions, ShowOptions, directory_type, regex_type, uuid_type, EnvVar
+from lib.catalog import catalog_size, catalog_entries, CATALOG_TAG_ALL, ordered_tags
+from lib.utils import (TaskOptions, TagOptions, ShowOptions, existing_file_type, filename_type, regex_type, uuid_type,
+                       EnvVar)
 from lib.task_common import regex_search, Task, Table, WaitActionsException
+from lib.defaults import VMANAGE_PORT, REST_TIMEOUT, BASE_URL, DATA_DIR, WORK_DIR
+from lib.models_base import UpdateEval, ModelException, filename_safe
+from lib.models_vmanage import (DeviceTemplate, DeviceTemplateAttached, DeviceTemplateValues, DeviceTemplateIndex,
+                                PolicyVsmartIndex, EdgeInventory, ControlInventory)
 
 __author__     = "Marcelo Reis"
 __copyright__  = "Copyright (c) 2019 Cisco Systems, Inc. and/or its affiliates"
-__version__    = "0.22"
+__version__    = "0.30"
 __maintainer__ = "Marcelo Reis"
 __status__     = "Development"
 
 
-class Defaults:
-    VMANAGE_PORT = '8443'
-    REST_TIMEOUT = 300
-    BASE_URL = 'https://{address}:{port}'
-    WORK_DIR = 'backup_{address}_{date:%Y%m%d}'
-
-
 def main(cli_args):
-    base_url = Defaults.BASE_URL.format(address=cli_args.address, port=cli_args.port)
-    default_workdir = Defaults.WORK_DIR.format(address=cli_args.address, date=date.today())
+    base_url = BASE_URL.format(address=cli_args.address, port=cli_args.port)
+    default_workdir = WORK_DIR.format(address=cli_args.address, date=date.today())
 
     parsed_task_args = cli_args.task.parser(default_workdir, cli_args.task_args)
     try:
@@ -50,7 +48,7 @@ class TaskBackup(Task):
         task_parser = argparse.ArgumentParser(prog='sastre.py backup',
                                               description='{header}\nBackup task:'.format(header=__doc__),
                                               formatter_class=argparse.RawDescriptionHelpFormatter)
-        task_parser.add_argument('--workdir', metavar='<directory>', default=default_workdir,
+        task_parser.add_argument('--workdir', metavar='<directory>', type=filename_type, default=default_workdir,
                                  help='''Directory used to save the backup (default will be "{default_dir}").
                                       '''.format(default_dir=default_workdir))
         task_parser.add_argument('tags', metavar='<tag>', nargs='+', type=TagOptions.tag,
@@ -63,6 +61,12 @@ class TaskBackup(Task):
     @classmethod
     def runner(cls, api, parsed_args):
         cls.log_info('Starting backup: vManage URL: "%s" > Local workdir: "%s"', api.base_url, parsed_args.workdir)
+
+        # Backup workdir must be empty for a new backup
+        saved_workdir = cls.clean_workdir(parsed_args.workdir)
+        if saved_workdir:
+            cls.log_info('Previous backup under "%s" was saved as "%s"', parsed_args.workdir, saved_workdir)
+
         for _, title, index_cls, item_cls in catalog_entries(*parsed_args.tags):
             item_index = index_cls.get(api)
             if item_index is None:
@@ -76,7 +80,7 @@ class TaskBackup(Task):
                 if item is None:
                     cls.log_error('Failed backup %s %s', title, item_name)
                     continue
-                if item.save(parsed_args.workdir, item_name=item_name, item_id=item_id):
+                if item.save(parsed_args.workdir, item_index.need_extended_name, item_name, item_id):
                     cls.log_info('Done %s %s', title, item_name)
 
                 # Special case for DeviceTemplateAttached and DeviceTemplateValues
@@ -85,7 +89,7 @@ class TaskBackup(Task):
                     if devices_attached is None:
                         cls.log_error('Failed backup %s %s attached devices', title, item_name)
                         continue
-                    if devices_attached.save(parsed_args.workdir, item_name=item_name, item_id=item_id):
+                    if devices_attached.save(parsed_args.workdir, item_index.need_extended_name, item_name, item_id):
                         cls.log_info('Done %s %s attached devices', title, item_name)
                     else:
                         cls.log_debug('Skipped %s %s attached devices, none found', title, item_name)
@@ -95,10 +99,25 @@ class TaskBackup(Task):
                         uuid_list = [uuid for uuid, _ in devices_attached]
                         values = DeviceTemplateValues(api.post(DeviceTemplateValues.api_params(item_id, uuid_list),
                                                                DeviceTemplateValues.api_path.post))
-                        if values.save(parsed_args.workdir, item_name=item_name, item_id=item_id):
+                        if values.save(parsed_args.workdir, item_index.need_extended_name, item_name, item_id):
                             cls.log_info('Done %s %s values', title, item_name)
                     except RestAPIException as ex:
                         cls.log_error('Failed backup %s %s values: %s', title, item_name, ex)
+
+    @staticmethod
+    def clean_workdir(workdir, max_saved=99):
+        workdir_path = Path(DATA_DIR, workdir)
+        if workdir_path.exists():
+            save_seq = range(max_saved)
+            for elem in save_seq:
+                save_path = Path(DATA_DIR, '{workdir}_{count}'.format(workdir=workdir, count=elem+1))
+                if elem == save_seq[-1]:
+                    rmtree(save_path, ignore_errors=True)
+                if not save_path.exists():
+                    workdir_path.rename(save_path)
+                    return save_path.name
+
+        return False
 
 
 @TaskOptions.register('restore')
@@ -108,7 +127,7 @@ class TaskRestore(Task):
         task_parser = argparse.ArgumentParser(prog='sastre.py restore',
                                               description='{header}\nRestore task:'.format(header=__doc__),
                                               formatter_class=argparse.RawDescriptionHelpFormatter)
-        task_parser.add_argument('--workdir', metavar='<directory>', type=directory_type, default=default_workdir,
+        task_parser.add_argument('--workdir', metavar='<directory>', type=existing_file_type, default=default_workdir,
                                  help='''Source of items to be restored (default will be "{default_dir}").
                                       '''.format(default_dir=default_workdir))
         task_parser.add_argument('--regex', metavar='<regex>', type=regex_type,
@@ -133,7 +152,7 @@ class TaskRestore(Task):
     def runner(cls, api, parsed_args):
         def load_items(index, item_cls):
             item_iter = (
-                (item_id, item_cls.load(parsed_args.workdir, item_name=item_name, item_id=item_id))
+                (item_id, item_cls.load(parsed_args.workdir, index.need_extended_name, item_name, item_id))
                 for item_id, item_name in index
             )
             return ((item_id, item_obj) for item_id, item_obj in item_iter if item_obj is not None)
@@ -233,6 +252,7 @@ class TaskRestore(Task):
                                 if put_eval.is_master:
                                     cls.log_info('Updating %s %s requires reattach', title, item.name)
                                     action_list = cls.attach_template(api, parsed_args.workdir,
+                                                                      index.need_extended_name,
                                                                       [(item.name, item_id, target_id)])
                                 else:
                                     cls.log_info('Updating %s %s requires reattach of affected templates',
@@ -274,13 +294,14 @@ class TaskRestore(Task):
             try:
                 target_templates = {item_name: item_id for item_id, item_name in DeviceTemplateIndex.get_raise(api)}
                 target_policies = {item_name: item_id for item_id, item_name in PolicyVsmartIndex.get_raise(api)}
+                attach_common_args = (api, parsed_args.workdir, saved_template_index.need_extended_name)
                 # Attach WAN Edge templates
                 edge_templates_iter = (
                     (saved_name, saved_id, target_templates.get(saved_name))
                     for saved_id, saved_name in saved_template_index.filtered_iter(DeviceTemplateIndex.is_not_vsmart)
                 )
                 wan_edge_set = {uuid for uuid, _ in EdgeInventory.get_raise(api)}
-                action_list = cls.attach_template(api, parsed_args.workdir, edge_templates_iter, wan_edge_set)
+                action_list = cls.attach_template(*attach_common_args, edge_templates_iter, wan_edge_set)
                 if len(action_list) == 0:
                     cls.log_info('No WAN Edge attachments needed')
                 else:
@@ -293,7 +314,7 @@ class TaskRestore(Task):
                 vsmart_set = {
                     uuid for uuid, _ in ControlInventory.get_raise(api).filtered_iter(ControlInventory.is_vsmart)
                 }
-                action_list = cls.attach_template(api, parsed_args.workdir, vsmart_templates_iter, vsmart_set)
+                action_list = cls.attach_template(*attach_common_args, vsmart_templates_iter, vsmart_set)
                 if len(action_list) == 0:
                     cls.log_info('No vSmart attachments needed')
                 else:
@@ -398,14 +419,14 @@ class TaskList(Task):
         task_parser = argparse.ArgumentParser(prog='sastre.py list',
                                               description='{header}\nList task:'.format(header=__doc__),
                                               formatter_class=argparse.RawDescriptionHelpFormatter)
-        task_parser.add_argument('--workdir', metavar='<directory>', type=directory_type,
+        task_parser.add_argument('--workdir', metavar='<directory>', type=existing_file_type,
                                  help='''If specified the list task will operate locally, on items from this directory,
                                          instead of on target vManage.
                                       '''.format(default_dir=default_workdir))
         task_parser.add_argument('--regex', metavar='<regex>', type=regex_type,
                                  help='''Regular expression matching item names or item IDs to list, 
                                          within selected tags.''')
-        task_parser.add_argument('--csv', metavar='<filename>',
+        task_parser.add_argument('--csv', metavar='<filename>', type=filename_type,
                                  help='''Instead of printing a table with the list results, export as csv file with
                                          the filename provided.''')
         task_parser.add_argument('tags', metavar='<tag>', nargs='+', type=TagOptions.tag,
@@ -453,11 +474,11 @@ class TaskShowTemplate(Task):
         task_parser.add_argument('option', metavar='<option>', type=ShowOptions.option,
                                  help='''Attributes to show. Available options: {show_options}.
                                       '''.format(show_options=ShowOptions.options()))
-        task_parser.add_argument('--workdir', metavar='<directory>', type=directory_type,
+        task_parser.add_argument('--workdir', metavar='<directory>', type=existing_file_type,
                                  help='''If specified the show task will operate locally, on items from this directory,
                                          instead of on target vManage.
                                       '''.format(default_dir=default_workdir))
-        task_parser.add_argument('--csv', metavar='<directory>',
+        task_parser.add_argument('--csv', metavar='<directory>', type=filename_type,
                                  help='''Instead of printing tables with the results, export as csv files.
                                          Exported files are saved under the specified directory.''')
         xor_group = task_parser.add_mutually_exclusive_group(required=True)
@@ -474,7 +495,7 @@ class TaskShowTemplate(Task):
         cls.log_info('Starting show: %s', target_info)
 
         if parsed_args.csv is not None:
-            os.makedirs(parsed_args.csv, exist_ok=True)
+            Path(parsed_args.csv).mkdir(parents=True, exist_ok=True)
 
         # Dispatch to the appropriate show handler
         parsed_args.option(cls, api, parsed_args)
@@ -489,7 +510,7 @@ class TaskShowTemplate(Task):
                 return item_name == show_args.name
             return regex_search(show_args.regex, item_name)
 
-        def template_values(template_name, template_id):
+        def template_values(ext_name, template_name, template_id):
             if show_args.workdir is None:
                 devices_attached = DeviceTemplateAttached.get(api, template_id)
                 if devices_attached is None:
@@ -504,7 +525,7 @@ class TaskShowTemplate(Task):
                     cls.log_error('Failed to retrieve %s values', template_name)
                     return None
             else:
-                values = DeviceTemplateValues.load(show_args.workdir, item_name=template_name, item_id=template_id)
+                values = DeviceTemplateValues.load(show_args.workdir, ext_name, template_name, template_id)
                 if values is None:
                     cls.log_debug('Skipped %s. No template values file found.', template_name)
 
@@ -513,13 +534,13 @@ class TaskShowTemplate(Task):
         print_buffer = []
         backend = show_args.workdir if show_args.workdir is not None else api
         matched_item_iter = (
-            (item_name, item_id, tag, title)
+            (index.need_extended_name, item_name, item_id, tag, title)
             for tag, title, index, item_cls in cls.index_iter(backend, catalog_entries('template_device'))
             for item_id, item_name in index
             if item_matches(item_name, item_id) and issubclass(item_cls, DeviceTemplate)
         )
-        for item_name, item_id, tag, title in matched_item_iter:
-            attached_values = template_values(item_name, item_id)
+        for use_ext_name, item_name, item_id, tag, title in matched_item_iter:
+            attached_values = template_values(use_ext_name, item_name, item_id)
             if attached_values is None:
                 continue
 
@@ -535,8 +556,9 @@ class TaskShowTemplate(Task):
                 )
                 if len(results) > 0:
                     if show_args.csv is not None:
-                        filename = 'template_values_{name}_{id}.csv'.format(name=item_name, id=csv_name or csv_id)
-                        results.save(os.path.join(show_args.csv, filename))
+                        filename = 'template_values_{name}_{id}.csv'.format(name=filename_safe(item_name, lower=True),
+                                                                            id=csv_name or csv_id)
+                        results.save(Path(show_args.csv, filename))
                     print_grp.extend(results.pretty_iter())
                 print_buffer.append('\n'.join(print_grp))
 
@@ -558,10 +580,10 @@ if __name__ == '__main__':
                             help='username, can also be provided via VMANAGE_USER environment variable')
     cli_parser.add_argument('-p', '--password', metavar='<password>', action=EnvVar, envvar='VMANAGE_PASSWORD',
                             help='password, can also be provided via VMANAGE_PASSWORD environment variable')
-    cli_parser.add_argument('--port', metavar='<port>', default=Defaults.VMANAGE_PORT,
-                            help='vManage TCP port number (default is {port})'.format(port=Defaults.VMANAGE_PORT))
-    cli_parser.add_argument('--timeout', metavar='<timeout>', type=int, default=Defaults.REST_TIMEOUT,
-                            help='REST API timeout (default is {timeout}s)'.format(timeout=Defaults.REST_TIMEOUT))
+    cli_parser.add_argument('--port', metavar='<port>', default=VMANAGE_PORT,
+                            help='vManage TCP port number (default is {port})'.format(port=VMANAGE_PORT))
+    cli_parser.add_argument('--timeout', metavar='<timeout>', type=int, default=REST_TIMEOUT,
+                            help='REST API timeout (default is {timeout}s)'.format(timeout=REST_TIMEOUT))
     cli_parser.add_argument('--verbose', action='store_true',
                             help='increase output verbosity')
     cli_parser.add_argument('--version', action='version',
@@ -610,7 +632,7 @@ if __name__ == '__main__':
             },
         },
     }
-    os.makedirs('logs', exist_ok=True)
+    Path('logs').mkdir(exist_ok=True)
     logging.config.dictConfig(LOGGING_CONFIG)
 
     # Entry point

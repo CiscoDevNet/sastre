@@ -2,7 +2,6 @@
 Supporting classes and functions for tasks
 
 """
-
 import logging
 import time
 import csv
@@ -10,9 +9,9 @@ import re
 from itertools import repeat
 from collections import namedtuple
 from lib.rest_api import Rest, RestAPIException
-from lib.config_items import (DeviceTemplateValues, DeviceTemplateAttached, DeviceTemplateAttach, DeviceModeCli,
-                              ActionStatus, PolicyVsmartStatus, PolicyVsmartStatusException, PolicyVsmartActivate,
-                              PolicyVsmartIndex, PolicyVsmartDeactivate)
+from lib.models_vmanage import (DeviceTemplateValues, DeviceTemplateAttached, DeviceTemplateAttach, DeviceModeCli,
+                                ActionStatus, PolicyVsmartStatus, PolicyVsmartStatusException, PolicyVsmartActivate,
+                                PolicyVsmartIndex, PolicyVsmartDeactivate)
 
 
 def regex_search(regex, *fields):
@@ -117,11 +116,12 @@ class Task:
         return ((tag, title, index, item_cls) for tag, title, index, item_cls in all_index_iter if index is not None)
 
     @classmethod
-    def attach_template(cls, api, work_dir, templates_iter, target_uuid_set=None):
+    def attach_template(cls, api, workdir, ext_name, templates_iter, target_uuid_set=None):
         """
         Attach templates considering local backup as the source of truth (i.e. where input values are)
         :param api: Instance of Rest API
-        :param work_dir: Directory containing saved items
+        :param workdir: Directory containing saved items
+        :param ext_name: Boolean passed to .load methods indicating whether extended item names should be used.
         :param templates_iter: Iterator of (<template_name>, <saved_template_id>, <target_template_id>)
         :param target_uuid_set: (optional) Set of existing device uuids on target node.
                                 When provided, attach only devices that were previously attached (on saved) and are on
@@ -134,7 +134,7 @@ class Task:
                 cls.log_debug('Skip %s, saved template is not on target node', template_name)
                 return None
 
-            saved_values = DeviceTemplateValues.load(work_dir, item_name=template_name, item_id=saved_id)
+            saved_values = DeviceTemplateValues.load(workdir, ext_name, template_name, saved_id)
             if saved_values is None:
                 cls.log_error('DeviceTemplateValues file not found: %s, %s', template_name, saved_id)
                 return None
@@ -146,7 +146,7 @@ class Task:
             if target_uuid_set is None:
                 allowed_uuid_set = target_attached_uuid_set
             else:
-                saved_attached = DeviceTemplateAttached.load(work_dir, item_name=template_name, item_id=saved_id)
+                saved_attached = DeviceTemplateAttached.load(workdir, ext_name, template_name, saved_id)
                 if saved_attached is None:
                     cls.log_error('DeviceTemplateAttached file not found: %s, %s', template_name, saved_id)
                     return None
