@@ -3,7 +3,7 @@ vManage API models
 
 """
 from lib.catalog import register
-from lib.models_base import ApiItem, IndexApiItem, ConfigItem, IndexConfigItem, ApiPath, ConditionalApiPath, IdName
+from lib.models_base import ApiItem, IndexApiItem, ConfigItem, IndexConfigItem, ApiPath, IdName
 
 
 #
@@ -48,6 +48,10 @@ class DeviceTemplateAttach(ApiItem):
                 template_entry(item_id, input_list) for item_id, input_list in template_input_iter
             ]
         }
+
+
+class DeviceTemplateCLIAttach(DeviceTemplateAttach):
+    api_path = ApiPath(None, 'template/device/config/attachcli', None, None)
 
 
 class PolicyVsmartDeactivate(ApiItem):
@@ -152,8 +156,20 @@ class ControlInventory(IndexApiItem):
 #
 # Templates
 #
+class CliOrFeatureApiPath:
+    def __init__(self, api_path_feature, api_path_cli):
+        self.api_path_feature = api_path_feature
+        self.api_path_cli = api_path_cli
+
+    def __get__(self, instance, owner):
+        # If called from class, assume its a feature template
+        is_cli_template = instance is not None and instance.is_type_cli
+
+        return self.api_path_cli if is_cli_template else self.api_path_feature
+
+
 class DeviceTemplate(ConfigItem):
-    api_path = ConditionalApiPath(
+    api_path = CliOrFeatureApiPath(
         ApiPath('template/device/object', 'template/device/feature', 'template/device'),
         ApiPath('template/device/object', 'template/device/cli', 'template/device')
     )
@@ -162,7 +178,12 @@ class DeviceTemplate(ConfigItem):
     id_tag = 'templateId'
     name_tag = 'templateName'
     post_filtered_tags = ('feature', )
-    skip_cmp_tag_set = {'createdOn', '@rid', 'lastUpdatedOn', 'templateAttached', 'owner', 'infoTag'}
+    skip_cmp_tag_set = {'createdOn', 'createdBy', 'lastUpdatedBy', 'lastUpdatedOn', '@rid', 'owner', 'infoTag',
+                        'templateAttached', 'templateConfigurationEdited'}
+
+    @property
+    def is_type_cli(self):
+        return self.data.get('configType', 'template') == 'file'
 
 
 @register('template_device', 'device template', DeviceTemplate)
@@ -272,11 +293,16 @@ class PolicyVsmartIndex(IndexConfigItem):
     store_file = 'policy_templates_vsmart.json'
     iter_fields = IdName('policyId', 'policyName')
 
-    def active_policy_iter(self):
-        return (
-            (item_id, item_name)
-            for is_active, item_id, item_name in self.iter('isPolicyActivated', *self.iter_fields) if is_active
-        )
+    @property
+    def active_policy(self):
+        """
+        Return ID and name from active policy or (None, None) if no policy is active
+        :return: (<id>, <name>) or (None, None)
+        """
+        for is_active, item_id, item_name in self.iter('isPolicyActivated', *self.iter_fields):
+            if is_active:
+                return item_id, item_name
+        return None, None
 
 
 #

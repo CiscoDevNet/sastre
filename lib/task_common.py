@@ -9,9 +9,10 @@ import re
 from itertools import repeat
 from collections import namedtuple
 from lib.rest_api import Rest, RestAPIException
-from lib.models_vmanage import (DeviceTemplateValues, DeviceTemplateAttached, DeviceTemplateAttach, DeviceModeCli,
-                                ActionStatus, PolicyVsmartStatus, PolicyVsmartStatusException, PolicyVsmartActivate,
-                                PolicyVsmartIndex, PolicyVsmartDeactivate)
+from lib.models_vmanage import (DeviceTemplate, DeviceTemplateValues, DeviceTemplateAttached, DeviceTemplateAttach,
+                                DeviceTemplateCLIAttach, DeviceModeCli, ActionStatus, PolicyVsmartStatus,
+                                PolicyVsmartStatusException, PolicyVsmartActivate, PolicyVsmartIndex,
+                                PolicyVsmartDeactivate)
 
 
 def regex_search(regex, *fields):
@@ -160,21 +161,14 @@ class Task:
 
             return input_list
 
-        template_input_iter = ((name, target_id, load_template_input(name, saved_id, target_id))
-                               for name, saved_id, target_id in templates_iter)
-        input_dict = {template_name: (target_id, input_list)
-                      for template_name, target_id, input_list in template_input_iter if input_list is not None}
+        def is_template_cli(template_name, saved_id):
+            return DeviceTemplate.load(workdir, ext_name, template_name, saved_id, raise_not_found=True).is_type_cli
 
-        action_list = []
-        if len(input_dict) > 0:
-            action_worker = DeviceTemplateAttach(
-                api.post(DeviceTemplateAttach.api_params(input_dict.values(), is_edited=target_uuid_set is None),
-                         DeviceTemplateAttach.api_path.post)
-            )
-            cls.log_debug('Template attach requested: %s', action_worker.uuid)
-            action_list.append((action_worker, ','.join(input_dict)))
-
-        return action_list
+        template_input_list = [
+            (name, target_id, load_template_input(name, saved_id, target_id), is_template_cli(name, saved_id))
+            for name, saved_id, target_id in templates_iter
+        ]
+        return cls._place_requests(api, template_input_list, is_edited=target_uuid_set is None)
 
     @classmethod
     def reattach_template(cls, api, templates_iter):
@@ -190,16 +184,47 @@ class Task:
                                                    DeviceTemplateValues.api_path.post))
             return values.input_list()
 
-        template_input_dict = {template_name: (template_id, get_template_input(template_id))
-                               for template_name, template_id in templates_iter}
+        def is_template_cli(template_id):
+            return DeviceTemplate.get_raise(api, template_id).is_type_cli
 
-        action_worker = DeviceTemplateAttach(
-            api.post(DeviceTemplateAttach.api_params(template_input_dict.values(), is_edited=True),
-                     DeviceTemplateAttach.api_path.post)
-        )
-        cls.log_debug('Template reattach requested: %s', action_worker.uuid)
+        template_input_list = [
+            (template_name, template_id, get_template_input(template_id), is_template_cli(template_id))
+            for template_name, template_id in templates_iter
+        ]
+        return cls._place_requests(api, template_input_list, is_edited=True)
 
-        return [(action_worker, ','.join(template_input_dict))]
+    @classmethod
+    def _place_requests(cls, api, template_input_list, is_edited):
+        action_list = []
+        # Attach requests for from-feature device templates
+        feature_input_dict = {
+            template_name: (template_id, input_list)
+            for template_name, template_id, input_list, is_cli in template_input_list
+            if input_list is not None and not is_cli
+        }
+        if len(feature_input_dict) > 0:
+            action_worker = DeviceTemplateAttach(
+                api.post(DeviceTemplateAttach.api_params(feature_input_dict.values(), is_edited),
+                         DeviceTemplateAttach.api_path.post)
+            )
+            cls.log_debug('Device template attach requested: %s', action_worker.uuid)
+            action_list.append((action_worker, ','.join(feature_input_dict)))
+
+        # Attach Requests for cli device templates
+        cli_input_dict = {
+            template_name: (template_id, input_list)
+            for template_name, template_id, input_list, is_cli in template_input_list
+            if input_list is not None and is_cli
+        }
+        if len(cli_input_dict) > 0:
+            action_worker = DeviceTemplateCLIAttach(
+                api.post(DeviceTemplateCLIAttach.api_params(cli_input_dict.values(), is_edited),
+                         DeviceTemplateCLIAttach.api_path.post)
+            )
+            cls.log_debug('Device CLI template attach requested: %s', action_worker.uuid)
+            action_list.append((action_worker, ','.join(cli_input_dict)))
+
+        return action_list
 
     @classmethod
     def detach_template(cls, api, template_index, filter_fn):
@@ -227,37 +252,38 @@ class Task:
         return action_list
 
     @classmethod
-    def activate_policy(cls, api, policy_iter, is_edited=False):
+    def activate_policy(cls, api, policy_id, policy_name, is_edited=False):
         """
         :param api: Instance of Rest API
-        :param policy_iter: An iterator of (<policy-id>, <policy-name>) tuples. It should yield a single entry.
+        :param policy_id: ID of policy to activate
+        :param policy_name: Name of policy to activate
         :param is_edited: (optional) When true it indicates reactivation of an already active policy (e.x. due to
                                      in-place modifications)
         :return: List of worker actions to monitor [(<action_worker>, <template_name>), ...]
         """
         action_list = []
+        if policy_id is None or policy_name is None:
+            # No policy is active or policy not on target vManage
+            return action_list
+
         try:
             PolicyVsmartStatus.get_raise(api).raise_for_status()
         except (RestAPIException, PolicyVsmartStatusException):
             cls.log_debug('vSmarts not in vManage mode or otherwise not ready to have policy activated')
         else:
-            for policy_id, policy_name in policy_iter:
-                if policy_id is None:
-                    cls.log_debug('Skip, vSmart policy is not on target node')
-                    continue
-
-                action_worker = PolicyVsmartActivate(
-                    api.post(PolicyVsmartActivate.api_params(is_edited), PolicyVsmartActivate.api_path.post, policy_id)
-                )
-                cls.log_debug('Policy activate requested: %s', action_worker.uuid)
-                action_list.append((action_worker, policy_name))
+            action_worker = PolicyVsmartActivate(
+                api.post(PolicyVsmartActivate.api_params(is_edited), PolicyVsmartActivate.api_path.post, policy_id)
+            )
+            cls.log_debug('Policy activate requested: %s', action_worker.uuid)
+            action_list.append((action_worker, policy_name))
 
         return action_list
 
     @classmethod
     def deactivate_policy(cls, api):
         action_list = []
-        for item_id, item_name in PolicyVsmartIndex.get_raise(api).active_policy_iter():
+        item_id, item_name = PolicyVsmartIndex.get_raise(api).active_policy
+        if item_id is not None and item_name is not None:
             action_worker = PolicyVsmartDeactivate(api.post({}, PolicyVsmartDeactivate.api_path.post, item_id))
             cls.log_debug('Policy deactivate requested: %s', action_worker.uuid)
             action_list.append((action_worker, item_name))

@@ -22,7 +22,7 @@ from lib.models_vmanage import (DeviceTemplate, DeviceTemplateAttached, DeviceTe
 
 __author__     = "Marcelo Reis"
 __copyright__  = "Copyright (c) 2019 Cisco Systems, Inc. and/or its affiliates"
-__version__    = "0.30"
+__version__    = "0.31"
 __maintainer__ = "Marcelo Reis"
 __status__     = "Development"
 
@@ -268,7 +268,7 @@ class TaskRestore(Task):
                             elif put_eval.need_reactivate:
                                 cls.log_info('Updating %s %s requires vSmart policy reactivate', title, item.name)
                                 action_list = cls.activate_policy(
-                                    api, PolicyVsmartIndex.get_raise(api).active_policy_iter(), is_edited=True
+                                    api, *PolicyVsmartIndex.get_raise(api).active_policy, is_edited=True
                                 )
                                 cls.wait_actions(api, action_list, 'reactivating vSmart policy', raise_on_failure=True)
                     except (RestAPIException, WaitActionsException) as ex:
@@ -288,12 +288,10 @@ class TaskRestore(Task):
             cls.log_info('%sNo items to push', log_prefix)
 
         if parsed_args.attach:
-            saved_template_index = DeviceTemplateIndex.load(parsed_args.workdir)
-            if saved_template_index is None:
-                raise FileNotFoundError('DeviceTemplateIndex file not found')
             try:
                 target_templates = {item_name: item_id for item_id, item_name in DeviceTemplateIndex.get_raise(api)}
                 target_policies = {item_name: item_id for item_id, item_name in PolicyVsmartIndex.get_raise(api)}
+                saved_template_index = DeviceTemplateIndex.load(parsed_args.workdir, raise_not_found=True)
                 attach_common_args = (api, parsed_args.workdir, saved_template_index.need_extended_name)
                 # Attach WAN Edge templates
                 edge_templates_iter = (
@@ -320,19 +318,13 @@ class TaskRestore(Task):
                 else:
                     cls.wait_actions(api, action_list, 'attaching vSmart template')
                 # Activate vSmart policy
-                saved_policy_index = PolicyVsmartIndex.load(parsed_args.workdir)
-                if saved_policy_index is None:
-                    raise FileNotFoundError('PolicyVsmartIndex file not found')
-                policy_iter = (
-                    (target_policies.get(saved_name), saved_name)
-                    for saved_id, saved_name in saved_policy_index.active_policy_iter()
-                )
-                action_list = cls.activate_policy(api, policy_iter)
+                _, policy_name = PolicyVsmartIndex.load(parsed_args.workdir, raise_not_found=True).active_policy
+                action_list = cls.activate_policy(api, target_policies.get(policy_name), policy_name)
                 if len(action_list) == 0:
                     cls.log_info('No vSmart policy to activate')
                 else:
                     cls.wait_actions(api, action_list, 'activating vSmart policy')
-            except RestAPIException as ex:
+            except (RestAPIException, FileNotFoundError) as ex:
                 cls.log_critical('Attach failed: %s', ex)
 
 

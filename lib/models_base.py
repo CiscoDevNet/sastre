@@ -58,18 +58,6 @@ class ApiPath:
             setattr(self, field, value)
 
 
-class ConditionalApiPath:
-    def __init__(self, api_path_feature, api_path_cli):
-        self.api_path_feature = api_path_feature
-        self.api_path_cli = api_path_cli
-
-    def __get__(self, instance, owner):
-        # If called from class, assume its a feature template
-        is_cli_template = instance is not None and instance.data.get('configType', 'template') == 'file'
-
-        return self.api_path_cli if is_cli_template else self.api_path_feature
-
-
 class ApiItem:
     """
     ApiItem represents a vManage API element defined by an ApiPath with GET, POST, PUT and DELETE paths. An instance
@@ -180,7 +168,7 @@ class ConfigItem(ApiItem):
         return cls.store_file.format(item_name=safe_name, item_id=item_id)
 
     @classmethod
-    def load(cls, node_dir, ext_name=False, item_name=None, item_id=None):
+    def load(cls, node_dir, ext_name=False, item_name=None, item_id=None, raise_not_found=False):
         """
         Factory method that loads data from a json file and returns a ConfigItem instance with that data
 
@@ -189,7 +177,8 @@ class ConfigItem(ApiItem):
                          filename safe version unique. False otherwise.
         :param item_name: (Optional) Name of the item being loaded. Variable used to build the filename.
         :param item_id: (Optional) UUID for the item being loaded. Variable used to build the filename.
-        :return: ConfigItem object, or None if file does not exist.
+        :param raise_not_found: (Optional) If set to True, raise FileNotFoundError if file is not found.
+        :return: ConfigItem object, or None if file does not exist and raise_not_found=False
         """
         dir_path = Path(cls.root_dir, node_dir, *cls.store_path)
         file_path = dir_path.joinpath(cls.get_filename(ext_name, item_name, item_id))
@@ -197,6 +186,10 @@ class ConfigItem(ApiItem):
             with open(file_path, 'r') as read_f:
                 data = json.load(read_f)
         except FileNotFoundError:
+            if raise_not_found:
+                has_detail = item_name is not None and item_id is not None
+                detail = ': {name}, {id}'.format(name=item_name, id=item_id) if has_detail else ''
+                raise FileNotFoundError('{owner} file not found{detail}'.format(owner=cls.__name__, detail=detail))
             return None
         except json.decoder.JSONDecodeError as ex:
             raise ModelException('Invalid JSON file: {file}: {msg}'.format(file=file_path, msg=ex))
