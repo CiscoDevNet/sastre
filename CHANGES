@@ -1,3 +1,11 @@
+Sastre 0.31 [Nov 18, 2019]
+==========================
+
+Enhancements:
+    - Template attach and reattach functions now support CLI templates. This means that restore --attach and --force
+      options now support CLI templates in addition to feature-based device templates.
+
+
 Sastre 0.30 [Oct 25, 2019]
 ==========================
 
@@ -32,3 +40,5 @@ Sastre 0.21 [Oct 5, 2019]
 Enhancements:
     - Added --force option to restore task. vManage items with the same name as backup items but with differences in
       their contents are updated with data from the backup. README file contains additional details.
+
+
