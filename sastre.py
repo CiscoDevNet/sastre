@@ -24,7 +24,6 @@ __author__     = "Marcelo Reis"
 __copyright__  = "Copyright (c) 2019 Cisco Systems, Inc. and/or its affiliates"
 __version__    = "0.31"
 __maintainer__ = "Marcelo Reis"
-__status__     = "Development"
 
 
 def main(cli_args):
@@ -51,6 +50,8 @@ class TaskBackup(Task):
         task_parser.add_argument('--workdir', metavar='<directory>', type=filename_type, default=default_workdir,
                                  help='''Directory used to save the backup (default will be "{default_dir}").
                                       '''.format(default_dir=default_workdir))
+        task_parser.add_argument('--regex', metavar='<regex>', type=regex_type,
+                                 help='Regular expression matching item names to be backed up, within selected tags.')
         task_parser.add_argument('tags', metavar='<tag>', nargs='+', type=TagOptions.tag,
                                  help='''One or more tags for selecting items to be backed up. 
                                          Multiple tags should be separated by space.
@@ -75,7 +76,11 @@ class TaskBackup(Task):
             if item_index.save(parsed_args.workdir):
                 cls.log_info('Saved %s index', title)
 
-            for item_id, item_name in item_index:
+            matched_item_iter = (
+                (item_id, item_name) for item_id, item_name in item_index
+                if parsed_args.regex is None or regex_search(parsed_args.regex, item_name)
+            )
+            for item_id, item_name in matched_item_iter:
                 item = item_cls.get(api, item_id)
                 if item is None:
                     cls.log_error('Failed backup %s %s', title, item_name)
@@ -504,6 +509,7 @@ class TaskShowTemplate(Task):
 
         def template_values(ext_name, template_name, template_id):
             if show_args.workdir is None:
+                # Load from vManage via API
                 devices_attached = DeviceTemplateAttached.get(api, template_id)
                 if devices_attached is None:
                     cls.log_error('Failed to retrieve %s attached devices', template_name)
@@ -517,6 +523,7 @@ class TaskShowTemplate(Task):
                     cls.log_error('Failed to retrieve %s values', template_name)
                     return None
             else:
+                # Load from local backup
                 values = DeviceTemplateValues.load(show_args.workdir, ext_name, template_name, template_id)
                 if values is None:
                     cls.log_debug('Skipped %s. No template values file found.', template_name)
