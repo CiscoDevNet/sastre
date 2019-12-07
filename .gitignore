@@ -3,7 +3,9 @@
 data/
 rc/
 logs/
-
+build/
+dist/
+*.egg-info/
 *.csv
 
 # IDE project files

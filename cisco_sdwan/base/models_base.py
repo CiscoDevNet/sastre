@@ -1,6 +1,8 @@
 """
-Base API Models
+ Sastre - Automation Tools for Cisco SD-WAN Powered by Viptela
 
+ cisco_sdwan.base.models_base
+ This module implements vManage base API models
 """
 import json
 import re
@@ -8,8 +10,11 @@ from pathlib import Path
 from itertools import zip_longest
 from operator import itemgetter
 from collections import namedtuple
-from lib.rest_api import RestAPIException
-from lib.defaults import DATA_DIR
+from .rest_api import RestAPIException
+
+
+# Top-level directory for local data store
+DATA_DIR = 'data'
 
 
 class UpdateEval:
