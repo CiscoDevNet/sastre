@@ -1,9 +1,11 @@
 """
-vManage API models
+ Sastre - Automation Tools for Cisco SD-WAN Powered by Viptela
 
+ cisco_sdwan.base.models_vmanage
+ This module implements vManage API models
 """
-from lib.catalog import register
-from lib.models_base import ApiItem, IndexApiItem, ConfigItem, IndexConfigItem, ApiPath, IdName
+from .catalog import register
+from .models_base import ApiItem, IndexApiItem, ConfigItem, IndexConfigItem, ApiPath, IdName
 
 
 #
@@ -429,7 +431,7 @@ class PolicyDefZonebasedfw(PolicyDef):
     store_path = ('policy_definitions', 'ZoneBasedFW')
 
 
-@register('policy_definition', 'zone-based firewall policy definition', PolicyDefZonebasedfw)
+@register('policy_definition', 'zone-based FW policy definition', PolicyDefZonebasedfw)
 class PolicyDefZonebasedfwIndex(PolicyDefIndex):
     api_path = ApiPath('template/policy/definition/zonebasedfw', None, None, None)
     store_file = 'policy_definitions_zonebasedfw.json'
@@ -451,7 +453,7 @@ class PolicyDefVpnmembershipgroup(PolicyDef):
     store_path = ('policy_definitions', 'VPNMembershipGroup')
 
 
-@register('policy_definition', 'VPN-membership-group policy definition', PolicyDefVpnmembershipgroup)
+@register('policy_definition', 'VPN membership policy definition', PolicyDefVpnmembershipgroup)
 class PolicyDefVpnmembershipgroupIndex(PolicyDefIndex):
     api_path = ApiPath('template/policy/definition/vpnmembershipgroup', None, None, None)
     store_file = 'policy_definitions_vpnmembershipgroup.json'
@@ -495,7 +497,7 @@ class PolicyDefIntrusionprevention(PolicyDef):
     store_path = ('policy_definitions', 'IntrusionPrevention')
 
 
-@register('policy_definition', 'intrusion-prevention policy definition', PolicyDefIntrusionprevention)
+@register('policy_definition', 'IPS policy definition', PolicyDefIntrusionprevention)
 class PolicyDefIntrusionpreventionIndex(PolicyDefIndex):
     api_path = ApiPath('template/policy/definition/intrusionprevention', None, None, None)
     store_file = 'policy_definitions_intrusionprevention.json'
@@ -539,7 +541,7 @@ class PolicyDefAMP(PolicyDef):
     store_path = ('policy_definitions', 'AMP')
 
 
-@register('policy_definition', 'advanced-malware-protection policy definition', PolicyDefAMP)
+@register('policy_definition', 'AMP policy definition', PolicyDefAMP)
 class PolicyDefAMPIndex(PolicyDefIndex):
     api_path = ApiPath('template/policy/definition/advancedMalwareProtection', None, None, None)
     store_file = 'policy_definitions_amp.json'

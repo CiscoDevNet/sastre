@@ -1,6 +1,8 @@
 """
-vManage REST API
+ Sastre - Automation Tools for Cisco SD-WAN Powered by Viptela
 
+ cisco_sdwan.base.rest_api
+ This module implements the lower level REST API
 """
 import requests
 import urllib3

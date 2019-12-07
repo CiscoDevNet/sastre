@@ -1,3 +1,12 @@
+Sastre 0.33 [Dec 6, 2019]
+==========================
+
+Enhancements:
+    - Sastre is now published to PyPI as cisco-sdwan package. When installed via pip, sdwan or sastre can be used to
+      run the application.
+    - When installed via source on github, the application can now be called using sdwan.py or sastre.py.
+
+
 Sastre 0.31 [Nov 18, 2019]
 ==========================
 
@@ -25,6 +34,8 @@ Non-backwards compatible enhancements:
       in the format <item name>_<item id>. For instance, if there is one device template named VEDGE_1K_v1 and another
       VEDGE/1K/v1, both will have the same filename-safe name (i.e. VEDGE_1K_v1). Sastre will save them as
       VEDGE_1K_v1_<uuid item 1>.json and VEDGE_1K_v1_<uuid item 2>.json.
+      The latest release using the old backup format was tagged as 'v0.2'. If there is a need to use older backups,
+      just git checkout this tag (git checkout v0.2).
 
 
 Sastre 0.22 [Oct 10, 2019]

@@ -1,6 +1,8 @@
 """
-Supporting classes and functions for tasks
+ Sastre - Automation Tools for Cisco SD-WAN Powered by Viptela
 
+ cisco_sdwan.tasks.common
+ This module implements supporting classes and functions for tasks
 """
 import logging
 import time
@@ -8,11 +10,11 @@ import csv
 import re
 from itertools import repeat
 from collections import namedtuple
-from lib.rest_api import Rest, RestAPIException
-from lib.models_vmanage import (DeviceTemplate, DeviceTemplateValues, DeviceTemplateAttached, DeviceTemplateAttach,
-                                DeviceTemplateCLIAttach, DeviceModeCli, ActionStatus, PolicyVsmartStatus,
-                                PolicyVsmartStatusException, PolicyVsmartActivate, PolicyVsmartIndex,
-                                PolicyVsmartDeactivate)
+from cisco_sdwan.base.rest_api import Rest, RestAPIException
+from cisco_sdwan.base.models_vmanage import (DeviceTemplate, DeviceTemplateValues, DeviceTemplateAttached,
+                                             DeviceTemplateAttach, DeviceTemplateCLIAttach, DeviceModeCli,
+                                             ActionStatus, PolicyVsmartStatus, PolicyVsmartStatusException,
+                                             PolicyVsmartActivate, PolicyVsmartIndex, PolicyVsmartDeactivate)
 
 
 def regex_search(regex, *fields):
@@ -100,21 +102,21 @@ class Task:
         from remote vManage via API. Otherwise items are loaded from local backup under the backend directory.
         :param backend: Rest api instance or directory name
         :param catalog_entry_iter: An iterator of CatalogEntry
-        :return: Iterator of (<tag>, <title>, <index>, <item_cls>)
+        :return: Iterator of (<tag>, <info>, <index>, <item_cls>)
         """
         is_api = isinstance(backend, Rest)
 
-        def load_index(index_cls, title):
+        def load_index(index_cls, info):
             index = index_cls.get(backend) if is_api else index_cls.load(backend)
-            cls.log_debug('No %s %s index' if index is None else 'Loaded %s %s index',
-                          'remote' if is_api else 'local', title)
+            cls.log_debug('%s %s %s index',
+                          'No' if index is None else 'Loaded', 'remote' if is_api else 'local', info)
             return index
 
         all_index_iter = (
-            (tag, title, load_index(index_cls, title), item_cls)
-            for tag, title, index_cls, item_cls in catalog_entry_iter
+            (tag, info, load_index(index_cls, info), item_cls)
+            for tag, info, index_cls, item_cls in catalog_entry_iter
         )
-        return ((tag, title, index, item_cls) for tag, title, index, item_cls in all_index_iter if index is not None)
+        return ((tag, info, index, item_cls) for tag, info, index, item_cls in all_index_iter if index is not None)
 
     @classmethod
     def attach_template(cls, api, workdir, ext_name, templates_iter, target_uuid_set=None):

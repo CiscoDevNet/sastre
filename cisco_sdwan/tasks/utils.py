@@ -1,15 +1,16 @@
 """
-Utility classes and functions
+ Sastre - Automation Tools for Cisco SD-WAN Powered by Viptela
 
+ cisco_sdwan.tasks.utils
+ This module implements task utility classes and functions
 """
 import os
 import re
 import argparse
 from pathlib import Path
-from lib.task_common import Task
-from lib.catalog import catalog_tags, CATALOG_TAG_ALL
-from lib.defaults import DATA_DIR
-from lib.models_base import filename_safe
+from cisco_sdwan.base.catalog import catalog_tags, CATALOG_TAG_ALL
+from cisco_sdwan.base.models_base import filename_safe, DATA_DIR
+from .common import Task
 
 
 class TaskOptions:

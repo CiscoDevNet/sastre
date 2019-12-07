@@ -1,13 +1,15 @@
 """
-vManage API Catalog
+ Sastre - Automation Tools for Cisco SD-WAN Powered by Viptela
 
+ cisco_sdwan.base.catalog
+ This module implements vManage API Catalog
 """
 from collections import namedtuple
-from lib.models_base import IndexConfigItem, ConfigItem
+from .models_base import IndexConfigItem, ConfigItem
 
-_catalog = list()   # [(<tag>, <title>, <index_cls>, <item_cls>), ...]
+_catalog = list()   # [(<tag>, <info>, <index_cls>, <item_cls>), ...]
 
-CatalogEntry = namedtuple('CatalogEntry', ['tag', 'title', 'index_cls', 'item_cls'])
+CatalogEntry = namedtuple('CatalogEntry', ['tag', 'info', 'index_cls', 'item_cls'])
 
 CATALOG_TAG_ALL = 'all'
 
@@ -47,12 +49,12 @@ def ordered_tags(tag, single=False):
             break
 
 
-def register(tag, title, item_cls):
+def register(tag, info, item_cls):
     """
     Decorator used for registering config item index/handler classes with the catalog.
     The class being decorated needs to be a subclass of IndexConfigItem.
     :param tag: Tag string associated with this item. String 'all' is reserved and cannot be used.
-    :param title: Item title used for logging purposes
+    :param info: Item information used for logging purposes
     :param item_cls: The config item handler class, needs to be a subclass of ConfigItem
     :return: decorator
     """
@@ -73,7 +75,7 @@ def register(tag, title, item_cls):
             raise CatalogException(
                 'Unknown tag provided: {}'.format(tag)
             )
-        _catalog.append(CatalogEntry(tag, title, index_cls, item_cls))
+        _catalog.append(CatalogEntry(tag, info, index_cls, item_cls))
 
         return index_cls
 

@@ -2,110 +2,159 @@
 
 # Sastre - Automation Tools for Cisco SD-WAN Powered by Viptela
 
-Sastre provides utility functions to assist with managing configuration elements in vManage. This includes backup, restore and delete vManage configuration items.
+Sastre provides functions to assist with managing configuration elements in Cisco vManage, including backup, restore and delete tasks.
 
-## Important note on backup format changes in v0.30
+## Introduction
+ 
+Sastre has a set of base parameters as well as task-specific arguments. 
 
-The backup database format was changed in Sastre 0.30. Backups taken with previous releases cannot be restored using the new release. Please check the CHANGES file for further details.
+The command line is structured as follows:
 
-The latest release using the old backup format was tagged as 'v0.2'. If there is a need to use older backups, just git checkout this tag:
+    sdwan <base parameters> <task> <task-specific parameters>
 
-    git checkout v0.2
+Currently available tasks: 
+- Backup: Save vManage configuration items to a local backup.
+- Restore: Restore configuration items from a local backup to vManage.
+- Delete: Delete configuration items on vManage.
+- List: List items configured on vManage or from a local backup. Display as table or export as csv file.
+- Show-template: Show details about device templates on vManage or from a local backup. Display as table or export as csv file.
 
-In order to return to the latest release:
+Notes:
+- Either 'sdwan' or 'sastre' can be used as the main command.
+- The command line described above, and in all examples that follow, assumes Sastre was installed from PyPI, via PIP. 
+- If Sastre was download from GitHub, then 'sdwan.py' or 'sastre.py' should used instead. Please check the installation section for more details.
 
-    git checkout master
+### Base parameters
 
-## Requirements
-
-Sastre requires Python 3.6 or newer and the requests pip package.
-
-This can be verified by pasting the following in a terminal window:
-
-    python3 -c "import requests;import sys;assert sys.version_info>(3,6)" && echo "ALL GOOD"
+    % sdwan -h
+    usage: sdwan [-h] [-a <vmanage-ip>] [-u <user>] [-p <password>] [--port <port>] [--timeout <timeout>] [--verbose] [--version] <task> ...
     
-If 'ALL GOOD' is printed it means all requirements are met. Otherwise additional installation steps are required. Specific instructions on how to install those requirements on different OSs are provided at the end, in the 'Installing Requirements' section.
+    Sastre - Automation Tools for Cisco SD-WAN Powered by Viptela
+    
+    positional arguments:
+      <task>                task to be performed (backup, restore, delete, list, show-template)
+      <arguments>           task parameters, if any
+    
+    optional arguments:
+      -h, --help            show this help message and exit
+      -a <vmanage-ip>, --address <vmanage-ip>
+                            vManage IP address, can also be provided via VMANAGE_IP environment variable
+      -u <user>, --user <user>
+                            username, can also be provided via VMANAGE_USER environment variable
+      -p <password>, --password <password>
+                            password, can also be provided via VMANAGE_PASSWORD environment variable
+      --port <port>         vManage TCP port number (default is 8443)
+      --timeout <timeout>   REST API timeout (default is 300s)
+      --verbose             increase output verbosity
+      --version             show program's version number and exit
 
-## Usage
- 
-Sastre has a set of basic options as well as task-specific arguments.
- 
-The general command line structure is as follows:
-
-     sastre.py [-h] [-a <vmanage-ip>] [-u <user>] [-p <password>]
-                 [--port <port>] [--timeout <timeout>] [--verbose] [--version]
-                 <task> ...
-
-The vManage address (-a), username (-u) and password (-p) can also be provided via environmental variables:
+vManage address (-a), username (-u) and password (-p) can also be provided via environment variables:
 - VMANAGE_IP
 - VMANAGE_USER
 - VMANAGE_PASSWORD
 
-The 'sastre-rc-example.sh' file is provided as an example of a file that can be sourced to set those variables.
+A good approach to reduce the number of parameters that need to be provided at execution is to create rc text files exporting those environment variables for a particular vManage. This is demonstrated in the tutorial section below.
 
-Tasks currently available: backup, restore, delete, list or show-template. Adding -h after the task displays help on the additional arguments for the specified task.
+### Task-specific parameters
 
-Task-specific parameters and options (including help) are provided after the task:
+Task-specific parameters and options are defined after the task is provided. Each task has its own set of parameters.
 
-    ./sastre.py --verbose backup --help
-    usage: sastre.py backup [-h] [--workdir <directory>] <tag> [<tag> ...]
+    % sdwan backup -h
+    usage: sdwan backup [-h] [--workdir <directory>] [--regex <regex>] <tag> [<tag> ...]
     
     Sastre - Automation Tools for Cisco SD-WAN Powered by Viptela
     
     Backup task:
     
     positional arguments:
-      <tag>                 One or more tags for selecting items to be backed up.
-                            Multiple tags should be separated by space. Available
-                            tags: all, policy_definition, policy_list,
-                            policy_security, policy_vedge, policy_vsmart,
-                            template_device, template_feature. Special tag 'all'
-                            selects all items.
+      <tag>                 One or more tags for selecting items to be backed up. Multiple tags should be separated by space. Available tags: all, policy_definition,
+                            policy_list, policy_security, policy_vedge, policy_vsmart, template_device, template_feature. Special tag 'all' selects all items.
     
     optional arguments:
       -h, --help            show this help message and exit
       --workdir <directory>
-                            Directory used to save the backup (default will be
-                            "backup_10.85.136.253_20191004").
+                            Directory used to save the backup (default will be "backup_10.85.136.253_20191207").
+      --regex <regex>       Regular expression matching item names to be backed up, within selected tags.
 
-Important concepts:
+#### Important concepts:
 - vManage URL: Built from the provided vManage IP address and TCP port (default 8443). All operations target this vManage.
-- Workdir: Defines the location (in the local machine) where vManage data files are located. By default it follows the format "backup_\<vmanage-ip\>_\<yyyymmdd\>". With the restore task, the --workdir parameter can be used to provide the location of data files to be used. This scenario is used to transfer data files from one vManage to another. Workdir is under the 'data' directory. 
-- Tag: vManage configuration items are grouped by tags, such as policy_apply, policy_definition, policy_list, template_device, etc. The special tag 'all' is used to refer to all configuration elements. Depending on the task, one or more tags can be specified in order to select specific configuration elements.
+- Workdir: Defines the location (in the local machine) where vManage data files are located. By default it follows the format "backup_\<vmanage-ip\>_\<yyyymmdd\>". The --workdir parameter can be used to specify a different location.  Workdir is under a 'data' directory. This 'data' directory is relative to the directory where Sastre is run.
+- Tag: vManage configuration items are grouped by tags, such as policy_apply, policy_definition, policy_list, template_device, etc. The special tag 'all' is used to refer to all configuration elements. Depending on the task, one or more tags can be specified in order to select groups of configuration elements.
 
-## Examples
+## Tutorial
 
-Go to the directory where the Sastre package was extracted:
+Create a directory to serve as root for backup files, log files and rc files:
 
-    cd sastre
+    % mkdir sastre
+    % cd sastre
+    
+When Sastre is executed, data/ and logs/ directories are created as needed to store backup files and application logs. These are created under the directory where Sastre is run.
 
-Edit sastre-rc-example.sh to include vManage details and source that file:
+Create an rc-example.sh file to include vManage details and source that file:
 
-    cat sastre-rc-example.sh 
-     export VMANAGE_IP='10.11.12.13'
+    % cat <<EOF > rc-example.sh
+     export VMANAGE_IP='10.85.136.253'
      export VMANAGE_USER='admin'
      export VMANAGE_PASSWORD='admin'
+    EOF
+    % source rc-example.sh
+
+Test vManage credentials by running a simple query listing configured device templates:
+
+    % sdwan list template_device
+    +-----------------+--------------------------------------+-----------------+-----------------+
+    | Name            | ID                                   | Tag             | Type            |
+    +-----------------+--------------------------------------+-----------------+-----------------+
+    | DC_ADVANCED     | bf322748-8dfd-4cb0-a9e4-5d758be239a0 | template_device | device template |
+    | DC_BASIC        | 09c02518-9557-4ae2-9031-7e6b3e7323fc | template_device | device template |
+    | VSMART_v1       | 15c1962f-740e-4b89-a269-69f2cbfba296 | template_device | device template |
+    | BRANCH_ADVANCED | ad449106-7ed6-442f-9ba8-820612b85981 | template_device | device template |
+    | BRANCH_BASIC    | cc2f7a24-4c93-49ed-8e6b-1c107797ba95 | template_device | device template |
+    +-----------------+--------------------------------------+-----------------+-----------------+
+
+Any vManage parameters not specified via environment variables need to be provided via command line. For instance, the password can be left off the rc file and then provided when Sastre is executed:
+
+    % sdwan -p admin list template_device
+
+Perform a backup:
+
+    % sdwan --verbose backup all
+    INFO: Starting backup: vManage URL: "https://10.85.136.253:8443" > Local workdir: "backup_10.85.136.253_20191206"
+    INFO: Saved device template index
+    INFO: Done device template DC_ADVANCED
+    INFO: Done device template DC_BASIC
+    INFO: Done device template DC_BASIC attached devices
+    INFO: Done device template DC_BASIC values
+    <snip>
+    INFO: Done SLA-class list Realtime_Full_Mesh
+    INFO: Task completed successfully
     
-    source sastre-rc-example.sh
+Note that '--verbose' was specified so that progress information is displayed. Without this option, only warning-level messages and above are displayed.
 
-### Backup vManage:
+The backup is saved under data/backup_10.85.136.253_20191206:
 
-    ./sastre.py --verbose backup all
-    INFO: Starting backup: vManage URL: "https://10.85.136.253:8443" > Local workdir: "backup_10.85.136.253_20191004"
-    <snip>
-    INFO: Task completed successfully
+    % ls
+    data		logs		rc-example.sh
+    % ls data
+    backup_10.85.136.253_20191206
 
-#### Customize backup directory:
+## Additional Examples
 
-    ./sastre.py --verbose backup all --workdir "my_custom_directory"
+### Customizing backup destination:
+
+    % sdwan --verbose backup all --workdir "my_custom_directory"
     INFO: Starting backup: vManage URL: "https://10.85.136.253:8443" > Local workdir: "my_custom_directory"
+    INFO: Saved device template index
+    INFO: Done device template DC_ADVANCED
+    INFO: Done device template DC_BASIC
     <snip>
+    INFO: Done SLA-class list Realtime_Full_Mesh
     INFO: Task completed successfully
 
-### Restore vMmanage:
+### Restoring from backup:
 
-    ./sastre.py --verbose restore all
-    INFO: Starting restore: Local workdir: "backup_10.85.136.253_20191004" > vManage URL: "https://10.85.136.253:8443"
+    % sdwan --verbose restore all        
+    INFO: Starting restore: Local workdir: "backup_10.85.136.253_20191206" > vManage URL: "https://10.85.136.253:8443"
     INFO: Loading existing items from target vManage
     INFO: Identifying items to be pushed
     INFO: Inspecting template_device items
@@ -117,40 +166,61 @@ Edit sastre-rc-example.sh to include vManage details and source that file:
     INFO: Inspecting policy_list items
     INFO: Pushing items to vManage
     INFO: Done: Create SLA-class list Best_Effort
+    INFO: Done: Create SLA-class list Realtime_Full_Mesh
+    INFO: Done: Create site list All_Sites
+    INFO: Done: Create class list af2
     <snip>
+    INFO: Done: Create device template BRANCH_ADVANCED
+    INFO: Done: Create device template BRANCH_BASIC
     INFO: Task completed successfully
     
-#### Including template attachments and policy activation with the restore:
-    
-    ./sastre.py --verbose restore all --attach
-    INFO: Starting restore: Local workdir: "backup_10.85.136.253_20191004" > vManage URL: "https://10.85.136.253:8443"
+#### Restoring from a backup in a different directory than the default:
+
+    % sdwan --verbose restore all --workdir my_custom_directory
+    INFO: Starting restore: Local workdir: "my_custom_directory" > vManage URL: "https://10.85.136.253:8443"
+    INFO: Loading existing items from target vManage
+    INFO: Identifying items to be pushed
+    INFO: Inspecting template_device items
+    INFO: Inspecting template_feature items
     <snip>
-    INFO: Done: Create device template BRANCH_BASIC
+    INFO: Task completed successfully
+
+#### Restoring with template attachments and policy activation:
+    
+    % sdwan --verbose restore all --attach
+    INFO: Starting restore: Local workdir: "backup_10.85.136.253_20191206" > vManage URL: "https://10.85.136.253:8443"
+    INFO: Loading existing items from target vManage
+    <snip>
     INFO: Attaching WAN Edge templates
+    INFO: Waiting...
+    INFO: Waiting...
+    INFO: Waiting...
     INFO: Waiting...
     INFO: Completed DC_BASIC,BRANCH_BASIC
     INFO: Completed attaching WAN Edge templates
     INFO: Attaching vSmart template
     INFO: Waiting...
+    INFO: Waiting...
     INFO: Completed VSMART_v1
     INFO: Completed attaching vSmart template
     INFO: Activating vSmart policy
+    INFO: Waiting...
     INFO: Waiting...
     INFO: Completed Central_policy_v1
     INFO: Completed activating vSmart policy
     INFO: Task completed successfully
 
 #### Overwriting items with the --force option:
-- By default, when an item from backup has the same name as an existing item in vManage, restore will skip this item and leave the existing one intact.
+- By default, when an item from backup has the same name as an existing item in vManage, it will be skipped by restore. Leaving the existing one intact.
 - When an item, say a device template, is modified in vManage. Performing a restore from a backup taken before the modification will skip that item.
 - With the --force option, items with the same name are updated with the info found in the backup.
-- Sastre only tries to update when the item payload is actually different.
+- Sastre only updates the item when its contents differ from what is in vManage.
 - If the item is associated with attached templates or activated policies, all necessary re-attach/re-activate actions are automatically performed.
 - Currently, the --force option does not apply to changes in template values. 
 
 Example:
 
-    ./sastre.py --verbose restore all --workdir state_b --force
+    % sdwan --verbose restore all --workdir state_b --force
     INFO: Starting restore: Local workdir: "state_b" > vManage URL: "https://10.85.136.253:8443"
     INFO: Loading existing items from target vManage
     INFO: Identifying items to be pushed
@@ -175,44 +245,43 @@ Example:
     INFO: Done: Update device template DC_BASIC
     INFO: Task completed successfully
 
-#### Specifying a different directory to source from:
+### Deleting vManage items:
 
-    ./sastre.py --verbose restore all --workdir node_10.85.136.253_22082019
-    INFO: Starting restore: Local workdir: "node_10.85.136.253_22082019" > vManage URL: "https://10.85.136.253:8443"
-    INFO: Loading existing items from target vManage
-    <snip>
-    INFO: Task completed successfully
+Dry-run, just list without deleting items matching the specified tag and regular expression:
 
-### Delete templates from vManage:
-
-Dry-run, just list the items matching the specified tag and regular expression:
-
-    ./sastre.py --verbose delete all --regex "VPN1" --dryrun
+    % sdwan --verbose delete all --regex "^DC"  --dryrun
     INFO: Starting delete, DRY-RUN mode: vManage URL: "https://10.85.136.253:8443"
     INFO: Inspecting template_device items
+    INFO: DRY-RUN: Delete device template DC_BASIC
+    INFO: DRY-RUN: Delete device template DC_ADVANCED
     INFO: Inspecting template_feature items
-    INFO: DRY-RUN: Delete feature template VPN1_Interface4_v01
-    <snip>
+    INFO: Inspecting policy_vsmart items
+    INFO: Inspecting policy_vedge items
+    INFO: Inspecting policy_security items
+    INFO: Inspecting policy_definition items
+    INFO: Inspecting policy_list items
     INFO: Task completed successfully
-    
+
 Deleting items:
 
-    ./sastre.py --verbose delete all --regex "VPN1"
+    % sdwan --verbose delete all --regex "^DC"
     INFO: Starting delete: vManage URL: "https://10.85.136.253:8443"
     INFO: Inspecting template_device items
+    INFO: Done: Delete device template DC_BASIC
+    INFO: Done: Delete device template DC_ADVANCED
     INFO: Inspecting template_feature items
-    INFO: Done: Delete feature template VPN1_Interface4_v01
-    <snip>
+    INFO: Inspecting policy_vsmart items
+    INFO: Inspecting policy_vedge items
+    INFO: Inspecting policy_security items
+    INFO: Inspecting policy_definition items
+    INFO: Inspecting policy_list items
     INFO: Task completed successfully
 
-    
-#### Delete with detach:
-- When vSmart policies are activated and device templates are attached, the associated items cannot be deleted. 
-- The --detach option performs the necessary template detach and vSmart policy deactivate before proceeding with the delete.
+#### Deleting with detach:
+When vSmart policies are activated and device templates are attached the associated items cannot be deleted. 
+The --detach option performs the necessary template detach and vSmart policy deactivate before proceeding with the delete.
 
-Example:
-
-    ./sastre.py --verbose delete all --detach
+    % sdwan --verbose delete all --detach
     INFO: Starting delete: vManage URL: "https://10.85.136.253:8443"
     INFO: Detaching WAN Edge templates
     INFO: Waiting...
@@ -232,55 +301,55 @@ Example:
     <snip>
     INFO: Task completed successfully
 
-### List items from vManage or from backup:
+### Listing items from vManage or from a backup:
 
 The list task can be used to list items from a target vManage, or a backup directory, matching a criteria of item tag(s) and regular expression.
 
 List device templates and feature templates from target vManage:
 
-    ./sastre.py --verbose list template_device template_feature
-    INFO: Starting list task: vManage URL: "https://10.85.136.253:8443"
-    INFO: List criteria matched 355 items
-    +------------------+--------------------------------------------------------------------+--------------------------------------+------------------+
-    | Tag              | Name                                                               | ID                                   | Description      |
-    +------------------+--------------------------------------------------------------------+--------------------------------------+------------------+
-    | template_device  | BRANCH_ADVANCED                                                    | 61b3b608-8ce5-4f9a-bdb2-7d23f759cd9f | device template  |
+    % sdwan --verbose list template_device template_feature
+    INFO: Starting list: vManage URL: "https://10.85.136.253:8443"
+    INFO: List criteria matched 45 items
+    +---------------------------+--------------------------------------+------------------+------------------+
+    | Name                      | ID                                   | Tag              | Type             |
+    +---------------------------+--------------------------------------+------------------+------------------+
+    | BRANCH_ADVANCED           | 6ece1f27-fbfa-4730-9a8f-b61bfd380047 | template_device  | device template  |
+    | VSMART_v1                 | ba623cf6-5d2c-4676-a763-11b9cf866074 | template_device  | device template  |
+    | BRANCH_BASIC              | 5e362c85-8251-428a-b650-d364f8e15a22 | template_device  | device template  |
     <snip>
-    | template_feature | VPN1_Interface1_v01                                                | 3768c2b8-65cb-4306-a1a7-f345ed789758 | feature template |
-    | template_feature | VPN0_Parent_Interface2_v01                                         | e5db93c7-ffd6-45eb-bbd4-29caab0f3d70 | feature template |
-    +------------------+--------------------------------------------------------------------+--------------------------------------+------------------+
-    INFO: List task completed successfully    
+    | vSmart_VPN0_Interface_v1  | be09349e-308e-4ca5-a306-fb7bcd5bcb28 | template_feature | feature template |
+    +---------------------------+--------------------------------------+------------------+------------------+
+    INFO: Task completed successfully
  
  List all items from target vManage with name starting with 'DC':
  
-     ./sastre.py list all --regex "^DC"
-    +-------------------+------------------+--------------------------------------+---------------------------+
-    | Tag               | Name             | ID                                   | Description               |
-    +-------------------+------------------+--------------------------------------+---------------------------+
-    | template_device   | DC_BASIC         | 64fc7226-2047-4fee-8460-a6df30ed7479 | device template           |
-    | template_device   | DC_ADVANCED      | 68bdd855-2c26-40ea-8c39-b50bf5bcebe4 | device template           |
-    | policy_definition | DC_Reject_DC_Out | 26b8bb45-6191-4a71-828f-b1d2d0a6ecff | control policy definition |
-    | policy_list       | DC_All           | d9b1f339-c914-4f0c-a2c3-610b4f6e6c2d | site list                 |
-    +-------------------+------------------+--------------------------------------+---------------------------+
+    % sdwan --verbose list all --regex "^DC"
+    INFO: Starting list: vManage URL: "https://10.85.136.253:8443"
+    INFO: List criteria matched 2 items
+    +-------------+--------------------------------------+-----------------+-----------------+
+    | Name        | ID                                   | Tag             | Type            |
+    +-------------+--------------------------------------+-----------------+-----------------+
+    | DC_BASIC    | 2ba8c66a-eadd-4a63-97c9-50d58a43b6b5 | template_device | device template |
+    | DC_ADVANCED | b042ed29-3875-4118-b800-a0b00542b58e | template_device | device template |
+    +-------------+--------------------------------------+-----------------+-----------------+
+    INFO: Task completed successfully
 
 List all items from backup directory with name starting with 'DC':
 
-    ./sastre.py --verbose list all --regex "^DC" --workdir node_10.85.136.253_02072019
-    INFO: Starting list task: Work_dir: "node_10.85.136.253_02072019"
+    % sdwan --verbose list all --regex "^DC" --workdir backup_10.85.136.253_20191206
+    INFO: Starting list: Local workdir: "backup_10.85.136.253_20191206"
     INFO: List criteria matched 2 items
-    +-----------------+-------------+--------------------------------------+-----------------+
-    | Tag             | Name        | ID                                   | Description     |
-    +-----------------+-------------+--------------------------------------+-----------------+
-    | template_device | DC_ADVANCED | 8845bbdd-31c3-4fd7-b3c3-17fe13c1fcb4 | device template |
-    | template_device | DC_BASIC    | 1cd6a025-a7e8-48e8-8757-dc00de06e4b9 | device template |
-    +-----------------+-------------+--------------------------------------+-----------------+
-    INFO: List task completed successfully
+    +-------------+--------------------------------------+-----------------+-----------------+
+    | Name        | ID                                   | Tag             | Type            |
+    +-------------+--------------------------------------+-----------------+-----------------+
+    | DC_ADVANCED | bf322748-8dfd-4cb0-a9e4-5d758be239a0 | template_device | device template |
+    | DC_BASIC    | 09c02518-9557-4ae2-9031-7e6b3e7323fc | template_device | device template |
+    +-------------+--------------------------------------+-----------------+-----------------+
+    INFO: Task completed successfully
 
-### Show items from vManage or from backup
+Similar to the list task, show tasks can be used to show items from a target vManage, or a backup. With show tasks, additional details about the selected items are displayed. The item id, name or a regular expression can be used to identify which item(s) to display.
 
-Similarly to list, show tasks can be used to show items from a target vManage, or a backup directory. With show tasks, additional details about the selected items are displayed. The item id, name or a regular expression can be used to identify which item(s) to display.
-
-     ./sastre.py show-template values --name DC_BASIC
+    % sdwan show-template values --name DC_BASIC
     Device template DC_BASIC, values for vedge-dc1:
     +-----------------------------------+--------------------------------------+--------------------------------------------------------------------+
     | Name                              | Value                                | Variable                                                           |
@@ -319,14 +388,13 @@ Similarly to list, show tasks can be used to show items from a target vManage, o
     | Preference(transport1_preference) | 0                                    | /0/ge0/0/interface/tunnel-interface/encapsulation/ipsec/preference |
     +-----------------------------------+--------------------------------------+--------------------------------------------------------------------+
 
-
 ## Notes
 
 ### Regular Expressions
 
 It is recommended to always use double quotes when specifying a regular expression to --regex option:
 
-    ./sastre.py --verbose restore all --regex "VPN1"
+    sdwan --verbose restore all --regex "VPN1"
      
 This is to prevent the shell from interpreting special characters that could be part of the pattern provided.
 
@@ -354,30 +422,40 @@ When an existing vManage item is modified, device templates may need to be reatt
 - The implication is that if the modified child template (e.g. feature template) defines new variables, re-attaching its master template will fail because not all variables will have values assigned. In this case, the recommended procedure is to detach the master template (i.e. change device to CLI mode in vManage), re-run the restore --force task and then re-attach the device-template from vManage, where one would have a chance to supply all missing variable values.
 - Updating items associated with an active vSmart policy may require this policy to be re-activated. In this case, Sastre will request the policy reactivate as well.
 
+## Installing
 
-## Installing Requirements
+Sastre requires Python 3.6 or newer. This can be verified by pasting the following to a terminal window:
 
-### Ubuntu 18.04 LTS/Bionic
+    % python3 -c "import sys;assert sys.version_info>(3,6)" && echo "ALL GOOD"
 
-Install distutils:
+If 'ALL GOOD' is printed it means Python requirements are met. If not, download and install the latest 3.x version at Python.org (https://www.python.org/downloads/).
 
-    sudo apt-get install python3-distutils
+The recommended way to install Sastre is via pip. For development purposes, Sastre can be installed from the github repository. Both methods are described in this section.
 
-Install pip3:
+### PIP install (recommended)
+
+To install Sastre:
+
+    % python3 -m pip install --upgrade cisco-sdwan
     
-    curl -O https://bootstrap.pypa.io/get-pip.py
-    sudo python3 get-pip.py
+Verify that Sastre can run:
 
-Install required pip3 packages:
-    
-    sudo pip3 install --upgrade requests
-    
-    
-### MacOS 10.14/Mojave
- 
-Install Python3:
-- Look for the latest 3.x.x version at Python.org: https://www.python.org/downloads/
+    % sdwan --version
 
-Install required pip3 packages:
+### Github install
+
+Install required Python packages:
+
+    % python3 -m pip install --upgrade requests
+
+Clone from the github repository:
+
+    % git clone https://github.com/reismarcelo/sastre
     
-    pip3 install --upgrade requests
+Move to the clone directory:
+    
+    % cd sastre
+
+Verify that Sastre can run:
+
+    % python3 sdwan.py --version
