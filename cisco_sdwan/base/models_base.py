@@ -319,6 +319,59 @@ class IndexConfigItem(ConfigItem):
         return (itemgetter(*iter_fields)(elem) for elem in self.data)
 
 
+class ServerInfo:
+    root_dir = DATA_DIR
+    store_file = 'server_info.json'
+
+    def __init__(self, **kwargs):
+        """
+        :param kwargs: key-value pairs of information about the vManage server
+        """
+        self.data = kwargs
+
+    def __getattr__(self, item):
+        attr = self.data.get(item)
+        if attr is None:
+            raise AttributeError("'{cls_name}' object has no attribute '{attr}'".format(cls_name=type(self).__name__,
+                                                                                        attr=item))
+        return attr
+
+    @classmethod
+    def load(cls, node_dir):
+        """
+        Factory method that loads data from a json file and returns a ServerInfo instance with that data
+
+        :param node_dir: String indicating directory under root_dir used for all files from a given vManage node.
+        :return: ServerInfo object, or None if file does not exist
+        """
+        dir_path = Path(cls.root_dir, node_dir)
+        file_path = dir_path.joinpath(cls.store_file)
+        try:
+            with open(file_path, 'r') as read_f:
+                data = json.load(read_f)
+        except FileNotFoundError:
+            return None
+        except json.decoder.JSONDecodeError as ex:
+            raise ModelException('Invalid JSON file: {file}: {msg}'.format(file=file_path, msg=ex))
+        else:
+            return cls(**data)
+
+    def save(self, node_dir):
+        """
+        Save data (i.e. self.data) to a json file
+
+        :param node_dir: String indicating directory under root_dir used for all files from a given vManage node.
+        :return: True indicates data has been saved. False indicates no data to save (and no file has been created).
+        """
+        dir_path = Path(self.root_dir, node_dir)
+        dir_path.mkdir(parents=True, exist_ok=True)
+
+        with open(dir_path.joinpath(self.store_file), 'w') as write_f:
+            json.dump(self.data, write_f, indent=2)
+
+        return True
+
+
 def filename_safe(name, lower=False):
     """
     Perform the necessary replacements in <name> to make it filename safe.

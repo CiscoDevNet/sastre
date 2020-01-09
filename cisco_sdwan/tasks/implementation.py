@@ -10,9 +10,9 @@ import argparse
 from shutil import rmtree
 from pathlib import Path
 from cisco_sdwan.__version__ import __doc__ as title
-from cisco_sdwan.base.rest_api import RestAPIException
+from cisco_sdwan.base.rest_api import RestAPIException, is_version_newer
 from cisco_sdwan.base.catalog import catalog_entries, CATALOG_TAG_ALL, ordered_tags
-from cisco_sdwan.base.models_base import UpdateEval, filename_safe, DATA_DIR
+from cisco_sdwan.base.models_base import UpdateEval, filename_safe, DATA_DIR, ServerInfo
 from cisco_sdwan.base.models_vmanage import (DeviceTemplate, DeviceTemplateAttached, DeviceTemplateValues,
                                              DeviceTemplateIndex, PolicyVsmartIndex, EdgeInventory, ControlInventory)
 from .utils import TaskOptions, TagOptions, ShowOptions, existing_file_type, filename_type, regex_type, uuid_type
@@ -46,6 +46,10 @@ class TaskBackup(Task):
         saved_workdir = cls.clean_workdir(parsed_args.workdir)
         if saved_workdir:
             cls.log_info('Previous backup under "%s" was saved as "%s"', parsed_args.workdir, saved_workdir)
+
+        target_info = ServerInfo(server_version=api.server_version)
+        if target_info.save(parsed_args.workdir):
+            cls.log_info('Saved vManage server information')
 
         for _, info, index_cls, item_cls in catalog_entries(*parsed_args.tags):
             item_index = index_cls.get(api)
@@ -143,6 +147,13 @@ class TaskRestore(Task):
 
         cls.log_info('Starting restore%s: Local workdir: "%s" > vManage URL: "%s"',
                      ', DRY-RUN mode' if parsed_args.dryrun else '', parsed_args.workdir, api.base_url)
+
+        local_info = ServerInfo.load(parsed_args.workdir)
+        # Server info file may not be present (e.g. backup from older Sastre releases)
+        if local_info is not None and is_version_newer(api.server_version, local_info.server_version):
+            cls.log_warning('Target vManage release (%s) is older than the release used in backup (%s). ' +
+                            'Items may fail to be restored due to incompatibilities across releases.',
+                            api.server_version, local_info.server_version)
 
         cls.log_info('Loading existing items from target vManage')
         target_all_items_map = {

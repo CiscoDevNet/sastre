@@ -27,7 +27,9 @@ class Rest:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self.session is not None:
-            self.logout()
+            # In 19.3, logging out actually de-authorize all sessions a user may have from the same IP address. For
+            # instance browser windows open from the same laptop. So for now, will not explicitly log out
+            # self.logout()
             self.session.close()
 
         return False
@@ -63,6 +65,7 @@ class Rest:
         response = self.session.get('{base_url}/logout?nocache'.format(base_url=self.base_url))
         return response.status_code == requests.codes.ok
 
+    @property
     def server_version(self):
         return self.server_facts.get('platformVersion')
 
@@ -103,6 +106,24 @@ def raise_for_status(response_obj):
         reply_data = response_obj.json() if response_obj.text else {}
         raise RestAPIException('{r.reason} ({r.status_code}): {error} [{r.request.method} {r.url}]'.format(
             r=response_obj, error=reply_data.get('error', {}).get('message', 'Unspecified error message')))
+
+
+def is_version_newer(version_1, version_2):
+    """
+    Indicates whether one vManage version is newer than another. Compares only the first 2 digits from version
+    because maintenance (i.e. 3rd digit) differences are not likely to create any incompatibility between REST API JSON
+    payloads, thus not relevant in this context.
+
+    Versions should be strings with fields separated by dots in format: <main>.<minor>.<maintenance>
+
+    :param version_1: String containing first version
+    :param version_2: String containing second version
+    :return: True if version_2 is newer than version_1.
+    """
+    def parse(version_string):
+        return ([int(v) for v in version_string.split('.')] + [0, ])[:2]
+
+    return parse(version_2) > parse(version_1)
 
 
 class RestAPIException(Exception):

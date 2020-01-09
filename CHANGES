@@ -1,3 +1,13 @@
+Sastre 0.34 [Jan 9, 2019]
+==========================
+
+Enhancements:
+    - Validated support for vManage 19.3 and included new API endpoints supporting device access policies.
+    - Included vManage version check. A warning is displayed during restore task if the vManage version on backup is
+      newer than the version on target vManage. Maintenance releases (i.e. 3rd digit in the version number) are ignored
+      for the purpose of this verification.
+
+
 Sastre 0.33 [Dec 6, 2019]
 ==========================
 
