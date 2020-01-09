@@ -53,7 +53,7 @@ vManage address (-a), username (-u) and password (-p) can also be provided via e
 - VMANAGE_USER
 - VMANAGE_PASSWORD
 
-A good approach to reduce the number of parameters that need to be provided at execution is to create rc text files exporting those environment variables for a particular vManage. This is demonstrated in the tutorial section below.
+A good approach to reduce the number of parameters that need to be provided at execution is to create rc text files exporting those environment variables for a particular vManage. This is demonstrated in the Getting Started section below.
 
 ### Task-specific parameters
 
@@ -81,7 +81,7 @@ Task-specific parameters and options are defined after the task is provided. Eac
 - Workdir: Defines the location (in the local machine) where vManage data files are located. By default it follows the format "backup_\<vmanage-ip\>_\<yyyymmdd\>". The --workdir parameter can be used to specify a different location.  Workdir is under a 'data' directory. This 'data' directory is relative to the directory where Sastre is run.
 - Tag: vManage configuration items are grouped by tags, such as policy_apply, policy_definition, policy_list, template_device, etc. The special tag 'all' is used to refer to all configuration elements. Depending on the task, one or more tags can be specified in order to select groups of configuration elements.
 
-## Tutorial
+## Getting Started
 
 Create a directory to serve as root for backup files, log files and rc files:
 
@@ -398,9 +398,9 @@ It is recommended to always use double quotes when specifying a regular expressi
      
 This is to prevent the shell from interpreting special characters that could be part of the pattern provided.
 
-Matching done by the --regex is un-anchored. That is, unless anchor marks are provided (e.g. ^ or $), the pattern matches if present anywhere in the string. In other words, this is a search function.
+Matching done by --regex is un-anchored. That is, unless anchor marks are provided (e.g. ^ or $), the specified pattern matches if present anywhere in the string. In other words, this is a search function.
 
-The regular expression syntax is described here: https://docs.python.org/3/library/re.html
+The regular expression syntax supported is described in https://docs.python.org/3/library/re.html
 
 ### Logs
 
@@ -412,15 +412,18 @@ The --verbose flag controls the severity of messages printed to the terminal. If
 
 ### Restore behavior
 
-By default restore will skip items with the same name. If an existing item in vManage has the same name as an item in the backup, this item is skipped from restore. Any references/dependencies on that item are properly updated. For instanve, if a feature template is not pushed to vManage because an item with the sama name is already present. Device templates being pushed will now point to the feature template which was already in vManage.
+By default, restore will skip items with the same name. If an existing item in vManage has the same name as an item in the backup this item is skipped from restore.
 
-Adding the --force option to restore modifies the default behavior. In this case Sastre will update existing items containing the same name as in the backup if their content is different. 
+Any references/dependencies on that item are properly updated. For instance, if a feature template is not pushed to vManage because an item with the same name is already present, device templates being pushed will now point to the feature template which was already in vManage.
+
+Adding the --force option to restore modifies this behavior. In this case Sastre will update existing items containing the same name as in the backup, but only if their content is different.
 
 When an existing vManage item is modified, device templates may need to be reattached or vSmart policies may need to be re-activated. This is handled by Sastre as follows:
+- Updating items associated with an active vSmart policy may require this policy to be re-activated. In this case, Sastre will request the policy reactivate automatically.
 - On updates to a master template (e.g. device template) containing attached devices, Sastre will re-attach this device template using attachment values (variables) from the backup to feed the attach request.
 - On Updates to a child template (e.g. feature template) associated with a master template containing attached devices, Sastre will re-attach the affected master template(s). In this case, Sastre will use the existing values in vManage to feed the attach request.
-- The implication is that if the modified child template (e.g. feature template) defines new variables, re-attaching its master template will fail because not all variables will have values assigned. In this case, the recommended procedure is to detach the master template (i.e. change device to CLI mode in vManage), re-run the restore --force task and then re-attach the device-template from vManage, where one would have a chance to supply all missing variable values.
-- Updating items associated with an active vSmart policy may require this policy to be re-activated. In this case, Sastre will request the policy reactivate as well.
+
+The implication is that if modified child templates (e.g. feature template) define new variables, re-attaching the master template will fail because not all variables will have values assigned. In this case, the recommended procedure is to detach the master template (i.e. change device to CLI mode in vManage), re-run “restore --force", then re-attach the device-template from vManage, where one would have a chance to supply any missing variable values.
 
 ## Installing
 

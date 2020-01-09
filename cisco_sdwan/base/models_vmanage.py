@@ -547,6 +547,51 @@ class PolicyDefAMPIndex(PolicyDefIndex):
     store_file = 'policy_definitions_amp.json'
 
 
+class PolicyDefDeviceAccess(PolicyDef):
+    api_path = ApiPath('template/policy/definition/deviceaccesspolicy')
+    store_path = ('policy_definitions', 'DeviceAccess')
+
+
+@register('policy_definition', 'device access policy definition', PolicyDefDeviceAccess)
+class PolicyDefDeviceAccessIndex(PolicyDefIndex):
+    api_path = ApiPath('template/policy/definition/deviceaccesspolicy', None, None, None)
+    store_file = 'policy_definitions_deviceaccess.json'
+
+
+class PolicyDefDeviceAccessV6(PolicyDef):
+    api_path = ApiPath('template/policy/definition/deviceaccesspolicyv6')
+    store_path = ('policy_definitions', 'DeviceAccessV6')
+
+
+@register('policy_definition', 'IPv6 device access policy definition', PolicyDefDeviceAccessV6)
+class PolicyDefDeviceAccessV6Index(PolicyDefIndex):
+    api_path = ApiPath('template/policy/definition/deviceaccesspolicyv6', None, None, None)
+    store_file = 'policy_definitions_deviceaccessv6.json'
+
+
+# These items showed up in swagger for 19.3 but are not yet configurable
+# class PolicyDefDialPeer(PolicyDef):
+#     api_path = ApiPath('template/policy/definition/dialpeer')
+#     store_path = ('policy_definitions', 'DialPeer')
+#
+#
+# @register('policy_definition', 'dial-peer policy definition', PolicyDefDialPeer)
+# class PolicyDefDialPeerIndex(PolicyDefIndex):
+#     api_path = ApiPath('template/policy/definition/dialpeer', None, None, None)
+#     store_file = 'policy_definitions_dialpeer.json'
+#
+#
+# class PolicyDefPhoneProfile(PolicyDef):
+#     api_path = ApiPath('template/policy/definition/srstphoneprofile')
+#     store_path = ('policy_definitions', 'PhoneProfile')
+#
+#
+# @register('policy_definition', 'phone profile policy definition', PolicyDefPhoneProfile)
+# class PolicyDefPhoneProfileIndex(PolicyDefIndex):
+#     api_path = ApiPath('template/policy/definition/srstphoneprofile', None, None, None)
+#     store_file = 'policy_definitions_phoneprofile.json'
+
+
 #
 # Policy lists
 #
@@ -607,18 +652,6 @@ class PolicyListPolicer(PolicyList):
 class PolicyListPolicerIndex(PolicyListIndex):
     api_path = ApiPath('template/policy/list/policer', None, None, None)
     store_file = 'policy_lists_policer.json'
-
-
-# Not supported well before 19.1
-# class PolicyListDataPrefixAll(PolicyList):
-#    api_path = ApiPath('template/policy/list/dataprefixall')
-#    store_path = ('templates', 'policy_list_dataprefixall')
-#
-#
-# @register('policy_list', 'data-prefix-all list', PolicyListDataPrefixAll)
-# class PolicyListDataPrefixAllIndex(PolicyListIndex):
-#    api_path = ApiPath('template/policy/list/dataprefixall', None, None, None)
-#    store_file = 'dataprefixall_policy_list.json'
 
 
 class PolicyListIpsSignature(PolicyList):
@@ -687,6 +720,8 @@ class PolicyListExtcommunityIndex(PolicyListIndex):
     store_file = 'policy_lists_extcommunity.json'
 
 
+# Data Prefix All (template/policy/list/dataprefixall) was purposely not included as it seems to collide with, meaning
+# error, Data Prefix (template/policy/list/dataprefix).
 class PolicyListDataprefix(PolicyList):
     api_path = ApiPath('template/policy/list/dataprefix')
     store_path = ('policy_lists', 'DataPrefix')
@@ -830,6 +865,7 @@ class PolicyListCommunityIndex(PolicyListIndex):
     store_file = 'policy_lists_community.json'
 
 
+# Umbrella Secret endpoints were removed in 19.3. Will leave it for now.
 class PolicyListUmbrellaSecret(PolicyList):
     api_path = ApiPath('template/policy/list/umbrellasecret')
     store_path = ('policy_lists', 'UmbrellaSecret')
@@ -850,3 +886,48 @@ class PolicyListTGApiKey(PolicyList):
 class PolicyListTGApiKeyIndex(PolicyListIndex):
     api_path = ApiPath('template/policy/list/tgapikey', None, None, None)
     store_file = 'policy_lists_tgapikey.json'
+
+
+# These items showed up in swagger for 19.3 but are not yet configurable
+# class PolicyListTransRules(PolicyList):
+#     api_path = ApiPath('template/policy/list/translationrules')
+#     store_path = ('policy_lists', 'TranslationRules')
+#
+#
+# @register('policy_list', 'translation rules list', PolicyListTransRules)
+# class PolicyListTransRulesIndex(PolicyListIndex):
+#     api_path = ApiPath('template/policy/list/translationrules', None, None, None)
+#     store_file = 'policy_lists_translationrules.json'
+#
+#
+# class PolicyListTransProfile(PolicyList):
+#     api_path = ApiPath('template/policy/list/translationprofile')
+#     store_path = ('policy_lists', 'TranslationProfile')
+#
+#
+# @register('policy_list', 'translation profile list', PolicyListTransProfile)
+# class PolicyListTransProfileIndex(PolicyListIndex):
+#     api_path = ApiPath('template/policy/list/translationprofile', None, None, None)
+#     store_file = 'policy_lists_translationprofile.json'
+#
+#
+# class PolicyListSupervisoryDisk(PolicyList):
+#     api_path = ApiPath('template/policy/list/supervisorydisc')
+#     store_path = ('policy_lists', 'SupervisoryDisk')
+#
+#
+# @register('policy_list', 'supervisory disk list', PolicyListSupervisoryDisk)
+# class PolicyListSupervisoryDiskIndex(PolicyListIndex):
+#     api_path = ApiPath('template/policy/list/supervisorydisc', None, None, None)
+#     store_file = 'policy_lists_supervisorydisc.json'
+#
+#
+# class PolicyListMediaProfile(PolicyList):
+#     api_path = ApiPath('template/policy/list/mediaprofile')
+#     store_path = ('policy_lists', 'MediaProfile')
+#
+#
+# @register('policy_list', 'media profile list', PolicyListMediaProfile)
+# class PolicyListMediaProfileIndex(PolicyListIndex):
+#     api_path = ApiPath('template/policy/list/mediaprofile', None, None, None)
+#     store_file = 'policy_lists_mediaprofile.json'
