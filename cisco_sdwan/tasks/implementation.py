@@ -4,7 +4,7 @@
  cisco_sdwan.tasks.implementation
  This module contains the implementation of user-facing tasks
 """
-__all__ = ['TaskBackup', 'TaskRestore', 'TaskDelete', 'TaskList', 'TaskShowTemplate']
+__all__ = ['TaskBackup', 'TaskRestore', 'TaskDelete', 'TaskCertificate', 'TaskList', 'TaskShowTemplate']
 
 import argparse
 from shutil import rmtree
@@ -14,7 +14,8 @@ from cisco_sdwan.base.rest_api import RestAPIException, is_version_newer
 from cisco_sdwan.base.catalog import catalog_entries, CATALOG_TAG_ALL, ordered_tags
 from cisco_sdwan.base.models_base import UpdateEval, filename_safe, DATA_DIR, ServerInfo
 from cisco_sdwan.base.models_vmanage import (DeviceTemplate, DeviceTemplateAttached, DeviceTemplateValues,
-                                             DeviceTemplateIndex, PolicyVsmartIndex, EdgeInventory, ControlInventory)
+                                             DeviceTemplateIndex, PolicyVsmartIndex, EdgeInventory, ControlInventory,
+                                             EdgeCertificate, EdgeCertificateSync)
 from .utils import TaskOptions, TagOptions, ShowOptions, existing_file_type, filename_type, regex_type, uuid_type
 from .common import regex_search, Task, Table, WaitActionsException
 
@@ -27,14 +28,15 @@ class TaskBackup(Task):
                                               formatter_class=argparse.RawDescriptionHelpFormatter)
         task_parser.prog = '{script} backup'.format(script=task_parser.prog)
         task_parser.add_argument('--workdir', metavar='<directory>', type=filename_type, default=default_workdir,
-                                 help='''Directory used to save the backup (default will be "{default_dir}").
+                                 help='''Backup destination (default will be "{default_dir}").
                                       '''.format(default_dir=default_workdir))
         task_parser.add_argument('--regex', metavar='<regex>', type=regex_type,
                                  help='Regular expression matching item names to be backed up, within selected tags.')
         task_parser.add_argument('tags', metavar='<tag>', nargs='+', type=TagOptions.tag,
                                  help='''One or more tags for selecting items to be backed up. 
                                          Multiple tags should be separated by space.
-                                         Available tags: {tag_options}. Special tag '{all}' selects all items.
+                                         Available tags: {tag_options}. Special tag '{all}' selects all items, 
+                                         including WAN edge certificates.
                                       '''.format(tag_options=TagOptions.options(), all=CATALOG_TAG_ALL))
         return task_parser.parse_args(task_args)
 
@@ -50,6 +52,14 @@ class TaskBackup(Task):
         target_info = ServerInfo(server_version=api.server_version)
         if target_info.save(parsed_args.workdir):
             cls.log_info('Saved vManage server information')
+
+        if CATALOG_TAG_ALL in parsed_args.tags:
+            # Items without index files to be included with tag 'all'
+            edge_certs = EdgeCertificate.get(api)
+            if edge_certs is None:
+                cls.log_error('Failed backup WAN edge certificates')
+            elif edge_certs.save(parsed_args.workdir):
+                cls.log_info('Saved WAN edge certificates')
 
         for _, info, index_cls, item_cls in catalog_entries(*parsed_args.tags):
             item_index = index_cls.get(api)
@@ -116,7 +126,7 @@ class TaskRestore(Task):
                                               formatter_class=argparse.RawDescriptionHelpFormatter)
         task_parser.prog = '{script} restore'.format(script=task_parser.prog)
         task_parser.add_argument('--workdir', metavar='<directory>', type=existing_file_type, default=default_workdir,
-                                 help='''Source of items to be restored (default will be "{default_dir}").
+                                 help='''Restore source (default will be "{default_dir}").
                                       '''.format(default_dir=default_workdir))
         task_parser.add_argument('--regex', metavar='<regex>', type=regex_type,
                                  help='Regular expression matching item names to be restored, within selected tags.')
@@ -336,8 +346,9 @@ class TaskDelete(Task):
         xor_group.add_argument('--dryrun', action='store_true',
                                help='Dry-run mode. Items matched for removal are listed but not deleted.')
         xor_group.add_argument('--detach', action='store_true',
-                               help='USE WITH CAUTION! Detach devices from templates and deactivate vSmart policy '
-                                    'before deleting items. This allows deleting items that are dependencies.')
+                               help='''USE WITH CAUTION! Detach devices from templates and deactivate vSmart policy 
+                                       before deleting items. This allows deleting items that are associated with
+                                       attached templates and active policies.''')
         task_parser.add_argument('tag', metavar='<tag>', type=TagOptions.tag,
                                  help='''Tag for selecting items to be deleted. 
                                          Available tags: {tag_options}. Special tag '{all}' selects all items.
@@ -399,6 +410,107 @@ class TaskDelete(Task):
                     cls.log_warning('Failed deleting %s %s', info, item_name)
 
 
+@TaskOptions.register('certificate')
+class TaskCertificate(Task):
+    @staticmethod
+    def parser(default_workdir, task_args):
+        task_parser = argparse.ArgumentParser(description='{header}\nCertificate task:'.format(header=title),
+                                              formatter_class=argparse.RawDescriptionHelpFormatter)
+        task_parser.prog = '{script} certificate'.format(script=task_parser.prog)
+        sub_tasks = task_parser.add_subparsers(title='commands', dest='command',
+                                               help='Define source of WAN edge certificate validity status.')
+        sub_tasks.required = True
+
+        restore_parser = sub_tasks.add_parser('restore', help='Restore status from backup.')
+        restore_parser.set_defaults(source_iter=TaskCertificate.restore_iter)
+        restore_parser.add_argument('--workdir', metavar='<directory>', type=existing_file_type, default=default_workdir,
+                                    help='''Restore source (default will be "{default_dir}").
+                                         '''.format(default_dir=default_workdir))
+
+        set_parser = sub_tasks.add_parser('set', help='Set status to provided value.')
+        set_parser.set_defaults(source_iter=TaskCertificate.set_iter)
+        set_parser.add_argument('status', choices=['invalid', 'staging', 'valid'],
+                                help='WAN edge certificate status.')
+
+        # Parameters common to all sub-tasks
+        for sub_task in (restore_parser, set_parser):
+            sub_task.add_argument('--regex', metavar='<regex>', type=regex_type,
+                                  help='''Regular expression selecting devices to modify certificate status. 
+                                          Matches on the hostname or chassis/uuid. Use "^-$" to match devices without 
+                                          a hostname. 
+                                       ''')
+            sub_task.add_argument('--dryrun', action='store_true',
+                                  help='''Dry-run mode. List modifications that would be performed without pushing 
+                                          changes to vManage.''')
+
+        return task_parser.parse_args(task_args)
+
+    @staticmethod
+    def restore_iter(target_certs, parsed_args):
+        saved_certs = EdgeCertificate.load(parsed_args.workdir)
+        if saved_certs is None:
+            raise FileNotFoundError('WAN edge certificates were not found in the backup')
+
+        saved_certs_dict = {uuid: status for uuid, status in saved_certs}
+
+        return (
+            (uuid, status, hostname, saved_certs_dict[uuid])
+            for uuid, status, hostname, chassis, serial, state in target_certs.extended_iter()
+            if uuid in saved_certs_dict
+        )
+
+    @staticmethod
+    def set_iter(target_certs, parsed_args):
+        return (
+            (uuid, status, hostname, parsed_args.status)
+            for uuid, status, hostname, chassis, serial, state in target_certs.extended_iter()
+        )
+
+    @classmethod
+    def runner(cls, api, parsed_args):
+        if parsed_args.command == 'restore':
+            start_msg = 'Restore status workdir: "{dir}" > vManage URL: "{url}"'.format(dir=parsed_args.workdir,
+                                                                                        url=api.base_url)
+        else:
+            start_msg = 'Set status to "{status}" > vManage URL: "{url}"'.format(status=parsed_args.status,
+                                                                                 url=api.base_url)
+        cls.log_info('Starting certificate%s: %s', ', DRY-RUN mode' if parsed_args.dryrun else '', start_msg)
+
+        try:
+            cls.log_info('Loading WAN edge certificate list from target vManage')
+            target_certs = EdgeCertificate.get_raise(api)
+
+            matched_items = (
+                (uuid, current_status, hostname, new_status)
+                for uuid, current_status, hostname, new_status in parsed_args.source_iter(target_certs, parsed_args)
+                if parsed_args.regex is None or regex_search(parsed_args.regex, hostname or '-', uuid)
+            )
+            update_list = []
+            cls.log_info('Identifying items to be pushed')
+            log_prefix = 'DRY-RUN: ' if parsed_args.dryrun else ''
+            for uuid, current_status, hostname, new_status in matched_items:
+                if current_status == new_status:
+                    cls.log_debug('%sSkipping %s, no changes', log_prefix, hostname or uuid)
+                    continue
+
+                cls.log_info('%sWill update %s status: %s -> %s',
+                             log_prefix, hostname or uuid, current_status, new_status)
+                update_list.append((uuid, new_status))
+
+            if len(update_list) > 0:
+                cls.log_info('%sPushing certificate status changes to vManage', log_prefix)
+                if not parsed_args.dryrun:
+                    api.post(target_certs.status_post_data(*update_list), EdgeCertificate.api_path.post)
+                    action_worker = EdgeCertificateSync(api.post({}, EdgeCertificateSync.api_path.post))
+                    cls.wait_actions(api, [(action_worker, None)], 'certificate sync with controllers',
+                                     raise_on_failure=True)
+            else:
+                cls.log_info('%sNo certificate status updates to push', log_prefix)
+
+        except (RestAPIException, FileNotFoundError, WaitActionsException) as ex:
+            cls.log_critical('Failed updating WAN edge certificate status: %s', ex)
+
+
 @TaskOptions.register('list')
 class TaskList(Task):
     @staticmethod
@@ -406,28 +518,43 @@ class TaskList(Task):
         task_parser = argparse.ArgumentParser(description='{header}\nList task:'.format(header=title),
                                               formatter_class=argparse.RawDescriptionHelpFormatter)
         task_parser.prog = '{script} list'.format(script=task_parser.prog)
-        task_parser.add_argument('--workdir', metavar='<directory>', type=existing_file_type,
-                                 help='''If specified the list task will operate locally, on items from this directory,
-                                         instead of on target vManage.
-                                      '''.format(default_dir=default_workdir))
-        task_parser.add_argument('--regex', metavar='<regex>', type=regex_type,
-                                 help='''Regular expression matching item names or item IDs to list, 
-                                         within selected tags.''')
-        task_parser.add_argument('--csv', metavar='<filename>', type=filename_type,
-                                 help='''Instead of printing a table with the list results, export as csv file with
-                                         the filename provided.''')
-        task_parser.add_argument('tags', metavar='<tag>', nargs='+', type=TagOptions.tag,
-                                 help='''One or more tags for selecting groups of items. 
-                                         Multiple tags should be separated by space.
-                                         Available tags: {tag_options}. Special tag '{all}' selects all items.
-                                      '''.format(tag_options=TagOptions.options(), all=CATALOG_TAG_ALL))
+        sub_tasks = task_parser.add_subparsers(title='options', dest='option', help='Specify type of elements to list.')
+        sub_tasks.required = True
+
+        config_parser = sub_tasks.add_parser('configuration', aliases=['config'], help='List configuration items.')
+        config_parser.set_defaults(table_factory=TaskList.config_table)
+        config_parser.add_argument('tags', metavar='<tag>', nargs='+', type=TagOptions.tag,
+                                   help='''One or more tags for selecting groups of items. 
+                                           Multiple tags should be separated by space.
+                                           Available tags: {tag_options}. Special tag '{all}' selects all items.
+                                        '''.format(tag_options=TagOptions.options(), all=CATALOG_TAG_ALL))
+        config_parser.add_argument('--regex', metavar='<regex>', type=regex_type,
+                                   help='Regular expression selecting items to list. Match on item names or item IDs.')
+
+        cert_parser = sub_tasks.add_parser('certificate', aliases=['cert'], help='List certificates.')
+        cert_parser.set_defaults(table_factory=TaskList.cert_table)
+        cert_parser.add_argument('--regex', metavar='<regex>', type=regex_type,
+                                 help='''Regular expression selecting devices to list. Match on hostname or 
+                                         chassis/uuid. Use "^-$" to match devices without a hostname.
+                                      ''')
+
+        # Parameters common to all sub-tasks
+        for sub_task in (config_parser, cert_parser):
+            sub_task.add_argument('--workdir', metavar='<directory>', type=existing_file_type,
+                                  help='''If specified, list will read from the specified directory instead of the 
+                                          target vManage.
+                                       '''.format(default_dir=default_workdir))
+            sub_task.add_argument('--csv', metavar='<filename>', type=filename_type,
+                                  help='''Instead of printing a table with list results, export as a csv file with
+                                          the provided filename.''')
+
         return task_parser.parse_args(task_args)
 
     @classmethod
-    def runner(cls, api, parsed_args):
+    def config_table(cls, api, parsed_args):
         target_info = 'vManage URL: "{url}"'.format(url=api.base_url) if parsed_args.workdir is None \
                  else 'Local workdir: "{workdir}"'.format(workdir=parsed_args.workdir)
-        cls.log_info('Starting list: %s', target_info)
+        cls.log_info('Starting list configuration: %s', target_info)
 
         backend = parsed_args.workdir if parsed_args.workdir is not None else api
         matched_item_iter = (
@@ -438,6 +565,35 @@ class TaskList(Task):
         )
         results = Table('Name', 'ID', 'Tag', 'Type')
         results.extend(matched_item_iter)
+
+        return results
+
+    @classmethod
+    def cert_table(cls, api, parsed_args):
+        target_info = 'vManage URL: "{url}"'.format(url=api.base_url) if parsed_args.workdir is None \
+                 else 'Local workdir: "{workdir}"'.format(workdir=parsed_args.workdir)
+        cls.log_info('Starting list certificates: %s', target_info)
+
+        if parsed_args.workdir is not None:
+            certs = EdgeCertificate.load(parsed_args.workdir)
+            if certs is None:
+                raise FileNotFoundError('WAN edge certificates were not found in the backup')
+        else:
+            certs = EdgeCertificate.get_raise(api)
+
+        matched_item_iter = (
+            (hostname or '-', chassis, serial, EdgeCertificate.state_str(state), status)
+            for uuid, status, hostname, chassis, serial, state in certs.extended_iter()
+            if parsed_args.regex is None or regex_search(parsed_args.regex, hostname or '-', uuid)
+        )
+        results = Table('Hostname', 'Chassis', 'Serial', 'State',  'Status')
+        results.extend(matched_item_iter)
+
+        return results
+
+    @classmethod
+    def runner(cls, api, parsed_args):
+        results = parsed_args.table_factory(api, parsed_args)
         cls.log_info('List criteria matched %s items', len(results))
 
         if len(results) > 0:
@@ -462,11 +618,11 @@ class TaskShowTemplate(Task):
                                  help='''Attributes to show. Available options: {show_options}.
                                       '''.format(show_options=ShowOptions.options()))
         task_parser.add_argument('--workdir', metavar='<directory>', type=existing_file_type,
-                                 help='''If specified the show task will operate locally, on items from this directory,
-                                         instead of on target vManage.
+                                 help='''If specified, show-template will read from the specified directory instead of 
+                                        the target vManage.
                                       '''.format(default_dir=default_workdir))
         task_parser.add_argument('--csv', metavar='<directory>', type=filename_type,
-                                 help='''Instead of printing tables with the results, export as csv files.
+                                 help='''Instead of printing tables with the show-template results, export as csv files.
                                          Exported files are saved under the specified directory.''')
         xor_group = task_parser.add_mutually_exclusive_group(required=True)
         xor_group.add_argument('--name', metavar='<name>', help='Device template name.')

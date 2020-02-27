@@ -16,12 +16,13 @@ Currently available tasks:
 - Backup: Save vManage configuration items to a local backup.
 - Restore: Restore configuration items from a local backup to vManage.
 - Delete: Delete configuration items on vManage.
-- List: List items configured on vManage or from a local backup. Display as table or export as csv file.
+- Certificate: Restore device certificate validity status from a backup or set to a desired value (i.e. valid, invalid or staging).
+- List: List configuration items or device certificate information from vManage or a local backup. Display as table or export as csv file.
 - Show-template: Show details about device templates on vManage or from a local backup. Display as table or export as csv file.
 
 Notes:
 - Either 'sdwan' or 'sastre' can be used as the main command.
-- The command line described above, and in all examples that follow, assumes Sastre was installed from PyPI, via PIP. 
+- The command line described above, and in all examples that follow, assume Sastre was installed from PyPI, via PIP. 
 - If Sastre was download from GitHub, then 'sdwan.py' or 'sastre.py' should used instead. Please check the installation section for more details.
 
 ### Base parameters
@@ -32,7 +33,7 @@ Notes:
     Sastre - Automation Tools for Cisco SD-WAN Powered by Viptela
     
     positional arguments:
-      <task>                task to be performed (backup, restore, delete, list, show-template)
+      <task>                task to be performed (backup, restore, delete, certificate, list, show-template)
       <arguments>           task parameters, if any
     
     optional arguments:
@@ -67,13 +68,14 @@ Task-specific parameters and options are defined after the task is provided. Eac
     Backup task:
     
     positional arguments:
-      <tag>                 One or more tags for selecting items to be backed up. Multiple tags should be separated by space. Available tags: all, policy_definition,
-                            policy_list, policy_security, policy_vedge, policy_vsmart, template_device, template_feature. Special tag 'all' selects all items.
+      <tag>                 One or more tags for selecting items to be backed up. Multiple tags should be separated by space. Available
+                            tags: all, policy_definition, policy_list, policy_security, policy_vedge, policy_vsmart, template_device,
+                            template_feature. Special tag 'all' selects all items, including WAN edge certificates.
     
     optional arguments:
       -h, --help            show this help message and exit
       --workdir <directory>
-                            Directory used to save the backup (default will be "backup_10.85.136.253_20191207").
+                            Backup destination (default will be "backup_198.18.1.10_20200226").
       --regex <regex>       Regular expression matching item names to be backed up, within selected tags.
 
 #### Important concepts:
@@ -101,7 +103,7 @@ Create an rc-example.sh file to include vManage details and source that file:
 
 Test vManage credentials by running a simple query listing configured device templates:
 
-    % sdwan list template_device
+    % sdwan list configuration template_device
     +-----------------+--------------------------------------+-----------------+-----------------+
     | Name            | ID                                   | Tag             | Type            |
     +-----------------+--------------------------------------+-----------------+-----------------+
@@ -114,12 +116,14 @@ Test vManage credentials by running a simple query listing configured device tem
 
 Any vManage parameters not specified via environment variables need to be provided via command line. For instance, the password can be left off the rc file and then provided when Sastre is executed:
 
-    % sdwan -p admin list template_device
+    % sdwan -p admin list configuration template_device
 
 Perform a backup:
 
     % sdwan --verbose backup all
     INFO: Starting backup: vManage URL: "https://10.85.136.253:8443" > Local workdir: "backup_10.85.136.253_20191206"
+    INFO: Saved vManage server information
+    INFO: Saved WAN edge certificates
     INFO: Saved device template index
     INFO: Done device template DC_ADVANCED
     INFO: Done device template DC_BASIC
@@ -144,6 +148,8 @@ The backup is saved under data/backup_10.85.136.253_20191206:
 
     % sdwan --verbose backup all --workdir "my_custom_directory"
     INFO: Starting backup: vManage URL: "https://10.85.136.253:8443" > Local workdir: "my_custom_directory"
+    INFO: Saved vManage server information
+    INFO: Saved WAN edge certificates
     INFO: Saved device template index
     INFO: Done device template DC_ADVANCED
     INFO: Done device template DC_BASIC
@@ -307,8 +313,8 @@ The list task can be used to list items from a target vManage, or a backup direc
 
 List device templates and feature templates from target vManage:
 
-    % sdwan --verbose list template_device template_feature
-    INFO: Starting list: vManage URL: "https://10.85.136.253:8443"
+    % sdwan --verbose list configuration template_device template_feature
+    INFO: Starting list configuration: vManage URL: "https://198.18.1.10:8443"
     INFO: List criteria matched 45 items
     +---------------------------+--------------------------------------+------------------+------------------+
     | Name                      | ID                                   | Tag              | Type             |
@@ -323,8 +329,8 @@ List device templates and feature templates from target vManage:
  
  List all items from target vManage with name starting with 'DC':
  
-    % sdwan --verbose list all --regex "^DC"
-    INFO: Starting list: vManage URL: "https://10.85.136.253:8443"
+    % sdwan --verbose list configuration all --regex "^DC"
+    INFO: Starting list configuration: vManage URL: "https://198.18.1.10:8443"
     INFO: List criteria matched 2 items
     +-------------+--------------------------------------+-----------------+-----------------+
     | Name        | ID                                   | Tag             | Type            |
@@ -336,8 +342,8 @@ List device templates and feature templates from target vManage:
 
 List all items from backup directory with name starting with 'DC':
 
-    % sdwan --verbose list all --regex "^DC" --workdir backup_10.85.136.253_20191206
-    INFO: Starting list: Local workdir: "backup_10.85.136.253_20191206"
+    % sdwan --verbose list configuration all --regex "^DC" --workdir backup_10.85.136.253_20191206
+    INFO: Starting list configuration: Local workdir: "backup_10.85.136.253_20191206"
     INFO: List criteria matched 2 items
     +-------------+--------------------------------------+-----------------+-----------------+
     | Name        | ID                                   | Tag             | Type            |
@@ -346,6 +352,23 @@ List all items from backup directory with name starting with 'DC':
     | DC_BASIC    | 09c02518-9557-4ae2-9031-7e6b3e7323fc | template_device | device template |
     +-------------+--------------------------------------+-----------------+-----------------+
     INFO: Task completed successfully
+    
+List also allows displaying device certificate information.
+
+    % sdwan --verbose list certificate                     
+    INFO: Starting list certificates: vManage URL: "https://198.18.1.10:8443"
+    INFO: List criteria matched 5 items
+    +------------+------------------------------------------+----------------------------------+----------------------------+--------+
+    | Hostname   | Chassis                                  | Serial                           | State                      | Status |
+    +------------+------------------------------------------+----------------------------------+----------------------------+--------+
+    | DC1-VEDGE1 | ebdc8bd9-17e5-4eb3-a5e0-f438403a83de     | ee08f743                         | certificate installed      | valid  |
+    | -          | 52c7911f-c5b0-45df-b826-3155809a2a1a     | 24801375888299141d620fbdb02de2d4 | bootstrap config generated | valid  |
+    | DC1-VEDGE2 | f21dbb35-30b3-47f4-93bb-d2b2fe092d35     | b02445f6                         | certificate installed      | valid  |
+    | BR1-CEDGE2 | CSR-04ed104b-86bb-4cb3-bd2b-a0d0991f6872 | AAC6C8F0                         | certificate installed      | valid  |
+    | BR1-CEDGE1 | CSR-940ad679-a16a-48ea-9920-16278597d98e | 487D703A                         | certificate installed      | valid  |
+    +------------+------------------------------------------+----------------------------------+----------------------------+--------+
+    INFO: Task completed successfully
+
 
 Similar to the list task, show tasks can be used to show items from a target vManage, or a backup. With show tasks, additional details about the selected items are displayed. The item id, name or a regular expression can be used to identify which item(s) to display.
 
@@ -387,6 +410,42 @@ Similar to the list task, show tasks can be used to show items from a target vMa
     | Remote AS(bgp_neighbor_remote_as) | 65222                                | /20//router/bgp/neighbor/bgp_neighbor_address/remote-as            |
     | Preference(transport1_preference) | 0                                    | /0/ge0/0/interface/tunnel-interface/encapsulation/ipsec/preference |
     +-----------------------------------+--------------------------------------+--------------------------------------------------------------------+
+
+### Modifying device certificate validity status:
+
+Restore certificate validity status from a backup:
+
+    % sdwan --verbose certificate restore --workdir test
+    INFO: Starting certificate: Restore status workdir: "test" > vManage URL: "https://198.18.1.10:8443"
+    INFO: Loading WAN edge certificate list from target vManage
+    INFO: Identifying items to be pushed
+    INFO: Will update DC1-VEDGE1 status: valid -> staging
+    INFO: Will update 52c7911f-c5b0-45df-b826-3155809a2a1a status: valid -> invalid
+    INFO: Will update DC1-VEDGE2 status: valid -> staging
+    INFO: Will update BR1-CEDGE2 status: valid -> staging
+    INFO: Will update BR1-CEDGE1 status: valid -> staging
+    INFO: Pushing certificate status changes to vManage
+    INFO: Certificate sync with controllers
+    INFO: Waiting...
+    INFO: Completed certificate sync with controllers
+    INFO: Task completed successfully
+
+Set certificate validity status to a desired value:
+
+     % sdwan --verbose certificate set valid             
+    INFO: Starting certificate: Set status to "valid" > vManage URL: "https://198.18.1.10:8443"
+    INFO: Loading WAN edge certificate list from target vManage
+    INFO: Identifying items to be pushed
+    INFO: Will update DC1-VEDGE1 status: staging -> valid
+    INFO: Will update 52c7911f-c5b0-45df-b826-3155809a2a1a status: invalid -> valid
+    INFO: Will update DC1-VEDGE2 status: staging -> valid
+    INFO: Will update BR1-CEDGE2 status: staging -> valid
+    INFO: Will update BR1-CEDGE1 status: staging -> valid
+    INFO: Pushing certificate status changes to vManage
+    INFO: Certificate sync with controllers
+    INFO: Waiting...
+    INFO: Completed certificate sync with controllers
+    INFO: Task completed successfully
 
 ## Notes
 
