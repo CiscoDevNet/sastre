@@ -87,6 +87,11 @@ class PolicyVsmartStatusException(Exception):
     pass
 
 
+class EdgeCertificateSync(ApiItem):
+    api_path = ApiPath(None, 'certificate/vedge/list?action=push', None, None)
+    id_tag = 'id'
+
+
 class ActionStatus(ApiItem):
     api_path = ApiPath('device/action/status', None, None, None)
 
@@ -318,7 +323,7 @@ class PolicyVedge(ConfigItem):
     name_tag = 'policyName'
 
 
-@register('policy_vedge', 'VEDGE policy', PolicyVedge)
+@register('policy_vedge', 'edge policy', PolicyVedge)
 class PolicyVedgeIndex(IndexConfigItem):
     api_path = ApiPath('template/policy/vedge', None, None, None)
     store_file = 'policy_templates_vedge.json'
@@ -486,7 +491,7 @@ class PolicyDefVedgeroute(PolicyDef):
     store_path = ('policy_definitions', 'vEdgeRoute')
 
 
-@register('policy_definition', 'vedge-route policy definition', PolicyDefVedgeroute)
+@register('policy_definition', 'edge-route policy definition', PolicyDefVedgeroute)
 class PolicyDefVedgerouteIndex(PolicyDefIndex):
     api_path = ApiPath('template/policy/definition/vedgeroute', None, None, None)
     store_file = 'policy_definitions_vedgeroute.json'
@@ -931,3 +936,50 @@ class PolicyListTGApiKeyIndex(PolicyListIndex):
 # class PolicyListMediaProfileIndex(PolicyListIndex):
 #     api_path = ApiPath('template/policy/list/mediaprofile', None, None, None)
 #     store_file = 'policy_lists_mediaprofile.json'
+
+#
+# Edge Certificate
+#
+class EdgeCertificate(IndexConfigItem):
+    api_path = ApiPath('certificate/vedge/list', 'certificate/save/vedge/list', None, None)
+    store_path = ('certificates', )
+    store_file = 'edge_certificates.json'
+    iter_fields = ('uuid', 'validity')
+
+    extended_iter_fields = ('host-name', 'chasisNumber', 'serialNumber', 'vedgeCertificateState')
+
+    _state_lookup = {
+        'tokengenerated': 'token generated',
+        'bootstrapconfiggenerated': 'bootstrap config generated',
+        'csrgenerated': 'CSR generated',
+        'csrfailed': 'CSR failed',
+        'certinstallfailed': 'certificate install failed',
+        'certinstalled': 'certificate installed',
+    }
+
+    @classmethod
+    def state_str(cls, state):
+        """
+        Convert the state field from WAN edge certificate into user-friendly string. If not known, return the original
+        state field
+        :param state: string containing the WAN edge certificate state field.
+        :return: string
+        """
+        return cls._state_lookup.get(state, state)
+
+    def status_post_data(self, *new_status):
+        """
+        Build payload to be used for POST requests that update WAN edge certificate validity status
+        :param new_status: One or more (<uuid>, <new status>) tuples
+        :return: List containing payload for POST requests
+        """
+        new_status_dict = dict(new_status)
+
+        return [
+            {
+                'chasisNumber': chassis,
+                'serialNumber': serial,
+                'validity': new_status_dict[uuid]
+            }
+            for uuid, status, hostname, chassis, serial, state in self.extended_iter() if uuid in new_status_dict
+        ]

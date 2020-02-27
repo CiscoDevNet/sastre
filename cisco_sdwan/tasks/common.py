@@ -298,7 +298,8 @@ class Task:
         Wait for actions in action_list to complete
         :param api: Instance of Rest API
         :param action_list: [(<action_worker>, <action_info>), ...]. Where <action_worker> is an instance of ApiItem and
-                            <action_info> is a str with information about the action.
+                            <action_info> is a str with information about the action. Action_info can be None, in which
+                            case no messages are logged for individual actions.
         :param log_context: String providing context to log messages
         :param raise_on_failure: If True, raise exception on action failures
         :return: True if all actions completed with success. False otherwise.
@@ -319,12 +320,13 @@ class Task:
                     break
 
                 if action.is_completed:
-                    if action.is_successful:
-                        cls.log_info('Completed %s', action_info)
-                        result_list.append(True)
-                    else:
-                        cls.log_warning('Failed %s: %s', action_info, action.activity_details)
-                        result_list.append(False)
+                    result_list.append(action.is_successful)
+                    if action_info is not None:
+                        if action.is_successful:
+                            cls.log_info('Completed %s', action_info)
+                        else:
+                            cls.log_warning('Failed %s: %s', action_info, action.activity_details)
+
                     break
 
                 time_budget -= cls.ACTION_INTERVAL

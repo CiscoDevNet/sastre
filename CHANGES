@@ -1,4 +1,17 @@
-Sastre 0.34 [Jan 9, 2019]
+Sastre 0.35 [Feb 27, 2020]
+==========================
+
+Enhancements:
+    - Backup task now also backup device certificates when the 'all' tag is used. The restore task does not restore
+      certificates.
+    - New certificate task, allowing device certificate validity status to be restored from a backup or set to a
+      desired value (i.e. valid, invalid or staging).
+    - List task now contains two sub-modes: configuration or certificate. List configuration works the same way as on
+      previous releases by listing configuration items (e.g. device templates, feature templates, policies, etc.).
+      The new certificate sub-mode allows listing of device certificate information from vManage or from a backup.
+
+
+Sastre 0.34 [Jan 9, 2020]
 ==========================
 
 Enhancements:
