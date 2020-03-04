@@ -1,4 +1,4 @@
-Sastre 0.35 [Feb 27, 2020]
+Sastre 0.35 [Mar 3, 2020]
 ==========================
 
 Enhancements:
@@ -9,6 +9,9 @@ Enhancements:
     - List task now contains two sub-modes: configuration or certificate. List configuration works the same way as on
       previous releases by listing configuration items (e.g. device templates, feature templates, policies, etc.).
       The new certificate sub-mode allows listing of device certificate information from vManage or from a backup.
+    - Restore task now verifies whether vBond is configured (Administration > Settings > vBond). If vBond is not
+      configured, device templates are skipped from the restore as it would otherwise fail. A warning message notifies
+      when this happens.
 
 
 Sastre 0.34 [Jan 9, 2020]

@@ -15,7 +15,7 @@ from cisco_sdwan.base.catalog import catalog_entries, CATALOG_TAG_ALL, ordered_t
 from cisco_sdwan.base.models_base import UpdateEval, filename_safe, DATA_DIR, ServerInfo
 from cisco_sdwan.base.models_vmanage import (DeviceTemplate, DeviceTemplateAttached, DeviceTemplateValues,
                                              DeviceTemplateIndex, PolicyVsmartIndex, EdgeInventory, ControlInventory,
-                                             EdgeCertificate, EdgeCertificateSync)
+                                             EdgeCertificate, EdgeCertificateSync, SettingsVbond)
 from .utils import TaskOptions, TagOptions, ShowOptions, existing_file_type, filename_type, regex_type, uuid_type
 from .common import regex_search, Task, Table, WaitActionsException
 
@@ -164,6 +164,10 @@ class TaskRestore(Task):
             cls.log_warning('Target vManage release (%s) is older than the release used in backup (%s). ' +
                             'Items may fail to be restored due to incompatibilities across releases.',
                             api.server_version, local_info.server_version)
+        vbond = SettingsVbond.get(api)
+        if vbond is None:
+            cls.log_warning('Failed retrieving vBond settings. Restoring template_device items will fail if vBond ' +
+                            'is not configured.')
 
         cls.log_info('Loading existing items from target vManage')
         target_all_items_map = {
@@ -177,6 +181,11 @@ class TaskRestore(Task):
         dependency_set = set()  # {<item_id>, ...}
         match_set = set()       # {<item_id>, ...}
         for tag in ordered_tags(parsed_args.tag):
+            if tag == 'template_device' and vbond is not None and not vbond.is_configured:
+                cls.log_warning('Will skip %s items because vBond is not configured. ' +
+                                'On vManage, Administration > Settings > vBond.', tag)
+                continue
+
             cls.log_info('Inspecting %s items', tag)
             tag_iter = (
                 (info, index, load_items(index, item_cls))
