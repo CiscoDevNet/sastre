@@ -83,8 +83,8 @@ class Rest:
         # POST may return an empty string, return None in this case
         return response.json() if response.text else None
 
-    def put(self, input_data, resource, key_value):
-        response = self.session.put(self._url(resource, key_value), json=input_data,
+    def put(self, input_data, *path_entries):
+        response = self.session.put(self._url(*path_entries), json=input_data,
                                     timeout=self.timeout, verify=self.verify)
         raise_for_status(response)
 

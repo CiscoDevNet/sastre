@@ -938,6 +938,27 @@ class PolicyListTGApiKeyIndex(PolicyListIndex):
 #     store_file = 'policy_lists_mediaprofile.json'
 
 #
+# Admin Settings
+#
+class SettingsVbond(ConfigItem):
+    api_path = ApiPath('settings/configuration/device', None, 'settings/configuration/device', None)
+    store_path = ('settings',)
+    store_file = 'vbond.json'
+
+    def __init__(self, data):
+        """
+        :param data: dict containing the information to be associated with this API item.
+        """
+        # Get requests return a dict as {'data': [{'domainIp': 'vbond.cisco.com', 'port': '12346'}]}
+        super().__init__(data.get('data', [''])[0])
+
+    @property
+    def is_configured(self):
+        domain_ip = self.data.get('domainIp', '')
+        return len(domain_ip) > 0 and domain_ip != 'Not Configured'
+
+
+#
 # Edge Certificate
 #
 class EdgeCertificate(IndexConfigItem):
