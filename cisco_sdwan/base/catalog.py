@@ -6,10 +6,12 @@
 """
 from collections import namedtuple
 from .models_base import IndexConfigItem, ConfigItem
+from .rest_api import is_version_newer
 
-_catalog = list()   # [(<tag>, <info>, <index_cls>, <item_cls>), ...]
 
-CatalogEntry = namedtuple('CatalogEntry', ['tag', 'info', 'index_cls', 'item_cls'])
+_catalog = list()   # [(<tag>, <info>, <index_cls>, <item_cls>, <min_version>), ...]
+
+CatalogEntry = namedtuple('CatalogEntry', ['tag', 'info', 'index_cls', 'item_cls', 'min_version'])
 
 CATALOG_TAG_ALL = 'all'
 
@@ -21,7 +23,10 @@ _tag_dependency_list = [
     'policy_vsmart',
     'policy_vedge',
     'policy_security',
+    'policy_voice',
+    'policy_customapp',
     'policy_definition',
+    'policy_profile',
     'policy_list',
 ]
 
@@ -49,13 +54,14 @@ def ordered_tags(tag, single=False):
             break
 
 
-def register(tag, info, item_cls):
+def register(tag, info, item_cls, min_version=None):
     """
     Decorator used for registering config item index/handler classes with the catalog.
     The class being decorated needs to be a subclass of IndexConfigItem.
     :param tag: Tag string associated with this item. String 'all' is reserved and cannot be used.
     :param info: Item information used for logging purposes
     :param item_cls: The config item handler class, needs to be a subclass of ConfigItem
+    :param min_version: (optional) Minimum vManage version that supports this catalog item.
     :return: decorator
     """
     def decorator(index_cls):
@@ -75,7 +81,7 @@ def register(tag, info, item_cls):
             raise CatalogException(
                 'Unknown tag provided: {}'.format(tag)
             )
-        _catalog.append(CatalogEntry(tag, info, index_cls, item_cls))
+        _catalog.append(CatalogEntry(tag, info, index_cls, item_cls, min_version))
 
         return index_cls
 
@@ -90,16 +96,26 @@ def catalog_size():
     return len(_catalog)
 
 
-def catalog_entries(*tags):
+def catalog_iter(*tags, version=None):
     """
-    Return an iterator of CatalogEntry matching the specified tag(s)
+    Return an iterator of (<tag>, <info>, <index_cls>, <item_cls>) tuples matching the specified tag(s) and supported
+    by vManage version.
     :param tags: tags indicating catalog entries to return
-    :return: iterator of CatalogEntry
+    :param version: Target vManage version. Only returns catalog items supported by the target vManage.
+                    If not specified or None, version is not verified.
+    :return: iterator of (<tag>, <info>, <index_cls>, <item_cls>) tuples from the catalog
     """
     def match_tags(catalog_entry):
-        return True if (CATALOG_TAG_ALL in tags) or (catalog_entry.tag in tags) else False
+        return CATALOG_TAG_ALL in tags or catalog_entry.tag in tags
 
-    return filter(match_tags, _catalog)
+    def match_version(catalog_entry):
+        return catalog_entry.min_version is None or version is None or not is_version_newer(version,
+                                                                                            catalog_entry.min_version)
+
+    return (
+        (entry.tag, entry.info, entry.index_cls, entry.item_cls)
+        for entry in _catalog if match_tags(entry) and match_version(entry)
+    )
 
 
 def catalog_tags():
@@ -107,7 +123,7 @@ def catalog_tags():
     Return unique tags used by items registered with the catalog
     :return: Set of unique tags
     """
-    return set(map(lambda x: x.tag, _catalog))
+    return {entry.tag for entry in _catalog}
 
 
 class CatalogException(Exception):

@@ -121,7 +121,8 @@ def is_version_newer(version_1, version_2):
     :return: True if version_2 is newer than version_1.
     """
     def parse(version_string):
-        return ([int(v) for v in version_string.split('.')] + [0, ])[:2]
+        # Development versions may follow this format: '20.1.999-98'
+        return ([int(v) for v in version_string.replace('-', '.').split('.')] + [0, ])[:2]
 
     return parse(version_2) > parse(version_1)
 
