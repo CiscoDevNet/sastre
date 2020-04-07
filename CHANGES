@@ -1,3 +1,15 @@
+Sastre 0.36 [???, 2020]
+==========================
+
+Enhancements:
+    - Validated support for vManage 20.1 and included new API endpoints:
+        - Policy lists: media profile, translation profile, translation rules, supervisory disconnect, FQDN
+        - Policy definitions: Dial peer, SRST phone profile, FXS port, FXO port, FXS-DID port, SSL decryption, SSL UTD profile
+        - Voice policies, custom application policies
+    - New API model versioning scheme to restrict REST API queries to only the endpoints supported by the target vManage.
+
+
+
 Sastre 0.35 [Mar 3, 2020]
 ==========================
 
