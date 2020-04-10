@@ -10,12 +10,15 @@ import argparse
 from shutil import rmtree
 from pathlib import Path
 from cisco_sdwan.__version__ import __doc__ as title
+from cisco_sdwan.base.migration import JSONInputDigest
 from cisco_sdwan.base.rest_api import RestAPIException, is_version_newer
 from cisco_sdwan.base.catalog import catalog_entries, CATALOG_TAG_ALL, ordered_tags
 from cisco_sdwan.base.models_base import UpdateEval, filename_safe, DATA_DIR, ServerInfo
 from cisco_sdwan.base.models_vmanage import (DeviceTemplate, DeviceTemplateAttached, DeviceTemplateValues,
-                                             DeviceTemplateIndex, PolicyVsmartIndex, EdgeInventory, ControlInventory,
-                                             EdgeCertificate, EdgeCertificateSync, SettingsVbond)
+                                             DeviceTemplateIndex, FeatureTemplate, PolicyVsmartIndex, EdgeInventory,
+                                             ControlInventory,
+                                             EdgeCertificate, EdgeCertificateSync, SettingsVbond, FeatureTemplateIndex)
+
 from .utils import TaskOptions, TagOptions, ShowOptions, existing_file_type, filename_type, regex_type, uuid_type
 from .common import regex_search, Task, Table, WaitActionsException
 
@@ -160,10 +163,12 @@ class TaskRestore(Task):
 
         local_info = ServerInfo.load(parsed_args.workdir)
         # Server info file may not be present (e.g. backup from older Sastre releases)
+        '''
         if local_info is not None and is_version_newer(api.server_version, local_info.server_version):
             cls.log_warning('Target vManage release (%s) is older than the release used in backup (%s). ' +
                             'Items may fail to be restored due to incompatibilities across releases.',
                             api.server_version, local_info.server_version)
+        '''
         vbond = SettingsVbond.get(api)
         if vbond is None:
             cls.log_warning('Failed retrieving vBond settings. Restoring template_device items will fail if vBond ' +
@@ -724,3 +729,126 @@ class TaskShowTemplate(Task):
         else:
             match_type = 'ID' if show_args.id is not None else 'name' if show_args.name is not None else 'regex'
             cls.log_warning('No items found with the %s provided', match_type)
+
+@TaskOptions.register('migrate-templates')
+class TaskMigrateTemplates(Task):
+    @staticmethod
+    def filter_feature_templates(id,type,output):
+        old_types = {"banner", "bfd-vedge", "bgp", "dhcp-server", "logging", "ntp", "omp-vedge", "ospf",
+                           "security-vedge", "snmp", "system-vedge", "vpn-vedge", "vpn-vedge-interface-gre",
+                           "vpn-vedge-interface-ipsec", "vpn-vedge-interface"}
+        aaa_type = "aaa"
+        global_type = "cedge_global"
+        idset,aaa_found,global_template_found,device_migration = output
+        if type == aaa_type:
+            aaa_found = True
+        elif type == global_type:
+            global_template_found = True
+        elif type in old_types:
+            idset.add(id)
+            device_migration = True
+        return (idset,aaa_found,global_template_found,device_migration)
+
+    @classmethod
+    def iterate_device_templates(cls,device_template):
+        needs_migration = True
+        if "generalTemplates" not in device_template.keys():
+            return None
+
+        def apply_iter_function(func,output = device_template,templates = device_template["generalTemplates"]):
+            for template in templates:
+                type = template["templateType"]
+                id = template["templateId"]
+                output = func(id,type,output)
+                if "subTemplates" in template.keys():
+                    return apply_iter_function(func,output,template["subTemplates"])
+            return output
+        return apply_iter_function
+    @staticmethod
+    def parser(default_workdir, task_args):
+        task_parser = argparse.ArgumentParser(description='{header}\nmigrate templates task:'.format(header=title),
+                                              formatter_class=argparse.RawDescriptionHelpFormatter)
+        task_parser.prog = '{script} migrate-templates'.format(script=task_parser.prog)
+        task_parser.add_argument('--prefix', metavar='<prefix>', type=str,
+                                 help='''The prefix to add to the name of migrated templates.
+                                      '''.format(default_dir=default_workdir),required=True)
+        task_parser.add_argument('--workdir', metavar='<directory>', type=filename_type, default=default_workdir,
+                                 help='''Backup destination (default will be "{default_dir}").
+                                      '''.format(default_dir=default_workdir))
+        task_parser.add_argument('--fv', metavar='<fv>', type=str,
+                                 help='''The version vmanage upgraded from.''')
+        task_parser.add_argument('--tv', metavar='<tv>', type=str,
+                                 help='''The version that is currently running on vmanage.''')
+        return task_parser.parse_args(task_args)
+
+    @classmethod
+    def runner(cls, api, parsed_args):
+        from pathlib import Path
+        prefix = parsed_args.prefix
+        work_dir = parsed_args.workdir
+        from_version = parsed_args.fv
+        to_version = parsed_args.tv
+
+        for _, info, index_cls, item_cls in catalog_entries("template_feature"):
+            item_index = index_cls.get(api)
+            if item_index is None:
+                cls.log_debug('Skipped %s, item not supported by this vManage', info)
+                continue
+            if item_index.save(parsed_args.workdir):
+                cls.log_info('Saved %s index', info)
+
+            feature_name_set = set()
+            for _,name in item_index:
+                feature_name_set.add(name)
+
+            matched_item_iter = (
+                (item_id, item_name) for item_id, item_name,*_ in item_index.filtered_iter(FeatureTemplateIndex.needs_migration)
+            )
+            name_conflict = False
+            for item_id, item_name in matched_item_iter:
+                item = item_cls.get(api, item_id)
+                if item is None:
+                    cls.log_error('Failed backup %s %s', info, item_name)
+                    continue
+                if prefix+item_name in feature_name_set:
+                    cls.log_error('A conflicting feature template name is found for %s when using the prefix %s',item_name,prefix)
+                    name_conflict = True
+                    continue
+                if item.save(parsed_args.workdir, item_index.need_extended_name, item_name, item_id):
+                    cls.log_info('Done %s %s', info, item_name)
+
+            if name_conflict:
+                cls.log_info("Because name collisions are found, template migration has terminated.")
+            migrate_dir = Path(item_cls.root_dir,work_dir,"migrated_feature")
+            migration = JSONInputDigest("cisco_sdwan/base/JSONInput.json")
+            migration.migrate("all", to_version, cls, Path(item_cls.root_dir,work_dir,*item_cls.store_path), migrate_dir, prefix)
+
+
+
+
+
+            '''
+            for device in device_index:
+                device_id,device_name = device
+                device_template = item_cls.get(api, device_id)
+                print(device_template.store_file)
+            '''
+
+        '''
+        for device_template in device_templates:
+            template = api.get(DeviceTemplate.api_path.get,device_template["templateId"]).iter()
+            iter = cls.iterate_device_templates(template)
+            if iter is not None: 
+                idset,aaa_found,global_template_found,device_migration = iter(cls.filter_feature_templates,idSet)
+        feature_templates = list()
+        for id in idSet:
+            template = api.get("%s/%s" % (FeatureTemplate.api_path.get,id))
+            feature_templates.append(template)
+        #invoke migration.py
+        #intiate class, pass cls attributes
+
+        print(feature_templates)
+        #print(device_templates)
+        '''
+
+
