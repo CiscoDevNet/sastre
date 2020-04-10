@@ -7,6 +7,7 @@
 import os
 import re
 import argparse
+from getpass import getpass
 from pathlib import Path
 from cisco_sdwan.base.catalog import catalog_tags, CATALOG_TAG_ALL
 from cisco_sdwan.base.models_base import filename_safe, DATA_DIR
@@ -121,17 +122,44 @@ def uuid_type(uuid_str):
     return uuid_str
 
 
+def non_empty_type(src_str):
+    out_str = src_str.strip()
+    if len(out_str) == 0:
+        raise argparse.ArgumentTypeError('Value cannot be empty.')
+
+    return out_str
+
+
 class EnvVar(argparse.Action):
-    def __init__(self, envvar=None, required=True, default=None, nargs=None, **kwargs):
+    def __init__(self, nargs=None, envvar=None, required=True, default=None, **kwargs):
         if nargs is not None:
-            raise ValueError("nargs not allowed")
+            raise ValueError('nargs not allowed')
+        if envvar is None:
+            raise ValueError('envvar is required')
 
         default = default or os.environ.get(envvar)
-        required = not required or default is None
+        required = required and default is None
         super().__init__(default=default, required=required, **kwargs)
 
     def __call__(self, parser, namespace, values, option_string=None):
         setattr(namespace, self.dest, values)
+
+
+class PromptArg:
+    def __init__(self, argument, prompt, secure_prompt=False, validate=non_empty_type):
+        self.argument = argument
+        self.prompt = prompt
+        self.prompt_func = getpass if secure_prompt else input
+        self.validate = validate
+
+    def __call__(self):
+        while True:
+            try:
+                value = self.validate(self.prompt_func(self.prompt))
+            except argparse.ArgumentTypeError as ex:
+                print('{msg} Please try again, or ^C to terminate.'.format(msg=ex))
+            else:
+                return value
 
 
 class SastreException(Exception):
