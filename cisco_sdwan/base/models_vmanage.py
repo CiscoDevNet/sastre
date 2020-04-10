@@ -207,6 +207,78 @@ class DeviceTemplateIndex(IndexConfigItem):
     def is_not_vsmart(device_type, num_attached):
         return device_type != 'vsmart' and num_attached > 0
 
+    @staticmethod
+    def is_cedge(*args):
+        device_type,num_attached = args
+        cedge_set = {
+            "vedge-IR-1101",
+            "vedge-ESR-6300",
+            "vedge-ASR-1001-X",
+            "vedge-ASR-1002-X",
+            "vedge-ASR-1002-HX",
+            "vedge-ASR-1001-HX",
+            "vedge-C8500L-8G4X",
+            "vedge-C8500-12X4QC",
+            "vedge-C8500-12X",
+            "vedge-CSR-1000v",
+            "vedge-ISR-4331",
+            "vedge-ISR-4431",
+            "vedge-ISR-4461",
+            "vedge-ISR-4451-X",
+            "vedge-ISR-4321",
+            "vedge-ISR-4351",
+            "vedge-ISR-4221",
+            "vedge-ISR-4221X",
+            "vedge-C1101-4P",
+            "vedge-C1101-4PLTEP",
+            "vedge-C1111-4P",
+            "vedge-C1161X-8P",
+            "vedge-C1111-8P",
+            "vedge-C1121X-8P",
+            "vedge-C1111X-8P",
+            "vedge-C1111-8PW",
+            "vedge-C1111-8PLTEEA",
+            "vedge-C1121-8PLTEPW",
+            "vedge-C1111-8PLTELAW",
+            "vedge-C1111-8PLTEEAW",
+            "vedge-C1111-8PLTELA",
+            "vedge-C1111-4PLTEEA",
+            "vedge-C1101-4PLTEPW",
+            "vedge-C1109-4PLTE2PW",
+            "vedge-C1109-4PLTE2P",
+            "vedge-C1121X-8PLTEP",
+            "vedge-C1161X-8PLTEP",
+            "vedge-C1113-8PMLTEEA",
+            "vedge-C1111-4PLTELA",
+            "vedge-C1116-4P",
+            "vedge-C1116-4PLTEEA",
+            "vedge-C1117-4P",
+            "vedge-C1117-4PM",
+            "vedge-C1117-4PLTEEA",
+            "vedge-C1126X-8PLTEP",
+            "vedge-C1127X-8PLTEP",
+            "vedge-C1127X-8PMLTEP",
+            "vedge-C1127-8PMLTEP",
+            "vedge-C1117-4PLTELA",
+            "vedge-C1117-4PMLTEEA",
+            "vedge-ISRv",
+            "vedge-C8000V",
+            "vedge-ccm",
+            "vedge-C8200-1N-4T",
+            "vedge-C8300-1N1S-4T2X",
+            "vedge-C8300-1N1S-4G2X",
+            "vedge-C8300-1N1S-6T",
+            "vedge-C8300-2N2S-6T",
+            "vedge-C8300-2N2S-4T2X",
+            "vmanage",
+            "vedge-C9500-40X",
+            "vedge-C9500-48Y4C",
+            "vedge-nfvis-ENCS5400",
+            "vedge-nfvis-C8200-UCPE"
+        }
+
+        return device_type in cedge_set
+
     def filtered_iter(self, filter_fn):
         return (
             (item_id, item_name) for item_type, item_attached, item_id, item_name
@@ -280,7 +352,124 @@ class FeatureTemplateIndex(IndexConfigItem):
     api_path = ApiPath('template/feature', None, None, None)
     store_file = 'feature_templates.json'
     iter_fields = IdName('templateId', 'templateName')
+    feature_atts = [
+        "templateId",
+        "templateName",
+        "templateDescription",
+        "templateType",
+        "deviceType",
+        "lastUpdatedBy",
+        "lastUpdatedOn",
+        "factoryDefault",
+        "devicesAttached",
+        "attachedMastersCount",
+        "templateMinVersion",
+        "configType",
+        "createdBy",
+        "createdOn",
+        "templateDefinition"
+    ]
 
+
+
+    @staticmethod
+    def needs_migration(*args):
+        _,_,_,item_type,device_type,_,_,factory_default,_,item_attached,_,config_type,_,_,_ = args
+        cedge_set = {
+            "vedge-IR-1101",
+            "vedge-ESR-6300",
+            "vedge-ASR-1001-X",
+            "vedge-ASR-1002-X",
+            "vedge-ASR-1002-HX",
+            "vedge-ASR-1001-HX",
+            "vedge-C8500L-8G4X",
+            "vedge-C8500-12X4QC",
+            "vedge-C8500-12X",
+            "vedge-CSR-1000v",
+            "vedge-ISR-4331",
+            "vedge-ISR-4431",
+            "vedge-ISR-4461",
+            "vedge-ISR-4451-X",
+            "vedge-ISR-4321",
+            "vedge-ISR-4351",
+            "vedge-ISR-4221",
+            "vedge-ISR-4221X",
+            "vedge-C1101-4P",
+            "vedge-C1101-4PLTEP",
+            "vedge-C1111-4P",
+            "vedge-C1161X-8P",
+            "vedge-C1111-8P",
+            "vedge-C1121X-8P",
+            "vedge-C1111X-8P",
+            "vedge-C1111-8PW",
+            "vedge-C1111-8PLTEEA",
+            "vedge-C1121-8PLTEPW",
+            "vedge-C1111-8PLTELAW",
+            "vedge-C1111-8PLTEEAW",
+            "vedge-C1111-8PLTELA",
+            "vedge-C1111-4PLTEEA",
+            "vedge-C1101-4PLTEPW",
+            "vedge-C1109-4PLTE2PW",
+            "vedge-C1109-4PLTE2P",
+            "vedge-C1121X-8PLTEP",
+            "vedge-C1161X-8PLTEP",
+            "vedge-C1113-8PMLTEEA",
+            "vedge-C1111-4PLTELA",
+            "vedge-C1116-4P",
+            "vedge-C1116-4PLTEEA",
+            "vedge-C1117-4P",
+            "vedge-C1117-4PM",
+            "vedge-C1117-4PLTEEA",
+            "vedge-C1126X-8PLTEP",
+            "vedge-C1127X-8PLTEP",
+            "vedge-C1127X-8PMLTEP",
+            "vedge-C1127-8PMLTEP",
+            "vedge-C1117-4PLTELA",
+            "vedge-C1117-4PMLTEEA",
+            "vedge-ISRv",
+            "vedge-C8000V",
+            "vedge-ccm",
+            "vedge-C8200-1N-4T",
+            "vedge-C8300-1N1S-4T2X",
+            "vedge-C8300-1N1S-4G2X",
+            "vedge-C8300-1N1S-6T",
+            "vedge-C8300-2N2S-6T",
+            "vedge-C8300-2N2S-4T2X",
+            "vmanage",
+            "vedge-C9500-40X",
+            "vedge-C9500-48Y4C",
+            "vedge-nfvis-ENCS5400",
+            "vedge-nfvis-C8200-UCPE"
+        }
+        old_templates = {
+            "banner",
+            "bfd-vedge",
+            "bgp",
+            "dhcp-server",
+            "logging",
+            "ntp",
+            "omp-vedge",
+            "ospf",
+            "security-vedge",
+            "snmp",
+            "system-vedge",
+            "vpn-vedge",
+            "vpn-vedge-interface-gre",
+            "vpn-vedge-interface-ipsec",
+            "vpn-vedge-interface"
+        }
+        device_found = False
+        for d in device_type:
+            if d in cedge_set:
+                device_found = True
+                break
+        return item_type in old_templates and item_attached > 0 and device_found and factory_default is False
+
+    def filtered_iter(self, filter_fn):
+        return (
+            attributes for attributes
+            in self.iter(*self.feature_atts) if filter_fn(*attributes)
+        )
 
 #
 # Policy vSmart
