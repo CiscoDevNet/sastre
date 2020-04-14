@@ -14,7 +14,7 @@ from cisco_sdwan.base.migration import JSONInputDigest
 from cisco_sdwan.base.rest_api import RestAPIException, is_version_newer
 from cisco_sdwan.base.catalog import catalog_entries, CATALOG_TAG_ALL, ordered_tags
 from cisco_sdwan.base.models_base import UpdateEval, filename_safe, DATA_DIR, ServerInfo
-from cisco_sdwan.base.models_vmanage import (DeviceTemplate, DeviceTemplateAttached, DeviceTemplateValues,
+from cisco_sdwan.base.models_vmanage import (DeviceTemplate, DeviceTemplateAttached, DeviceTemplateValues, ConfigItem,
                                              DeviceTemplateIndex, FeatureTemplate, PolicyVsmartIndex, EdgeInventory,
                                              ControlInventory,
                                              EdgeCertificate, EdgeCertificateSync, SettingsVbond, FeatureTemplateIndex)
@@ -732,30 +732,108 @@ class TaskShowTemplate(Task):
 
 @TaskOptions.register('migrate-templates')
 class TaskMigrateTemplates(Task):
+    template_type_mapping = {"banner": "cisco_banner",
+                           "bfd-vedge": "cisco_bfd",
+                           "bgp": "cisco_bgp",
+                           "dhcp-server": "cisco_dhcp_server",
+                           "logging": "cisco_logging",
+                           "ntp": "cisco_ntp",
+                           "omp-vedge": "cisco_omp",
+                           "ospf": "cisco_ospf",
+                           "snmp": "cisco_snmp",
+                           "system-vedge": "cisco_system",
+                           "vpn-vedge": "cisco_vpn",
+                           "vpn-vedge-interface": "cisco_vpn_interface",
+                           "vpn-vedge-interface-gre": "cisco_vpn_interface_gre",
+                           "vpn-vedge-interface-ipsec": "cisco_vpn_interface_ipsec",
+                           "security-vedge": "cisco_security"}
+    old_types = template_type_mapping.keys()
+
+    @classmethod
+    def prepare_payload(cls,body):
+        if 'templateId' in body.keys():
+            del body['templateId']
+        if "@rid" in body.keys():
+            del body["@rid"]
+        if "createdOn" in body.keys():
+            del body["createdOn"]
+        if "lastUpdatedOn" in body.keys():
+            del body["lastUpdatedOn"]
+        if "gTemplateClass" in body.keys():
+            body["gTemplateClass"] = "cedge"
+        if "templateClass" in body.keys():
+            body["templateClass"] = "cedge"
+        return body
+
     @staticmethod
-    def filter_feature_templates(id,type,output):
-        old_types = {"banner", "bfd-vedge", "bgp", "dhcp-server", "logging", "ntp", "omp-vedge", "ospf",
-                           "security-vedge", "snmp", "system-vedge", "vpn-vedge", "vpn-vedge-interface-gre",
-                           "vpn-vedge-interface-ipsec", "vpn-vedge-interface"}
+    def filter_master_templates(id,type,output):
         aaa_type = "aaa"
         global_type = "cedge_global"
-        idset,aaa_found,global_template_found,device_migration = output
+        aaa_found = False
+        global_template_found = False
+        device_migration = False
+        if output is not None:
+            aaa_found,global_template_found,device_migration = output
         if type == aaa_type:
             aaa_found = True
         elif type == global_type:
             global_template_found = True
-        elif type in old_types:
-            idset.add(id)
+        elif type in TaskMigrateTemplates.old_types:
             device_migration = True
-        return (idset,aaa_found,global_template_found,device_migration)
+        return (aaa_found,global_template_found,device_migration)
+
+    @classmethod
+    def get_global_default(cls,api):
+        global_type = "cedge_global"
+        for _, info, index_cls, item_cls in catalog_entries("template_feature"):
+            item_index = index_cls.get(api)
+            if item_index is None:
+                cls.log_debug('Skipped %s, item not supported by this vManage', info)
+                continue
+            matched_item_iter = (
+                (item_id, item_type) for item_id, _, _,item_type,*_ in item_index.filtered_iter(FeatureTemplateIndex.is_default)
+            )
+
+            for item_id, item_type in matched_item_iter:
+                if item_type == global_type:
+                    return {
+                        "templateType":global_type,
+                        "templateId":item_id
+                    }
+            return None
+
+    @classmethod
+    def get_required_device_templates(cls,api):
+        global_field = cls.get_global_default(api)
+        requires_migration = list()
+        for _, info, index_cls, item_cls in catalog_entries("template_device"):
+            item_index = index_cls.get(api)
+            matched_item_iter = (
+                (item_id, item_name) for item_id, item_name,*_ in item_index.filtered_iter(DeviceTemplateIndex.is_cedge)
+            )
+            for item_id, item_name in matched_item_iter:
+                item = item_cls.get(api, item_id)
+                device_template_iterator = cls.iterate_device_templates(item.data)
+                if device_template_iterator is None:
+                    continue
+                aaa_found,global_temlpate_found,device_migration = device_template_iterator(TaskMigrateTemplates.filter_master_templates)
+                if device_migration:
+                    if aaa_found:
+                        cls.log_info("AAA template is found for the device template %s. Please attach a Cisco AAA template to it.", item["templateName"])
+                    if not global_temlpate_found:
+                        if global_field is None:
+                            cls.log_info("Unable to attached default global template to %s.",item["templateName"])
+                        else:
+                            item.data["generalTemplates"].append(global_field)
+                    requires_migration.append(item)
+        return requires_migration
 
     @classmethod
     def iterate_device_templates(cls,device_template):
-        needs_migration = True
         if "generalTemplates" not in device_template.keys():
             return None
 
-        def apply_iter_function(func,output = device_template,templates = device_template["generalTemplates"]):
+        def apply_iter_function(func,output = None,templates = device_template["generalTemplates"]):
             for template in templates:
                 type = template["templateType"]
                 id = template["templateId"]
@@ -784,11 +862,16 @@ class TaskMigrateTemplates(Task):
     @classmethod
     def runner(cls, api, parsed_args):
         from pathlib import Path
+        import os
+        import re
+        import json
+
+        templateNameRegex = r'(?=^.{1,128}$)[^&<>! "]+$'
+        regex_check = re.compile(templateNameRegex)
         prefix = parsed_args.prefix
         work_dir = parsed_args.workdir
         from_version = parsed_args.fv
         to_version = parsed_args.tv
-
         for _, info, index_cls, item_cls in catalog_entries("template_feature"):
             item_index = index_cls.get(api)
             if item_index is None:
@@ -805,6 +888,7 @@ class TaskMigrateTemplates(Task):
                 (item_id, item_name) for item_id, item_name,*_ in item_index.filtered_iter(FeatureTemplateIndex.needs_migration)
             )
             name_conflict = False
+            illegal_name = False
             for item_id, item_name in matched_item_iter:
                 item = item_cls.get(api, item_id)
                 if item is None:
@@ -814,41 +898,42 @@ class TaskMigrateTemplates(Task):
                     cls.log_error('A conflicting feature template name is found for %s when using the prefix %s',item_name,prefix)
                     name_conflict = True
                     continue
+                if regex_check.match(item_name) is None:
+                    cls.log_error('%s is an illegal name for a template.',prefix+item_name)
+                    illegal_name = True
+
                 if item.save(parsed_args.workdir, item_index.need_extended_name, item_name, item_id):
                     cls.log_info('Done %s %s', info, item_name)
 
             if name_conflict:
                 cls.log_info("Because name collisions are found, template migration has terminated.")
+            if illegal_name:
+                cls.log_info("Because at least one template has an illegal name, task has terminated.")
+            dir_path = Path(item_cls.root_dir,work_dir,"migrated_device")
+            dir_path.mkdir(parents=True, exist_ok=True)
             migrate_dir = Path(item_cls.root_dir,work_dir,"migrated_feature")
+            migrate_dir.mkdir(parents=True,exist_ok=True)
             migration = JSONInputDigest("cisco_sdwan/base/JSONInput.json")
             migration.migrate("all", to_version, cls, Path(item_cls.root_dir,work_dir,*item_cls.store_path), migrate_dir, prefix)
 
+            id_mapping = {}
+            device_templates = cls.get_required_device_templates(api)
+            for _,_,files in os.walk(migrate_dir):
+                for file in files:
+                    with open(Path(migrate_dir,file)) as f:
+                        feature_template = json.load(f)
+                        id = feature_template["templateId"]
+                        feature_template = cls.prepare_payload(feature_template)
+                        id_mapping[id] = api.post(feature_template,FeatureTemplate.api_path.post)["templateId"]
+            for device_template in device_templates:
+                device_template.save(work_dir)
+                migrated_device_template = device_template.post_data(id_mapping,prefix + device_template.data["templateName"],True)
+                #print(migrated_device_template)
+                id = migrated_device_template["templateName"]
+                post_body = cls.prepare_payload(migrated_device_template)
+                with open(Path(dir_path,id+".json"),"w") as f:
+                    json.dump(post_body, f, indent=2)
+                api.post(post_body,DeviceTemplate.api_path.post)
 
-
-
-
-            '''
-            for device in device_index:
-                device_id,device_name = device
-                device_template = item_cls.get(api, device_id)
-                print(device_template.store_file)
-            '''
-
-        '''
-        for device_template in device_templates:
-            template = api.get(DeviceTemplate.api_path.get,device_template["templateId"]).iter()
-            iter = cls.iterate_device_templates(template)
-            if iter is not None: 
-                idset,aaa_found,global_template_found,device_migration = iter(cls.filter_feature_templates,idSet)
-        feature_templates = list()
-        for id in idSet:
-            template = api.get("%s/%s" % (FeatureTemplate.api_path.get,id))
-            feature_templates.append(template)
-        #invoke migration.py
-        #intiate class, pass cls attributes
-
-        print(feature_templates)
-        #print(device_templates)
-        '''
 
 

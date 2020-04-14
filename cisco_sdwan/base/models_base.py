@@ -223,7 +223,7 @@ class ConfigItem(ApiItem):
 
         return True
 
-    def post_data(self, id_mapping_dict, new_name=None):
+    def post_data(self, id_mapping_dict, new_name=None, device_template_migration = False):
         """
         Build payload to be used for POST requests against this config item. From self.data, perform item id
         replacements defined in id_mapping_dict, also remove item id and rename item with new_name (if provided).
@@ -244,6 +244,24 @@ class ConfigItem(ApiItem):
         if new_name is not None:
             post_dict[self.name_tag] = new_name
 
+        if device_template_migration:
+            type_mapping = {"banner":"cisco_banner",
+                      "bfd-vedge":"cisco_bfd",
+                      "bgp":"cisco_bgp",
+                      "dhcp-server":"cisco_dhcp_server",
+                      "logging":"cisco_logging",
+                      "ntp":"cisco_ntp",
+                      "omp-vedge":"cisco_omp",
+                      "ospf":"cisco_ospf",
+                      "snmp":"cisco_snmp",
+                      "system-vedge":"cisco_system",
+                      "vpn-vedge":"cisco_vpn",
+                      "vpn-vedge-interface":"cisco_vpn_interface",
+                      "vpn-vedge-interface-gre":"cisco_vpn_interface_gre",
+                      "vpn-vedge-interface-ipsec":"cisco_vpn_interface_ipsec",
+                      "security-vedge":"cisco_security"}
+            post_dict = self._updated_type(type_mapping, post_dict)
+
         return self._update_ids(id_mapping_dict, post_dict)
 
     def put_data(self, id_mapping_dict):
@@ -261,10 +279,18 @@ class ConfigItem(ApiItem):
         def replace_id(match):
             matched_id = match.group(0)
             return id_mapping_dict.get(matched_id, matched_id)
-
         dict_json = re.sub(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}',
                            replace_id, json.dumps(data_dict))
 
+        return json.loads(dict_json)
+
+    @staticmethod
+    def _updated_type(type_mapping, data_dict):
+        def replace_att(match):
+            matched_id = match.group(0)
+            return type_mapping.get(matched_id, matched_id)
+        exp = r'(?<=("templateType"):\s\")[A-Za-z]*((_|-)?[A-Za-z]*)*'
+        dict_json = re.sub(exp, replace_att, json.dumps(data_dict))
         return json.loads(dict_json)
 
     @property

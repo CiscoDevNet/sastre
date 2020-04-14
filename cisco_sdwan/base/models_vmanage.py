@@ -371,6 +371,10 @@ class FeatureTemplateIndex(IndexConfigItem):
     ]
 
 
+    @staticmethod
+    def is_default(*args):
+        _,_,_,_,_,_,_,factory_default,*_=args
+        return factory_default
 
     @staticmethod
     def needs_migration(*args):
