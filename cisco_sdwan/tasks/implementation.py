@@ -803,11 +803,14 @@ class TaskMigrateTemplates(Task):
             return None
 
     @classmethod
-    def get_required_device_templates(cls,api):
+    def get_required_device_templates(cls,api,workdir,prefix,regex):
         global_field = cls.get_global_default(api)
         requires_migration = list()
         for _, info, index_cls, item_cls in catalog_entries("template_device"):
+            nameset = set()
             item_index = index_cls.get(api)
+            for _, name in item_index:
+                nameset.add(name)
             matched_item_iter = (
                 (item_id, item_name) for item_id, item_name,*_ in item_index.filtered_iter(DeviceTemplateIndex.is_cedge)
             )
@@ -818,11 +821,17 @@ class TaskMigrateTemplates(Task):
                     continue
                 aaa_found,global_temlpate_found,device_migration = device_template_iterator(TaskMigrateTemplates.filter_master_templates)
                 if device_migration:
+                    if prefix + item_name in nameset:
+                        cls.log_error("A name conflict was found for %s",prefix+item_name)
+                    if regex.search(prefix+item_name) is None:
+                        cls.log_error("Illegal name was found for %s",prefix+item_name)
                     if aaa_found:
                         cls.log_info("AAA template is found for the device template %s. Please attach a Cisco AAA template to it.", item["templateName"])
+                    if item.save(workdir, item_index.need_extended_name, item_name, item_id):
+                        cls.log_info('Done %s %s', info, item_name)
                     if not global_temlpate_found:
                         if global_field is None:
-                            cls.log_info("Unable to attached default global template to %s.",item["templateName"])
+                            cls.log_debug("Unable to attached default global template to %s.",item["templateName"])
                         else:
                             item.data["generalTemplates"].append(global_field)
                     requires_migration.append(item)
@@ -866,74 +875,88 @@ class TaskMigrateTemplates(Task):
         import re
         import json
 
-        templateNameRegex = r'(?=^.{1,128}$)[^&<>! "]+$'
-        regex_check = re.compile(templateNameRegex)
-        prefix = parsed_args.prefix
-        work_dir = parsed_args.workdir
-        from_version = parsed_args.fv
-        to_version = parsed_args.tv
-        for _, info, index_cls, item_cls in catalog_entries("template_feature"):
-            item_index = index_cls.get(api)
-            if item_index is None:
-                cls.log_debug('Skipped %s, item not supported by this vManage', info)
-                continue
-            if item_index.save(parsed_args.workdir):
-                cls.log_info('Saved %s index', info)
+        try:
+            templateNameRegex = r'(?=^.{1,128}$)[^&<>! "]+$'
+            regex_check = re.compile(templateNameRegex)
+            prefix = parsed_args.prefix
+            work_dir = parsed_args.workdir
+            from_version = parsed_args.fv
+            to_version = parsed_args.tv
+            validate_versions = False
+            with open("cisco_sdwan/base/JSONInput.json","r") as f:
+                JSONInput = json.load(f)
+                for j in JSONInput:
+                    if from_version in j["squashedVmanageVersions"] and to_version == j["tovManageVersion"]:
+                        validate_versions = True
+                        break
+            if not validate_versions:
+                cls.log_error("The migration from %s to %s is not supported.",from_version,to_version)
+            else:
+                for _, info, index_cls, item_cls in catalog_entries("template_feature"):
+                    item_index = index_cls.get(api)
+                    if item_index is None:
+                        cls.log_debug('Skipped %s, item not supported by this vManage', info)
+                        continue
+                    if item_index.save(parsed_args.workdir):
+                        cls.log_info('Saved %s index', info)
+                    feature_name_set = set()
+                    for _,name in item_index:
+                        feature_name_set.add(name)
 
-            feature_name_set = set()
-            for _,name in item_index:
-                feature_name_set.add(name)
+                    matched_item_iter = (
+                        (item_id, item_name) for item_id, item_name,*_ in item_index.filtered_iter(FeatureTemplateIndex.needs_migration)
+                    )
+                    name_conflict = False
+                    illegal_name = False
+                    cls.log_info("Verifying potential name issues for migrated feature templates.")
+                    for item_id, item_name in matched_item_iter:
+                        item = item_cls.get(api, item_id)
+                        if item is None:
+                            cls.log_error('Failed backup %s %s', info, item_name)
+                            continue
+                        if prefix+item_name in feature_name_set:
+                            cls.log_error('A conflicting feature template name is found for %s when using the prefix %s',item_name,prefix)
+                            name_conflict = True
+                            continue
+                        if regex_check.search(prefix+item_name) is None:
+                            cls.log_error('%s is an illegal name for a template.',prefix+item_name)
+                            illegal_name = True
+                            continue
+                        if item.save(parsed_args.workdir, item_index.need_extended_name, item_name, item_id):
+                            cls.log_info('Done %s %s', info, item_name)
 
-            matched_item_iter = (
-                (item_id, item_name) for item_id, item_name,*_ in item_index.filtered_iter(FeatureTemplateIndex.needs_migration)
-            )
-            name_conflict = False
-            illegal_name = False
-            for item_id, item_name in matched_item_iter:
-                item = item_cls.get(api, item_id)
-                if item is None:
-                    cls.log_error('Failed backup %s %s', info, item_name)
-                    continue
-                if prefix+item_name in feature_name_set:
-                    cls.log_error('A conflicting feature template name is found for %s when using the prefix %s',item_name,prefix)
-                    name_conflict = True
-                    continue
-                if regex_check.match(item_name) is None:
-                    cls.log_error('%s is an illegal name for a template.',prefix+item_name)
-                    illegal_name = True
+                    if name_conflict:
+                        cls.log_error("Because name collisions are found, template migration has terminated.")
+                    if illegal_name:
+                        cls.log_error("Because at least one template has an illegal name, task has terminated.")
+                    if illegal_name is False and name_conflict is False:
+                        dir_path = Path(item_cls.root_dir,work_dir,"migrated_device")
+                        dir_path.mkdir(parents=True, exist_ok=True)
+                        migrate_dir = Path(item_cls.root_dir,work_dir,"migrated_feature")
+                        migrate_dir.mkdir(parents=True,exist_ok=True)
+                        migration = JSONInputDigest("cisco_sdwan/base/JSONInput.json")
+                        cls.log_info("Migrating feature templates.")
+                        migration.migrate("all", to_version, cls, Path(item_cls.root_dir,work_dir,*item_cls.store_path), migrate_dir, prefix)
 
-                if item.save(parsed_args.workdir, item_index.need_extended_name, item_name, item_id):
-                    cls.log_info('Done %s %s', info, item_name)
+                        id_mapping = {}
+                        cls.log_info("Acquring deving templates.")
+                        device_templates = cls.get_required_device_templates(api,work_dir,prefix,regex_check)
+                        for _,_,files in os.walk(migrate_dir):
+                            for file in files:
+                                with open(Path(migrate_dir,file)) as f:
+                                    feature_template = json.load(f)
+                                    id = feature_template["templateId"]
+                                    feature_template = cls.prepare_payload(feature_template)
+                                    id_mapping[id] = api.post(feature_template,FeatureTemplate.api_path.post)["templateId"]
+                        for device_template in device_templates:
+                            migrated_device_template = device_template.post_data(id_mapping,prefix + device_template.data["templateName"],True)
+                            #print(migrated_device_template)
+                            id = migrated_device_template["templateName"]
+                            post_body = cls.prepare_payload(migrated_device_template)
+                            with open(Path(dir_path,id+".json"),"w") as f:
+                                json.dump(post_body, f, indent=2)
+                            api.post(post_body,DeviceTemplate.api_path.post)
 
-            if name_conflict:
-                cls.log_info("Because name collisions are found, template migration has terminated.")
-            if illegal_name:
-                cls.log_info("Because at least one template has an illegal name, task has terminated.")
-            dir_path = Path(item_cls.root_dir,work_dir,"migrated_device")
-            dir_path.mkdir(parents=True, exist_ok=True)
-            migrate_dir = Path(item_cls.root_dir,work_dir,"migrated_feature")
-            migrate_dir.mkdir(parents=True,exist_ok=True)
-            migration = JSONInputDigest("cisco_sdwan/base/JSONInput.json")
-            migration.migrate("all", to_version, cls, Path(item_cls.root_dir,work_dir,*item_cls.store_path), migrate_dir, prefix)
-
-            id_mapping = {}
-            device_templates = cls.get_required_device_templates(api)
-            for _,_,files in os.walk(migrate_dir):
-                for file in files:
-                    with open(Path(migrate_dir,file)) as f:
-                        feature_template = json.load(f)
-                        id = feature_template["templateId"]
-                        feature_template = cls.prepare_payload(feature_template)
-                        id_mapping[id] = api.post(feature_template,FeatureTemplate.api_path.post)["templateId"]
-            for device_template in device_templates:
-                device_template.save(work_dir)
-                migrated_device_template = device_template.post_data(id_mapping,prefix + device_template.data["templateName"],True)
-                #print(migrated_device_template)
-                id = migrated_device_template["templateName"]
-                post_body = cls.prepare_payload(migrated_device_template)
-                with open(Path(dir_path,id+".json"),"w") as f:
-                    json.dump(post_body, f, indent=2)
-                api.post(post_body,DeviceTemplate.api_path.post)
-
-
+        except Exception as e:
+            cls.log_error("Migration failed:%s",e)
 
