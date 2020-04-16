@@ -826,12 +826,12 @@ class TaskMigrateTemplates(Task):
                     if regex.search(prefix+item_name) is None:
                         cls.log_error("Illegal name was found for %s",prefix+item_name)
                     if aaa_found:
-                        cls.log_info("AAA template is found for the device template %s. Please attach a Cisco AAA template to it.", item["templateName"])
+                        cls.log_info("AAA template is found for the device template %s. Please attach a Cisco AAA template to it.", item_name)
                     if item.save(workdir, item_index.need_extended_name, item_name, item_id):
                         cls.log_info('Done %s %s', info, item_name)
                     if not global_temlpate_found:
                         if global_field is None:
-                            cls.log_debug("Unable to attached default global template to %s.",item["templateName"])
+                            cls.log_debug("Unable to attached default global template to %s.",item_name)
                         else:
                             item.data["generalTemplates"].append(global_field)
                     requires_migration.append(item)
