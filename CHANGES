@@ -1,3 +1,13 @@
+Sastre 0.37 [April 21, 2020]
+============================
+
+Fixes:
+    - Restore task with --attach option when one or more WAN Edges or vSmarts are offline would show a warning that the
+      template attach failed, even though it was successfully attached (with sync pending for offline devices).
+      Similarly, if one or more vSmarts are offline vSmart policy would not be activated (with sync pending).
+      This has been fixed.
+
+
 Sastre 0.36 [April 10, 2020]
 ============================
 
