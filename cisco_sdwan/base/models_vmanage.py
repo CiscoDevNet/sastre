@@ -75,7 +75,7 @@ class PolicyVsmartStatus(ApiItem):
 
     def raise_for_status(self):
         def vsmart_ready(vsmart_entry):
-            return vsmart_entry['operationMode'] == 'vmanage' and vsmart_entry['isOnline']
+            return vsmart_entry['operationMode'] == 'vmanage'
 
         data_list = self.data.get('data', [])
         if len(data_list) == 0 or not all(vsmart_ready(entry) for entry in data_list):
@@ -106,7 +106,7 @@ class ActionStatus(ApiItem):
     @property
     def is_successful(self):
         def task_success(task_entry):
-            return task_entry['status'] == 'Success'
+            return task_entry['statusId'] == 'success' or task_entry['statusId'] == 'success_scheduled'
 
         data_list = self.data.get('data', [])
         # When action validation fails, returned data is empty
