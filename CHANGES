@@ -1,3 +1,25 @@
+Sastre 0.37 [April 21, 2020]
+============================
+
+Fixes:
+    - Restore task with --attach option when one or more WAN Edges or vSmarts are offline would show a warning that the
+      template attach failed, even though it was successfully attached (with sync pending for offline devices).
+      Similarly, if one or more vSmarts are offline vSmart policy would not be activated (with sync pending).
+      This has been fixed.
+
+
+Sastre 0.36 [April 10, 2020]
+============================
+
+Enhancements:
+    - Validated support for vManage 20.1 and included new API endpoints:
+        - Policy lists: media profile, translation profile, translation rules, supervisory disconnect, FQDN
+        - Policy definitions: Dial peer, SRST phone profile, FXS port, FXO port, FXS-DID port, SSL decryption, SSL UTD profile
+        - Voice policies, custom application policies
+    - New API model versioning scheme to restrict REST API queries to only the endpoints supported by the target vManage.
+    - User is now prompted for vManage address, username or password if they are not provided via command line or environment variables.
+
+
 Sastre 0.35 [Mar 3, 2020]
 ==========================
 

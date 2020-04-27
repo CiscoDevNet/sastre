@@ -28,7 +28,7 @@ Notes:
 ### Base parameters
 
     % sdwan -h
-    usage: sdwan [-h] [-a <vmanage-ip>] [-u <user>] [-p <password>] [--port <port>] [--timeout <timeout>] [--verbose] [--version] <task> ...
+    usage: sdwan.py [-h] [-a <vmanage-ip>] [-u <user>] [-p <password>] [--port <port>] [--timeout <timeout>] [--verbose] [--version] <task> ...
     
     Sastre - Automation Tools for Cisco SD-WAN Powered by Viptela
     
@@ -39,22 +39,24 @@ Notes:
     optional arguments:
       -h, --help            show this help message and exit
       -a <vmanage-ip>, --address <vmanage-ip>
-                            vManage IP address, can also be provided via VMANAGE_IP environment variable
+                            vManage IP address, can also be defined via VMANAGE_IP environment variable. If neither is provided user is prompted for an address.
       -u <user>, --user <user>
-                            username, can also be provided via VMANAGE_USER environment variable
+                            user name, can also be defined via VMANAGE_USER environment variable. If neither is provided user is prompted for a user name.
       -p <password>, --password <password>
-                            password, can also be provided via VMANAGE_PASSWORD environment variable
+                            password, can also be defined via VMANAGE_PASSWORD environment variable. If neither is provided user is prompted for a password.
       --port <port>         vManage TCP port number (default is 8443)
       --timeout <timeout>   REST API timeout (default is 300s)
       --verbose             increase output verbosity
       --version             show program's version number and exit
 
-vManage address (-a), username (-u) and password (-p) can also be provided via environment variables:
+vManage address (-a/--address), user name (-u/--user) and password (-p/--password) can also be provided via environment variables:
 - VMANAGE_IP
 - VMANAGE_USER
 - VMANAGE_PASSWORD
 
 A good approach to reduce the number of parameters that need to be provided at execution is to create rc text files exporting those environment variables for a particular vManage. This is demonstrated in the Getting Started section below.
+
+For any of these arguments, vManage address, user and password; if they are not provided via the environment variables or command line arguments, the user is prompted for a value.
 
 ### Task-specific parameters
 
@@ -97,13 +99,15 @@ Create an rc-example.sh file to include vManage details and source that file:
     % cat <<EOF > rc-example.sh
      export VMANAGE_IP='10.85.136.253'
      export VMANAGE_USER='admin'
-     export VMANAGE_PASSWORD='admin'
     EOF
     % source rc-example.sh
+
+Note that in this example the password was not defined, the user will be prompted for a password.
 
 Test vManage credentials by running a simple query listing configured device templates:
 
     % sdwan list configuration template_device
+    vManage password: 
     +-----------------+--------------------------------------+-----------------+-----------------+
     | Name            | ID                                   | Tag             | Type            |
     +-----------------+--------------------------------------+-----------------+-----------------+
@@ -114,7 +118,7 @@ Test vManage credentials by running a simple query listing configured device tem
     | BRANCH_BASIC    | cc2f7a24-4c93-49ed-8e6b-1c107797ba95 | template_device | device template |
     +-----------------+--------------------------------------+-----------------+-----------------+
 
-Any vManage parameters not specified via environment variables need to be provided via command line. For instance, the password can be left off the rc file and then provided when Sastre is executed:
+Any those vManage parameters can also be provided via command line:
 
     % sdwan -p admin list configuration template_device
 
