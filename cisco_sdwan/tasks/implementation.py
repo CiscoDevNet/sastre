@@ -12,7 +12,7 @@ from pathlib import Path
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.migration import JSONInputDigest
 from cisco_sdwan.base.rest_api import RestAPIException, is_version_newer
-from cisco_sdwan.base.catalog import catalog_entries, CATALOG_TAG_ALL, ordered_tags
+from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL, ordered_tags
 from cisco_sdwan.base.models_base import UpdateEval, filename_safe, DATA_DIR, ServerInfo
 from cisco_sdwan.base.models_vmanage import (DeviceTemplate, DeviceTemplateAttached, DeviceTemplateValues, ConfigItem,
                                              DeviceTemplateIndex, FeatureTemplate, PolicyVsmartIndex, EdgeInventory,
@@ -64,7 +64,7 @@ class TaskBackup(Task):
             elif edge_certs.save(parsed_args.workdir):
                 cls.log_info('Saved WAN edge certificates')
 
-        for _, info, index_cls, item_cls in catalog_entries(*parsed_args.tags):
+        for _, info, index_cls, item_cls in catalog_iter(*parsed_args.tags, version=api.server_version):
             item_index = index_cls.get(api)
             if item_index is None:
                 cls.log_debug('Skipped %s, item not supported by this vManage', info)
@@ -177,7 +177,7 @@ class TaskRestore(Task):
         cls.log_info('Loading existing items from target vManage')
         target_all_items_map = {
             hash(type(index)): {item_name: item_id for item_id, item_name in index}
-            for _, _, index, item_cls in cls.index_iter(api, catalog_entries(CATALOG_TAG_ALL))
+            for _, _, index, item_cls in cls.index_iter(api, catalog_iter(CATALOG_TAG_ALL, version=api.server_version))
         }
 
         cls.log_info('Identifying items to be pushed')
@@ -194,7 +194,8 @@ class TaskRestore(Task):
             cls.log_info('Inspecting %s items', tag)
             tag_iter = (
                 (info, index, load_items(index, item_cls))
-                for _, info, index, item_cls in cls.index_iter(parsed_args.workdir, catalog_entries(tag))
+                for _, info, index, item_cls in cls.index_iter(parsed_args.workdir,
+                                                               catalog_iter(tag, version=api.server_version))
             )
             for info, index, loaded_items_iter in tag_iter:
                 target_item_map = target_all_items_map.get(hash(type(index)))
@@ -402,7 +403,7 @@ class TaskDelete(Task):
             cls.log_info('Inspecting %s items', tag)
             matched_item_iter = (
                 (item_name, item_id, item_cls, info)
-                for _, info, index, item_cls in cls.index_iter(api, catalog_entries(tag))
+                for _, info, index, item_cls in cls.index_iter(api, catalog_iter(tag, version=api.server_version))
                 for item_id, item_name in index
                 if parsed_args.regex is None or regex_search(parsed_args.regex, item_name)
             )
@@ -571,9 +572,12 @@ class TaskList(Task):
         cls.log_info('Starting list configuration: %s', target_info)
 
         backend = parsed_args.workdir if parsed_args.workdir is not None else api
+        # Only perform version-based filtering if backend is api
+        version = None if parsed_args.workdir is not None else api.server_version
+
         matched_item_iter = (
             (item_name, item_id, tag, info)
-            for tag, info, index, item_cls in cls.index_iter(backend, catalog_entries(*parsed_args.tags))
+            for tag, info, index, item_cls in cls.index_iter(backend, catalog_iter(*parsed_args.tags, version=version))
             for item_id, item_name in index
             if parsed_args.regex is None or regex_search(parsed_args.regex, item_name, item_id)
         )
@@ -694,7 +698,7 @@ class TaskShowTemplate(Task):
         backend = show_args.workdir if show_args.workdir is not None else api
         matched_item_iter = (
             (index.need_extended_name, item_name, item_id, tag, info)
-            for tag, info, index, item_cls in cls.index_iter(backend, catalog_entries('template_device'))
+            for tag, info, index, item_cls in cls.index_iter(backend, catalog_iter('template_device'))
             for item_id, item_name in index
             if item_matches(item_name, item_id) and issubclass(item_cls, DeviceTemplate)
         )

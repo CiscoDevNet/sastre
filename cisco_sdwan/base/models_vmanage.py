@@ -75,7 +75,7 @@ class PolicyVsmartStatus(ApiItem):
 
     def raise_for_status(self):
         def vsmart_ready(vsmart_entry):
-            return vsmart_entry['operationMode'] == 'vmanage' and vsmart_entry['isOnline']
+            return vsmart_entry['operationMode'] == 'vmanage'
 
         data_list = self.data.get('data', [])
         if len(data_list) == 0 or not all(vsmart_ready(entry) for entry in data_list):
@@ -106,7 +106,7 @@ class ActionStatus(ApiItem):
     @property
     def is_successful(self):
         def task_success(task_entry):
-            return task_entry['status'] == 'Success'
+            return task_entry['statusId'] == 'success' or task_entry['statusId'] == 'success_scheduled'
 
         data_list = self.data.get('data', [])
         # When action validation fails, returned data is empty
@@ -526,6 +526,7 @@ class PolicyVedgeIndex(IndexConfigItem):
 #
 # Policy Security
 #
+
 class PolicySecurity(ConfigItem):
     api_path = ApiPath('template/policy/security/definition', 'template/policy/security')
     store_path = ('policy_templates', 'Security')
@@ -537,6 +538,42 @@ class PolicySecurity(ConfigItem):
 class PolicySecurityIndex(IndexConfigItem):
     api_path = ApiPath('template/policy/security', None, None, None)
     store_file = 'policy_templates_security.json'
+    iter_fields = IdName('policyId', 'policyName')
+
+
+#
+# Policy Voice
+#
+
+class PolicyVoice(ConfigItem):
+    api_path = ApiPath('template/policy/voice/definition', 'template/policy/voice')
+    store_path = ('policy_templates', 'Voice')
+    store_file = '{item_name}.json'
+    name_tag = 'policyName'
+
+
+@register('policy_voice', 'voice policy', PolicyVoice, min_version='20.1')
+class PolicyVoiceIndex(IndexConfigItem):
+    api_path = ApiPath('template/policy/voice', None, None, None)
+    store_file = 'policy_templates_voice.json'
+    iter_fields = IdName('policyId', 'policyName')
+
+
+#
+# Policy Custom Application
+#
+
+class PolicyCustomApp(ConfigItem):
+    api_path = ApiPath('template/policy/customapp')
+    store_path = ('policy_templates', 'CustomApp')
+    store_file = '{item_name}.json'
+    name_tag = 'policyName'
+
+
+@register('policy_customapp', 'custom application policy', PolicyCustomApp, min_version='20.1')
+class PolicyCustomAppIndex(IndexConfigItem):
+    api_path = ApiPath('template/policy/customapp', None, None, None)
+    store_file = 'policy_templates_customapp.json'
     iter_fields = IdName('policyId', 'policyName')
 
 
@@ -767,27 +804,81 @@ class PolicyDefDeviceAccessV6Index(PolicyDefIndex):
     store_file = 'policy_definitions_deviceaccessv6.json'
 
 
-# These items showed up in swagger for 19.3 but are not yet configurable
-# class PolicyDefDialPeer(PolicyDef):
-#     api_path = ApiPath('template/policy/definition/dialpeer')
-#     store_path = ('policy_definitions', 'DialPeer')
-#
-#
-# @register('policy_definition', 'dial-peer policy definition', PolicyDefDialPeer)
-# class PolicyDefDialPeerIndex(PolicyDefIndex):
-#     api_path = ApiPath('template/policy/definition/dialpeer', None, None, None)
-#     store_file = 'policy_definitions_dialpeer.json'
-#
-#
-# class PolicyDefPhoneProfile(PolicyDef):
-#     api_path = ApiPath('template/policy/definition/srstphoneprofile')
-#     store_path = ('policy_definitions', 'PhoneProfile')
-#
-#
-# @register('policy_definition', 'phone profile policy definition', PolicyDefPhoneProfile)
-# class PolicyDefPhoneProfileIndex(PolicyDefIndex):
-#     api_path = ApiPath('template/policy/definition/srstphoneprofile', None, None, None)
-#     store_file = 'policy_definitions_phoneprofile.json'
+class PolicyDefDialPeer(PolicyDef):
+    api_path = ApiPath('template/policy/definition/dialpeer')
+    store_path = ('policy_definitions', 'DialPeer')
+
+
+@register('policy_definition', 'dial-peer policy definition', PolicyDefDialPeer, min_version='20.1')
+class PolicyDefDialPeerIndex(PolicyDefIndex):
+    api_path = ApiPath('template/policy/definition/dialpeer', None, None, None)
+    store_file = 'policy_definitions_dialpeer.json'
+
+
+class PolicyDefPhoneProfile(PolicyDef):
+    api_path = ApiPath('template/policy/definition/srstphoneprofile')
+    store_path = ('policy_definitions', 'PhoneProfile')
+
+
+@register('policy_definition', 'phone profile policy definition', PolicyDefPhoneProfile, min_version='20.1')
+class PolicyDefPhoneProfileIndex(PolicyDefIndex):
+    api_path = ApiPath('template/policy/definition/srstphoneprofile', None, None, None)
+    store_file = 'policy_definitions_phoneprofile.json'
+
+
+class PolicyDefFXOPort(PolicyDef):
+    api_path = ApiPath('template/policy/definition/fxoport')
+    store_path = ('policy_definitions', 'FXOPort')
+
+
+@register('policy_definition', 'FXO port policy definition', PolicyDefFXOPort, min_version='20.1')
+class PolicyDefFXOPortIndex(PolicyDefIndex):
+    api_path = ApiPath('template/policy/definition/fxoport', None, None, None)
+    store_file = 'policy_definitions_fxoport.json'
+
+
+class PolicyDefFXSPort(PolicyDef):
+    api_path = ApiPath('template/policy/definition/fxsport')
+    store_path = ('policy_definitions', 'FXSPort')
+
+
+@register('policy_definition', 'FXS port policy definition', PolicyDefFXSPort, min_version='20.1')
+class PolicyDefFXSPortIndex(PolicyDefIndex):
+    api_path = ApiPath('template/policy/definition/fxsport', None, None, None)
+    store_file = 'policy_definitions_fxsport.json'
+
+
+class PolicyDefFXSDIDPort(PolicyDef):
+    api_path = ApiPath('template/policy/definition/fxsdidport')
+    store_path = ('policy_definitions', 'FXSDIDPort')
+
+
+@register('policy_definition', 'FXS-DID port policy definition', PolicyDefFXSDIDPort, min_version='20.1')
+class PolicyDefFXSDIDPortIndex(PolicyDefIndex):
+    api_path = ApiPath('template/policy/definition/fxsdidport', None, None, None)
+    store_file = 'policy_definitions_fxsdidport.json'
+
+
+class PolicyDefSSLDecryption(PolicyDef):
+    api_path = ApiPath('template/policy/definition/ssldecryption')
+    store_path = ('policy_definitions', 'SSLDecryption')
+
+
+@register('policy_definition', 'SSL decryption policy definition', PolicyDefSSLDecryption, min_version='20.1')
+class PolicyDefSSLDecryptionIndex(PolicyDefIndex):
+    api_path = ApiPath('template/policy/definition/ssldecryption', None, None, None)
+    store_file = 'policy_definitions_ssldecryption.json'
+
+
+class PolicyDefUTDProfile(PolicyDef):
+    api_path = ApiPath('template/policy/definition/sslutdprofile')
+    store_path = ('policy_definitions', 'SSLUTDProfile')
+
+
+@register('policy_definition', 'SSL decryption UTD profile policy definition', PolicyDefUTDProfile, min_version='20.1')
+class PolicyDefUTDProfileIndex(PolicyDefIndex):
+    api_path = ApiPath('template/policy/definition/sslutdprofile', None, None, None)
+    store_file = 'policy_definitions_sslutdprofile.json'
 
 
 #
@@ -1086,49 +1177,71 @@ class PolicyListTGApiKeyIndex(PolicyListIndex):
     store_file = 'policy_lists_tgapikey.json'
 
 
-# These items showed up in swagger for 19.3 but are not yet configurable
-# class PolicyListTransRules(PolicyList):
-#     api_path = ApiPath('template/policy/list/translationrules')
-#     store_path = ('policy_lists', 'TranslationRules')
+class PolicyListFQDN(PolicyList):
+    api_path = ApiPath('template/policy/list/fqdn')
+    store_path = ('policy_lists', 'FQDN')
+
+
+@register('policy_list', 'FQDN list', PolicyListFQDN, min_version='20.1')
+class PolicyListFQDNIndex(PolicyListIndex):
+    api_path = ApiPath('template/policy/list/fqdn', None, None, None)
+    store_file = 'policy_lists_fqdn.json'
+
+# Shows up in SWAGGER for 20.1 but it is failing to be retrieved
+# class PolicyListDataPrefixFQDN(PolicyList):
+#     api_path = ApiPath('template/policy/list/dataprefixfqdn')
+#     store_path = ('policy_lists', 'DataPrefixFQDN')
 #
 #
-# @register('policy_list', 'translation rules list', PolicyListTransRules)
-# class PolicyListTransRulesIndex(PolicyListIndex):
-#     api_path = ApiPath('template/policy/list/translationrules', None, None, None)
-#     store_file = 'policy_lists_translationrules.json'
-#
-#
-# class PolicyListTransProfile(PolicyList):
-#     api_path = ApiPath('template/policy/list/translationprofile')
-#     store_path = ('policy_lists', 'TranslationProfile')
-#
-#
-# @register('policy_list', 'translation profile list', PolicyListTransProfile)
-# class PolicyListTransProfileIndex(PolicyListIndex):
-#     api_path = ApiPath('template/policy/list/translationprofile', None, None, None)
-#     store_file = 'policy_lists_translationprofile.json'
-#
-#
-# class PolicyListSupervisoryDisk(PolicyList):
-#     api_path = ApiPath('template/policy/list/supervisorydisc')
-#     store_path = ('policy_lists', 'SupervisoryDisk')
-#
-#
-# @register('policy_list', 'supervisory disk list', PolicyListSupervisoryDisk)
-# class PolicyListSupervisoryDiskIndex(PolicyListIndex):
-#     api_path = ApiPath('template/policy/list/supervisorydisc', None, None, None)
-#     store_file = 'policy_lists_supervisorydisc.json'
-#
-#
-# class PolicyListMediaProfile(PolicyList):
-#     api_path = ApiPath('template/policy/list/mediaprofile')
-#     store_path = ('policy_lists', 'MediaProfile')
-#
-#
-# @register('policy_list', 'media profile list', PolicyListMediaProfile)
-# class PolicyListMediaProfileIndex(PolicyListIndex):
-#     api_path = ApiPath('template/policy/list/mediaprofile', None, None, None)
-#     store_file = 'policy_lists_mediaprofile.json'
+# @register('policy_list', 'data prefix FQDN list', PolicyListDataPrefixFQDN)
+# class PolicyListDataPrefixFQDNIndex(PolicyListIndex):
+#    api_path = ApiPath('template/policy/list/dataprefixfqdn', None, None, None)
+#    store_file = 'policy_lists_dataprefixfqdn.json'
+
+
+class PolicyListTransRules(PolicyList):
+    api_path = ApiPath('template/policy/list/translationrules')
+    store_path = ('policy_lists', 'TranslationRules')
+
+
+@register('policy_list', 'translation rules list', PolicyListTransRules, min_version='20.1')
+class PolicyListTransRulesIndex(PolicyListIndex):
+    api_path = ApiPath('template/policy/list/translationrules', None, None, None)
+    store_file = 'policy_lists_translationrules.json'
+
+
+class PolicyListTransProfile(PolicyList):
+    api_path = ApiPath('template/policy/list/translationprofile')
+    store_path = ('policy_lists', 'TranslationProfile')
+
+
+@register('policy_profile', 'translation profile', PolicyListTransProfile, min_version='20.1')
+class PolicyListTransProfileIndex(PolicyListIndex):
+    api_path = ApiPath('template/policy/list/translationprofile', None, None, None)
+    store_file = 'policy_lists_translationprofile.json'
+
+
+class PolicyListSupervisoryDisc(PolicyList):
+    api_path = ApiPath('template/policy/list/supervisorydisc')
+    store_path = ('policy_lists', 'SupervisoryDisconnect')
+
+
+@register('policy_list', 'supervisory disconnect list', PolicyListSupervisoryDisc, min_version='20.1')
+class PolicyListSupervisoryDiscIndex(PolicyListIndex):
+    api_path = ApiPath('template/policy/list/supervisorydisc', None, None, None)
+    store_file = 'policy_lists_supervisorydisconnect.json'
+
+
+class PolicyListMediaProfile(PolicyList):
+    api_path = ApiPath('template/policy/list/mediaprofile')
+    store_path = ('policy_lists', 'MediaProfile')
+
+
+@register('policy_list', 'media profile list', PolicyListMediaProfile, min_version='20.1')
+class PolicyListMediaProfileIndex(PolicyListIndex):
+    api_path = ApiPath('template/policy/list/mediaprofile', None, None, None)
+    store_file = 'policy_lists_mediaprofile.json'
+
 
 #
 # Admin Settings
