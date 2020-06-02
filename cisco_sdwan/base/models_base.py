@@ -10,6 +10,7 @@ from pathlib import Path
 from itertools import zip_longest
 from operator import itemgetter
 from collections import namedtuple
+from typing import Sequence
 from .rest_api import RestAPIException
 
 
@@ -139,8 +140,10 @@ class ConfigItem(ApiItem):
     readonly_tag = 'readOnly'
     owner_tag = 'owner'
     info_tag = 'infoTag'
+    type_tag = None
     post_filtered_tags = None
     skip_cmp_tag_set = set()
+    name_check_regex = re.compile(r'(?=^.{1,128}$)[^&<>! "]+$')
 
     def __init__(self, data):
         """
@@ -161,6 +164,10 @@ class ConfigItem(ApiItem):
     @property
     def is_system(self):
         return self.data.get(self.owner_tag, '') == 'system' or self.data.get(self.info_tag, '') == 'aci'
+
+    @property
+    def type(self):
+        return self.data.get(self.type_tag)
 
     @classmethod
     def get_filename(cls, ext_name, item_name, item_id):
@@ -223,7 +230,7 @@ class ConfigItem(ApiItem):
 
         return True
 
-    def post_data(self, id_mapping_dict, new_name=None, device_template_migration = False):
+    def post_data(self, id_mapping_dict, new_name=None):
         """
         Build payload to be used for POST requests against this config item. From self.data, perform item id
         replacements defined in id_mapping_dict, also remove item id and rename item with new_name (if provided).
@@ -235,6 +242,9 @@ class ConfigItem(ApiItem):
         # Delete keys that shouldn't be on post requests
         filtered_keys = {
             self.id_tag,
+            '@rid',
+            'createdOn',
+            'lastUpdatedOn'
         }
         if self.post_filtered_tags is not None:
             filtered_keys.update(self.post_filtered_tags)
@@ -243,24 +253,6 @@ class ConfigItem(ApiItem):
         # Rename item
         if new_name is not None:
             post_dict[self.name_tag] = new_name
-
-        if device_template_migration:
-            type_mapping = {"banner":"cisco_banner",
-                      "bfd-vedge":"cisco_bfd",
-                      "bgp":"cisco_bgp",
-                      "dhcp-server":"cisco_dhcp_server",
-                      "logging":"cisco_logging",
-                      "ntp":"cisco_ntp",
-                      "omp-vedge":"cisco_omp",
-                      "ospf":"cisco_ospf",
-                      "snmp":"cisco_snmp",
-                      "system-vedge":"cisco_system",
-                      "vpn-vedge":"cisco_vpn",
-                      "vpn-vedge-interface":"cisco_vpn_interface",
-                      "vpn-vedge-interface-gre":"cisco_vpn_interface_gre",
-                      "vpn-vedge-interface-ipsec":"cisco_vpn_interface_ipsec",
-                      "security-vedge":"cisco_security"}
-            post_dict = self._updated_type(type_mapping, post_dict)
 
         return self._update_ids(id_mapping_dict, post_dict)
 
@@ -272,25 +264,24 @@ class ConfigItem(ApiItem):
         <new item id>
         :return: Dict containing payload for PUT requests
         """
-        return self._update_ids(id_mapping_dict, self.data)
+        filtered_keys = {
+            '@rid',
+            'createdOn',
+            'lastUpdatedOn'
+        }
+        put_dict = {k: v for k, v in self.data.items() if k not in filtered_keys}
+
+        return self._update_ids(id_mapping_dict, put_dict)
 
     @staticmethod
     def _update_ids(id_mapping_dict, data_dict):
         def replace_id(match):
             matched_id = match.group(0)
             return id_mapping_dict.get(matched_id, matched_id)
+
         dict_json = re.sub(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}',
                            replace_id, json.dumps(data_dict))
 
-        return json.loads(dict_json)
-
-    @staticmethod
-    def _updated_type(type_mapping, data_dict):
-        def replace_att(match):
-            matched_id = match.group(0)
-            return type_mapping.get(matched_id, matched_id)
-        exp = r'(?<=("templateType"):\s\")[A-Za-z]*((_|-)?[A-Za-z]*)*'
-        dict_json = re.sub(exp, replace_att, json.dumps(data_dict))
         return json.loads(dict_json)
 
     @property
@@ -306,6 +297,44 @@ class ConfigItem(ApiItem):
 
         return set(re.findall(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}',
                               json.dumps(filtered_data)))
+
+    def get_new_name(self, name_template, **kwargs):
+        """
+        Return a new valid name for this item based on the format string template provided. Variable {name} is replaced
+        with the existing item name. Other variables are provided via kwargs.
+        """
+        try:
+            new_name = name_template.format(name=self.data[self.name_tag], **kwargs)
+        except KeyError:
+            return None
+        if self.name_check_regex.search(new_name) is None:
+            return None
+        return new_name
+
+    def find_key(self, key):
+        """
+        Returns a list containing the values of all occurrences of key inside data. Matched values that are dict or list
+        are not included.
+        :param key: Key to search
+        :return: List
+        """
+        match_list = []
+
+        def find_in(json_obj):
+            if isinstance(json_obj, dict):
+                matched_val = json_obj.get(key)
+                if matched_val is not None and not isinstance(matched_val, dict) and not isinstance(matched_val, list):
+                    match_list.append(matched_val)
+                for value in json_obj.values():
+                    find_in(value)
+
+            elif isinstance(json_obj, list):
+                for elem in json_obj:
+                    find_in(elem)
+
+            return match_list
+
+        return find_in(self.data)
 
 
 # Used for IndexConfigItem iter_fields when they follow (<item-id-label>, <item-name-label>) format
@@ -339,6 +368,18 @@ class IndexConfigItem(ConfigItem):
     extended_iter_fields = None
 
     store_path = ('inventory', )
+
+    @classmethod
+    def create(cls, item_list: Sequence[ConfigItem]):
+        def item_dict(item_obj: ConfigItem):
+            return {
+                key: item_obj.data.get(key) for key in cls.iter_fields
+            }
+
+        index_dict = {
+            'data': [item_dict(item) for item in item_list]
+        }
+        return cls(index_dict)
 
     def __iter__(self):
         return self.iter(*self.iter_fields)

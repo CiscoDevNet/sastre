@@ -7,11 +7,19 @@
 import os
 import re
 import argparse
+from datetime import date
 from getpass import getpass
 from pathlib import Path
 from cisco_sdwan.base.catalog import catalog_tags, CATALOG_TAG_ALL
 from cisco_sdwan.base.models_base import filename_safe, DATA_DIR
 from .common import Task
+
+# Default local data store
+DEFAULT_WORKDIR_FORMAT = 'backup_{address}_{date:%Y%m%d}'
+
+
+def default_workdir(address):
+    return DEFAULT_WORKDIR_FORMAT.format(date=date.today(), address=address or 'VMANAGE-ADDRESS')
 
 
 class TaskOptions:
@@ -128,6 +136,14 @@ def non_empty_type(src_str):
         raise argparse.ArgumentTypeError('Value cannot be empty.')
 
     return out_str
+
+
+def version_type(version_str):
+    # Development versions may follow this format: '20.1.999-98'
+    if re.match(r'(\d+[.-])*\d+$', version_str) is None:
+        raise argparse.ArgumentTypeError(f'"{version_str}" is not a valid version identifier.')
+
+    return '.'.join(([str(int(v)) for v in version_str.replace('-', '.').split('.')] + ['0', ])[:2])
 
 
 class EnvVar(argparse.Action):
