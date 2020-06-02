@@ -1,3 +1,14 @@
+Sastre 0.38 [???]
+============================
+
+New features:
+    = Migrate task, allowing migration of feature templates and device templates to be compatible with vManage 20.1.
+
+Enhancements:
+    - vManage information (address, user and password) is no longer required when a task uses a local workdir as
+      source. For instance, list or show-template tasks when --workdir is provided.
+
+
 Sastre 0.37 [April 21, 2020]
 ============================
 

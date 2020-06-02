@@ -4,6 +4,8 @@
  cisco_sdwan.base.models_vmanage
  This module implements vManage API models
 """
+from uuid import uuid4
+from typing import Sequence
 from .catalog import register
 from .models_base import ApiItem, IndexApiItem, ConfigItem, IndexConfigItem, ApiPath, IdName
 
@@ -175,6 +177,22 @@ class CliOrFeatureApiPath:
         return self.api_path_cli if is_cli_template else self.api_path_feature
 
 
+CEDGE_SET = {"vedge-IR-1101", "vedge-ESR-6300", "vedge-ASR-1001-X", "vedge-ASR-1002-X", "vedge-ASR-1002-HX",
+             "vedge-ASR-1001-HX", "vedge-C8500L-8G4X", "vedge-C8500-12X4QC", "vedge-C8500-12X", "vedge-CSR-1000v",
+             "vedge-ISR-4331", "vedge-ISR-4431", "vedge-ISR-4461", "vedge-ISR-4451-X", "vedge-ISR-4321",
+             "vedge-ISR-4351", "vedge-ISR-4221", "vedge-ISR-4221X", "vedge-C1101-4P", "vedge-C1101-4PLTEP",
+             "vedge-C1111-4P", "vedge-C1161X-8P", "vedge-C1111-8P", "vedge-C1121X-8P", "vedge-C1111X-8P",
+             "vedge-C1111-8PW", "vedge-C1111-8PLTEEA", "vedge-C1121-8PLTEPW", "vedge-C1111-8PLTELAW",
+             "vedge-C1111-8PLTEEAW", "vedge-C1111-8PLTELA", "vedge-C1111-4PLTEEA", "vedge-C1101-4PLTEPW",
+             "vedge-C1109-4PLTE2PW", "vedge-C1109-4PLTE2P", "vedge-C1121X-8PLTEP", "vedge-C1161X-8PLTEP",
+             "vedge-C1113-8PMLTEEA", "vedge-C1111-4PLTELA", "vedge-C1116-4P", "vedge-C1116-4PLTEEA", "vedge-C1117-4P",
+             "vedge-C1117-4PM", "vedge-C1117-4PLTEEA", "vedge-C1126X-8PLTEP", "vedge-C1127X-8PLTEP",
+             "vedge-C1127X-8PMLTEP", "vedge-C1127-8PMLTEP", "vedge-C1117-4PLTELA", "vedge-C1117-4PMLTEEA", "vedge-ISRv",
+             "vedge-C8000V", "vedge-ccm", "vedge-C8200-1N-4T", "vedge-C8300-1N1S-4T2X", "vedge-C8300-1N1S-4G2X",
+             "vedge-C8300-1N1S-6T", "vedge-C8300-2N2S-6T", "vedge-C8300-2N2S-4T2X", "vmanage", "vedge-C9500-40X",
+             "vedge-C9500-48Y4C", "vedge-nfvis-ENCS5400", "vedge-nfvis-C8200-UCPE"}
+
+
 class DeviceTemplate(ConfigItem):
     api_path = CliOrFeatureApiPath(
         ApiPath('template/device/object', 'template/device/feature', 'template/device'),
@@ -188,9 +206,39 @@ class DeviceTemplate(ConfigItem):
     skip_cmp_tag_set = {'createdOn', 'createdBy', 'lastUpdatedBy', 'lastUpdatedOn', '@rid', 'owner', 'infoTag',
                         'templateAttached', 'templateConfigurationEdited'}
 
+    def __init__(self, data):
+        # Device templates do not contain an id inside its payload, an artificial id is going to be generated if
+        # queried
+        self.artificial_id = None
+        super().__init__(data)
+
+    @property
+    def uuid(self):
+        # Generate an artificial id the first time the uuid is queried
+        if self.artificial_id is None:
+            self.artificial_id = str(uuid4())
+
+        return self.data.get(self.id_tag, self.artificial_id) if self.id_tag is not None else None
+
     @property
     def is_type_cli(self):
         return self.data.get('configType', 'template') == 'file'
+
+    def contains_template(self, template_type):
+        return template_type in self.find_key('templateType')
+
+    def add_template(self, template_type, template_id):
+        general_templates = self.data.get('generalTemplates')
+        if general_templates is None:
+            return False
+
+        general_templates.append(
+            {
+                "templateType": template_type,
+                "templateId": template_id
+            }
+        )
+        return True
 
 
 @register('template_device', 'device template', DeviceTemplate)
@@ -208,82 +256,27 @@ class DeviceTemplateIndex(IndexConfigItem):
         return device_type != 'vsmart' and num_attached > 0
 
     @staticmethod
-    def is_cedge(*args):
-        device_type,num_attached = args
-        cedge_set = {
-            "vedge-IR-1101",
-            "vedge-ESR-6300",
-            "vedge-ASR-1001-X",
-            "vedge-ASR-1002-X",
-            "vedge-ASR-1002-HX",
-            "vedge-ASR-1001-HX",
-            "vedge-C8500L-8G4X",
-            "vedge-C8500-12X4QC",
-            "vedge-C8500-12X",
-            "vedge-CSR-1000v",
-            "vedge-ISR-4331",
-            "vedge-ISR-4431",
-            "vedge-ISR-4461",
-            "vedge-ISR-4451-X",
-            "vedge-ISR-4321",
-            "vedge-ISR-4351",
-            "vedge-ISR-4221",
-            "vedge-ISR-4221X",
-            "vedge-C1101-4P",
-            "vedge-C1101-4PLTEP",
-            "vedge-C1111-4P",
-            "vedge-C1161X-8P",
-            "vedge-C1111-8P",
-            "vedge-C1121X-8P",
-            "vedge-C1111X-8P",
-            "vedge-C1111-8PW",
-            "vedge-C1111-8PLTEEA",
-            "vedge-C1121-8PLTEPW",
-            "vedge-C1111-8PLTELAW",
-            "vedge-C1111-8PLTEEAW",
-            "vedge-C1111-8PLTELA",
-            "vedge-C1111-4PLTEEA",
-            "vedge-C1101-4PLTEPW",
-            "vedge-C1109-4PLTE2PW",
-            "vedge-C1109-4PLTE2P",
-            "vedge-C1121X-8PLTEP",
-            "vedge-C1161X-8PLTEP",
-            "vedge-C1113-8PMLTEEA",
-            "vedge-C1111-4PLTELA",
-            "vedge-C1116-4P",
-            "vedge-C1116-4PLTEEA",
-            "vedge-C1117-4P",
-            "vedge-C1117-4PM",
-            "vedge-C1117-4PLTEEA",
-            "vedge-C1126X-8PLTEP",
-            "vedge-C1127X-8PLTEP",
-            "vedge-C1127X-8PMLTEP",
-            "vedge-C1127-8PMLTEP",
-            "vedge-C1117-4PLTELA",
-            "vedge-C1117-4PMLTEEA",
-            "vedge-ISRv",
-            "vedge-C8000V",
-            "vedge-ccm",
-            "vedge-C8200-1N-4T",
-            "vedge-C8300-1N1S-4T2X",
-            "vedge-C8300-1N1S-4G2X",
-            "vedge-C8300-1N1S-6T",
-            "vedge-C8300-2N2S-6T",
-            "vedge-C8300-2N2S-4T2X",
-            "vmanage",
-            "vedge-C9500-40X",
-            "vedge-C9500-48Y4C",
-            "vedge-nfvis-ENCS5400",
-            "vedge-nfvis-C8200-UCPE"
-        }
-
-        return device_type in cedge_set
+    def is_cedge(device_type, num_attached):
+        return device_type in CEDGE_SET
 
     def filtered_iter(self, filter_fn):
         return (
             (item_id, item_name) for item_type, item_attached, item_id, item_name
             in self.iter('deviceType', 'devicesAttached', *self.iter_fields) if filter_fn(item_type, item_attached)
         )
+
+    @classmethod
+    def create(cls, item_list: Sequence[ConfigItem]):
+        def item_dict(item_obj: ConfigItem):
+            return {
+                'templateId': item_obj.uuid,
+                'templateName': item_obj.name
+            }
+
+        index_dict = {
+            'data': [item_dict(item) for item in item_list]
+        }
+        return cls(index_dict)
 
 
 # This is a special case handled under DeviceTemplate
@@ -343,8 +336,20 @@ class FeatureTemplate(ConfigItem):
     store_file = '{item_name}.json'
     id_tag = 'templateId'
     name_tag = 'templateName'
+    type_tag = 'templateType'
     skip_cmp_tag_set = {'createdOn', 'createdBy', 'lastUpdatedBy', 'lastUpdatedOn', '@rid', 'owner', 'infoTag',
                         'devicesAttached', 'attachedMastersCount'}
+
+    @property
+    def device_type_set(self):
+        return set(self.data.get('deviceType', []))
+
+    @property
+    def masters_attached(self):
+        """
+        Returns number of device templates (i.e. master templates) that utilize this feature template
+        """
+        return self.data.get('attachedMastersCount')
 
 
 @register('template_feature', 'feature template', FeatureTemplate)
@@ -352,128 +357,29 @@ class FeatureTemplateIndex(IndexConfigItem):
     api_path = ApiPath('template/feature', None, None, None)
     store_file = 'feature_templates.json'
     iter_fields = IdName('templateId', 'templateName')
-    feature_atts = [
-        "templateId",
-        "templateName",
-        "templateDescription",
-        "templateType",
-        "deviceType",
-        "lastUpdatedBy",
-        "lastUpdatedOn",
-        "factoryDefault",
-        "devicesAttached",
-        "attachedMastersCount",
-        "templateMinVersion",
-        "configType",
-        "createdBy",
-        "createdOn",
-        "templateDefinition"
-    ]
-
 
     @staticmethod
-    def is_default(*args):
-        _,_,_,_,_,_,_,factory_default,*_=args
-        return factory_default
+    def filter_type_default(desired_type: str, desired_is_default: bool, item_type: str, item_is_default: bool) -> bool:
+        """
+        Intended to be used along with partial to create a filter_fn that matches on desired_type and
+        desired_is_default values. Partial locks the desired_type and desired_is_default parameters.
+        :param desired_type: Desired feature templateType
+        :param desired_is_default: Whether to match only factoryDefault templates
+        :param item_type: templateType from feature template being matched
+        :param item_is_default: factoryDefault from feature template being matched
+        :returns: True if conditions matched, false otherwise
+        """
+        if desired_is_default and not item_is_default:
+            return False
 
-    @staticmethod
-    def needs_migration(*args):
-        _,_,_,item_type,device_type,_,_,factory_default,_,item_attached,_,config_type,_,_,_ = args
-        cedge_set = {
-            "vedge-IR-1101",
-            "vedge-ESR-6300",
-            "vedge-ASR-1001-X",
-            "vedge-ASR-1002-X",
-            "vedge-ASR-1002-HX",
-            "vedge-ASR-1001-HX",
-            "vedge-C8500L-8G4X",
-            "vedge-C8500-12X4QC",
-            "vedge-C8500-12X",
-            "vedge-CSR-1000v",
-            "vedge-ISR-4331",
-            "vedge-ISR-4431",
-            "vedge-ISR-4461",
-            "vedge-ISR-4451-X",
-            "vedge-ISR-4321",
-            "vedge-ISR-4351",
-            "vedge-ISR-4221",
-            "vedge-ISR-4221X",
-            "vedge-C1101-4P",
-            "vedge-C1101-4PLTEP",
-            "vedge-C1111-4P",
-            "vedge-C1161X-8P",
-            "vedge-C1111-8P",
-            "vedge-C1121X-8P",
-            "vedge-C1111X-8P",
-            "vedge-C1111-8PW",
-            "vedge-C1111-8PLTEEA",
-            "vedge-C1121-8PLTEPW",
-            "vedge-C1111-8PLTELAW",
-            "vedge-C1111-8PLTEEAW",
-            "vedge-C1111-8PLTELA",
-            "vedge-C1111-4PLTEEA",
-            "vedge-C1101-4PLTEPW",
-            "vedge-C1109-4PLTE2PW",
-            "vedge-C1109-4PLTE2P",
-            "vedge-C1121X-8PLTEP",
-            "vedge-C1161X-8PLTEP",
-            "vedge-C1113-8PMLTEEA",
-            "vedge-C1111-4PLTELA",
-            "vedge-C1116-4P",
-            "vedge-C1116-4PLTEEA",
-            "vedge-C1117-4P",
-            "vedge-C1117-4PM",
-            "vedge-C1117-4PLTEEA",
-            "vedge-C1126X-8PLTEP",
-            "vedge-C1127X-8PLTEP",
-            "vedge-C1127X-8PMLTEP",
-            "vedge-C1127-8PMLTEP",
-            "vedge-C1117-4PLTELA",
-            "vedge-C1117-4PMLTEEA",
-            "vedge-ISRv",
-            "vedge-C8000V",
-            "vedge-ccm",
-            "vedge-C8200-1N-4T",
-            "vedge-C8300-1N1S-4T2X",
-            "vedge-C8300-1N1S-4G2X",
-            "vedge-C8300-1N1S-6T",
-            "vedge-C8300-2N2S-6T",
-            "vedge-C8300-2N2S-4T2X",
-            "vmanage",
-            "vedge-C9500-40X",
-            "vedge-C9500-48Y4C",
-            "vedge-nfvis-ENCS5400",
-            "vedge-nfvis-C8200-UCPE"
-        }
-        old_templates = {
-            "banner",
-            "bfd-vedge",
-            "bgp",
-            "dhcp-server",
-            "logging",
-            "ntp",
-            "omp-vedge",
-            "ospf",
-            "security-vedge",
-            "snmp",
-            "system-vedge",
-            "vpn-vedge",
-            "vpn-vedge-interface-gre",
-            "vpn-vedge-interface-ipsec",
-            "vpn-vedge-interface"
-        }
-        device_found = False
-        for d in device_type:
-            if d in cedge_set:
-                device_found = True
-                break
-        return item_type in old_templates and item_attached > 0 and device_found and factory_default is False
+        return desired_type == item_type
 
     def filtered_iter(self, filter_fn):
         return (
-            attributes for attributes
-            in self.iter(*self.feature_atts) if filter_fn(*attributes)
+            (item_id, item_name) for item_type, item_is_default, item_id, item_name
+            in self.iter('templateType', 'factoryDefault', *self.iter_fields) if filter_fn(item_type, item_is_default)
         )
+
 
 #
 # Policy vSmart
@@ -484,6 +390,7 @@ class PolicyVsmart(ConfigItem):
     store_path = ('policy_templates', 'vSmart')
     store_file = '{item_name}.json'
     name_tag = 'policyName'
+    type_tag = 'policyType'
     skip_cmp_tag_set = {'isPolicyActivated', }
 
 
@@ -514,6 +421,7 @@ class PolicyVedge(ConfigItem):
     store_path = ('policy_templates', 'vEdge')
     store_file = '{item_name}.json'
     name_tag = 'policyName'
+    type_tag = 'policyType'
 
 
 @register('policy_vedge', 'edge policy', PolicyVedge)
@@ -532,6 +440,7 @@ class PolicySecurity(ConfigItem):
     store_path = ('policy_templates', 'Security')
     store_file = '{item_name}.json'
     name_tag = 'policyName'
+    type_tag = 'policyType'
 
 
 @register('policy_security', 'security policy', PolicySecurity)
@@ -550,6 +459,7 @@ class PolicyVoice(ConfigItem):
     store_path = ('policy_templates', 'Voice')
     store_file = '{item_name}.json'
     name_tag = 'policyName'
+    type_tag = 'policyType'
 
 
 @register('policy_voice', 'voice policy', PolicyVoice, min_version='20.1')
@@ -568,6 +478,7 @@ class PolicyCustomApp(ConfigItem):
     store_path = ('policy_templates', 'CustomApp')
     store_file = '{item_name}.json'
     name_tag = 'policyName'
+    type_tag = 'policyType'
 
 
 @register('policy_customapp', 'custom application policy', PolicyCustomApp, min_version='20.1')
@@ -586,6 +497,7 @@ class PolicyDef(ConfigItem):
     store_file = '{item_name}.json'
     id_tag = 'definitionId'
     name_tag = 'name'
+    type_tag = 'type'
     skip_cmp_tag_set = {'lastUpdated', 'referenceCount', 'references', 'activatedId', 'isActivatedByVsmart',
                         'owner', 'infoTag'}
 
@@ -890,6 +802,7 @@ class PolicyList(ConfigItem):
     store_file = '{item_name}.json'
     id_tag = 'listId'
     name_tag = 'name'
+    type_tag = 'type'
     skip_cmp_tag_set = {'lastUpdated', 'referenceCount', 'references', 'activatedId', 'isActivatedByVsmart',
                         'owner', 'infoTag'}
 

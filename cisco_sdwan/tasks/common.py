@@ -88,11 +88,15 @@ class Task:
         return msg.format(tally=', '.join(msg_list))
 
     @staticmethod
-    def parser(default_workdir, task_args):
+    def parser(task_args, **kwargs):
         raise NotImplementedError()
 
+    @staticmethod
+    def is_api_required(parsed_args):
+        return True
+
     @classmethod
-    def runner(cls, api, parsed_args):
+    def runner(cls, parsed_args, api):
         raise NotImplementedError()
 
     @classmethod
@@ -117,6 +121,17 @@ class Task:
             for tag, info, index_cls, item_cls in catalog_entry_iter
         )
         return ((tag, info, index, item_cls) for tag, info, index, item_cls in all_index_iter if index is not None)
+
+    @staticmethod
+    def item_get(item_cls, backend, item_id, item_name, ext_name):
+        if isinstance(backend, Rest):
+            return item_cls.get(backend, item_id)
+        else:
+            return item_cls.load(backend, ext_name, item_name, item_id)
+
+    @staticmethod
+    def index_get(index_cls, backend):
+        return index_cls.get(backend) if isinstance(backend, Rest) else index_cls.load(backend)
 
     @classmethod
     def attach_template(cls, api, workdir, ext_name, templates_iter, target_uuid_set=None):
@@ -349,7 +364,12 @@ class Task:
         return result
 
 
-class WaitActionsException(Exception):
+class TaskException(Exception):
+    """ Exception for Task errors """
+    pass
+
+
+class WaitActionsException(TaskException):
     """ Exception indicating failure in one or more actions being monitored """
     pass
 
