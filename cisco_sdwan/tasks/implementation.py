@@ -4,7 +4,7 @@
  cisco_sdwan.tasks.implementation
  This module contains the implementation of user-facing tasks
 """
-__all__ = ['TaskBackup', 'TaskRestore', 'TaskDelete', 'TaskCertificate', 'TaskList', 'TaskShowTemplate']
+__all__ = ['TaskBackup', 'TaskRestore', 'TaskDelete', 'TaskCertificate', 'TaskList', 'TaskShowTemplate', 'TaskMigrate']
 
 import argparse
 from pathlib import Path
