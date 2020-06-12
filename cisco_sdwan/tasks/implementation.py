@@ -7,14 +7,12 @@
 __all__ = ['TaskBackup', 'TaskRestore', 'TaskDelete', 'TaskCertificate', 'TaskList', 'TaskShowTemplate']
 
 import argparse
-from shutil import rmtree
 from pathlib import Path
 from uuid import uuid4
-from datetime import date
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import RestAPIException, is_version_newer
 from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL, ordered_tags
-from cisco_sdwan.base.models_base import UpdateEval, filename_safe, update_ids, DATA_DIR, ServerInfo
+from cisco_sdwan.base.models_base import UpdateEval, filename_safe, update_ids, ServerInfo
 from cisco_sdwan.base.models_vmanage import (DeviceTemplate, DeviceTemplateAttached, DeviceTemplateValues,
                                              DeviceTemplateIndex, FeatureTemplate, PolicyVsmartIndex, EdgeInventory,
                                              ControlInventory, EdgeCertificate, EdgeCertificateSync, SettingsVbond)
@@ -24,7 +22,7 @@ from cisco_sdwan.migration.feature_migration import FeatureProcessor
 from cisco_sdwan.migration.device_migration import DeviceProcessor
 from .utils import (TaskOptions, TagOptions, ShowOptions, existing_file_type, filename_type, regex_type, uuid_type,
                     version_type, default_workdir)
-from .common import regex_search, Task, Table, WaitActionsException, TaskException
+from .common import regex_search, clean_dir, Task, Table, WaitActionsException, TaskException
 
 
 @TaskOptions.register('backup')
@@ -37,7 +35,11 @@ class TaskBackup(Task):
 
         task_parser.add_argument('--workdir', metavar='<directory>', type=filename_type,
                                  default=default_workdir(target_address),
-                                 help=f'Backup destination (default will be "{default_workdir(target_address)}").')
+                                 help='Backup destination (default: %(default)s).')
+        task_parser.add_argument('--no-rollover', action='store_true',
+                                 help='By default, if workdir already exists (before a new backup is saved) the old '
+                                      'workdir is renamed using a rolling naming scheme. This option disables this '
+                                      'automatic rollover.')
         task_parser.add_argument('--regex', metavar='<regex>', type=regex_type,
                                  help='Regular expression matching item names to be backed up, within selected tags.')
         task_parser.add_argument('tags', metavar='<tag>', nargs='+', type=TagOptions.tag,
@@ -51,7 +53,7 @@ class TaskBackup(Task):
         cls.log_info('Starting backup: vManage URL: "%s" -> Local workdir: "%s"', api.base_url, parsed_args.workdir)
 
         # Backup workdir must be empty for a new backup
-        saved_workdir = cls.clean_workdir(parsed_args.workdir)
+        saved_workdir = clean_dir(parsed_args.workdir, max_saved=0 if parsed_args.no_rollover else 99)
         if saved_workdir:
             cls.log_info('Previous backup under "%s" was saved as "%s"', parsed_args.workdir, saved_workdir)
 
@@ -108,21 +110,6 @@ class TaskBackup(Task):
                     except RestAPIException as ex:
                         cls.log_error('Failed backup %s %s values: %s', info, item_name, ex)
 
-    @staticmethod
-    def clean_workdir(workdir, max_saved=99):
-        workdir_path = Path(DATA_DIR, workdir)
-        if workdir_path.exists():
-            save_seq = range(max_saved)
-            for elem in save_seq:
-                save_path = Path(DATA_DIR, '{workdir}_{count}'.format(workdir=workdir, count=elem+1))
-                if elem == save_seq[-1]:
-                    rmtree(save_path, ignore_errors=True)
-                if not save_path.exists():
-                    workdir_path.rename(save_path)
-                    return save_path.name
-
-        return False
-
 
 @TaskOptions.register('restore')
 class TaskRestore(Task):
@@ -134,7 +121,7 @@ class TaskRestore(Task):
 
         task_parser.add_argument('--workdir', metavar='<directory>', type=existing_file_type,
                                  default=default_workdir(target_address),
-                                 help=f'Restore source (default will be "{default_workdir(target_address)}").')
+                                 help='Restore source (default: %(default)s).')
         task_parser.add_argument('--regex', metavar='<regex>', type=regex_type,
                                  help='Regular expression matching item names to be restored, within selected tags.')
         xor_group = task_parser.add_mutually_exclusive_group(required=False)
@@ -442,7 +429,7 @@ class TaskCertificate(Task):
         restore_parser.set_defaults(source_iter=TaskCertificate.restore_iter)
         restore_parser.add_argument('--workdir', metavar='<directory>', type=existing_file_type,
                                     default=default_workdir(target_address),
-                                    help=f'Restore source (default will be "{default_workdir(target_address)}").')
+                                    help='Restore source (default: %(default)s).')
 
         set_parser = sub_tasks.add_parser('set', help='Set status to provided value.')
         set_parser.set_defaults(source_iter=TaskCertificate.set_iter)
@@ -739,31 +726,28 @@ class TaskShowTemplate(Task):
 class TaskMigrate(Task):
     @staticmethod
     def parser(task_args, target_address=None):
-        default_output = 'migrated_{date:%Y%m%d}'.format(date=date.today())
-
         task_parser = argparse.ArgumentParser(description=f'{title}\nMigrate task:')
         task_parser.prog = f'{task_parser.prog} migrate'
         task_parser.formatter_class = argparse.RawDescriptionHelpFormatter
 
+        task_parser.add_argument('scope', choices=['all', 'attached'],
+                                 help='Select whether to evaluate all feature templates, or only feature templates '
+                                      'attached to device templates.')
+        task_parser.add_argument('output', metavar='<directory>', type=filename_type,
+                                 help='Directory to save migrated templates.')
+        task_parser.add_argument('--no-rollover', action='store_true',
+                                 help='By default, if the output directory already exists it is renamed using a '
+                                      'rolling naming scheme. This option disables this automatic rollover.')
         task_parser.add_argument('--name', metavar='<format>', default='migrated_{name}',
-                                 help='Format used to name migrated templates. Variable {name} is replaced with the '
-                                      'original template name. Default is "migrated_{name}".')
+                                 help='Format used to name the migrated templates (default: %(default)s). '
+                                      'Variable {name} is replaced with the original template name.')
         task_parser.add_argument('--from', metavar='<version>', type=version_type, dest='from_version', default='18.4',
-                                 help='vManage version from source templates. Default is 18.4.')
+                                 help='vManage version from source templates (default: %(default)s).')
         task_parser.add_argument('--to', metavar='<version>', type=version_type, dest='to_version', default='20.1',
-                                 help='Target vManage version for template migration. Default is 20.1.')
-        task_parser.add_argument('--out', metavar='<directory>', type=filename_type, dest='output',
-                                 default=default_output,
-                                 help=f'Destination for migrated templates (default will be "{default_output}").')
+                                 help='Target vManage version for template migration (default: %(default)s).')
         task_parser.add_argument('--workdir', metavar='<directory>', type=existing_file_type,
-                                 help='If provided, migrate will read from the specified directory instead of '
-                                      'the target vManage.')
-        task_parser.add_argument('--regex', metavar='<regex>', type=regex_type,
-                                 help='Regular expression matching the name of feature templates to be evaluated for '
-                                      'migration. If not defined, all feature templates are evaluated.')
-        task_parser.add_argument('--all', action='store_true',
-                                 help='By default, only feature templates attached to device templates are evaluated. '
-                                      'With this setting, all feature templates are evaluated.')
+                                 help='If provided, migrate will read from the specified directory. '
+                                      'Otherwise it reads from the target vManage.')
 
         return task_parser.parse_args(task_args)
 
@@ -776,6 +760,11 @@ class TaskMigrate(Task):
         source_info = f'Local workdir: "{parsed_args.workdir}"' if api is None else f'vManage URL: "{api.base_url}"'
         cls.log_info('Starting migrate: %s %s -> %s Local output dir: "%s"', source_info, parsed_args.from_version,
                      parsed_args.to_version, parsed_args.output)
+
+        # Output directory must be empty for a new migration
+        saved_output = clean_dir(parsed_args.output, max_saved=0 if parsed_args.no_rollover else 99)
+        if saved_output:
+            cls.log_info('Previous migration under "%s" was saved as "%s"', parsed_args.output, saved_output)
 
         if api is None:
             backend = parsed_args.workdir
@@ -822,17 +811,17 @@ class TaskMigrate(Task):
                                 raise StopProcessorException()
 
                             cls.log_debug('Evaluating %s %s', info, item_name)
-                            if not item_processor.is_in_scope(item, migrate_all=parsed_args.all):
+                            if not item_processor.is_in_scope(item, migrate_all=(parsed_args.scope == 'all')):
                                 cls.log_debug('Skipping %s, migration not necessary', item_name)
                                 raise StopProcessorException()
 
-                            new_name = item.get_new_name(parsed_args.name)
-                            if new_name is None:
+                            new_name, is_valid = item.get_new_name(parsed_args.name)
+                            if not is_valid:
                                 cls.log_error('New %s name is not valid: %s', info, new_name)
                                 is_bad_name = True
                                 raise StopProcessorException()
                             if new_name in name_set:
-                                cls.log_error('New %s name conflicts with an existing one: %s', info, new_name)
+                                cls.log_error('New %s name conflicts with: %s', info, new_name)
                                 is_bad_name = True
                                 raise StopProcessorException()
 
@@ -850,15 +839,16 @@ class TaskMigrate(Task):
                             id_hint_map[new_name] = new_id
 
                             if item_processor.replace_original():
-                                cls.log_info('Migrated %s %s as %s', info, item_name, new_name)
+                                cls.log_debug('Migrated replaces original: %s -> %s', item_name, new_name)
                                 item = new_item
                             else:
+                                cls.log_debug('Migrated adds to original: %s + %s', item_name, new_name)
                                 export_list.append(new_item)
 
                         except StopProcessorException:
                             pass
-                        finally:
-                            export_list.append(item)
+
+                        export_list.append(item)
 
                     if is_bad_name:
                         raise TaskException(f'One or more new {info} names are not valid')

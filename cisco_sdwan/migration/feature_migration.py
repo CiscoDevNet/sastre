@@ -201,8 +201,7 @@ class FeatureProcessor(Processor):
         migrated_payload['templateId'] = new_id
         migrated_payload['deviceType'] = list(feature_template.device_types - DEVICE_TYPES_TO_FILTER)
 
-        trace_log.append(f'Updated name: {old_name} -> {new_name}')
-
+        # Update list of device types on original feature template
         feature_template.device_types = feature_template.device_types & DEVICE_TYPES_TO_FILTER
 
         return migrated_payload, trace_log
