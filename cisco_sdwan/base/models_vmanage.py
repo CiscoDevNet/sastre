@@ -4,8 +4,7 @@
  cisco_sdwan.base.models_vmanage
  This module implements vManage API models
 """
-from uuid import uuid4
-from typing import Sequence
+from typing import Iterable, Set
 from .catalog import register
 from .models_base import ApiItem, IndexApiItem, ConfigItem, IndexConfigItem, ApiPath, IdName
 
@@ -200,45 +199,21 @@ class DeviceTemplate(ConfigItem):
     )
     store_path = ('device_templates', 'template')
     store_file = '{item_name}.json'
-    id_tag = 'templateId'
     name_tag = 'templateName'
     post_filtered_tags = ('feature', )
     skip_cmp_tag_set = {'createdOn', 'createdBy', 'lastUpdatedBy', 'lastUpdatedOn', '@rid', 'owner', 'infoTag',
                         'templateAttached', 'templateConfigurationEdited'}
 
-    def __init__(self, data):
-        # Device templates do not contain an id inside its payload, an artificial id is going to be generated if
-        # queried
-        self.artificial_id = None
-        super().__init__(data)
-
-    @property
-    def uuid(self):
-        # Generate an artificial id the first time the uuid is queried
-        if self.artificial_id is None:
-            self.artificial_id = str(uuid4())
-
-        return self.data.get(self.id_tag, self.artificial_id) if self.id_tag is not None else None
-
     @property
     def is_type_cli(self):
         return self.data.get('configType', 'template') == 'file'
 
+    @property
+    def is_cedge(self):
+        return self.data['deviceType'] in CEDGE_SET
+
     def contains_template(self, template_type):
         return template_type in self.find_key('templateType')
-
-    def add_template(self, template_type, template_id):
-        general_templates = self.data.get('generalTemplates')
-        if general_templates is None:
-            return False
-
-        general_templates.append(
-            {
-                "templateType": template_type,
-                "templateId": template_id
-            }
-        )
-        return True
 
 
 @register('template_device', 'device template', DeviceTemplate)
@@ -264,19 +239,6 @@ class DeviceTemplateIndex(IndexConfigItem):
             (item_id, item_name) for item_type, item_attached, item_id, item_name
             in self.iter('deviceType', 'devicesAttached', *self.iter_fields) if filter_fn(item_type, item_attached)
         )
-
-    @classmethod
-    def create(cls, item_list: Sequence[ConfigItem]):
-        def item_dict(item_obj: ConfigItem):
-            return {
-                'templateId': item_obj.uuid,
-                'templateName': item_obj.name
-            }
-
-        index_dict = {
-            'data': [item_dict(item) for item in item_list]
-        }
-        return cls(index_dict)
 
 
 # This is a special case handled under DeviceTemplate
@@ -341,11 +303,15 @@ class FeatureTemplate(ConfigItem):
                         'devicesAttached', 'attachedMastersCount'}
 
     @property
-    def device_type_set(self):
+    def device_types(self) -> Set[str]:
         return set(self.data.get('deviceType', []))
 
+    @device_types.setter
+    def device_types(self, device_type_iter: Iterable[str]) -> None:
+        self.data['deviceType'] = [device_type for device_type in device_type_iter]
+
     @property
-    def masters_attached(self):
+    def masters_attached(self) -> int:
         """
         Returns number of device templates (i.e. master templates) that utilize this feature template
         """

@@ -10,7 +10,7 @@ from pathlib import Path
 from itertools import zip_longest
 from operator import itemgetter
 from collections import namedtuple
-from typing import Sequence
+from typing import Sequence, Dict
 from .rest_api import RestAPIException
 
 
@@ -180,7 +180,7 @@ class ConfigItem(ApiItem):
         return cls.store_file.format(item_name=safe_name, item_id=item_id)
 
     @classmethod
-    def load(cls, node_dir, ext_name=False, item_name=None, item_id=None, raise_not_found=False):
+    def load(cls, node_dir, ext_name=False, item_name=None, item_id=None, raise_not_found=False, use_root_dir=True):
         """
         Factory method that loads data from a json file and returns a ConfigItem instance with that data
 
@@ -190,9 +190,11 @@ class ConfigItem(ApiItem):
         :param item_name: (Optional) Name of the item being loaded. Variable used to build the filename.
         :param item_id: (Optional) UUID for the item being loaded. Variable used to build the filename.
         :param raise_not_found: (Optional) If set to True, raise FileNotFoundError if file is not found.
+        :param use_root_dir: True indicates that node_dir is under the root_dir. When false, item should be located
+                             directly under node_dir/store_path
         :return: ConfigItem object, or None if file does not exist and raise_not_found=False
         """
-        dir_path = Path(cls.root_dir, node_dir, *cls.store_path)
+        dir_path = Path(cls.root_dir, node_dir, *cls.store_path) if use_root_dir else Path(node_dir, *cls.store_path)
         file_path = dir_path.joinpath(cls.get_filename(ext_name, item_name, item_id))
         try:
             with open(file_path, 'r') as read_f:
@@ -254,7 +256,7 @@ class ConfigItem(ApiItem):
         if new_name is not None:
             post_dict[self.name_tag] = new_name
 
-        return self._update_ids(id_mapping_dict, post_dict)
+        return update_ids(id_mapping_dict, post_dict)
 
     def put_data(self, id_mapping_dict):
         """
@@ -271,18 +273,7 @@ class ConfigItem(ApiItem):
         }
         put_dict = {k: v for k, v in self.data.items() if k not in filtered_keys}
 
-        return self._update_ids(id_mapping_dict, put_dict)
-
-    @staticmethod
-    def _update_ids(id_mapping_dict, data_dict):
-        def replace_id(match):
-            matched_id = match.group(0)
-            return id_mapping_dict.get(matched_id, matched_id)
-
-        dict_json = re.sub(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}',
-                           replace_id, json.dumps(data_dict))
-
-        return json.loads(dict_json)
+        return update_ids(id_mapping_dict, put_dict)
 
     @property
     def id_references_set(self):
@@ -370,10 +361,10 @@ class IndexConfigItem(ConfigItem):
     store_path = ('inventory', )
 
     @classmethod
-    def create(cls, item_list: Sequence[ConfigItem]):
+    def create(cls, item_list: Sequence[ConfigItem], id_hint_dict: Dict[str, str]):
         def item_dict(item_obj: ConfigItem):
             return {
-                key: item_obj.data.get(key) for key in cls.iter_fields
+                key: item_obj.data.get(key, id_hint_dict.get(item_obj.name)) for key in cls.iter_fields
             }
 
         index_dict = {
@@ -463,6 +454,17 @@ def filename_safe(name, lower=False):
     # Inspired by Django's slugify function
     cleaned = re.sub(r'[^\w\s-]', '_', name)
     return cleaned.lower() if lower else cleaned
+
+
+def update_ids(id_mapping_dict, item_data):
+    def replace_id(match):
+        matched_id = match.group(0)
+        return id_mapping_dict.get(matched_id, matched_id)
+
+    dict_json = re.sub(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}',
+                       replace_id, json.dumps(item_data))
+
+    return json.loads(dict_json)
 
 
 class ModelException(Exception):

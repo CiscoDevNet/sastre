@@ -31,7 +31,7 @@ _tag_dependency_list = [
 ]
 
 
-def ordered_tags(tag, single=False):
+def ordered_tags(tag, single=False, reverse=False):
     """
     Generator which yields the specified tag plus any 'child' tags (i.e. dependent tags), following the order in which
     items need to be removed based on their dependencies (e.g. template_device before template_feature). The overall
@@ -39,10 +39,11 @@ def ordered_tags(tag, single=False):
     If special tag 'all' is used, all items from _tag_dependency_list are yielded.
     :param tag: tag string or 'all'
     :param single: Optional, when True only a the one (first) tag is yielded. Used mainly for convenience of the caller.
+    :param reverse: If true, yield tags in reverse order
     :return: Selected tags in order, as per _tag_dependency_list
     """
     find_tag = (tag == CATALOG_TAG_ALL)
-    for item in _tag_dependency_list:
+    for item in _tag_dependency_list if not reverse else reversed(_tag_dependency_list):
         if not find_tag:
             if item == tag:
                 find_tag = True

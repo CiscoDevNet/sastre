@@ -1,7 +1,7 @@
 from copy import deepcopy
 from collections import Hashable
 from cisco_sdwan.base.processor import Operation, Processor, ProcessorException
-from . import module_dir
+from . import module_dir, factory_cedge_aaa, factory_cedge_global
 
 
 _operations = {}  # {<operation_key>: Operation ...}
@@ -100,6 +100,20 @@ def op_remove(template_data, field_hierarchy_list, value):
     return op_trace
 
 
+def add_template(payload_dict: dict, template_type: str, template_id: str) -> bool:
+    general_templates = payload_dict.get('generalTemplates')
+    if general_templates is None:
+        return False
+
+    general_templates.append(
+        {
+            "templateType": template_type,
+            "templateId": template_id
+        }
+    )
+    return True
+
+
 class DeviceProcessor(Processor):
     recipe_file = module_dir().joinpath('device_template_recipes.json')
 
@@ -124,9 +138,24 @@ class DeviceProcessor(Processor):
 
         super().__init__(matched_recipes)
 
-    def eval(self, device_template, new_name):
+    def is_in_scope(self, device_template, **kwargs):
+        return device_template.is_cedge
+
+    def eval(self, device_template, new_name, new_id):
         migrated_payload = deepcopy(device_template.data)
         trace_log = []
+
+        old_name = device_template.name
+
+        if not device_template.contains_template('cedge_aaa'):
+            if not add_template(migrated_payload, 'cedge_aaa', factory_cedge_aaa.uuid):
+                raise ProcessorException(f'Unable to attach cedge_aaa factory default to {old_name}')
+            trace_log.append(f'Attached cedge_aaa factory default to {old_name}')
+
+        if not device_template.contains_template('cedge_global'):
+            if not add_template(migrated_payload, 'cedge_global', factory_cedge_global.uuid):
+                raise ProcessorException(f'Unable to attach cedge_global factory default to {old_name}')
+            trace_log.append(f'Attached cedge_global factory default to {old_name}')
 
         for recipe in self.data:
             for task in recipe['listOfTasks']:
@@ -139,12 +168,13 @@ class DeviceProcessor(Processor):
                 op_trace = op.handler_fn(migrated_payload, *param_values)
                 trace_log.extend(op_trace)
 
-            if 'templateClass' in migrated_payload:
-                migrated_payload['templateClass'] = 'cedge'
-            else:
-                trace_log.append('No templateClass in {name}'.format(name=migrated_payload['templateName']))
+        if 'templateClass' in migrated_payload:
+            migrated_payload['templateClass'] = 'cedge'
+        else:
+            trace_log.append(f'No templateClass in {old_name}')
 
-            migrated_payload['templateName'] = new_name
-            trace_log.append('Updated name: {name}'.format(name=migrated_payload['templateName']))
+        migrated_payload['templateName'] = new_name
+
+        trace_log.append(f'Updated name: {old_name} -> {new_name}')
 
         return migrated_payload, trace_log
