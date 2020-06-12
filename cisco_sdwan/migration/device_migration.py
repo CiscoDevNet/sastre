@@ -175,6 +175,4 @@ class DeviceProcessor(Processor):
 
         migrated_payload['templateName'] = new_name
 
-        trace_log.append(f'Updated name: {old_name} -> {new_name}')
-
         return migrated_payload, trace_log

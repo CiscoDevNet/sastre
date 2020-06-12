@@ -28,7 +28,7 @@ Notes:
 ### Base parameters
 
     % sdwan -h
-    usage: sdwan.py [-h] [-a <vmanage-ip>] [-u <user>] [-p <password>] [--port <port>] [--timeout <timeout>] [--verbose] [--version] <task> ...
+    usage: sdwan [-h] [-a <vmanage-ip>] [-u <user>] [-p <password>] [--port <port>] [--timeout <timeout>] [--verbose] [--version] <task> ...
     
     Sastre - Automation Tools for Cisco SD-WAN Powered by Viptela
     

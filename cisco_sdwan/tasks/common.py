@@ -8,9 +8,12 @@ import logging
 import time
 import csv
 import re
+from pathlib import Path
+from shutil import rmtree
 from itertools import repeat
 from collections import namedtuple
 from cisco_sdwan.base.rest_api import Rest, RestAPIException
+from cisco_sdwan.base.models_base import DATA_DIR
 from cisco_sdwan.base.models_vmanage import (DeviceTemplate, DeviceTemplateValues, DeviceTemplateAttached,
                                              DeviceTemplateAttach, DeviceTemplateCLIAttach, DeviceModeCli,
                                              ActionStatus, PolicyVsmartStatus, PolicyVsmartStatusException,
@@ -417,3 +420,27 @@ class Table:
             writer = csv.writer(csv_file)
             writer.writerow(self.header)
             writer.writerows(self._rows)
+
+
+def clean_dir(target_dir_name, max_saved=99):
+    """
+    Clean target_dir_name directory if it exists. If max_saved is non-zero and target_dir_name exists, move it to a new
+    directory name in sequence.
+    :param target_dir_name: str with the directory to be cleaned
+    :param max_saved: int indicating the maximum instances to keep. If 0, target_dir_name is just deleted.
+    """
+    target_dir = Path(DATA_DIR, target_dir_name)
+    if target_dir.exists():
+        if max_saved > 0:
+            save_seq = range(max_saved)
+            for elem in save_seq:
+                save_path = Path(DATA_DIR, '{workdir}_{count}'.format(workdir=target_dir_name, count=elem+1))
+                if elem == save_seq[-1]:
+                    rmtree(save_path, ignore_errors=True)
+                if not save_path.exists():
+                    target_dir.rename(save_path)
+                    return save_path.name
+        else:
+            rmtree(target_dir, ignore_errors=True)
+
+    return False

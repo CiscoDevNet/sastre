@@ -10,7 +10,7 @@ from pathlib import Path
 from itertools import zip_longest
 from operator import itemgetter
 from collections import namedtuple
-from typing import Sequence, Dict
+from typing import Sequence, Dict, Tuple
 from .rest_api import RestAPIException
 
 
@@ -289,18 +289,24 @@ class ConfigItem(ApiItem):
         return set(re.findall(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}',
                               json.dumps(filtered_data)))
 
-    def get_new_name(self, name_template, **kwargs):
+    def get_new_name(self, name_template: str, **kwargs) -> Tuple[str, bool]:
         """
         Return a new valid name for this item based on the format string template provided. Variable {name} is replaced
         with the existing item name. Other variables are provided via kwargs.
+        :param name_template: str containing the name template to construct the new name
+        :param kwargs: keyword args passed to str.format
+        :return: Tuple containing new name and an indication whether it is valid
         """
+        is_valid = False
         try:
             new_name = name_template.format(name=self.data[self.name_tag], **kwargs)
         except KeyError:
-            return None
-        if self.name_check_regex.search(new_name) is None:
-            return None
-        return new_name
+            new_name = None
+
+        if self.name_check_regex.search(new_name) is not None:
+            is_valid = True
+
+        return new_name, is_valid
 
     def find_key(self, key):
         """
