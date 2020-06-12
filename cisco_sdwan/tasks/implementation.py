@@ -9,17 +9,17 @@ __all__ = ['TaskBackup', 'TaskRestore', 'TaskDelete', 'TaskCertificate', 'TaskLi
 import argparse
 from shutil import rmtree
 from pathlib import Path
-from functools import partial
+from uuid import uuid4
 from datetime import date
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import RestAPIException, is_version_newer
 from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL, ordered_tags
-from cisco_sdwan.base.models_base import UpdateEval, filename_safe, DATA_DIR, ServerInfo
+from cisco_sdwan.base.models_base import UpdateEval, filename_safe, update_ids, DATA_DIR, ServerInfo
 from cisco_sdwan.base.models_vmanage import (DeviceTemplate, DeviceTemplateAttached, DeviceTemplateValues,
                                              DeviceTemplateIndex, FeatureTemplate, PolicyVsmartIndex, EdgeInventory,
-                                             ControlInventory, EdgeCertificate, EdgeCertificateSync, SettingsVbond,
-                                             FeatureTemplateIndex, CEDGE_SET)
-from cisco_sdwan.base.processor import ProcessorException
+                                             ControlInventory, EdgeCertificate, EdgeCertificateSync, SettingsVbond)
+from cisco_sdwan.base.processor import StopProcessorException, ProcessorException
+from cisco_sdwan.migration import factory_cedge_aaa, factory_cedge_global
 from cisco_sdwan.migration.feature_migration import FeatureProcessor
 from cisco_sdwan.migration.device_migration import DeviceProcessor
 from .utils import (TaskOptions, TagOptions, ShowOptions, existing_file_type, filename_type, regex_type, uuid_type,
@@ -229,7 +229,7 @@ class TaskRestore(Task):
                     if item_matches:
                         match_set.add(item_id)
                     if item_matches or item_id in dependency_set:
-                        # A target_id that is not None signals a push operation, as opposed to post.
+                        # A target_id that is not None signals a put operation, as opposed to post.
                         # target_id will be None unless --force is specified and item name is on target
                         restore_item_list.append((item_id, item, target_id))
                         dependency_set.update(item.id_references_set)
@@ -773,165 +773,114 @@ class TaskMigrate(Task):
 
     @classmethod
     def runner(cls, parsed_args, api=None):
-        # TODO: Clean migrated workdir
         source_info = f'Local workdir: "{parsed_args.workdir}"' if api is None else f'vManage URL: "{api.base_url}"'
         cls.log_info('Starting migrate: %s %s -> %s Local output dir: "%s"', source_info, parsed_args.from_version,
                      parsed_args.to_version, parsed_args.output)
 
-        backend = api or parsed_args.workdir
+        if api is None:
+            backend = parsed_args.workdir
+            local_info = ServerInfo.load(backend)
+            server_version = local_info.server_version if local_info is not None else None
+        else:
+            backend = api
+            server_version = backend.server_version
+
         try:
             # Load migration processors
-            feature_processor = FeatureProcessor.load(from_version=parsed_args.from_version,
-                                                      to_version=parsed_args.to_version)
-            device_processor = DeviceProcessor.load(from_version=parsed_args.from_version,
-                                                    to_version=parsed_args.to_version)
+            loaded_processors = {
+                FeatureTemplate: FeatureProcessor.load(from_version=parsed_args.from_version,
+                                                       to_version=parsed_args.to_version),
+                DeviceTemplate: DeviceProcessor.load(from_version=parsed_args.from_version,
+                                                     to_version=parsed_args.to_version)
+            }
             cls.log_info('Loaded template migration recipes')
 
-            # Migration of feature templates
-            cls.log_info('Inspecting feature templates')
-            feature_index = cls.index_get(FeatureTemplateIndex, backend)
-            if feature_index is None:
-                raise TaskException('Could not retrieve feature template index')
+            id_mapping = {}  # {<old_id>: <new_id>}
+            for tag in ordered_tags(CATALOG_TAG_ALL, reverse=True):
+                cls.log_info('Inspecting %s items', tag)
 
-            feature_name_set = {item_name for item_id, item_name in feature_index}
-            matched_item_iter = (
-                (item_id, item_name, feature_index.need_extended_name) for item_id, item_name in feature_index
-                if parsed_args.regex is None or regex_search(parsed_args.regex, item_name)
-            )
-            is_bad_name = False
-            feature_migrate_list = []
-            for item_id, item_name, ext_name in matched_item_iter:
-                item = cls.item_get(FeatureTemplate, backend, item_id, item_name, ext_name)
-                if item is None:
-                    cls.log_error('Failed retrieve feature template %s', item_name)
-                    continue
-                if item.is_readonly or item.device_type_set.isdisjoint(CEDGE_SET):
-                    cls.log_debug('Skipping %s, migration not necessary', item_name)
-                    continue
-                if not item.masters_attached and not parsed_args.all:
-                    cls.log_debug('Skipping %s, not attached to device templates', item_name)
-                    continue
+                for _, info, index_cls, item_cls in catalog_iter(tag, version=server_version):
+                    item_index = cls.index_get(index_cls, backend)
+                    if item_index is None:
+                        cls.log_debug('Skipped %s, none found', info)
+                        continue
 
-                name_candidate = item.get_new_name(parsed_args.name)
-                if name_candidate is None:
-                    cls.log_error('New feature template name is not valid: %s', name_candidate)
-                    is_bad_name = True
-                    continue
-                if name_candidate in feature_name_set:
-                    cls.log_error('New feature template name conflicts with an existing template: %s', name_candidate)
-                    is_bad_name = True
-                    continue
+                    name_set = {item_name for item_id, item_name in item_index}
 
-                feature_migrate_list.append((item, name_candidate))
+                    is_bad_name = False
+                    export_list = []
+                    id_hint_map = {item_name: item_id for item_id, item_name in item_index}
+                    for item_id, item_name in item_index:
+                        item = cls.item_get(item_cls, backend, item_id, item_name, item_index.need_extended_name)
+                        if item is None:
+                            cls.log_error('Failed loading %s %s', info, item_name)
+                            continue
 
-            if is_bad_name:
-                raise TaskException('One or more new feature template names are not valid. Migration aborted.')
+                        try:
+                            item_processor = loaded_processors.get(item_cls)
+                            if item_processor is None:
+                                raise StopProcessorException()
 
-            cls.log_info("Migrating feature templates")
-            migrated_feature_list = cls.migrate_items(feature_migrate_list, FeatureTemplate, feature_processor)
-            if migrated_feature_list:
-                new_feature_index = FeatureTemplateIndex.create(migrated_feature_list)
-                if new_feature_index.save(parsed_args.output):
-                    cls.log_info('Saved migrated feature template index')
+                            cls.log_debug('Evaluating %s %s', info, item_name)
+                            if not item_processor.is_in_scope(item, migrate_all=parsed_args.all):
+                                cls.log_debug('Skipping %s, migration not necessary', item_name)
+                                raise StopProcessorException()
 
-                for item in migrated_feature_list:
-                    if item.save(parsed_args.output, new_feature_index.need_extended_name, item.name, item.uuid):
-                        cls.log_info('Saved migrated feature template %s', item.name)
-            else:
-                cls.log_info('No feature templates migrated')
-                return
+                            new_name = item.get_new_name(parsed_args.name)
+                            if new_name is None:
+                                cls.log_error('New %s name is not valid: %s', info, new_name)
+                                is_bad_name = True
+                                raise StopProcessorException()
+                            if new_name in name_set:
+                                cls.log_error('New %s name conflicts with an existing one: %s', info, new_name)
+                                is_bad_name = True
+                                raise StopProcessorException()
 
-            # Migration of device templates
-            cls.log_info('Inspecting device templates')
+                            new_id = str(uuid4())
+                            new_payload, trace_log = item_processor.eval(item, new_name, new_id)
+                            for trace in trace_log:
+                                cls.log_debug('Processor: %s', trace)
 
-            # Template id for factory default cedge_global
-            filter_fn = partial(FeatureTemplateIndex.filter_type_default, 'cedge_global', True)
-            factory_cedge_global_id = next((item_id for item_id, _ in feature_index.filtered_iter(filter_fn)), None)
-            # Template id for factory default cedge_aaa
-            filter_fn = partial(FeatureTemplateIndex.filter_type_default, 'cedge_aaa', True)
-            factory_cedge_aaa_id = next((item_id for item_id, _ in feature_index.filtered_iter(filter_fn)), None)
+                            if item.is_equal(new_payload):
+                                cls.log_debug('Skipping %s, no changes', item_name)
+                                raise StopProcessorException()
 
-            device_index = cls.index_get(DeviceTemplateIndex, backend)
-            if device_index is None:
-                raise TaskException('Could not retrieve device template index')
+                            new_item = item_cls(update_ids(id_mapping, new_payload))
+                            id_mapping[item_id] = new_id
+                            id_hint_map[new_name] = new_id
 
-            device_name_set = {item_name for item_id, item_name in device_index}
-            new_feature_id_set = {item_id for item_id, item_name in new_feature_index}
-            matched_item_iter = (
-                (item_id, item_name, device_index.need_extended_name)
-                for item_id, item_name in device_index.filtered_iter(DeviceTemplateIndex.is_cedge)
-            )
-            is_bad_name = False
-            device_migrate_list = []
-            for item_id, item_name, ext_name in matched_item_iter:
-                item = cls.item_get(DeviceTemplate, backend, item_id, item_name, ext_name)
-                if item is None:
-                    cls.log_error('Failed retrieve device template %s', item_name)
-                    continue
-                if item.id_references_set.isdisjoint(new_feature_id_set):
-                    cls.log_debug('Skipping %s, device template does not use any migrated feature template', item_name)
-                    continue
+                            if item_processor.replace_original():
+                                cls.log_info('Migrated %s %s as %s', info, item_name, new_name)
+                                item = new_item
+                            else:
+                                export_list.append(new_item)
 
-                name_candidate = item.get_new_name(parsed_args.name)
-                if name_candidate is None:
-                    cls.log_error('New device template name is not valid: %s', name_candidate)
-                    is_bad_name = True
-                    continue
-                if name_candidate in device_name_set:
-                    cls.log_error('New device template name conflicts with an existing template: %s', name_candidate)
-                    is_bad_name = True
-                    continue
+                        except StopProcessorException:
+                            pass
+                        finally:
+                            export_list.append(item)
 
-                if not item.contains_template('cedge_aaa'):
-                    if factory_cedge_aaa_id is None:
-                        cls.log_warning('Unable to attach factory default Cisco AAA template to %s.', item_name)
-                    else:
-                        item.add_template('cedge_aaa', factory_cedge_aaa_id)
-                        cls.log_debug('Attached cedge_aaa factory default to %s', item_name)
+                    if is_bad_name:
+                        raise TaskException(f'One or more new {info} names are not valid')
 
-                if not item.contains_template('cedge_global'):
-                    if factory_cedge_global_id is None:
-                        cls.log_warning('Unable to attach factory default global template to %s.', item_name)
-                    else:
-                        item.add_template('cedge_global', factory_cedge_global_id)
-                        cls.log_debug('Attached cedge_global factory default to %s', item_name)
+                    if not export_list:
+                        cls.log_info('No %s migrated', info)
+                        continue
 
-                device_migrate_list.append((item, name_candidate))
+                    if issubclass(item_cls, FeatureTemplate):
+                        for factory_default in (factory_cedge_aaa, factory_cedge_global):
+                            export_list.append(factory_default)
+                            id_hint_map[factory_default.name] = factory_default.uuid
+                            cls.log_debug('Added factory %s %s', info, factory_default.name)
 
-            if is_bad_name:
-                raise TaskException('One or more new device template names are not valid. Migration aborted.')
+                    new_item_index = index_cls.create(export_list, id_hint_map)
+                    if new_item_index.save(parsed_args.output):
+                        cls.log_info('Saved %s index', info)
 
-            cls.log_info("Migrating device templates")
-            migrated_device_list = cls.migrate_items(device_migrate_list, DeviceTemplate, device_processor)
-            if migrated_device_list:
-                new_device_index = DeviceTemplateIndex.create(migrated_device_list)
-                if new_device_index.save(parsed_args.output):
-                    cls.log_info('Saved migrated device template index')
-
-                for item in migrated_device_list:
-                    if item.save(parsed_args.output, new_device_index.need_extended_name, item.name, item.uuid):
-                        cls.log_info('Saved migrated device template %s', item.name)
-            else:
-                cls.log_info('No device templates migrated')
-                return
+                    for new_item in export_list:
+                        if new_item.save(parsed_args.output, new_item_index.need_extended_name, new_item.name,
+                                         id_hint_map[new_item.name]):
+                            cls.log_info('Saved %s %s', info, new_item.name)
 
         except (ProcessorException, TaskException) as ex:
             cls.log_critical('Migration aborted: %s', ex)
-
-    @classmethod
-    def migrate_items(cls, item_list, item_cls, processor):
-        migrated_template_list = []
-        for item_obj, new_name in item_list:
-            cls.log_info('Evaluating %s', item_obj.name)
-            new_payload, trace_log = processor.eval(item_obj, new_name)
-            for trace in trace_log:
-                cls.log_debug('Processor: %s', trace)
-
-            if item_obj.is_equal(new_payload):
-                cls.log_debug('Skipping %s, no changes', item_obj.name)
-                continue
-
-            new_template = item_cls(new_payload)
-            migrated_template_list.append(new_template)
-
-        return migrated_template_list

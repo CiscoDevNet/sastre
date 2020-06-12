@@ -1,0 +1,123 @@
+{
+  "templateType": "cedge_global",
+  "templateMinVersion": "19.3.0",
+  "deviceType": [
+    "vedge-C1109-2PLTEVZ",
+    "vedge-C8500-12X4QC",
+    "vedge-C1111-4PLTEEA",
+    "vedge-C1161-8P",
+    "vedge-C1121X-8P",
+    "vedge-C1117-4P",
+    "vedge-C8300-2N2S-6T",
+    "vedge-C1127-8PMLTEP",
+    "vedge-ISR-4331",
+    "vedge-ISR-4221X",
+    "vedge-ISRv",
+    "vedge-C8500-12X",
+    "vedge-C1127X-8PMLTEP",
+    "vedge-C1109-2PLTEGB",
+    "vedge-CSR-1000v",
+    "vedge-ISR-4451-X",
+    "vedge-C1121X-8PLTEPW",
+    "vedge-C1113-8PLTEEA",
+    "vedge-C1121-4PLTEP",
+    "vedge-C1111-8PLTEEA",
+    "vedge-C1117-4PLTEEA",
+    "vedge-C1127X-8PLTEP",
+    "vedge-ASR-1001-X",
+    "vedge-C1109-2PLTEUS",
+    "vedge-ISR-4321",
+    "vedge-C1109-4PLTE2P",
+    "vedge-C1161X-8P",
+    "vedge-C1111-8PW",
+    "vedge-C1161X-8PLTEP",
+    "vedge-C1121-8P",
+    "vedge-C1101-4PLTEPW",
+    "vedge-ASR-1002-HX",
+    "vedge-IR-1101",
+    "vedge-C1111-8PLTEEAW",
+    "vedge-C1101-4PLTEP",
+    "vedge-C1111-4P",
+    "vedge-C1111-8P",
+    "vedge-C1111-8PLTELA",
+    "vedge-C1117-4PMLTEEA",
+    "vedge-C1121X-8PLTEP",
+    "vedge-C1111-8PLTELAW",
+    "vedge-C8300-1N1S-4T2X",
+    "vedge-C1121-4P",
+    "vedge-ISR-4351",
+    "vedge-ISR-4431",
+    "vedge-C1117-4PLTELA",
+    "vedge-C8500L-8G4X",
+    "vedge-C1101-4P",
+    "vedge-C1109-4PLTE2PW",
+    "vedge-C1127-8PLTEP",
+    "vedge-C1121-8PLTEPW",
+    "vedge-ASR-1001-HX",
+    "vedge-C1126-8PLTEP",
+    "vedge-C1128-8PLTEP",
+    "vedge-C8300-1N1S-6T",
+    "vedge-C1121-8PLTEP",
+    "vedge-C8300-2N2S-4T2X",
+    "vedge-C1116-4P",
+    "vedge-C1113-8PMLTEEA",
+    "vedge-C1111-4PLTELA",
+    "vedge-ASR-1002-X",
+    "vedge-ISR-4461",
+    "vedge-C1116-4PLTEEA",
+    "vedge-ISR-4221",
+    "vedge-C1111X-8P",
+    "vedge-C1126X-8PLTEP",
+    "vedge-C1117-4PM"
+  ],
+  "lastUpdatedBy": "system",
+  "editedTemplateDefinition": {
+    "nat64-global": {
+      "nat64-timeout": {
+        "udp-timeout": {
+          "vipObjectType": "object",
+          "vipType": "ignore",
+          "vipValue": 1,
+          "vipVariableName": "udp_timeout"
+        },
+        "tcp-timeout": {
+          "vipObjectType": "object",
+          "vipType": "ignore",
+          "vipValue": 60,
+          "vipVariableName": "tcp_timeout"
+        }
+      }
+    }
+  },
+  "gTemplateClass": "cedge",
+  "templateDefinition": {
+    "nat64-global": {
+      "nat64-timeout": {
+        "udp-timeout": {
+          "vipObjectType": "object",
+          "vipType": "ignore",
+          "vipValue": 1,
+          "vipVariableName": "udp_timeout"
+        },
+        "tcp-timeout": {
+          "vipObjectType": "object",
+          "vipType": "ignore",
+          "vipValue": 60,
+          "vipVariableName": "tcp_timeout"
+        }
+      }
+    }
+  },
+  "configType": "xml",
+  "attachedMastersCount": 3,
+  "templateId": "300d7759-cc0a-4cd7-90c0-eb52adc27f2f",
+  "createdOn": 1585958232266,
+  "@rid": 512,
+  "feature": "vmanage-default",
+  "factoryDefault": false,
+  "templateName": "Factory_Default_Global_CISCO_Template",
+  "createdBy": "system",
+  "devicesAttached": 0,
+  "templateDescription": "Default Global CISCO template settings",
+  "lastUpdatedOn": 1585958232266
+}

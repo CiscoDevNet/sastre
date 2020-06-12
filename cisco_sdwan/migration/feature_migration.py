@@ -1,6 +1,7 @@
 from copy import deepcopy
 from numbers import Number
 from cisco_sdwan.base.processor import Operation, Processor, ProcessorException
+from cisco_sdwan.base.models_vmanage import CEDGE_SET
 from . import module_dir
 
 
@@ -152,9 +153,19 @@ class FeatureProcessor(Processor):
 
         super().__init__(matched_recipes)
 
-    def eval(self, feature_template, new_name):
+    def is_in_scope(self, feature_template, **kwargs):
+        if feature_template.is_readonly or feature_template.device_types.isdisjoint(CEDGE_SET):
+            return False
+        if not feature_template.masters_attached and not kwargs.get('migrate_all', True):
+            return False
+
+        return True
+
+    def eval(self, feature_template, new_name, new_id):
         migrated_payload = deepcopy(feature_template.data)
         trace_log = []
+
+        old_name = feature_template.name
 
         for recipe in self.data:
             matched_transforms = [
@@ -179,16 +190,22 @@ class FeatureProcessor(Processor):
                 op_trace = op.handler_fn(migrated_payload, *param_values)
                 trace_log.extend(op_trace)
 
-            if 'gTemplateClass' in migrated_payload:
-                migrated_payload['gTemplateClass'] = 'cedge'
-            else:
-                trace_log.append('No gTemplateClass in {name}'.format(name=migrated_payload['templateName']))
-
-            migrated_payload['templateName'] = new_name
             migrated_payload['templateType'] = transform['toFeatureName']
-            migrated_payload['deviceType'] = list(feature_template.device_type_set - DEVICE_TYPES_TO_FILTER)
 
-            trace_log.append('Updated name: {name}, type: {template_type}, and device model list'.format(
-                name=migrated_payload['templateName'], template_type=migrated_payload['templateType'])
-            )
+        if 'gTemplateClass' in migrated_payload:
+            migrated_payload['gTemplateClass'] = 'cedge'
+        else:
+            trace_log.append(f'No gTemplateClass in {old_name}')
+
+        migrated_payload['templateName'] = new_name
+        migrated_payload['templateId'] = new_id
+        migrated_payload['deviceType'] = list(feature_template.device_types - DEVICE_TYPES_TO_FILTER)
+
+        trace_log.append(f'Updated name: {old_name} -> {new_name}')
+
+        feature_template.device_types = feature_template.device_types & DEVICE_TYPES_TO_FILTER
+
         return migrated_payload, trace_log
+
+    def replace_original(self):
+        return False
