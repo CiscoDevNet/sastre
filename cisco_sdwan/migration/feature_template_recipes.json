@@ -203,14 +203,6 @@
                         ]
                     },
                     {
-                        "operation": "remove",
-                        "fieldHierarchyList": [
-                            "ospf",
-                            "route-policy",
-                            "direction"
-                        ]
-                    },
-                    {
                         "operation": "range",
                         "fieldHierarchyList": [
                             "ospf",
