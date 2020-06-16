@@ -121,12 +121,25 @@ class IndexApiItem(ApiItem):
 
     # Iter_fields should be defined in subclasses and needs to be a tuple subclass.
     iter_fields = None
+    # Extended_iter_fields should be defined in subclasses that use extended_iter, needs to be a tuple subclass.
+    extended_iter_fields = None
 
     def __iter__(self):
         return self.iter(*self.iter_fields)
 
     def iter(self, *iter_fields):
         return (itemgetter(*iter_fields)(elem) for elem in self.data)
+
+    def extended_iter(self):
+        """
+        Returns an iterator where each entry is composed of the combined fields of iter_fields and extended_iter_fields.
+        None is returned on any fields that are missing in an entry
+        :return: The iterator
+        """
+        def default_getter(*fields):
+            return lambda row: tuple(row.get(field) for field in fields)
+
+        return (default_getter(*self.iter_fields, *self.extended_iter_fields)(elem) for elem in self.data)
 
 
 class ConfigItem(ApiItem):
