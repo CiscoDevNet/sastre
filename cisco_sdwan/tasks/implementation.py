@@ -13,7 +13,7 @@ from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import RestAPIException, is_version_newer
 from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL, ordered_tags
 from cisco_sdwan.base.models_base import UpdateEval, filename_safe, update_ids, ServerInfo
-from cisco_sdwan.base.models_vmanage import (DeviceTemplate, DeviceTemplateAttached, DeviceTemplateValues,
+from cisco_sdwan.base.models_vmanage import (DeviceConfig, DeviceTemplate, DeviceTemplateAttached, DeviceTemplateValues,
                                              DeviceTemplateIndex, FeatureTemplate, PolicyVsmartIndex, EdgeInventory,
                                              ControlInventory, EdgeCertificate, EdgeCertificateSync, SettingsVbond)
 from cisco_sdwan.base.processor import StopProcessorException, ProcessorException
@@ -61,14 +61,32 @@ class TaskBackup(Task):
         if target_info.save(parsed_args.workdir):
             cls.log_info('Saved vManage server information')
 
+        # Backup items not registered to the catalog, but to be included when tag is 'all'
         if CATALOG_TAG_ALL in parsed_args.tags:
-            # Items without index files to be included with tag 'all'
             edge_certs = EdgeCertificate.get(api)
             if edge_certs is None:
                 cls.log_error('Failed backup WAN edge certificates')
             elif edge_certs.save(parsed_args.workdir):
                 cls.log_info('Saved WAN edge certificates')
 
+            for inventory, info in ((EdgeInventory.get(api), 'WAN edge'), (ControlInventory.get(api), 'controller')):
+                if inventory is None:
+                    cls.log_error('Failed retrieving %s inventory', info)
+                    continue
+
+                for uuid, _, hostname, _ in inventory.extended_iter():
+                    if hostname is None:
+                        cls.log_debug('Skipping %s, no hostname', uuid)
+                        continue
+
+                    item = DeviceConfig.get(api, uuid)
+                    if item is None:
+                        cls.log_error('Failed backup device configuration %s', hostname)
+                        continue
+                    if item.save(parsed_args.workdir, item_name=hostname, item_id=uuid):
+                        cls.log_info('Done device configuration %s', hostname)
+
+        # Backup items registered to the catalog
         for _, info, index_cls, item_cls in catalog_iter(*parsed_args.tags, version=api.server_version):
             item_index = index_cls.get(api)
             if item_index is None:

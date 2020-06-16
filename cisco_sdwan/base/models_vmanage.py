@@ -5,6 +5,7 @@
  This module implements vManage API models
 """
 from typing import Iterable, Set
+from pathlib import Path
 from .catalog import register
 from .models_base import ApiItem, IndexApiItem, ConfigItem, IndexConfigItem, ApiPath, IdName
 
@@ -137,10 +138,14 @@ class EdgeInventory(IndexApiItem):
     api_path = ApiPath('system/device/vedges', None, None, None)
     iter_fields = ('uuid', 'vedgeCertificateState')
 
+    extended_iter_fields = ('host-name', 'system-ip')
+
 
 class ControlInventory(IndexApiItem):
     api_path = ApiPath('system/device/controllers', None, None, None)
     iter_fields = ('uuid', 'validity')
+
+    extended_iter_fields = ('host-name', 'system-ip')
 
     @staticmethod
     def is_vsmart(device_type):
@@ -159,6 +164,37 @@ class ControlInventory(IndexApiItem):
             (item_id, item_name) for item_type, item_id, item_name
             in self.iter('deviceType', *self.iter_fields) if filter_fn(item_type)
         )
+
+
+#
+# Device configuration
+#
+class DeviceConfig(ConfigItem):
+    api_path = ApiPath('template/config/attached', None, None, None)
+    store_path = ('device_configs', )
+    store_file = '{item_name}.txt'
+
+    def save(self, node_dir, ext_name=False, item_name=None, item_id=None):
+        """
+        Save data (i.e. self.data) to a json file
+
+        :param node_dir: String indicating directory under root_dir used for all files from a given vManage node.
+        :param ext_name: True indicates that item_names need to be extended (with item_id) in order to make their
+                         filename safe version unique. False otherwise.
+        :param item_name: (Optional) Name of the item being saved. Variable used to build the filename.
+        :param item_id: (Optional) UUID for the item being saved. Variable used to build the filename.
+        :return: True indicates data has been saved. False indicates no data to save (and no file has been created).
+        """
+        if self.is_empty:
+            return False
+
+        dir_path = Path(self.root_dir, node_dir, *self.store_path)
+        dir_path.mkdir(parents=True, exist_ok=True)
+
+        with open(dir_path.joinpath(self.get_filename(ext_name, item_name, item_id)), 'w') as write_f:
+            write_f.write(self.data['config'])
+
+        return True
 
 
 #
