@@ -21,7 +21,7 @@ from cisco_sdwan.migration import factory_cedge_aaa, factory_cedge_global
 from cisco_sdwan.migration.feature_migration import FeatureProcessor
 from cisco_sdwan.migration.device_migration import DeviceProcessor
 from .utils import (TaskOptions, TagOptions, ShowOptions, existing_file_type, filename_type, regex_type, uuid_type,
-                    version_type, default_workdir)
+                    version_type, default_workdir, ext_template_type)
 from .common import regex_search, clean_dir, Task, Table, WaitActionsException, TaskException
 
 
@@ -45,7 +45,8 @@ class TaskBackup(Task):
         task_parser.add_argument('tags', metavar='<tag>', nargs='+', type=TagOptions.tag,
                                  help='One or more tags for selecting items to be backed up. Multiple tags should be '
                                       f'separated by space. Available tags: {TagOptions.options()}. Special tag '
-                                      f'"{CATALOG_TAG_ALL}" selects all items, including WAN edge certificates.')
+                                      f'"{CATALOG_TAG_ALL}" selects all items, including WAN edge certificates and '
+                                      'device configurations.')
         return task_parser.parse_args(task_args)
 
     @classmethod
@@ -756,9 +757,12 @@ class TaskMigrate(Task):
         task_parser.add_argument('--no-rollover', action='store_true',
                                  help='By default, if the output directory already exists it is renamed using a '
                                       'rolling naming scheme. This option disables this automatic rollover.')
-        task_parser.add_argument('--name', metavar='<format>', default='migrated_{name}',
+        task_parser.add_argument('--name', metavar='<format>', type=ext_template_type, default='migrated_{name}',
                                  help='Format used to name the migrated templates (default: %(default)s). '
-                                      'Variable {name} is replaced with the original template name.')
+                                      'Variable {name} is replaced with the original template name. Sections of the '
+                                      'original template name can be selected using the {name&<regex>} format. Where '
+                                      '<regex> is a regular expression that must contain at least one capturing group. '
+                                      'Capturing groups identify sections of the original name to keep.')
         task_parser.add_argument('--from', metavar='<version>', type=version_type, dest='from_version', default='18.4',
                                  help='vManage version from source templates (default: %(default)s).')
         task_parser.add_argument('--to', metavar='<version>', type=version_type, dest='to_version', default='20.1',
