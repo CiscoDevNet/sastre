@@ -760,7 +760,7 @@ class TaskMigrate(Task):
         task_parser.add_argument('--name', metavar='<format>', type=ext_template_type, default='migrated_{name}',
                                  help='Format used to name the migrated templates (default: %(default)s). '
                                       'Variable {name} is replaced with the original template name. Sections of the '
-                                      'original template name can be selected using the {name&<regex>} format. Where '
+                                      'original template name can be selected using the {name <regex>} format. Where '
                                       '<regex> is a regular expression that must contain at least one capturing group. '
                                       'Capturing groups identify sections of the original name to keep.')
         task_parser.add_argument('--from', metavar='<version>', type=version_type, dest='from_version', default='18.4',
