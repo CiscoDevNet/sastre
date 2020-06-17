@@ -3,7 +3,7 @@ Sastre - Automation Tools for Cisco SD-WAN Powered by Viptela
 
 """
 __copyright__    = "Copyright (c) 2019-2020 Cisco Systems, Inc. and/or its affiliates"
-__version__      = "1.1f"
+__version__      = "1.1g"
 __author__       = "Marcelo Reis"
 __email__        = "mareis@cisco.com"
 __url__          = "https://github.com/reismarcelo/sastre"

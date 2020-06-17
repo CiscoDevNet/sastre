@@ -12,7 +12,7 @@ from uuid import uuid4
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import RestAPIException, is_version_newer
 from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL, ordered_tags
-from cisco_sdwan.base.models_base import UpdateEval, filename_safe, update_ids, ServerInfo
+from cisco_sdwan.base.models_base import UpdateEval, filename_safe, update_ids, ServerInfo, ExtendedTemplate
 from cisco_sdwan.base.models_vmanage import (DeviceConfig, DeviceConfigRFS, DeviceTemplate, DeviceTemplateAttached,
                                              DeviceTemplateValues, DeviceTemplateIndex, FeatureTemplate,
                                              PolicyVsmartIndex, EdgeInventory, ControlInventory, EdgeCertificate,
@@ -558,8 +558,23 @@ class TaskList(Task):
                                  help='Regular expression selecting devices to list. Match on hostname or '
                                       'chassis/uuid. Use "^-$" to match devices without a hostname.')
 
+        xform_parser = sub_tasks.add_parser('name-transform', aliases=['transform'],
+                                            help='List name transformations performed by the provided name-regex '
+                                                 'against existing item names.')
+        xform_parser.set_defaults(table_factory=TaskList.xform_table)
+        xform_parser.add_argument('tags', metavar='<tag>', nargs='+', type=TagOptions.tag,
+                                  help='One or more tags for selecting groups of items. Multiple tags should be '
+                                       f'separated by space. Available tags: {TagOptions.options()}. Special tag '
+                                       f'"{CATALOG_TAG_ALL}" selects all items.')
+        xform_parser.add_argument('name_regex', metavar='<name-regex>', type=ext_template_type,
+                                  help='Name-regex used to transform an existing item name. Variable {name} is '
+                                       'replaced with the original template name. Sections of the original template '
+                                       'name can be selected using the {name <regex>} format. Where <regex> is a '
+                                       'regular expression that must contain at least one capturing group. Capturing '
+                                       'groups identify sections of the original name to keep.')
+
         # Parameters common to all sub-tasks
-        for sub_task in (config_parser, cert_parser):
+        for sub_task in (config_parser, cert_parser, xform_parser):
             sub_task.add_argument('--workdir', metavar='<directory>', type=existing_file_type,
                                   help='If provided, list will read from the specified directory instead of the ' 
                                        'target vManage.')
@@ -626,6 +641,26 @@ class TaskList(Task):
             if parsed_args.regex is None or regex_search(parsed_args.regex, hostname or '-', uuid)
         )
         results = Table('Hostname', 'Chassis', 'Serial', 'State',  'Status')
+        results.extend(matched_item_iter)
+
+        return results
+
+    @classmethod
+    def xform_table(cls, parsed_args, api):
+        source_info = f'Local workdir: "{parsed_args.workdir}"' if api is None else f'vManage URL: "{api.base_url}"'
+        cls.log_info('Starting test name-regex: %s', source_info)
+
+        backend = api or parsed_args.workdir
+        # Only perform version-based filtering if backend is api
+        version = None if api is None else api.server_version
+
+        name_regex = ExtendedTemplate(parsed_args.name_regex)
+        matched_item_iter = (
+            (item_name,  name_regex(item_name), tag, info)
+            for tag, info, index, item_cls in cls.index_iter(backend, catalog_iter(*parsed_args.tags, version=version))
+            for item_id, item_name in index
+        )
+        results = Table('Name', 'Translated', 'Tag', 'Type')
         results.extend(matched_item_iter)
 
         return results
@@ -845,9 +880,11 @@ class TaskMigrate(Task):
                                 is_bad_name = True
                                 raise StopProcessorException()
                             if new_name in name_set:
-                                cls.log_error('New %s name conflicts with: %s', info, new_name)
+                                cls.log_error('New %s name for %s conflicts with: %s', info, item_name, new_name)
                                 is_bad_name = True
                                 raise StopProcessorException()
+
+                            name_set.add(new_name)
 
                             new_id = str(uuid4())
                             new_payload, trace_log = item_processor.eval(item, new_name, new_id)
