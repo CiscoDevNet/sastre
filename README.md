@@ -56,7 +56,7 @@ vManage address (-a/--address), user name (-u/--user) and password (-p/--passwor
 
 A good approach to reduce the number of parameters that need to be provided at execution is to create rc text files exporting those environment variables for a particular vManage. This is demonstrated in the Getting Started section below.
 
-For any of these arguments, vManage address, user and password; if they are not provided via the environment variables or command line arguments, the user is prompted for a value.
+For any of these arguments, vManage address, user and password; user is prompted for a value if they are not provided via the environment variables or command line arguments.
 
 ### Task-specific parameters
 

@@ -1,4 +1,4 @@
-Sastre 1.1 [June ???, 2020]
+Sastre 1.1 [June 19, 2020]
 ============================
 
 New features:
@@ -9,7 +9,7 @@ Enhancements:
       source. For instance, list or show-template tasks when --workdir is provided.
     - Backup task now allows disabling of the automatic workdir rollover mechanism using the --no-rollover option. This
       is useful when the backup directory is being managed by an external version control tool (e.g. git).
-    - Backup task now also backup device configurations when tag 'all' is used. This includes WAN edges and controllers.
+    - Backup task now also include device configurations when tag 'all' is used. This includes WAN edges and controllers.
 
 
 Sastre 0.37 [April 21, 2020]
