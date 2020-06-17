@@ -11,7 +11,7 @@ from datetime import date
 from getpass import getpass
 from pathlib import Path
 from cisco_sdwan.base.catalog import catalog_tags, CATALOG_TAG_ALL
-from cisco_sdwan.base.models_base import filename_safe, DATA_DIR
+from cisco_sdwan.base.models_base import filename_safe, DATA_DIR, ExtendedTemplate
 from .common import Task
 
 # Default local data store
@@ -176,6 +176,17 @@ class PromptArg:
                 print('{msg} Please try again, or ^C to terminate.'.format(msg=ex))
             else:
                 return value
+
+
+def ext_template_type(template_str):
+    try:
+        ExtendedTemplate(template_str)('test')
+    except re.error:
+        raise argparse.ArgumentTypeError('regular expression is invalid')
+    except (KeyError, ValueError) as ex:
+        raise argparse.ArgumentTypeError(ex)
+
+    return template_str
 
 
 class SastreException(Exception):

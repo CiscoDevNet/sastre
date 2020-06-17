@@ -302,22 +302,23 @@ class ConfigItem(ApiItem):
         return set(re.findall(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}',
                               json.dumps(filtered_data)))
 
-    def get_new_name(self, name_template: str, **kwargs) -> Tuple[str, bool]:
+    def get_new_name(self, name_template: str) -> Tuple[str, bool]:
         """
         Return a new valid name for this item based on the format string template provided. Variable {name} is replaced
         with the existing item name. Other variables are provided via kwargs.
-        :param name_template: str containing the name template to construct the new name
-        :param kwargs: keyword args passed to str.format
+        :param name_template: str containing the name template to construct the new name.
+                              For example: migrated_{name&G_Branch_184_(.*)}
         :return: Tuple containing new name and an indication whether it is valid
         """
         is_valid = False
+
         try:
-            new_name = name_template.format(name=self.data[self.name_tag], **kwargs)
+            new_name = ExtendedTemplate(name_template)(self.data[self.name_tag])
         except KeyError:
             new_name = None
-
-        if self.name_check_regex.search(new_name) is not None:
-            is_valid = True
+        else:
+            if self.name_check_regex.search(new_name) is not None:
+                is_valid = True
 
         return new_name, is_valid
 
@@ -484,6 +485,40 @@ def update_ids(id_mapping_dict, item_data):
                        replace_id, json.dumps(item_data))
 
     return json.loads(dict_json)
+
+
+class ExtendedTemplate:
+    template_pattern = re.compile(r'{name(?:&(?P<regex>.*?))?\}')
+
+    def __init__(self, template):
+        self.src_template = template
+        self.label_value_map = None
+
+    def __call__(self, name):
+        def regex_replace(match_obj):
+            new_value = name
+
+            regex = match_obj.group('regex')
+            if regex is not None:
+                regex_p = re.compile(regex)
+                if not regex_p.groups:
+                    raise KeyError('regular expression must include at least one capturing group')
+
+                value, regex_p_subs = regex_p.subn(''.join(f'\\{group+1}' for group in range(regex_p.groups)), name)
+                if regex_p_subs:
+                    new_value = value
+
+            label = 'name_{count}'.format(count=len(self.label_value_map))
+            self.label_value_map[label] = new_value
+
+            return f'{{{label}}}'
+
+        self.label_value_map = {}
+        template, name_p_subs = self.template_pattern.subn(regex_replace, self.src_template)
+        if not name_p_subs:
+            raise KeyError('template must include {name} variable')
+
+        return template.format(**self.label_value_map)
 
 
 class ModelException(Exception):
