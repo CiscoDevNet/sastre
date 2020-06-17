@@ -13,9 +13,10 @@ from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import RestAPIException, is_version_newer
 from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL, ordered_tags
 from cisco_sdwan.base.models_base import UpdateEval, filename_safe, update_ids, ServerInfo
-from cisco_sdwan.base.models_vmanage import (DeviceConfig, DeviceTemplate, DeviceTemplateAttached, DeviceTemplateValues,
-                                             DeviceTemplateIndex, FeatureTemplate, PolicyVsmartIndex, EdgeInventory,
-                                             ControlInventory, EdgeCertificate, EdgeCertificateSync, SettingsVbond)
+from cisco_sdwan.base.models_vmanage import (DeviceConfig, DeviceConfigRFS, DeviceTemplate, DeviceTemplateAttached,
+                                             DeviceTemplateValues, DeviceTemplateIndex, FeatureTemplate,
+                                             PolicyVsmartIndex, EdgeInventory, ControlInventory, EdgeCertificate,
+                                             EdgeCertificateSync, SettingsVbond)
 from cisco_sdwan.base.processor import StopProcessorException, ProcessorException
 from cisco_sdwan.migration import factory_cedge_aaa, factory_cedge_global
 from cisco_sdwan.migration.feature_migration import FeatureProcessor
@@ -80,12 +81,13 @@ class TaskBackup(Task):
                         cls.log_debug('Skipping %s, no hostname', uuid)
                         continue
 
-                    item = DeviceConfig.get(api, uuid)
-                    if item is None:
-                        cls.log_error('Failed backup device configuration %s', hostname)
-                        continue
-                    if item.save(parsed_args.workdir, item_name=hostname, item_id=uuid):
-                        cls.log_info('Done device configuration %s', hostname)
+                    for item, config_type in ((DeviceConfig.get(api, DeviceConfig.api_params(uuid)), 'CFS'),
+                                              (DeviceConfigRFS.get(api, DeviceConfigRFS.api_params(uuid)), 'RFS')):
+                        if item is None:
+                            cls.log_error('Failed backup %s device configuration %s', config_type, hostname)
+                            continue
+                        if item.save(parsed_args.workdir, item_name=hostname, item_id=uuid):
+                            cls.log_info('Done %s device configuration %s', config_type, hostname)
 
         # Backup items registered to the catalog
         for _, info, index_cls, item_cls in catalog_iter(*parsed_args.tags, version=api.server_version):
