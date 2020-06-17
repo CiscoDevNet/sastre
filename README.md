@@ -351,7 +351,7 @@ List device templates and feature templates from target vManage:
     +---------------------------+--------------------------------------+------------------+------------------+
     INFO: Task completed successfully
  
- List all items from target vManage with name starting with 'DC':
+List all items from target vManage with name starting with 'DC':
  
     % sdwan --verbose list configuration all --regex "^DC"
     INFO: Starting list configuration: vManage URL: "https://198.18.1.10:8443"
@@ -478,6 +478,28 @@ Set certificate validity status to a desired value:
 
 Migrating off a live vManage:
 
+    % sdwan --verbose migrate all dcloud_migrated    
+    INFO: Starting migrate: vManage URL: "https://198.18.1.10:8443" 18.4 -> 20.1 Local output dir: "dcloud_migrated"
+    INFO: Loaded template migration recipes
+    INFO: Inspecting policy_list items
+    INFO: Saved VPN list index
+    INFO: Saved VPN list myvpns
+    INFO: Saved VPN list corpVPN
+    INFO: Saved VPN list pciVPN
+    INFO: Saved VPN list guestVPN
+    INFO: Saved VPN list ALLVPNs
+    INFO: Saved URL-whitelist list index
+    INFO: Saved URL-whitelist list Cisco
+    <snip>
+    INFO: Inspecting template_device items
+    INFO: Saved device template index
+    INFO: Saved device template vSmartConfigurationTemplate
+    INFO: Saved device template VSMART-device-template
+    INFO: Saved device template BranchType2Template-vEdge
+    INFO: Saved device template DC-vEdges
+    INFO: Saved device template migrated_BranchType1Template-CSR
+    INFO: Task completed successfully
+
 Migrating from a local workdir:
 
     % sdwan --verbose migrate all --workdir sastre_cx_golden_repo sastre_cx_golden_repo_201
@@ -496,8 +518,35 @@ Migrating from a local workdir:
     INFO: Task completed successfully
     
 Basic customization of migrated template names:
+- Using the --name option to specify the format for building migrated template names. Default is "migrated_{name}", where {name} is replaced with the original template name.
 
-Regex-based customization of migrated templated names:
+
+    % sdwan --verbose migrate all dcloud_migrated --workdir dcloud_192 --name "201_{name}"
+    INFO: Starting migrate: Local workdir: "dcloud_192" 18.4 -> 20.1 Local output dir: "dcloud_migrated"
+    INFO: Previous migration under "dcloud_migrated" was saved as "dcloud_migrated_1"
+    INFO: Loaded template migration recipes
+    INFO: Inspecting policy_list items
+    INFO: Saved VPN list index
+    INFO: Saved VPN list myvpns
+    INFO: Saved VPN list corpVPN
+    INFO: Saved VPN list pciVPN
+    INFO: Saved VPN list guestVPN
+    INFO: Saved VPN list ALLVPNs
+    INFO: Saved URL-whitelist list index
+    INFO: Saved URL-whitelist list Cisco
+    <snip>
+    INFO: Inspecting template_device items
+    INFO: Saved device template index
+    INFO: Saved device template vSmartConfigurationTemplate
+    INFO: Saved device template VSMART-device-template
+    INFO: Saved device template BranchType2Template-vEdge
+    INFO: Saved device template DC-vEdges
+    INFO: Saved device template 201_BranchType1Template-CSR
+    INFO: Task completed successfully
+
+Regex-based customization of migrated template names:
+- This example shows a more complex --name option, containing multiple {name} entries with regular expressions.
+- Additional details about the name regex syntax are provided in the "Migrate task template name manipulation" section.
 
 
 ## Notes
@@ -516,6 +565,9 @@ The regular expression syntax supported is described in https://docs.python.org/
 
 ### Migrate task template name manipulation
 
+- The --name format specification can contain multiple occurrences of {name}. Each occurrence can contain a regular expression with one or more capturing groups. These capturing groups define the segments of the original name to "copy". Segments matching each capturing group are concatenated and "pasted" to the {name} position.
+- Consider the template name "BranchType1Template-CSR". In order to get the migrated name as "BranchType1Template_201_CSR", one can use --name "{name ([^-]+)-CSR}_201_{name [^-]+-(CSR)}".
+- If name regex does not match, {name <regex>} is replaced by an empty string.
 
 
 ### Logs

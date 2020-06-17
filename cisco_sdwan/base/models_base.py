@@ -496,8 +496,6 @@ class ExtendedTemplate:
 
     def __call__(self, name):
         def regex_replace(match_obj):
-            new_value = name
-
             regex = match_obj.group('regex')
             if regex is not None:
                 regex_p = re.compile(regex)
@@ -505,8 +503,9 @@ class ExtendedTemplate:
                     raise KeyError('regular expression must include at least one capturing group')
 
                 value, regex_p_subs = regex_p.subn(''.join(f'\\{group+1}' for group in range(regex_p.groups)), name)
-                if regex_p_subs:
-                    new_value = value
+                new_value = value if regex_p_subs else ''
+            else:
+                new_value = name
 
             label = 'name_{count}'.format(count=len(self.label_value_map))
             self.label_value_map[label] = new_value
