@@ -6,6 +6,7 @@
 """
 from typing import Iterable, Set
 from pathlib import Path
+from urllib.parse import quote_plus
 from .catalog import register
 from .models_base import ApiItem, IndexApiItem, ConfigItem, IndexConfigItem, ApiPath, IdName
 
@@ -195,6 +196,20 @@ class DeviceConfig(ConfigItem):
             write_f.write(self.data['config'])
 
         return True
+
+    @staticmethod
+    def api_params(device_id):
+        # Device uuid is not url-safe
+        return quote_plus(device_id)
+
+
+class DeviceConfigRFS(DeviceConfig):
+    store_file = '{item_name}_rfs.txt'
+
+    @staticmethod
+    def api_params(device_id):
+        # Device uuid is not url-safe
+        return '{safe_device_id}?type=RFS'.format(safe_device_id=quote_plus(device_id))
 
 
 #
