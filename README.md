@@ -587,11 +587,13 @@ The regular expression syntax supported is described in https://docs.python.org/
 
 - The --name format specification can contain multiple occurrences of {name}. Each occurrence may contain a regular expression separated by a space: {name &lt;regex&gt;}. The regular expressions must contain one or more capturing groups, which define the segments of the original name to "copy". Segments matching each capturing group are concatenated and "pasted" to the {name} position.
 - If name regex does not match, {name &lt;regex&gt;} is replaced with an empty string.
-- Consider the template name "G_Branch_184_Single_cE4451-X_2xWAN_DHCP_L2_v01". In order to get the migrated name as "G_Branch_201_Single_cE4451-X_2xWAN_DHCP_L2_v01", one can use --name "{name (G_.+)_184_.+}_201_{name G.+_184_(.+)}".
 - A transform option under the list task allows one to verify of the effect of a name-regex (e.g. as used by the --name format specification in the migrate task).
 
 Example:
 
+    Consider the template name "G_Branch_184_Single_cE4451-X_2xWAN_DHCP_L2_v01". 
+    In order to get the migrated name as "G_Branch_201_Single_cE4451-X_2xWAN_DHCP_L2_v01", one can use --name "{name (G_.+)_184_.+}_201_{name G.+_184_(.+)}".
+    
     % sdwan list transform template_device --regex "G_Branch_184_Single_cE4451" --workdir sastre_cx_golden_repo "{name (G_.+)_184_.+}_201_{name G.+_184_(.+)}"
     +---------------------------------------------------------------+---------------------------------------------------------------+-----------------+-----------------+
     | Name                                                          | Transformed                                                   | Tag             | Type            |
