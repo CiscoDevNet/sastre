@@ -520,6 +520,7 @@ Migrating from a local workdir:
 Basic customization of migrated template names:
 - Using the --name option to specify the format for building migrated template names. Default is "migrated_{name}", where {name} is replaced with the original template name.
 
+Example:
 
     % sdwan --verbose migrate all dcloud_migrated --workdir dcloud_192 --name "201_{name}"
     INFO: Starting migrate: Local workdir: "dcloud_192" 18.4 -> 20.1 Local output dir: "dcloud_migrated"
