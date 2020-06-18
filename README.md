@@ -548,6 +548,7 @@ Regex-based customization of migrated template names:
 - This example shows a more complex --name option, containing multiple {name} entries with regular expressions.
 - Additional details about the name regex syntax are provided in the "Migrate task template name manipulation" section.
 
+Example:
 
     % sdwan --verbose migrate all sastre_cx_golden_repo_201 --workdir sastre_cx_golden_repo --name "{name (G_.+)_184_.+}{name (G_VPN.+)}_201{name G.+_184(_.+)}" 
     INFO: Starting migrate: Local workdir: "sastre_cx_golden_repo" 18.4 -> 20.1 Local output dir: "sastre_cx_golden_repo_201"
