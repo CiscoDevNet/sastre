@@ -3,14 +3,15 @@ Sastre 1.1 [June 19, 2020]
 
 New features:
     - Migrate task, allowing migration of feature templates and device templates to be compatible with vManage 20.1.
-    - Name-transform option added to list task, allowing user to test a name-regex transform against existing item names.
+    - Transform option added to list task, allowing user to test name-regex transforms against existing item names.
 
 Enhancements:
     - vManage information (address, user and password) is no longer required when a task uses local workdir as
       source. For instance, list or show-template tasks when --workdir is provided.
     - Backup task now allows disabling of the automatic workdir rollover mechanism using the --no-rollover option. This
       is useful when the backup directory is being managed by an external version control tool (e.g. git).
-    - Backup task now also include device configurations when tag 'all' is used. This includes WAN edges and controllers.
+    - Backup task now also include device configurations when tag 'all' is used. This includes WAN edges and controllers,
+      also RFS and CFS configurations.
 
 
 Sastre 0.37 [April 21, 2020]
