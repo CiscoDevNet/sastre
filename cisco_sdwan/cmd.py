@@ -11,7 +11,6 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from datetime import date
 from requests.exceptions import ConnectionError
 from .base.rest_api import Rest, LoginFailedException
 from .base.catalog import catalog_size
@@ -20,9 +19,6 @@ from .__version__ import __version__ as version
 from .__version__ import __doc__ as title
 from .tasks.utils import TaskOptions, TagOptions, EnvVar, non_empty_type, PromptArg
 from .tasks.implementation import *
-
-# Default local data store
-WORK_DIR = 'backup_{address}_{date:%Y%m%d}'
 
 # vManage REST API defaults
 VMANAGE_PORT = '8443'
@@ -75,27 +71,27 @@ def main():
     cli_parser = argparse.ArgumentParser(description=title)
     cli_parser.add_argument('-a', '--address', metavar='<vmanage-ip>', action=EnvVar, required=False,
                             envvar='VMANAGE_IP', type=non_empty_type,
-                            help='''vManage IP address, can also be defined via VMANAGE_IP environment variable. 
-                                    If neither is provided user is prompted for an address.''')
+                            help='vManage IP address, can also be defined via VMANAGE_IP environment variable. '
+                                 'If neither is provided user is prompted for the address.')
     cli_parser.add_argument('-u', '--user', metavar='<user>', action=EnvVar, required=False,
                             envvar='VMANAGE_USER', type=non_empty_type,
-                            help='''user name, can also be defined via VMANAGE_USER environment variable. 
-                                    If neither is provided user is prompted for a user name.''')
+                            help='username, can also be defined via VMANAGE_USER environment variable. '
+                                 'If neither is provided user is prompted for username.')
     cli_parser.add_argument('-p', '--password', metavar='<password>', action=EnvVar, required=False,
                             envvar='VMANAGE_PASSWORD', type=non_empty_type,
-                            help='''password, can also be defined via VMANAGE_PASSWORD environment variable. 
-                                    If neither is provided user is prompted for a password.''')
+                            help='password, can also be defined via VMANAGE_PASSWORD environment variable. '
+                                 ' If neither is provided user is prompted for password.')
     cli_parser.add_argument('--port', metavar='<port>', default=VMANAGE_PORT,
-                            help='vManage TCP port number (default is {port})'.format(port=VMANAGE_PORT))
+                            help='vManage TCP port number (default: %(default)s)')
     cli_parser.add_argument('--timeout', metavar='<timeout>', type=int, default=REST_TIMEOUT,
-                            help='REST API timeout (default is {timeout}s)'.format(timeout=REST_TIMEOUT))
+                            help='REST API timeout (default: %(default)s)')
     cli_parser.add_argument('--verbose', action='store_true',
                             help='increase output verbosity')
     cli_parser.add_argument('--version', action='version',
-                            version='''Sastre Version {version}. Catalog info: {num} items, tags: {tags}.
-                                    '''.format(version=version, num=catalog_size(), tags=TagOptions.options()))
+                            version=f'Sastre Version {version}. Catalog info: {catalog_size()} items, '
+                                    f'tags: {TagOptions.options()}.')
     cli_parser.add_argument('task', metavar='<task>', type=TaskOptions.task,
-                            help='task to be performed ({options})'.format(options=TaskOptions.options()))
+                            help=f'task to be performed ({TaskOptions.options()})')
     cli_parser.add_argument('task_args', metavar='<arguments>', nargs=argparse.REMAINDER,
                             help='task parameters, if any')
     cli_parser.set_defaults(prompt_arguments=[
@@ -104,14 +100,6 @@ def main():
         PromptArg('password', 'vManage password: ', secure_prompt=True)
     ])
     cli_args = cli_parser.parse_args()
-
-    # Evaluate whether user must be prompted for additional arguments
-    try:
-        for prompt_arg in getattr(cli_args, 'prompt_arguments', []):
-            if getattr(cli_args, prompt_arg.argument) is None:
-                setattr(cli_args, prompt_arg.argument, prompt_arg())
-    except KeyboardInterrupt:
-        sys.exit(1)
 
     # Logging setup
     logging_config = json.loads(LOGGING_CONFIG)
@@ -126,14 +114,31 @@ def main():
     logging.config.dictConfig(logging_config)
 
     # Dispatch task
-    base_url = BASE_URL.format(address=cli_args.address, port=cli_args.port)
-    default_workdir = WORK_DIR.format(address=cli_args.address, date=date.today())
-
-    parsed_task_args = cli_args.task.parser(default_workdir, cli_args.task_args)
+    target_address = cli_args.address
+    parsed_task_args = cli_args.task.parser(cli_args.task_args, target_address=target_address)
     try:
-        with Rest(base_url, cli_args.user, cli_args.password, timeout=cli_args.timeout) as api:
-            # Dispatch to the appropriate task handler
-            cli_args.task.runner(api, parsed_task_args)
+        if cli_args.task.is_api_required(parsed_task_args):
+            # Evaluate whether user must be prompted for additional arguments
+            try:
+                for prompt_arg in getattr(cli_args, 'prompt_arguments', []):
+                    if getattr(cli_args, prompt_arg.argument) is None:
+                        setattr(cli_args, prompt_arg.argument, prompt_arg())
+            except KeyboardInterrupt:
+                sys.exit(1)
+
+            if target_address != cli_args.address:
+                # Target address changed, re-run parser
+                parsed_task_args = cli_args.task.parser(cli_args.task_args, target_address=cli_args.address)
+
+            base_url = BASE_URL.format(address=cli_args.address, port=cli_args.port)
+            with Rest(base_url, cli_args.user, cli_args.password, timeout=cli_args.timeout) as api:
+                # Dispatch to the appropriate task handler
+                cli_args.task.runner(parsed_task_args, api)
+
+        else:
+            # Dispatch to the appropriate task handler without api connection
+            cli_args.task.runner(parsed_task_args)
+
         cli_args.task.log_info('Task completed %s', cli_args.task.outcome('successfully', 'with caveats: {tally}'))
     except (LoginFailedException, ConnectionError, FileNotFoundError, ModelException) as ex:
         logging.getLogger(__name__).critical(ex)

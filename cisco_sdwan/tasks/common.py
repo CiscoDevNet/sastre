@@ -8,9 +8,12 @@ import logging
 import time
 import csv
 import re
+from pathlib import Path
+from shutil import rmtree
 from itertools import repeat
 from collections import namedtuple
 from cisco_sdwan.base.rest_api import Rest, RestAPIException
+from cisco_sdwan.base.models_base import DATA_DIR
 from cisco_sdwan.base.models_vmanage import (DeviceTemplate, DeviceTemplateValues, DeviceTemplateAttached,
                                              DeviceTemplateAttach, DeviceTemplateCLIAttach, DeviceModeCli,
                                              ActionStatus, PolicyVsmartStatus, PolicyVsmartStatusException,
@@ -88,11 +91,15 @@ class Task:
         return msg.format(tally=', '.join(msg_list))
 
     @staticmethod
-    def parser(default_workdir, task_args):
+    def parser(task_args, **kwargs):
         raise NotImplementedError()
 
+    @staticmethod
+    def is_api_required(parsed_args):
+        return True
+
     @classmethod
-    def runner(cls, api, parsed_args):
+    def runner(cls, parsed_args, api):
         raise NotImplementedError()
 
     @classmethod
@@ -117,6 +124,17 @@ class Task:
             for tag, info, index_cls, item_cls in catalog_entry_iter
         )
         return ((tag, info, index, item_cls) for tag, info, index, item_cls in all_index_iter if index is not None)
+
+    @staticmethod
+    def item_get(item_cls, backend, item_id, item_name, ext_name):
+        if isinstance(backend, Rest):
+            return item_cls.get(backend, item_id)
+        else:
+            return item_cls.load(backend, ext_name, item_name, item_id)
+
+    @staticmethod
+    def index_get(index_cls, backend):
+        return index_cls.get(backend) if isinstance(backend, Rest) else index_cls.load(backend)
 
     @classmethod
     def attach_template(cls, api, workdir, ext_name, templates_iter, target_uuid_set=None):
@@ -349,7 +367,12 @@ class Task:
         return result
 
 
-class WaitActionsException(Exception):
+class TaskException(Exception):
+    """ Exception for Task errors """
+    pass
+
+
+class WaitActionsException(TaskException):
     """ Exception indicating failure in one or more actions being monitored """
     pass
 
@@ -357,11 +380,14 @@ class WaitActionsException(Exception):
 class Table:
     def __init__(self, *columns):
         self.header = tuple(columns)
-        self._row_class = namedtuple('Row', columns)
+        self._row_class = namedtuple('Row', (f'column_{i}' for i in range(len(columns))))
         self._rows = list()
 
     def add(self, *row_values):
         self._rows.append(self._row_class(*row_values))
+
+    def add_marker(self):
+        self._rows.append(None)
 
     def extend(self, row_values_iter):
         self._rows.extend(self._row_class(*row_values) for row_values in row_values_iter)
@@ -375,7 +401,7 @@ class Table:
     def _column_max_width(self, index):
         return max(
             len(self.header[index]),
-            max((len(row[index]) for row in self._rows)) if len(self._rows) > 0 else 0
+            max((len(row[index]) for row in self._rows if row is not None)) if len(self._rows) > 0 else 0
         )
 
     def pretty_iter(self):
@@ -388,12 +414,40 @@ class Table:
         yield border_line
         yield '|' + '|'.join(cell_format(width, value) for width, value in zip(col_width_list, self.header)) + '|'
         yield border_line
-        for row in self._rows:
-            yield '|' + '|'.join(cell_format(width, value) for width, value in zip(col_width_list, row)) + '|'
+        for row_num, row in enumerate(self._rows):
+            if row is not None:
+                yield '|' + '|'.join(cell_format(width, value) for width, value in zip(col_width_list, row)) + '|'
+            elif 0 < row_num < len(self._rows)-1:
+                yield border_line
+
         yield border_line
 
     def save(self, filename):
         with open(filename, 'w', newline='') as csv_file:
             writer = csv.writer(csv_file)
             writer.writerow(self.header)
-            writer.writerows(self._rows)
+            writer.writerows(row for row in self._rows if row is not None)
+
+
+def clean_dir(target_dir_name, max_saved=99):
+    """
+    Clean target_dir_name directory if it exists. If max_saved is non-zero and target_dir_name exists, move it to a new
+    directory name in sequence.
+    :param target_dir_name: str with the directory to be cleaned
+    :param max_saved: int indicating the maximum instances to keep. If 0, target_dir_name is just deleted.
+    """
+    target_dir = Path(DATA_DIR, target_dir_name)
+    if target_dir.exists():
+        if max_saved > 0:
+            save_seq = range(max_saved)
+            for elem in save_seq:
+                save_path = Path(DATA_DIR, '{workdir}_{count}'.format(workdir=target_dir_name, count=elem+1))
+                if elem == save_seq[-1]:
+                    rmtree(save_path, ignore_errors=True)
+                if not save_path.exists():
+                    target_dir.rename(save_path)
+                    return save_path.name
+        else:
+            rmtree(target_dir, ignore_errors=True)
+
+    return False

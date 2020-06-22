@@ -4,48 +4,59 @@
  cisco_sdwan.tasks.implementation
  This module contains the implementation of user-facing tasks
 """
-__all__ = ['TaskBackup', 'TaskRestore', 'TaskDelete', 'TaskCertificate', 'TaskList', 'TaskShowTemplate']
+__all__ = ['TaskBackup', 'TaskRestore', 'TaskDelete', 'TaskCertificate', 'TaskList', 'TaskShowTemplate', 'TaskMigrate']
 
 import argparse
-from shutil import rmtree
 from pathlib import Path
+from uuid import uuid4
+from collections import namedtuple
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import RestAPIException, is_version_newer
 from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL, ordered_tags
-from cisco_sdwan.base.models_base import UpdateEval, filename_safe, DATA_DIR, ServerInfo
-from cisco_sdwan.base.models_vmanage import (DeviceTemplate, DeviceTemplateAttached, DeviceTemplateValues,
-                                             DeviceTemplateIndex, PolicyVsmartIndex, EdgeInventory, ControlInventory,
+from cisco_sdwan.base.models_base import UpdateEval, filename_safe, update_ids, ServerInfo, ExtendedTemplate
+from cisco_sdwan.base.models_vmanage import (DeviceConfig, DeviceConfigRFS, DeviceTemplate, DeviceTemplateAttached,
+                                             DeviceTemplateValues, DeviceTemplateIndex, FeatureTemplate,
+                                             FeatureTemplateIndex, PolicyVsmartIndex, EdgeInventory, ControlInventory,
                                              EdgeCertificate, EdgeCertificateSync, SettingsVbond)
-from .utils import TaskOptions, TagOptions, ShowOptions, existing_file_type, filename_type, regex_type, uuid_type
-from .common import regex_search, Task, Table, WaitActionsException
+from cisco_sdwan.base.processor import StopProcessorException, ProcessorException
+from cisco_sdwan.migration import factory_cedge_aaa, factory_cedge_global
+from cisco_sdwan.migration.feature_migration import FeatureProcessor
+from cisco_sdwan.migration.device_migration import DeviceProcessor
+from .utils import (TaskOptions, TagOptions, existing_file_type, filename_type, regex_type, uuid_type,
+                    version_type, default_workdir, ext_template_type)
+from .common import regex_search, clean_dir, Task, Table, WaitActionsException, TaskException
 
 
 @TaskOptions.register('backup')
 class TaskBackup(Task):
     @staticmethod
-    def parser(default_workdir, task_args):
-        task_parser = argparse.ArgumentParser(description='{header}\nBackup task:'.format(header=title),
-                                              formatter_class=argparse.RawDescriptionHelpFormatter)
-        task_parser.prog = '{script} backup'.format(script=task_parser.prog)
-        task_parser.add_argument('--workdir', metavar='<directory>', type=filename_type, default=default_workdir,
-                                 help='''Backup destination (default will be "{default_dir}").
-                                      '''.format(default_dir=default_workdir))
+    def parser(task_args, target_address=None):
+        task_parser = argparse.ArgumentParser(description=f'{title}\nBackup task:')
+        task_parser.prog = f'{task_parser.prog} backup'
+        task_parser.formatter_class = argparse.RawDescriptionHelpFormatter
+
+        task_parser.add_argument('--workdir', metavar='<directory>', type=filename_type,
+                                 default=default_workdir(target_address),
+                                 help='Backup destination (default: %(default)s).')
+        task_parser.add_argument('--no-rollover', action='store_true',
+                                 help='By default, if workdir already exists (before a new backup is saved) the old '
+                                      'workdir is renamed using a rolling naming scheme. This option disables this '
+                                      'automatic rollover.')
         task_parser.add_argument('--regex', metavar='<regex>', type=regex_type,
                                  help='Regular expression matching item names to be backed up, within selected tags.')
         task_parser.add_argument('tags', metavar='<tag>', nargs='+', type=TagOptions.tag,
-                                 help='''One or more tags for selecting items to be backed up. 
-                                         Multiple tags should be separated by space.
-                                         Available tags: {tag_options}. Special tag '{all}' selects all items, 
-                                         including WAN edge certificates.
-                                      '''.format(tag_options=TagOptions.options(), all=CATALOG_TAG_ALL))
+                                 help='One or more tags for selecting items to be backed up. Multiple tags should be '
+                                      f'separated by space. Available tags: {TagOptions.options()}. Special tag '
+                                      f'"{CATALOG_TAG_ALL}" selects all items, including WAN edge certificates and '
+                                      'device configurations.')
         return task_parser.parse_args(task_args)
 
     @classmethod
-    def runner(cls, api, parsed_args):
-        cls.log_info('Starting backup: vManage URL: "%s" > Local workdir: "%s"', api.base_url, parsed_args.workdir)
+    def runner(cls, parsed_args, api):
+        cls.log_info('Starting backup: vManage URL: "%s" -> Local workdir: "%s"', api.base_url, parsed_args.workdir)
 
         # Backup workdir must be empty for a new backup
-        saved_workdir = cls.clean_workdir(parsed_args.workdir)
+        saved_workdir = clean_dir(parsed_args.workdir, max_saved=0 if parsed_args.no_rollover else 99)
         if saved_workdir:
             cls.log_info('Previous backup under "%s" was saved as "%s"', parsed_args.workdir, saved_workdir)
 
@@ -53,14 +64,33 @@ class TaskBackup(Task):
         if target_info.save(parsed_args.workdir):
             cls.log_info('Saved vManage server information')
 
+        # Backup items not registered to the catalog, but to be included when tag is 'all'
         if CATALOG_TAG_ALL in parsed_args.tags:
-            # Items without index files to be included with tag 'all'
             edge_certs = EdgeCertificate.get(api)
             if edge_certs is None:
                 cls.log_error('Failed backup WAN edge certificates')
             elif edge_certs.save(parsed_args.workdir):
                 cls.log_info('Saved WAN edge certificates')
 
+            for inventory, info in ((EdgeInventory.get(api), 'WAN edge'), (ControlInventory.get(api), 'controller')):
+                if inventory is None:
+                    cls.log_error('Failed retrieving %s inventory', info)
+                    continue
+
+                for uuid, _, hostname, _ in inventory.extended_iter():
+                    if hostname is None:
+                        cls.log_debug('Skipping %s, no hostname', uuid)
+                        continue
+
+                    for item, config_type in ((DeviceConfig.get(api, DeviceConfig.api_params(uuid)), 'CFS'),
+                                              (DeviceConfigRFS.get(api, DeviceConfigRFS.api_params(uuid)), 'RFS')):
+                        if item is None:
+                            cls.log_error('Failed backup %s device configuration %s', config_type, hostname)
+                            continue
+                        if item.save(parsed_args.workdir, item_name=hostname, item_id=uuid):
+                            cls.log_info('Done %s device configuration %s', config_type, hostname)
+
+        # Backup items registered to the catalog
         for _, info, index_cls, item_cls in catalog_iter(*parsed_args.tags, version=api.server_version):
             item_index = index_cls.get(api)
             if item_index is None:
@@ -102,32 +132,18 @@ class TaskBackup(Task):
                     except RestAPIException as ex:
                         cls.log_error('Failed backup %s %s values: %s', info, item_name, ex)
 
-    @staticmethod
-    def clean_workdir(workdir, max_saved=99):
-        workdir_path = Path(DATA_DIR, workdir)
-        if workdir_path.exists():
-            save_seq = range(max_saved)
-            for elem in save_seq:
-                save_path = Path(DATA_DIR, '{workdir}_{count}'.format(workdir=workdir, count=elem+1))
-                if elem == save_seq[-1]:
-                    rmtree(save_path, ignore_errors=True)
-                if not save_path.exists():
-                    workdir_path.rename(save_path)
-                    return save_path.name
-
-        return False
-
 
 @TaskOptions.register('restore')
 class TaskRestore(Task):
     @staticmethod
-    def parser(default_workdir, task_args):
-        task_parser = argparse.ArgumentParser(description='{header}\nRestore task:'.format(header=title),
-                                              formatter_class=argparse.RawDescriptionHelpFormatter)
-        task_parser.prog = '{script} restore'.format(script=task_parser.prog)
-        task_parser.add_argument('--workdir', metavar='<directory>', type=existing_file_type, default=default_workdir,
-                                 help='''Restore source (default will be "{default_dir}").
-                                      '''.format(default_dir=default_workdir))
+    def parser(task_args, target_address=None):
+        task_parser = argparse.ArgumentParser(description=f'{title}\nRestore task:')
+        task_parser.prog = f'{task_parser.prog} restore'
+        task_parser.formatter_class = argparse.RawDescriptionHelpFormatter
+
+        task_parser.add_argument('--workdir', metavar='<directory>', type=existing_file_type,
+                                 default=default_workdir(target_address),
+                                 help='Restore source (default: %(default)s).')
         task_parser.add_argument('--regex', metavar='<regex>', type=regex_type,
                                  help='Regular expression matching item names to be restored, within selected tags.')
         xor_group = task_parser.add_mutually_exclusive_group(required=False)
@@ -136,18 +152,17 @@ class TaskRestore(Task):
         xor_group.add_argument('--attach', action='store_true',
                                help='Attach devices to templates and activate vSmart policy after restoring items.')
         task_parser.add_argument('--force', action='store_true',
-                                 help='''Target vManage items with the same name as the corresponding item in workdir
-                                         are updated with the contents from workdir. Without this option, those items
-                                         are skipped and not overwritten.''')
+                                 help='Target vManage items with the same name as the corresponding item in workdir '
+                                      'are updated with the contents from workdir. Without this option, those items '
+                                      'are skipped and not overwritten.')
         task_parser.add_argument('tag', metavar='<tag>', type=TagOptions.tag,
-                                 help='''Tag for selecting items to be restored. 
-                                         Items that are dependencies of the specified tag are automatically included.
-                                         Available tags: {tag_options}. Special tag '{all}' selects all items.
-                                      '''.format(tag_options=TagOptions.options(), all=CATALOG_TAG_ALL))
+                                 help='Tag for selecting items to be restored. Items that are dependencies of the '
+                                      'specified tag are automatically included. Available tags: '
+                                      f'{TagOptions.options()}. Special tag "{CATALOG_TAG_ALL}" selects all items.')
         return task_parser.parse_args(task_args)
 
     @classmethod
-    def runner(cls, api, parsed_args):
+    def runner(cls, parsed_args, api):
         def load_items(index, item_cls):
             item_iter = (
                 (item_id, item_cls.load(parsed_args.workdir, index.need_extended_name, item_name, item_id))
@@ -155,18 +170,18 @@ class TaskRestore(Task):
             )
             return ((item_id, item_obj) for item_id, item_obj in item_iter if item_obj is not None)
 
-        cls.log_info('Starting restore%s: Local workdir: "%s" > vManage URL: "%s"',
+        cls.log_info('Starting restore%s: Local workdir: "%s" -> vManage URL: "%s"',
                      ', DRY-RUN mode' if parsed_args.dryrun else '', parsed_args.workdir, api.base_url)
 
         local_info = ServerInfo.load(parsed_args.workdir)
         # Server info file may not be present (e.g. backup from older Sastre releases)
         if local_info is not None and is_version_newer(api.server_version, local_info.server_version):
-            cls.log_warning('Target vManage release (%s) is older than the release used in backup (%s). ' +
+            cls.log_warning('Target vManage release (%s) is older than the release used in backup (%s). '
                             'Items may fail to be restored due to incompatibilities across releases.',
                             api.server_version, local_info.server_version)
         vbond = SettingsVbond.get(api)
         if vbond is None:
-            cls.log_warning('Failed retrieving vBond settings. Restoring template_device items will fail if vBond ' +
+            cls.log_warning('Failed retrieving vBond settings. Restoring template_device items will fail if vBond '
                             'is not configured.')
 
         cls.log_info('Loading existing items from target vManage')
@@ -182,7 +197,7 @@ class TaskRestore(Task):
         match_set = set()       # {<item_id>, ...}
         for tag in ordered_tags(parsed_args.tag):
             if tag == 'template_device' and vbond is not None and not vbond.is_configured:
-                cls.log_warning('Will skip %s items because vBond is not configured. ' +
+                cls.log_warning('Will skip %s items because vBond is not configured. '
                                 'On vManage, Administration > Settings > vBond.', tag)
                 continue
 
@@ -223,7 +238,7 @@ class TaskRestore(Task):
                     if item_matches:
                         match_set.add(item_id)
                     if item_matches or item_id in dependency_set:
-                        # A target_id that is not None signals a push operation, as opposed to post.
+                        # A target_id that is not None signals a put operation, as opposed to post.
                         # target_id will be None unless --force is specified and item name is on target
                         restore_item_list.append((item_id, item, target_id))
                         dependency_set.update(item.id_references_set)
@@ -346,27 +361,27 @@ class TaskRestore(Task):
 @TaskOptions.register('delete')
 class TaskDelete(Task):
     @staticmethod
-    def parser(default_workdir, task_args):
-        task_parser = argparse.ArgumentParser(description='{header}\nDelete task:'.format(header=title),
-                                              formatter_class=argparse.RawDescriptionHelpFormatter)
-        task_parser.prog = '{script} delete'.format(script=task_parser.prog)
+    def parser(task_args, target_address=None):
+        task_parser = argparse.ArgumentParser(description=f'{title}\nDelete task:')
+        task_parser.prog = f'{task_parser.prog} delete'
+        task_parser.formatter_class = argparse.RawDescriptionHelpFormatter
+
         task_parser.add_argument('--regex', metavar='<regex>', type=regex_type,
                                  help='Regular expression matching item names to be deleted, within selected tags.')
         xor_group = task_parser.add_mutually_exclusive_group(required=False)
         xor_group.add_argument('--dryrun', action='store_true',
                                help='Dry-run mode. Items matched for removal are listed but not deleted.')
         xor_group.add_argument('--detach', action='store_true',
-                               help='''USE WITH CAUTION! Detach devices from templates and deactivate vSmart policy 
-                                       before deleting items. This allows deleting items that are associated with
-                                       attached templates and active policies.''')
+                               help='USE WITH CAUTION! Detach devices from templates and deactivate vSmart policy '
+                                    'before deleting items. This allows deleting items that are associated with '
+                                    'attached templates and active policies.')
         task_parser.add_argument('tag', metavar='<tag>', type=TagOptions.tag,
-                                 help='''Tag for selecting items to be deleted. 
-                                         Available tags: {tag_options}. Special tag '{all}' selects all items.
-                                      '''.format(tag_options=TagOptions.options(), all=CATALOG_TAG_ALL))
+                                 help='Tag for selecting items to be deleted. Available tags: '
+                                      f'{TagOptions.options()}. Special tag "{CATALOG_TAG_ALL}" selects all items.')
         return task_parser.parse_args(task_args)
 
     @classmethod
-    def runner(cls, api, parsed_args):
+    def runner(cls, parsed_args, api):
         cls.log_info('Starting delete%s: vManage URL: "%s"',
                      ', DRY-RUN mode' if parsed_args.dryrun else '', api.base_url)
 
@@ -423,19 +438,20 @@ class TaskDelete(Task):
 @TaskOptions.register('certificate')
 class TaskCertificate(Task):
     @staticmethod
-    def parser(default_workdir, task_args):
-        task_parser = argparse.ArgumentParser(description='{header}\nCertificate task:'.format(header=title),
-                                              formatter_class=argparse.RawDescriptionHelpFormatter)
-        task_parser.prog = '{script} certificate'.format(script=task_parser.prog)
+    def parser(task_args, target_address=None):
+        task_parser = argparse.ArgumentParser(description=f'{title}\nCertificate task:')
+        task_parser.prog = f'{task_parser.prog} certificate'
+        task_parser.formatter_class = argparse.RawDescriptionHelpFormatter
+
         sub_tasks = task_parser.add_subparsers(title='commands', dest='command',
                                                help='Define source of WAN edge certificate validity status.')
         sub_tasks.required = True
 
         restore_parser = sub_tasks.add_parser('restore', help='Restore status from backup.')
         restore_parser.set_defaults(source_iter=TaskCertificate.restore_iter)
-        restore_parser.add_argument('--workdir', metavar='<directory>', type=existing_file_type, default=default_workdir,
-                                    help='''Restore source (default will be "{default_dir}").
-                                         '''.format(default_dir=default_workdir))
+        restore_parser.add_argument('--workdir', metavar='<directory>', type=existing_file_type,
+                                    default=default_workdir(target_address),
+                                    help='Restore source (default: %(default)s).')
 
         set_parser = sub_tasks.add_parser('set', help='Set status to provided value.')
         set_parser.set_defaults(source_iter=TaskCertificate.set_iter)
@@ -445,13 +461,11 @@ class TaskCertificate(Task):
         # Parameters common to all sub-tasks
         for sub_task in (restore_parser, set_parser):
             sub_task.add_argument('--regex', metavar='<regex>', type=regex_type,
-                                  help='''Regular expression selecting devices to modify certificate status. 
-                                          Matches on the hostname or chassis/uuid. Use "^-$" to match devices without 
-                                          a hostname. 
-                                       ''')
+                                  help='Regular expression selecting devices to modify certificate status. Matches on '
+                                       'the hostname or chassis/uuid. Use "^-$" to match devices without a hostname.')
             sub_task.add_argument('--dryrun', action='store_true',
-                                  help='''Dry-run mode. List modifications that would be performed without pushing 
-                                          changes to vManage.''')
+                                  help='Dry-run mode. List modifications that would be performed without pushing '
+                                       'changes to vManage.')
 
         return task_parser.parse_args(task_args)
 
@@ -477,13 +491,11 @@ class TaskCertificate(Task):
         )
 
     @classmethod
-    def runner(cls, api, parsed_args):
+    def runner(cls, parsed_args, api):
         if parsed_args.command == 'restore':
-            start_msg = 'Restore status workdir: "{dir}" > vManage URL: "{url}"'.format(dir=parsed_args.workdir,
-                                                                                        url=api.base_url)
+            start_msg = f'Restore status workdir: "{parsed_args.workdir}" -> vManage URL: "{api.base_url}"'
         else:
-            start_msg = 'Set status to "{status}" > vManage URL: "{url}"'.format(status=parsed_args.status,
-                                                                                 url=api.base_url)
+            start_msg = f'Set status to "{parsed_args.status}" -> vManage URL: "{api.base_url}"'
         cls.log_info('Starting certificate%s: %s', ', DRY-RUN mode' if parsed_args.dryrun else '', start_msg)
 
         try:
@@ -524,51 +536,82 @@ class TaskCertificate(Task):
 @TaskOptions.register('list')
 class TaskList(Task):
     @staticmethod
-    def parser(default_workdir, task_args):
-        task_parser = argparse.ArgumentParser(description='{header}\nList task:'.format(header=title),
-                                              formatter_class=argparse.RawDescriptionHelpFormatter)
-        task_parser.prog = '{script} list'.format(script=task_parser.prog)
-        sub_tasks = task_parser.add_subparsers(title='options', dest='option', help='Specify type of elements to list.')
+    def parser(task_args, target_address=None):
+        task_parser = argparse.ArgumentParser(description=f'{title}\nList task:')
+        task_parser.prog = f'{task_parser.prog} list'
+        task_parser.formatter_class = argparse.RawDescriptionHelpFormatter
+
+        sub_tasks = task_parser.add_subparsers(title='options', dest='option', help='list options')
         sub_tasks.required = True
 
         config_parser = sub_tasks.add_parser('configuration', aliases=['config'], help='List configuration items.')
         config_parser.set_defaults(table_factory=TaskList.config_table)
+        config_parser.set_defaults(subtask_info='list configuration')
         config_parser.add_argument('tags', metavar='<tag>', nargs='+', type=TagOptions.tag,
-                                   help='''One or more tags for selecting groups of items. 
-                                           Multiple tags should be separated by space.
-                                           Available tags: {tag_options}. Special tag '{all}' selects all items.
-                                        '''.format(tag_options=TagOptions.options(), all=CATALOG_TAG_ALL))
+                                   help='One or more tags for selecting groups of items. Multiple tags should be '
+                                        f'separated by space. Available tags: {TagOptions.options()}. Special tag '
+                                        f'"{CATALOG_TAG_ALL}" selects all items.')
         config_parser.add_argument('--regex', metavar='<regex>', type=regex_type,
                                    help='Regular expression selecting items to list. Match on item names or item IDs.')
 
         cert_parser = sub_tasks.add_parser('certificate', aliases=['cert'], help='List certificates.')
         cert_parser.set_defaults(table_factory=TaskList.cert_table)
+        cert_parser.set_defaults(subtask_info='list certificates')
         cert_parser.add_argument('--regex', metavar='<regex>', type=regex_type,
-                                 help='''Regular expression selecting devices to list. Match on hostname or 
-                                         chassis/uuid. Use "^-$" to match devices without a hostname.
-                                      ''')
+                                 help='Regular expression selecting devices to list. Match on hostname or '
+                                      'chassis/uuid. Use "^-$" to match devices without a hostname.')
+
+        xform_parser = sub_tasks.add_parser('transform',
+                                            help='List name transformations performed by a name-regex against '
+                                                 'existing item names.')
+        xform_parser.set_defaults(table_factory=TaskList.xform_table)
+        xform_parser.set_defaults(subtask_info='test name-regex')
+        xform_parser.add_argument('tags', metavar='<tag>', nargs='+', type=TagOptions.tag,
+                                  help='One or more tags for selecting groups of items. Multiple tags should be '
+                                       f'separated by space. Available tags: {TagOptions.options()}. Special tag '
+                                       f'"{CATALOG_TAG_ALL}" selects all items.')
+        xform_parser.add_argument('name_regex', metavar='<name-regex>', type=ext_template_type,
+                                  help='Name-regex used to transform an existing item name. Variable {name} is '
+                                       'replaced with the original template name. Sections of the original template '
+                                       'name can be selected using the {name <regex>} format. Where <regex> is a '
+                                       'regular expression that must contain at least one capturing group. Capturing '
+                                       'groups identify sections of the original name to keep.')
+        xform_parser.add_argument('--regex', metavar='<regex>', type=regex_type,
+                                  help='Regular expression selecting items to list. Match on original item names')
 
         # Parameters common to all sub-tasks
-        for sub_task in (config_parser, cert_parser):
+        for sub_task in (config_parser, cert_parser, xform_parser):
             sub_task.add_argument('--workdir', metavar='<directory>', type=existing_file_type,
-                                  help='''If specified, list will read from the specified directory instead of the 
-                                          target vManage.
-                                       '''.format(default_dir=default_workdir))
-            sub_task.add_argument('--csv', metavar='<filename>', type=filename_type,
-                                  help='''Instead of printing a table with list results, export as a csv file with
-                                          the provided filename.''')
+                                  help='If provided, list will read from the specified directory instead of the ' 
+                                       'target vManage.')
+            sub_task.add_argument('--csv', metavar='<filename>', type=filename_type, help='Export table as a csv file.')
 
         return task_parser.parse_args(task_args)
 
-    @classmethod
-    def config_table(cls, api, parsed_args):
-        target_info = 'vManage URL: "{url}"'.format(url=api.base_url) if parsed_args.workdir is None \
-                 else 'Local workdir: "{workdir}"'.format(workdir=parsed_args.workdir)
-        cls.log_info('Starting list configuration: %s', target_info)
+    @staticmethod
+    def is_api_required(parsed_args):
+        return parsed_args.workdir is None
 
-        backend = parsed_args.workdir if parsed_args.workdir is not None else api
+    @classmethod
+    def runner(cls, parsed_args, api=None):
+        source_info = f'Local workdir: "{parsed_args.workdir}"' if api is None else f'vManage URL: "{api.base_url}"'
+        cls.log_info('Starting %s: %s', parsed_args.subtask_info, source_info)
+
+        results = parsed_args.table_factory(parsed_args, api)
+        cls.log_info('List criteria matched %s items', len(results))
+
+        if len(results) > 0:
+            if parsed_args.csv is not None:
+                results.save(parsed_args.csv)
+                cls.log_info('Table exported as %s', parsed_args.csv)
+            else:
+                print('\n'.join(results.pretty_iter()))
+
+    @classmethod
+    def config_table(cls, parsed_args, api):
+        backend = api or parsed_args.workdir
         # Only perform version-based filtering if backend is api
-        version = None if parsed_args.workdir is not None else api.server_version
+        version = None if api is None else api.server_version
 
         matched_item_iter = (
             (item_name, item_id, tag, info)
@@ -582,12 +625,8 @@ class TaskList(Task):
         return results
 
     @classmethod
-    def cert_table(cls, api, parsed_args):
-        target_info = 'vManage URL: "{url}"'.format(url=api.base_url) if parsed_args.workdir is None \
-                 else 'Local workdir: "{workdir}"'.format(workdir=parsed_args.workdir)
-        cls.log_info('Starting list certificates: %s', target_info)
-
-        if parsed_args.workdir is not None:
+    def cert_table(cls, parsed_args, api):
+        if api is None:
             certs = EdgeCertificate.load(parsed_args.workdir)
             if certs is None:
                 raise FileNotFoundError('WAN edge certificates were not found in the backup')
@@ -605,69 +644,93 @@ class TaskList(Task):
         return results
 
     @classmethod
-    def runner(cls, api, parsed_args):
-        results = parsed_args.table_factory(api, parsed_args)
-        cls.log_info('List criteria matched %s items', len(results))
+    def xform_table(cls, parsed_args, api):
+        backend = api or parsed_args.workdir
+        # Only perform version-based filtering if backend is api
+        version = None if api is None else api.server_version
 
-        if len(results) > 0:
-            print_buffer = []
-            print_buffer.extend(results.pretty_iter())
+        name_regex = ExtendedTemplate(parsed_args.name_regex)
+        matched_item_iter = (
+            (item_name,  name_regex(item_name), tag, info)
+            for tag, info, index, item_cls in cls.index_iter(backend, catalog_iter(*parsed_args.tags, version=version))
+            for item_id, item_name in index
+            if parsed_args.regex is None or regex_search(parsed_args.regex, item_name)
+        )
+        results = Table('Name', 'Transformed', 'Tag', 'Type')
+        results.extend(matched_item_iter)
 
-            if parsed_args.csv is not None:
-                results.save(parsed_args.csv)
-                cls.log_info('Table exported as %s', parsed_args.csv)
-            else:
-                print('\n'.join(print_buffer))
+        return results
 
 
 @TaskOptions.register('show-template')
 class TaskShowTemplate(Task):
     @staticmethod
-    def parser(default_workdir, task_args):
-        task_parser = argparse.ArgumentParser(description='{header}\nShow template task:'.format(header=title),
-                                              formatter_class=argparse.RawDescriptionHelpFormatter)
-        task_parser.prog = '{script} show-template'.format(script=task_parser.prog)
-        task_parser.add_argument('option', metavar='<option>', type=ShowOptions.option,
-                                 help='''Attributes to show. Available options: {show_options}.
-                                      '''.format(show_options=ShowOptions.options()))
-        task_parser.add_argument('--workdir', metavar='<directory>', type=existing_file_type,
-                                 help='''If specified, show-template will read from the specified directory instead of 
-                                        the target vManage.
-                                      '''.format(default_dir=default_workdir))
-        task_parser.add_argument('--csv', metavar='<directory>', type=filename_type,
-                                 help='''Instead of printing tables with the show-template results, export as csv files.
-                                         Exported files are saved under the specified directory.''')
-        xor_group = task_parser.add_mutually_exclusive_group(required=True)
+    def parser(task_args, target_address=None):
+        task_parser = argparse.ArgumentParser(description=f'{title}\nShow template task:')
+        task_parser.prog = f'{task_parser.prog} show-template'
+        task_parser.formatter_class = argparse.RawDescriptionHelpFormatter
+
+        sub_tasks = task_parser.add_subparsers(title='options', dest='option', help='show-template options')
+        sub_tasks.required = True
+
+        values_parser = sub_tasks.add_parser('values', help='Show values from template attachments.')
+        values_parser.set_defaults(table_factory=TaskShowTemplate.values_table)
+        values_parser.set_defaults(subtask_info='values')
+        xor_group = values_parser.add_mutually_exclusive_group(required=True)
         xor_group.add_argument('--name', metavar='<name>', help='Device template name.')
         xor_group.add_argument('--id', metavar='<id>', type=uuid_type, help='Device template ID.')
         xor_group.add_argument('--regex', metavar='<regex>', type=regex_type,
                                help='Regular expression matching device template names.')
+        values_parser.add_argument('--csv', metavar='<directory>', type=filename_type,
+                                   help='Export tables as csv files under the specified directory.')
+
+        references_parser = sub_tasks.add_parser('references', aliases=['ref'],
+                                                 help='Show device templates that reference a feature template.')
+        references_parser.set_defaults(table_factory=TaskShowTemplate.references_table)
+        references_parser.set_defaults(subtask_info='references')
+        references_parser.add_argument('--with-refs', action='store_true',
+                                       help='Include only feature-templates with device-template references.')
+        references_parser.add_argument('--regex', metavar='<regex>', type=regex_type,
+                                       help='Regular expression matching feature template names to include.')
+        references_parser.add_argument('--csv', metavar='<filename>', type=filename_type,
+                                       help='Export table as a csv file.')
+
+        # Parameters common to all sub-tasks
+        for sub_task in (values_parser, references_parser):
+            sub_task.add_argument('--workdir', metavar='<directory>', type=existing_file_type,
+                                  help='If provided, show-template will read from the specified directory instead of '
+                                       'the target vManage.')
+
         return task_parser.parse_args(task_args)
 
-    @classmethod
-    def runner(cls, api, parsed_args):
-        target_info = 'vManage URL: "{url}"'.format(url=api.base_url) if parsed_args.workdir is None \
-            else 'Local workdir: "{workdir}"'.format(workdir=parsed_args.workdir)
-        cls.log_info('Starting show: %s', target_info)
+    @staticmethod
+    def is_api_required(parsed_args):
+        return parsed_args.workdir is None
 
-        if parsed_args.csv is not None:
-            Path(parsed_args.csv).mkdir(parents=True, exist_ok=True)
+    @classmethod
+    def runner(cls, parsed_args, api=None):
+        source_info = f'Local workdir: "{parsed_args.workdir}"' if api is None else f'vManage URL: "{api.base_url}"'
+        cls.log_info('Starting show-template %s: %s', parsed_args.subtask_info, source_info)
 
         # Dispatch to the appropriate show handler
-        parsed_args.option(cls, api, parsed_args)
+        parsed_args.table_factory(parsed_args, api)
 
     @classmethod
-    @ShowOptions.register('values')
-    def device_template_values(cls, api, show_args):
+    def values_table(cls, parsed_args, api):
         def item_matches(item_name, item_id):
-            if show_args.id is not None:
-                return item_id == show_args.id
-            if show_args.name is not None:
-                return item_name == show_args.name
-            return regex_search(show_args.regex, item_name)
+            if parsed_args.id is not None:
+                return item_id == parsed_args.id
+            if parsed_args.name is not None:
+                return item_name == parsed_args.name
+            return regex_search(parsed_args.regex, item_name)
 
         def template_values(ext_name, template_name, template_id):
-            if show_args.workdir is None:
+            if api is None:
+                # Load from local backup
+                values = DeviceTemplateValues.load(parsed_args.workdir, ext_name, template_name, template_id)
+                if values is None:
+                    cls.log_debug('Skipped %s. No template values file found.', template_name)
+            else:
                 # Load from vManage via API
                 devices_attached = DeviceTemplateAttached.get(api, template_id)
                 if devices_attached is None:
@@ -681,16 +744,14 @@ class TaskShowTemplate(Task):
                 except RestAPIException:
                     cls.log_error('Failed to retrieve %s values', template_name)
                     return None
-            else:
-                # Load from local backup
-                values = DeviceTemplateValues.load(show_args.workdir, ext_name, template_name, template_id)
-                if values is None:
-                    cls.log_debug('Skipped %s. No template values file found.', template_name)
 
             return values
 
+        if parsed_args.csv is not None:
+            Path(parsed_args.csv).mkdir(parents=True, exist_ok=True)
+
         print_buffer = []
-        backend = show_args.workdir if show_args.workdir is not None else api
+        backend = api or parsed_args.workdir
         matched_item_iter = (
             (index.need_extended_name, item_name, item_id, tag, info)
             for tag, info, index, item_cls in cls.index_iter(backend, catalog_iter('template_device'))
@@ -713,18 +774,246 @@ class TaskShowTemplate(Task):
                     (var_names.get(var, '<not found>'), value, var) for var, value in entry.items()
                 )
                 if len(results) > 0:
-                    if show_args.csv is not None:
+                    if parsed_args.csv is not None:
                         filename = 'template_values_{name}_{id}.csv'.format(name=filename_safe(item_name, lower=True),
                                                                             id=csv_name or csv_id)
-                        results.save(Path(show_args.csv, filename))
+                        results.save(Path(parsed_args.csv, filename))
                     print_grp.extend(results.pretty_iter())
                 print_buffer.append('\n'.join(print_grp))
 
         if len(print_buffer) > 0:
-            if show_args.csv is not None:
-                cls.log_info('Files saved under directory %s', show_args.csv)
+            if parsed_args.csv is not None:
+                cls.log_info('Files saved under directory %s', parsed_args.csv)
             else:
                 print('\n\n'.join(print_buffer))
         else:
-            match_type = 'ID' if show_args.id is not None else 'name' if show_args.name is not None else 'regex'
+            match_type = 'ID' if parsed_args.id is not None else 'name' if parsed_args.name is not None else 'regex'
             cls.log_warning('No items found with the %s provided', match_type)
+
+    @classmethod
+    def references_table(cls, parsed_args, api):
+        FeatureInfo = namedtuple('FeatureInfo', ['name', 'type', 'attached', 'device_templates'])
+
+        backend = api or parsed_args.workdir
+        cls.log_info('Inspecting feature templates')
+        feature_index = cls.index_get(FeatureTemplateIndex, backend)
+        feature_dict = {}
+        for item_id, item_name in feature_index:
+            feature = cls.item_get(FeatureTemplate, backend, item_id, item_name, feature_index.need_extended_name)
+            if feature is None:
+                cls.log_error('Failed to load feature template %s', item_name)
+                continue
+
+            feature_dict[item_id] = FeatureInfo(item_name, feature.type, feature.devices_attached, set())
+
+        cls.log_info('Inspecting device templates')
+        device_index = cls.index_get(DeviceTemplateIndex, backend)
+        for item_id, item_name in device_index:
+            device = cls.item_get(DeviceTemplate, backend, item_id, item_name, device_index.need_extended_name)
+            if device is None:
+                cls.log_error('Failed to load device template %s', item_name)
+                continue
+            if device.is_type_cli:
+                continue
+
+            for feature_id in device.feature_templates:
+                feature_info = feature_dict.get(feature_id)
+                if feature_info is None:
+                    cls.log_warning('Template %s references a non-existing feature template: %s', item_name, feature_id)
+                    continue
+
+                feature_info.device_templates.add(item_name)
+
+        cls.log_info('Creating references table')
+        results = Table('Feature Template', 'Type', 'Devices Attached', 'Device Templates')
+        matched_item_iter = (feature_info for feature_info in feature_dict.values()
+                             if parsed_args.regex is None or regex_search(parsed_args.regex, feature_info.name))
+        for feature_info in matched_item_iter:
+            if not parsed_args.with_refs and not feature_info.device_templates:
+                results.add_marker()
+                results.add(feature_info.name, feature_info.type, str(feature_info.attached), '')
+                continue
+
+            for seq, device_template in enumerate(feature_info.device_templates):
+                if seq == 0:
+                    results.add_marker()
+                    results.add(feature_info.name, feature_info.type, str(feature_info.attached), device_template)
+                else:
+                    results.add('', '', '', device_template)
+
+        if len(results) > 0:
+            if parsed_args.csv is not None:
+                results.save(parsed_args.csv)
+                cls.log_info('Table exported as %s', parsed_args.csv)
+            else:
+                print('\n'.join(results.pretty_iter()))
+        else:
+            cls.log_warning('Table is empty, no items matched the criteria.')
+
+
+@TaskOptions.register('migrate')
+class TaskMigrate(Task):
+    @staticmethod
+    def parser(task_args, target_address=None):
+        task_parser = argparse.ArgumentParser(description=f'{title}\nMigrate task:')
+        task_parser.prog = f'{task_parser.prog} migrate'
+        task_parser.formatter_class = argparse.RawDescriptionHelpFormatter
+
+        task_parser.add_argument('scope', choices=['all', 'attached'],
+                                 help='Select whether to evaluate all feature templates, or only feature templates '
+                                      'attached to device templates.')
+        task_parser.add_argument('output', metavar='<directory>', type=filename_type,
+                                 help='Directory to save migrated templates.')
+        task_parser.add_argument('--no-rollover', action='store_true',
+                                 help='By default, if the output directory already exists it is renamed using a '
+                                      'rolling naming scheme. This option disables this automatic rollover.')
+        task_parser.add_argument('--name', metavar='<format>', type=ext_template_type, default='migrated_{name}',
+                                 help='Format used to name the migrated templates (default: %(default)s). '
+                                      'Variable {name} is replaced with the original template name. Sections of the '
+                                      'original template name can be selected using the {name <regex>} format. Where '
+                                      '<regex> is a regular expression that must contain at least one capturing group. '
+                                      'Capturing groups identify sections of the original name to keep.')
+        task_parser.add_argument('--from', metavar='<version>', type=version_type, dest='from_version', default='18.4',
+                                 help='vManage version from source templates (default: %(default)s).')
+        task_parser.add_argument('--to', metavar='<version>', type=version_type, dest='to_version', default='20.1',
+                                 help='Target vManage version for template migration (default: %(default)s).')
+        task_parser.add_argument('--workdir', metavar='<directory>', type=existing_file_type,
+                                 help='If provided, migrate will read from the specified directory. '
+                                      'Otherwise it reads from the target vManage.')
+
+        return task_parser.parse_args(task_args)
+
+    @staticmethod
+    def is_api_required(parsed_args):
+        return parsed_args.workdir is None
+
+    @classmethod
+    def runner(cls, parsed_args, api=None):
+        source_info = f'Local workdir: "{parsed_args.workdir}"' if api is None else f'vManage URL: "{api.base_url}"'
+        cls.log_info('Starting migrate: %s %s -> %s Local output dir: "%s"', source_info, parsed_args.from_version,
+                     parsed_args.to_version, parsed_args.output)
+
+        # Output directory must be empty for a new migration
+        saved_output = clean_dir(parsed_args.output, max_saved=0 if parsed_args.no_rollover else 99)
+        if saved_output:
+            cls.log_info('Previous migration under "%s" was saved as "%s"', parsed_args.output, saved_output)
+
+        if api is None:
+            backend = parsed_args.workdir
+            local_info = ServerInfo.load(backend)
+            server_version = local_info.server_version if local_info is not None else None
+        else:
+            backend = api
+            server_version = backend.server_version
+
+        try:
+            # Load migration processors
+            loaded_processors = {
+                FeatureTemplate: FeatureProcessor.load(from_version=parsed_args.from_version,
+                                                       to_version=parsed_args.to_version),
+                DeviceTemplate: DeviceProcessor.load(from_version=parsed_args.from_version,
+                                                     to_version=parsed_args.to_version)
+            }
+            cls.log_info('Loaded template migration recipes')
+
+            server_info = ServerInfo(server_version=parsed_args.to_version)
+            if server_info.save(parsed_args.output):
+                cls.log_info('Saved vManage server information')
+
+            id_mapping = {}  # {<old_id>: <new_id>}
+            for tag in ordered_tags(CATALOG_TAG_ALL, reverse=True):
+                cls.log_info('Inspecting %s items', tag)
+
+                for _, info, index_cls, item_cls in catalog_iter(tag, version=server_version):
+                    item_index = cls.index_get(index_cls, backend)
+                    if item_index is None:
+                        cls.log_debug('Skipped %s, none found', info)
+                        continue
+
+                    name_set = {item_name for item_id, item_name in item_index}
+
+                    is_bad_name = False
+                    export_list = []
+                    id_hint_map = {item_name: item_id for item_id, item_name in item_index}
+                    for item_id, item_name in item_index:
+                        item = cls.item_get(item_cls, backend, item_id, item_name, item_index.need_extended_name)
+                        if item is None:
+                            cls.log_error('Failed loading %s %s', info, item_name)
+                            continue
+
+                        try:
+                            item_processor = loaded_processors.get(item_cls)
+                            if item_processor is None:
+                                raise StopProcessorException()
+
+                            cls.log_debug('Evaluating %s %s', info, item_name)
+                            if not item_processor.is_in_scope(item, migrate_all=(parsed_args.scope == 'all')):
+                                cls.log_debug('Skipping %s, migration not necessary', item_name)
+                                raise StopProcessorException()
+
+                            new_name, is_valid = item.get_new_name(parsed_args.name)
+                            if not is_valid:
+                                cls.log_error('New %s name is not valid: %s', info, new_name)
+                                is_bad_name = True
+                                raise StopProcessorException()
+                            if new_name in name_set:
+                                cls.log_error('New %s name collision: %s -> %s', info, item_name, new_name)
+                                is_bad_name = True
+                                raise StopProcessorException()
+
+                            name_set.add(new_name)
+
+                            new_id = str(uuid4())
+                            new_payload, trace_log = item_processor.eval(item, new_name, new_id)
+                            for trace in trace_log:
+                                cls.log_debug('Processor: %s', trace)
+
+                            if item.is_equal(new_payload):
+                                cls.log_debug('Skipping %s, no changes', item_name)
+                                raise StopProcessorException()
+
+                            new_item = item_cls(update_ids(id_mapping, new_payload))
+                            id_mapping[item_id] = new_id
+                            id_hint_map[new_name] = new_id
+
+                            if item_processor.replace_original():
+                                cls.log_debug('Migrated replaces original: %s -> %s', item_name, new_name)
+                                item = new_item
+                            else:
+                                cls.log_debug('Migrated adds to original: %s + %s', item_name, new_name)
+                                export_list.append(new_item)
+
+                        except StopProcessorException:
+                            pass
+
+                        export_list.append(item)
+
+                    if is_bad_name:
+                        raise TaskException(f'One or more new {info} names are not valid')
+
+                    if not export_list:
+                        cls.log_info('No %s migrated', info)
+                        continue
+
+                    if issubclass(item_cls, FeatureTemplate):
+                        for factory_default in (factory_cedge_aaa, factory_cedge_global):
+                            if any(factory_default.name == elem.name for elem in export_list):
+                                cls.log_debug('Using existing factory %s %s', info, factory_default.name)
+                                # Updating because device processor always use the built-in IDs
+                                id_mapping[factory_default.uuid] = id_hint_map[factory_default.name]
+                            else:
+                                export_list.append(factory_default)
+                                id_hint_map[factory_default.name] = factory_default.uuid
+                                cls.log_debug('Added factory %s %s', info, factory_default.name)
+
+                    new_item_index = index_cls.create(export_list, id_hint_map)
+                    if new_item_index.save(parsed_args.output):
+                        cls.log_info('Saved %s index', info)
+
+                    for new_item in export_list:
+                        if new_item.save(parsed_args.output, new_item_index.need_extended_name, new_item.name,
+                                         id_hint_map[new_item.name]):
+                            cls.log_info('Saved %s %s', info, new_item.name)
+
+        except (ProcessorException, TaskException) as ex:
+            cls.log_critical('Migration aborted: %s', ex)

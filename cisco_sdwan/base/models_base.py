@@ -10,6 +10,7 @@ from pathlib import Path
 from itertools import zip_longest
 from operator import itemgetter
 from collections import namedtuple
+from typing import Sequence, Dict, Tuple
 from .rest_api import RestAPIException
 
 
@@ -120,12 +121,25 @@ class IndexApiItem(ApiItem):
 
     # Iter_fields should be defined in subclasses and needs to be a tuple subclass.
     iter_fields = None
+    # Extended_iter_fields should be defined in subclasses that use extended_iter, needs to be a tuple subclass.
+    extended_iter_fields = None
 
     def __iter__(self):
         return self.iter(*self.iter_fields)
 
     def iter(self, *iter_fields):
         return (itemgetter(*iter_fields)(elem) for elem in self.data)
+
+    def extended_iter(self):
+        """
+        Returns an iterator where each entry is composed of the combined fields of iter_fields and extended_iter_fields.
+        None is returned on any fields that are missing in an entry
+        :return: The iterator
+        """
+        def default_getter(*fields):
+            return lambda row: tuple(row.get(field) for field in fields)
+
+        return (default_getter(*self.iter_fields, *self.extended_iter_fields)(elem) for elem in self.data)
 
 
 class ConfigItem(ApiItem):
@@ -139,8 +153,10 @@ class ConfigItem(ApiItem):
     readonly_tag = 'readOnly'
     owner_tag = 'owner'
     info_tag = 'infoTag'
+    type_tag = None
     post_filtered_tags = None
     skip_cmp_tag_set = set()
+    name_check_regex = re.compile(r'(?=^.{1,128}$)[^&<>! "]+$')
 
     def __init__(self, data):
         """
@@ -162,6 +178,10 @@ class ConfigItem(ApiItem):
     def is_system(self):
         return self.data.get(self.owner_tag, '') == 'system' or self.data.get(self.info_tag, '') == 'aci'
 
+    @property
+    def type(self):
+        return self.data.get(self.type_tag)
+
     @classmethod
     def get_filename(cls, ext_name, item_name, item_id):
         if item_name is None or item_id is None:
@@ -173,7 +193,7 @@ class ConfigItem(ApiItem):
         return cls.store_file.format(item_name=safe_name, item_id=item_id)
 
     @classmethod
-    def load(cls, node_dir, ext_name=False, item_name=None, item_id=None, raise_not_found=False):
+    def load(cls, node_dir, ext_name=False, item_name=None, item_id=None, raise_not_found=False, use_root_dir=True):
         """
         Factory method that loads data from a json file and returns a ConfigItem instance with that data
 
@@ -183,9 +203,11 @@ class ConfigItem(ApiItem):
         :param item_name: (Optional) Name of the item being loaded. Variable used to build the filename.
         :param item_id: (Optional) UUID for the item being loaded. Variable used to build the filename.
         :param raise_not_found: (Optional) If set to True, raise FileNotFoundError if file is not found.
+        :param use_root_dir: True indicates that node_dir is under the root_dir. When false, item should be located
+                             directly under node_dir/store_path
         :return: ConfigItem object, or None if file does not exist and raise_not_found=False
         """
-        dir_path = Path(cls.root_dir, node_dir, *cls.store_path)
+        dir_path = Path(cls.root_dir, node_dir, *cls.store_path) if use_root_dir else Path(node_dir, *cls.store_path)
         file_path = dir_path.joinpath(cls.get_filename(ext_name, item_name, item_id))
         try:
             with open(file_path, 'r') as read_f:
@@ -235,6 +257,9 @@ class ConfigItem(ApiItem):
         # Delete keys that shouldn't be on post requests
         filtered_keys = {
             self.id_tag,
+            '@rid',
+            'createdOn',
+            'lastUpdatedOn'
         }
         if self.post_filtered_tags is not None:
             filtered_keys.update(self.post_filtered_tags)
@@ -244,7 +269,7 @@ class ConfigItem(ApiItem):
         if new_name is not None:
             post_dict[self.name_tag] = new_name
 
-        return self._update_ids(id_mapping_dict, post_dict)
+        return update_ids(id_mapping_dict, post_dict)
 
     def put_data(self, id_mapping_dict):
         """
@@ -254,18 +279,14 @@ class ConfigItem(ApiItem):
         <new item id>
         :return: Dict containing payload for PUT requests
         """
-        return self._update_ids(id_mapping_dict, self.data)
+        filtered_keys = {
+            '@rid',
+            'createdOn',
+            'lastUpdatedOn'
+        }
+        put_dict = {k: v for k, v in self.data.items() if k not in filtered_keys}
 
-    @staticmethod
-    def _update_ids(id_mapping_dict, data_dict):
-        def replace_id(match):
-            matched_id = match.group(0)
-            return id_mapping_dict.get(matched_id, matched_id)
-
-        dict_json = re.sub(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}',
-                           replace_id, json.dumps(data_dict))
-
-        return json.loads(dict_json)
+        return update_ids(id_mapping_dict, put_dict)
 
     @property
     def id_references_set(self):
@@ -280,6 +301,52 @@ class ConfigItem(ApiItem):
 
         return set(re.findall(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}',
                               json.dumps(filtered_data)))
+
+    def get_new_name(self, name_template: str) -> Tuple[str, bool]:
+        """
+        Return a new valid name for this item based on the format string template provided. Variable {name} is replaced
+        with the existing item name. Other variables are provided via kwargs.
+        :param name_template: str containing the name template to construct the new name.
+                              For example: migrated_{name&G_Branch_184_(.*)}
+        :return: Tuple containing new name and an indication whether it is valid
+        """
+        is_valid = False
+
+        try:
+            new_name = ExtendedTemplate(name_template)(self.data[self.name_tag])
+        except KeyError:
+            new_name = None
+        else:
+            if self.name_check_regex.search(new_name) is not None:
+                is_valid = True
+
+        return new_name, is_valid
+
+    def find_key(self, key, from_key=None):
+        """
+        Returns a list containing the values of all occurrences of key inside data. Matched values that are dict or list
+        are not included.
+        :param key: Key to search
+        :param from_key: Top-level key under which to start the search
+        :return: List
+        """
+        match_list = []
+
+        def find_in(json_obj):
+            if isinstance(json_obj, dict):
+                matched_val = json_obj.get(key)
+                if matched_val is not None and not isinstance(matched_val, dict) and not isinstance(matched_val, list):
+                    match_list.append(matched_val)
+                for value in json_obj.values():
+                    find_in(value)
+
+            elif isinstance(json_obj, list):
+                for elem in json_obj:
+                    find_in(elem)
+
+            return match_list
+
+        return find_in(self.data) if from_key is None else find_in(self.data[from_key])
 
 
 # Used for IndexConfigItem iter_fields when they follow (<item-id-label>, <item-name-label>) format
@@ -313,6 +380,18 @@ class IndexConfigItem(ConfigItem):
     extended_iter_fields = None
 
     store_path = ('inventory', )
+
+    @classmethod
+    def create(cls, item_list: Sequence[ConfigItem], id_hint_dict: Dict[str, str]):
+        def item_dict(item_obj: ConfigItem):
+            return {
+                key: item_obj.data.get(key, id_hint_dict.get(item_obj.name)) for key in cls.iter_fields
+            }
+
+        index_dict = {
+            'data': [item_dict(item) for item in item_list]
+        }
+        return cls(index_dict)
 
     def __iter__(self):
         return self.iter(*self.iter_fields)
@@ -396,6 +475,50 @@ def filename_safe(name, lower=False):
     # Inspired by Django's slugify function
     cleaned = re.sub(r'[^\w\s-]', '_', name)
     return cleaned.lower() if lower else cleaned
+
+
+def update_ids(id_mapping_dict, item_data):
+    def replace_id(match):
+        matched_id = match.group(0)
+        return id_mapping_dict.get(matched_id, matched_id)
+
+    dict_json = re.sub(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}',
+                       replace_id, json.dumps(item_data))
+
+    return json.loads(dict_json)
+
+
+class ExtendedTemplate:
+    template_pattern = re.compile(r'{name(?:\s+(?P<regex>.*?))?\}')
+
+    def __init__(self, template):
+        self.src_template = template
+        self.label_value_map = None
+
+    def __call__(self, name):
+        def regex_replace(match_obj):
+            regex = match_obj.group('regex')
+            if regex is not None:
+                regex_p = re.compile(regex)
+                if not regex_p.groups:
+                    raise KeyError('regular expression must include at least one capturing group')
+
+                value, regex_p_subs = regex_p.subn(''.join(f'\\{group+1}' for group in range(regex_p.groups)), name)
+                new_value = value if regex_p_subs else ''
+            else:
+                new_value = name
+
+            label = 'name_{count}'.format(count=len(self.label_value_map))
+            self.label_value_map[label] = new_value
+
+            return f'{{{label}}}'
+
+        self.label_value_map = {}
+        template, name_p_subs = self.template_pattern.subn(regex_replace, self.src_template)
+        if not name_p_subs:
+            raise KeyError('template must include {name} variable')
+
+        return template.format(**self.label_value_map)
 
 
 class ModelException(Exception):

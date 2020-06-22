@@ -1,0 +1,46 @@
+[
+    {
+        "dateGenerated": "06/02/2020",
+        "squashedVmanageVersions": [
+            "18.4",
+            "19.2",
+            "19.3"
+        ],
+        "fromvManageVersion": "all",
+        "tovManageVersion": "20.1",
+        "listOfTasks": [
+            {
+                "operation": "remove",
+                "fieldHierarchyList": [
+                    "generalTemplates",
+                    "templateType"
+                ],
+                "value": "aaa"
+            },
+            {
+                "operation": "replace",
+                "fieldHierarchyList": [
+                    "generalTemplates",
+                    "templateType"
+                ],
+                "mappings": {
+                    "banner": "cisco_banner",
+                    "bfd-vedge": "cisco_bfd",
+                    "bgp": "cisco_bgp",
+                    "dhcp-server": "cisco_dhcp_server",
+                    "logging": "cisco_logging",
+                    "ntp": "cisco_ntp",
+                    "omp-vedge": "cisco_omp",
+                    "ospf": "cisco_ospf",
+                    "snmp": "cisco_snmp",
+                    "system-vedge": "cisco_system",
+                    "vpn-vedge": "cisco_vpn",
+                    "vpn-vedge-interface": "cisco_vpn_interface",
+                    "vpn-vedge-interface-gre": "cisco_vpn_interface_gre",
+                    "vpn-vedge-interface-ipsec": "cisco_vpn_interface_ipsec",
+                    "security-vedge": "cisco_security"
+                }
+            }
+        ]
+    }
+]
