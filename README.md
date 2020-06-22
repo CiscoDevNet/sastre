@@ -19,6 +19,7 @@ Currently available tasks:
 - Certificate: Restore device certificate validity status from a backup or set to a desired value (i.e. valid, invalid or staging).
 - List: List configuration items or device certificate information from vManage or a local backup. Display as table or export as csv file.
 - Show-template: Show details about device templates on vManage or from a local backup. Display as table or export as csv file.
+- Migrate: Migrate configuration items from a vManage release to another. Currently only 18.4, 19.2 or 19.3 to 20.1 is supported. Minor revision numbers (e.g. 20.1.1) are not relevant for the template migration.
 
 Notes:
 - Either 'sdwan' or 'sastre' can be used as the main command.
@@ -28,24 +29,24 @@ Notes:
 ### Base parameters
 
     % sdwan -h
-    usage: sdwan.py [-h] [-a <vmanage-ip>] [-u <user>] [-p <password>] [--port <port>] [--timeout <timeout>] [--verbose] [--version] <task> ...
+    usage: sdwan [-h] [-a <vmanage-ip>] [-u <user>] [-p <password>] [--port <port>] [--timeout <timeout>] [--verbose] [--version] <task> ...
     
     Sastre - Automation Tools for Cisco SD-WAN Powered by Viptela
     
     positional arguments:
-      <task>                task to be performed (backup, restore, delete, certificate, list, show-template)
+      <task>                task to be performed (backup, restore, delete, certificate, list, show-template, migrate)
       <arguments>           task parameters, if any
     
     optional arguments:
       -h, --help            show this help message and exit
       -a <vmanage-ip>, --address <vmanage-ip>
-                            vManage IP address, can also be defined via VMANAGE_IP environment variable. If neither is provided user is prompted for an address.
+                            vManage IP address, can also be defined via VMANAGE_IP environment variable. If neither is provided user is prompted for the address.
       -u <user>, --user <user>
-                            user name, can also be defined via VMANAGE_USER environment variable. If neither is provided user is prompted for a user name.
+                            username, can also be defined via VMANAGE_USER environment variable. If neither is provided user is prompted for username.
       -p <password>, --password <password>
-                            password, can also be defined via VMANAGE_PASSWORD environment variable. If neither is provided user is prompted for a password.
-      --port <port>         vManage TCP port number (default is 8443)
-      --timeout <timeout>   REST API timeout (default is 300s)
+                            password, can also be defined via VMANAGE_PASSWORD environment variable. If neither is provided user is prompted for password.
+      --port <port>         vManage TCP port number (default: 8443)
+      --timeout <timeout>   REST API timeout (default: 300)
       --verbose             increase output verbosity
       --version             show program's version number and exit
 
@@ -56,28 +57,30 @@ vManage address (-a/--address), user name (-u/--user) and password (-p/--passwor
 
 A good approach to reduce the number of parameters that need to be provided at execution is to create rc text files exporting those environment variables for a particular vManage. This is demonstrated in the Getting Started section below.
 
-For any of these arguments, vManage address, user and password; if they are not provided via the environment variables or command line arguments, the user is prompted for a value.
+For any of these arguments, vManage address, user and password; user is prompted for a value if they are not provided via the environment variables or command line arguments.
 
 ### Task-specific parameters
 
 Task-specific parameters and options are defined after the task is provided. Each task has its own set of parameters.
 
     % sdwan backup -h
-    usage: sdwan backup [-h] [--workdir <directory>] [--regex <regex>] <tag> [<tag> ...]
+    usage: sdwan backup [-h] [--workdir <directory>] [--no-rollover] [--regex <regex>] <tag> [<tag> ...]
     
     Sastre - Automation Tools for Cisco SD-WAN Powered by Viptela
     
     Backup task:
     
     positional arguments:
-      <tag>                 One or more tags for selecting items to be backed up. Multiple tags should be separated by space. Available
-                            tags: all, policy_definition, policy_list, policy_security, policy_vedge, policy_vsmart, template_device,
-                            template_feature. Special tag 'all' selects all items, including WAN edge certificates.
+      <tag>                 One or more tags for selecting items to be backed up. Multiple tags should be separated by space. Available tags: all, policy_customapp,
+                            policy_definition, policy_list, policy_profile, policy_security, policy_vedge, policy_voice, policy_vsmart, template_device, template_feature. Special
+                            tag "all" selects all items, including WAN edge certificates and device configurations.
     
     optional arguments:
       -h, --help            show this help message and exit
       --workdir <directory>
-                            Backup destination (default will be "backup_198.18.1.10_20200226").
+                            Backup destination (default: backup_VMANAGE-ADDRESS_20200617).
+      --no-rollover         By default, if workdir already exists (before a new backup is saved) the old workdir is renamed using a rolling naming scheme. This option disables
+                            this automatic rollover.
       --regex <regex>       Regular expression matching item names to be backed up, within selected tags.
 
 #### Important concepts:
@@ -125,9 +128,16 @@ Any those vManage parameters can also be provided via command line:
 Perform a backup:
 
     % sdwan --verbose backup all
-    INFO: Starting backup: vManage URL: "https://10.85.136.253:8443" > Local workdir: "backup_10.85.136.253_20191206"
+    INFO: Starting backup: vManage URL: "https://10.85.136.253:8443" -> Local workdir: "backup_10.85.136.253_20200617"
     INFO: Saved vManage server information
     INFO: Saved WAN edge certificates
+    INFO: Done device configuration vedge-dc1
+    INFO: Done device configuration vedge-dc2
+    INFO: Done device configuration vedge-b1
+    INFO: Done device configuration vedge-b2
+    INFO: Done device configuration vmanage-1
+    INFO: Done device configuration vsmart-1
+    INFO: Done device configuration vbond-1
     INFO: Saved device template index
     INFO: Done device template DC_ADVANCED
     INFO: Done device template DC_BASIC
@@ -151,20 +161,27 @@ The backup is saved under data/backup_10.85.136.253_20191206:
 ### Customizing backup destination:
 
     % sdwan --verbose backup all --workdir "my_custom_directory"
-    INFO: Starting backup: vManage URL: "https://10.85.136.253:8443" > Local workdir: "my_custom_directory"
+    INFO: Starting backup: vManage URL: "https://10.85.136.253:8443" -> Local workdir: "my_custom_directory"
     INFO: Saved vManage server information
     INFO: Saved WAN edge certificates
+    INFO: Done device configuration vedge-dc1
+    INFO: Done device configuration vedge-dc2
+    INFO: Done device configuration vedge-b1
+    INFO: Done device configuration vedge-b2
+    INFO: Done device configuration vmanage-1
+    INFO: Done device configuration vsmart-1
+    INFO: Done device configuration vbond-1
     INFO: Saved device template index
-    INFO: Done device template DC_ADVANCED
-    INFO: Done device template DC_BASIC
+    INFO: Done device template BRANCH_ADVANCED
     <snip>
-    INFO: Done SLA-class list Realtime_Full_Mesh
+    INFO: Saved data-ipv6-prefix list index
+    INFO: Done data-ipv6-prefix list mgmt_prefixes_ipv6
     INFO: Task completed successfully
 
 ### Restoring from backup:
 
     % sdwan --verbose restore all        
-    INFO: Starting restore: Local workdir: "backup_10.85.136.253_20191206" > vManage URL: "https://10.85.136.253:8443"
+    INFO: Starting restore: Local workdir: "backup_10.85.136.253_20200617" -> vManage URL: "https://10.85.136.253:8443"
     INFO: Loading existing items from target vManage
     INFO: Identifying items to be pushed
     INFO: Inspecting template_device items
@@ -172,13 +189,16 @@ The backup is saved under data/backup_10.85.136.253_20191206:
     INFO: Inspecting policy_vsmart items
     INFO: Inspecting policy_vedge items
     INFO: Inspecting policy_security items
+    INFO: Inspecting policy_voice items
+    INFO: Inspecting policy_customapp items
     INFO: Inspecting policy_definition items
+    INFO: Inspecting policy_profile items
     INFO: Inspecting policy_list items
     INFO: Pushing items to vManage
-    INFO: Done: Create SLA-class list Best_Effort
+    INFO: Done: Create data-ipv6-prefix list mgmt_prefixes_ipv6
     INFO: Done: Create SLA-class list Realtime_Full_Mesh
-    INFO: Done: Create site list All_Sites
-    INFO: Done: Create class list af2
+    INFO: Done: Create SLA-class list Best_Effort
+    INFO: Done: Create data-prefix list mgmt_prefixes
     <snip>
     INFO: Done: Create device template BRANCH_ADVANCED
     INFO: Done: Create device template BRANCH_BASIC
@@ -187,7 +207,7 @@ The backup is saved under data/backup_10.85.136.253_20191206:
 #### Restoring from a backup in a different directory than the default:
 
     % sdwan --verbose restore all --workdir my_custom_directory
-    INFO: Starting restore: Local workdir: "my_custom_directory" > vManage URL: "https://10.85.136.253:8443"
+    INFO: Starting restore: Local workdir: "my_custom_directory" -> vManage URL: "https://10.85.136.253:8443"
     INFO: Loading existing items from target vManage
     INFO: Identifying items to be pushed
     INFO: Inspecting template_device items
@@ -198,7 +218,7 @@ The backup is saved under data/backup_10.85.136.253_20191206:
 #### Restoring with template attachments and policy activation:
     
     % sdwan --verbose restore all --attach
-    INFO: Starting restore: Local workdir: "backup_10.85.136.253_20191206" > vManage URL: "https://10.85.136.253:8443"
+    INFO: Starting restore: Local workdir: "backup_10.85.136.253_20200617" -> vManage URL: "https://10.85.136.253:8443"
     INFO: Loading existing items from target vManage
     <snip>
     INFO: Attaching WAN Edge templates
@@ -231,7 +251,7 @@ The backup is saved under data/backup_10.85.136.253_20191206:
 Example:
 
     % sdwan --verbose restore all --workdir state_b --force
-    INFO: Starting restore: Local workdir: "state_b" > vManage URL: "https://10.85.136.253:8443"
+    INFO: Starting restore: Local workdir: "state_b" -> vManage URL: "https://10.85.136.253:8443"
     INFO: Loading existing items from target vManage
     INFO: Identifying items to be pushed
     INFO: Inspecting template_device items
@@ -331,7 +351,7 @@ List device templates and feature templates from target vManage:
     +---------------------------+--------------------------------------+------------------+------------------+
     INFO: Task completed successfully
  
- List all items from target vManage with name starting with 'DC':
+List all items from target vManage with name starting with 'DC':
  
     % sdwan --verbose list configuration all --regex "^DC"
     INFO: Starting list configuration: vManage URL: "https://198.18.1.10:8443"
@@ -436,7 +456,7 @@ Restore certificate validity status from a backup:
 
 Set certificate validity status to a desired value:
 
-     % sdwan --verbose certificate set valid             
+    % sdwan --verbose certificate set valid             
     INFO: Starting certificate: Set status to "valid" > vManage URL: "https://198.18.1.10:8443"
     INFO: Loading WAN edge certificate list from target vManage
     INFO: Identifying items to be pushed
@@ -449,6 +469,104 @@ Set certificate validity status to a desired value:
     INFO: Certificate sync with controllers
     INFO: Waiting...
     INFO: Completed certificate sync with controllers
+    INFO: Task completed successfully
+
+### Migrating templates to 20.1
+- Template migration from 18.4, 19.2 or 19.3 to 20.1 is supported. Maintenance numbers are not relevant to the migration. That is, 20.1 and 20.1.1 can be specified without any difference in terms of template migration.
+- The source of templates can be a live vManage or a backup. The destination is always a local directory. A restore task is then used to push migrated items to the target vManage.
+- Device attachments and template values are currently not handled by the migrate task. For instance, devices attached to a device template are left on that same template even when a new migrated template is created. 
+
+Migrating off a live vManage:
+
+    % sdwan --verbose migrate all dcloud_migrated    
+    INFO: Starting migrate: vManage URL: "https://198.18.1.10:8443" 18.4 -> 20.1 Local output dir: "dcloud_migrated"
+    INFO: Loaded template migration recipes
+    INFO: Inspecting policy_list items
+    INFO: Saved VPN list index
+    INFO: Saved VPN list myvpns
+    INFO: Saved VPN list corpVPN
+    INFO: Saved VPN list pciVPN
+    INFO: Saved VPN list guestVPN
+    INFO: Saved VPN list ALLVPNs
+    INFO: Saved URL-whitelist list index
+    INFO: Saved URL-whitelist list Cisco
+    <snip>
+    INFO: Inspecting template_device items
+    INFO: Saved device template index
+    INFO: Saved device template vSmartConfigurationTemplate
+    INFO: Saved device template VSMART-device-template
+    INFO: Saved device template BranchType2Template-vEdge
+    INFO: Saved device template DC-vEdges
+    INFO: Saved device template migrated_BranchType1Template-CSR
+    INFO: Task completed successfully
+
+Migrating from a local workdir:
+
+    % sdwan --verbose migrate all --workdir sastre_cx_golden_repo sastre_cx_golden_repo_201
+    INFO: Starting migrate: Local workdir: "sastre_cx_golden_repo" 18.4 -> 20.1 Local output dir: "sastre_cx_golden_repo_201"
+    INFO: Loaded template migration recipes
+    INFO: Inspecting policy_list items
+    INFO: Saved VPN list index
+    INFO: Saved VPN list ALL_VPNS
+    INFO: Saved VPN list G_All_SLAN_VPN_List
+    INFO: Saved URL-blacklist list index
+    INFO: Saved URL-blacklist list G_URL_BL_Example_List
+    INFO: Saved class list index
+    INFO: Saved class list G_Voice_Class_D46_C5_V01
+    <snip>
+    INFO: Saved device template migrated_G_Branch_184_Single_cE4451-X_2xWAN_DHCP_L2_v01
+    INFO: Task completed successfully
+    
+Basic customization of migrated template names:
+- Using the --name option to specify the format for building migrated template names. Default is "migrated_{name}", where {name} is replaced with the original template name.
+
+Example:
+
+    % sdwan --verbose migrate all dcloud_migrated --workdir dcloud_192 --name "201_{name}"
+    INFO: Starting migrate: Local workdir: "dcloud_192" 18.4 -> 20.1 Local output dir: "dcloud_migrated"
+    INFO: Previous migration under "dcloud_migrated" was saved as "dcloud_migrated_1"
+    INFO: Loaded template migration recipes
+    INFO: Inspecting policy_list items
+    INFO: Saved VPN list index
+    INFO: Saved VPN list myvpns
+    INFO: Saved VPN list corpVPN
+    INFO: Saved VPN list pciVPN
+    INFO: Saved VPN list guestVPN
+    INFO: Saved VPN list ALLVPNs
+    INFO: Saved URL-whitelist list index
+    INFO: Saved URL-whitelist list Cisco
+    <snip>
+    INFO: Inspecting template_device items
+    INFO: Saved device template index
+    INFO: Saved device template vSmartConfigurationTemplate
+    INFO: Saved device template VSMART-device-template
+    INFO: Saved device template BranchType2Template-vEdge
+    INFO: Saved device template DC-vEdges
+    INFO: Saved device template 201_BranchType1Template-CSR
+    INFO: Task completed successfully
+
+Regex-based customization of migrated template names:
+- This example shows a more complex --name option, containing multiple {name} entries with regular expressions.
+- Additional details about the name regex syntax are provided in the "Migrate task template name manipulation" section.
+
+Example:
+
+    % sdwan --verbose migrate all sastre_cx_golden_repo_201 --workdir sastre_cx_golden_repo --name "{name (G_.+)_184_.+}{name (G_VPN.+)}_201{name G.+_184(_.+)}" 
+    INFO: Starting migrate: Local workdir: "sastre_cx_golden_repo" 18.4 -> 20.1 Local output dir: "sastre_cx_golden_repo_201"
+    INFO: Loaded template migration recipes
+    INFO: Inspecting policy_list items
+    <snip>
+    INFO: Inspecting template_feature items
+    INFO: Saved feature template index
+    INFO: Saved feature template G_vEdge_201_Banner_Template_v01
+    INFO: Saved feature template G_vEdge_184_Banner_Template_v01
+    INFO: Saved feature template G_vEdge_184_SLAN_INT3_v01
+    INFO: Saved feature template G_vEdge_184_VPN0_Transport5_TLOC_EXT_v01
+    INFO: Saved feature template G_cEdge_201_Loopback0_Template_v01
+    INFO: Saved feature template G_cEdge_184_Loopback0_Template_v01
+    <snip>
+    INFO: Saved device template G_Branch_201_Dual_cE4321_2xWAN_TLOC_L2_v01
+    INFO: Saved device template G_Branch_201_Single_cE4451-X_2xWAN_DHCP_L2_v01
     INFO: Task completed successfully
 
 ## Notes
@@ -464,6 +582,25 @@ This is to prevent the shell from interpreting special characters that could be 
 Matching done by --regex is un-anchored. That is, unless anchor marks are provided (e.g. ^ or $), the specified pattern matches if present anywhere in the string. In other words, this is a search function.
 
 The regular expression syntax supported is described in https://docs.python.org/3/library/re.html
+
+### Migrate task template name manipulation
+
+- The --name format specification can contain multiple occurrences of {name}. Each occurrence may contain a regular expression separated by a space: {name &lt;regex&gt;}. The regular expressions must contain one or more capturing groups, which define the segments of the original name to "copy". Segments matching each capturing group are concatenated and "pasted" to the {name} position.
+- If name regex does not match, {name &lt;regex&gt;} is replaced with an empty string.
+- A transform option under the list task allows one to verify of the effect of a name-regex (e.g. as used by the --name format specification in the migrate task).
+
+Example:
+
+    Consider the template name "G_Branch_184_Single_cE4451-X_2xWAN_DHCP_L2_v01". 
+    In order to get the migrated name as "G_Branch_201_Single_cE4451-X_2xWAN_DHCP_L2_v01", one can use --name "{name (G_.+)_184_.+}_201_{name G.+_184_(.+)}".
+    
+    % sdwan list transform template_device --regex "G_Branch_184_Single_cE4451" --workdir sastre_cx_golden_repo "{name (G_.+)_184_.+}_201_{name G.+_184_(.+)}"
+    +---------------------------------------------------------------+---------------------------------------------------------------+-----------------+-----------------+
+    | Name                                                          | Transformed                                                   | Tag             | Type            |
+    +---------------------------------------------------------------+---------------------------------------------------------------+-----------------+-----------------+
+    | G_Branch_184_Single_cE4451-X_2xWAN_Static_2xSLAN_Trunk_L2_v01 | G_Branch_201_Single_cE4451-X_2xWAN_Static_2xSLAN_Trunk_L2_v01 | template_device | device template |
+    | G_Branch_184_Single_cE4451-X_2xWAN_DHCP_L2_v01                | G_Branch_201_Single_cE4451-X_2xWAN_DHCP_L2_v01                | template_device | device template |
+    +---------------------------------------------------------------+---------------------------------------------------------------+-----------------+-----------------+
 
 ### Logs
 

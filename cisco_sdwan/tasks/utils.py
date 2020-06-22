@@ -7,11 +7,19 @@
 import os
 import re
 import argparse
+from datetime import date
 from getpass import getpass
 from pathlib import Path
 from cisco_sdwan.base.catalog import catalog_tags, CATALOG_TAG_ALL
-from cisco_sdwan.base.models_base import filename_safe, DATA_DIR
+from cisco_sdwan.base.models_base import filename_safe, DATA_DIR, ExtendedTemplate
 from .common import Task
+
+# Default local data store
+DEFAULT_WORKDIR_FORMAT = 'backup_{address}_{date:%Y%m%d}'
+
+
+def default_workdir(address):
+    return DEFAULT_WORKDIR_FORMAT.format(date=date.today(), address=address or 'VMANAGE-ADDRESS')
 
 
 class TaskOptions:
@@ -62,34 +70,6 @@ class TagOptions:
         return ', '.join([CATALOG_TAG_ALL] + sorted(catalog_tags()))
 
 
-class ShowOptions:
-    _show_options = {}
-
-    @classmethod
-    def option(cls, option_str):
-        option_fn = cls._show_options.get(option_str)
-        if option_fn is None:
-            raise argparse.ArgumentTypeError('Invalid show option. Options are: {ops}.'.format(ops=cls.options()))
-        return option_fn
-
-    @classmethod
-    def options(cls):
-        return ', '.join(cls._show_options)
-
-    @classmethod
-    def register(cls, option_str):
-        """
-        Decorator used for registering show task options.
-        :param option_str: String presented to the user in order to select a show option
-        :return: decorator
-        """
-        def decorator(option_fn):
-            cls._show_options[option_str] = option_fn
-            return option_fn
-
-        return decorator
-
-
 def regex_type(regex_str):
     try:
         re.compile(regex_str)
@@ -130,6 +110,14 @@ def non_empty_type(src_str):
     return out_str
 
 
+def version_type(version_str):
+    # Development versions may follow this format: '20.1.999-98'
+    if re.match(r'(\d+[.-])*\d+$', version_str) is None:
+        raise argparse.ArgumentTypeError(f'"{version_str}" is not a valid version identifier.')
+
+    return '.'.join(([str(int(v)) for v in version_str.replace('-', '.').split('.')] + ['0', ])[:2])
+
+
 class EnvVar(argparse.Action):
     def __init__(self, nargs=None, envvar=None, required=True, default=None, **kwargs):
         if nargs is not None:
@@ -160,6 +148,17 @@ class PromptArg:
                 print('{msg} Please try again, or ^C to terminate.'.format(msg=ex))
             else:
                 return value
+
+
+def ext_template_type(template_str):
+    try:
+        ExtendedTemplate(template_str)('test')
+    except re.error:
+        raise argparse.ArgumentTypeError('regular expression is invalid')
+    except (KeyError, ValueError) as ex:
+        raise argparse.ArgumentTypeError(ex)
+
+    return template_str
 
 
 class SastreException(Exception):

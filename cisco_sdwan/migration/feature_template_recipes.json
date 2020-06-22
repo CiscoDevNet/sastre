@@ -1,0 +1,973 @@
+[
+    {
+        "dateGenerated": "03/20/2020",
+        "squashedVmanageVersions": [
+            "18.4",
+            "19.2",
+            "19.3"
+        ],
+        "fromvManageVersion": "all",
+        "tovManageVersion": "20.1",
+        "templateTypeList": [
+            {
+                "fromFeatureName": "banner",
+                "toFeatureName": "cisco_banner",
+                "listOfTasks": []
+            },
+            {
+                "fromFeatureName": "bfd-vedge",
+                "toFeatureName": "cisco_bfd",
+                "listOfTasks": []
+            },
+            {
+                "fromFeatureName": "bgp",
+                "toFeatureName": "cisco_bgp",
+                "listOfTasks": [
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "bgp",
+                            "neighbor",
+                            "remote-as",
+                            "optionType",
+                            "ignore"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "bgp",
+                            "ipv6-neighbor",
+                            "update-source",
+                            "if-address"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "bgp",
+                            "ipv6-neighbor",
+                            "timers",
+                            "advertisement-interval"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "bgp",
+                            "ipv6-neighbor",
+                            "remote-as",
+                            "optionType",
+                            "ignore"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "bgp",
+                            "ipv6-neighbor",
+                            "capability-negotiate"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "bgp",
+                            "neighbor",
+                            "timers",
+                            "advertisement-interval"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "bgp",
+                            "neighbor",
+                            "update-source",
+                            "if-address"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "bgp",
+                            "neighbor",
+                            "timers",
+                            "connect-retry"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "bgp",
+                            "neighbor",
+                            "capability-negotiate"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "bgp",
+                            "ipv6-neighbor",
+                            "timers",
+                            "connect-retry"
+                        ]
+                    }
+                ]
+            },
+            {
+                "fromFeatureName": "dhcp-server",
+                "toFeatureName": "cisco_dhcp_server",
+                "listOfTasks": [
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "max-leases"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "offer-time"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "admin-state"
+                        ]
+                    },
+                    {
+                        "operation": "range",
+                        "fieldHierarchyList": [
+                            "lease-time"
+                        ],
+                        "rangeMax": 31536000
+                    }
+                ]
+            },
+            {
+                "fromFeatureName": "logging",
+                "toFeatureName": "cisco_logging",
+                "listOfTasks": [
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "ipv6-server",
+                            "priority",
+                            "dataType",
+                            "values",
+                            "notice"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "disk",
+                            "priority"
+                        ]
+                    }
+                ]
+            },
+            {
+                "fromFeatureName": "ntp",
+                "toFeatureName": "cisco_ntp",
+                "listOfTasks": []
+            },
+            {
+                "fromFeatureName": "omp-vedge",
+                "toFeatureName": "cisco_omp",
+                "listOfTasks": []
+            },
+            {
+                "fromFeatureName": "ospf",
+                "toFeatureName": "cisco_ospf",
+                "listOfTasks": [
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "ospf",
+                            "area",
+                            "interface",
+                            "authentication",
+                            "authentication-key"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "ospf",
+                            "area",
+                            "nssa",
+                            "translate"
+                        ]
+                    },
+                    {
+                        "operation": "range",
+                        "fieldHierarchyList": [
+                            "ospf",
+                            "distance",
+                            "inter-area"
+                        ],
+                        "rangeMin": 1
+                    },
+                    {
+                        "operation": "range",
+                        "fieldHierarchyList": [
+                            "ospf",
+                            "distance",
+                            "intra-area"
+                        ],
+                        "rangeMin": 1
+                    },
+                    {
+                        "operation": "range",
+                        "fieldHierarchyList": [
+                            "ospf",
+                            "distance",
+                            "external"
+                        ],
+                        "rangeMin": 1
+                    }
+                ]
+            },
+            {
+                "fromFeatureName": "snmp",
+                "toFeatureName": "cisco_snmp",
+                "listOfTasks": [
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "trap",
+                            "group"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "name"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "trap",
+                            "target",
+                            "source-interface",
+                            "optionType",
+                            "ignore"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "trap",
+                            "target",
+                            "group-name"
+                        ]
+                    }
+                ]
+            },
+            {
+                "fromFeatureName": "system-vedge",
+                "toFeatureName": "cisco_system",
+                "listOfTasks": [
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "icmp-error-pps"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "tcp-optimization-enabled"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "vbond",
+                            "remote"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "tracker",
+                            "endpoint-api-url",
+                            "deviceModels"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "vbond",
+                            "local"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "host-policer-pps"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "allow-same-site-tunnels"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "vbond",
+                            "vbond-only"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "eco-friendly-mode"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "multicast-buffer-percent"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "timer",
+                            "dns-cache-timeout"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "usb-controller"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "route-consistency-check"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "system-tunnel-mtu"
+                        ]
+                    },
+                    {
+                        "operation": "range",
+                        "fieldHierarchyList": [
+                            "tracker",
+                            "interval"
+                        ],
+                        "rangeMin": 20
+                    }
+                ]
+            },
+            {
+                "fromFeatureName": "vpn-vedge",
+                "toFeatureName": "cisco_vpn",
+                "listOfTasks": [
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "host-ipv6"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "nat64-global",
+                            "prefix",
+                            "stateful",
+                            "ipv6-prefix"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "ipv6",
+                            "route",
+                            "distance"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "tcp-optimization"
+                        ]
+                    }
+                ]
+            },
+            {
+                "fromFeatureName": "vpn-vedge-interface",
+                "toFeatureName": "cisco_vpn_interface",
+                "listOfTasks": [
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "dot1x",
+                            "wake-on-lan"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "nat",
+                            "port-forward"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "dot1x",
+                            "das",
+                            "secret-key"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "nat",
+                            "respond-to-ping"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "pmtu"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "dot1x",
+                            "reauthentication"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "static-ingress-qos"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "nat",
+                            "log-translations"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "dot1x",
+                            "default-vlan"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "dot1x",
+                            "das",
+                            "port"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "dot1x",
+                            "guest-vlan"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "dot1x",
+                            "acct-req-attr"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "tunnel-interface",
+                            "hold-time"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "nat64",
+                            "v4",
+                            "pool"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "nat",
+                            "refresh"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "nat",
+                            "block-icmp-error"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "nat",
+                            "static",
+                            "source-port"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "dot1x",
+                            "das",
+                            "client"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "nat",
+                            "static",
+                            "translate-port"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "dot1x",
+                            "control-direction"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "dot1x",
+                            "das",
+                            "require-timestamp"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "tloc-extension-gre-from",
+                            "xconnect",
+                            "dataType",
+                            "minLength"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "tloc-extension",
+                            "dataType",
+                            "maxLength"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "tloc-extension",
+                            "dataType",
+                            "minLength"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "dot1x",
+                            "nas-identifier"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "nat64",
+                            "udp-timeout"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "nat64",
+                            "tcp-timeout"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "nat",
+                            "natpool",
+                            "range-end",
+                            "optionType",
+                            "ignore"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "clear-dont-fragment"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "tloc-extension-gre-from",
+                            "xconnect",
+                            "dataType",
+                            "maxLength"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "dot1x",
+                            "auth-req-attr"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "dot1x",
+                            "auth-fail-vlan"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "policer"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "flow-control"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "nat64",
+                            "natpool",
+                            "range-start"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "dot1x",
+                            "das",
+                            "vpn"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "dot1x",
+                            "accounting-interval"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "dot1x",
+                            "radius-servers"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "nat",
+                            "static",
+                            "proto"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "dot1x",
+                            "mac-authentication-bypass",
+                            "allow"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "vrrp",
+                            "track-omp",
+                            "optionType",
+                            "variable"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "dot1x",
+                            "host-mode"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "dot1x",
+                            "timeout",
+                            "inactivity"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "nat",
+                            "natpool",
+                            "range-start",
+                            "optionType",
+                            "ignore"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "ipv6",
+                            "dhcp-rapid-commit"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "ipv6",
+                            "dhcp-distance"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "nat",
+                            "static",
+                            "static-nat-direction",
+                            "optionType",
+                            "ignore"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "nat64",
+                            "natpool",
+                            "range-end"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "dot1x",
+                            "auth-reject-vlan"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "dot1x",
+                            "nas-ip-address"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "dot1x",
+                            "auth-order"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "dot1x",
+                            "mac-authentication-bypass",
+                            "server"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "dot1x",
+                            "das",
+                            "time-window"
+                        ]
+                    },
+                    {
+                        "operation": "default",
+                        "default": 100,
+                        "fieldHierarchyList": [
+                            "vrrp",
+                            "timer"
+                        ]
+                    },
+                    {
+                        "operation": "default",
+                        "default": "false",
+                        "fieldHierarchyList": [
+                            "icmp-redirect-disable"
+                        ]
+                    },
+                    {
+                        "operation": "default",
+                        "default": 100,
+                        "fieldHierarchyList": [
+                            "ipv6-vrrp",
+                            "timer"
+                        ]
+                    },
+                    {
+                        "operation": "range",
+                        "fieldHierarchyList": [
+                            "tcp-mss-adjust"
+                        ],
+                        "rangeMax": 1460
+                    },
+                    {
+                        "operation": "range",
+                        "fieldHierarchyList": [
+                            "ipv6-vrrp",
+                            "timer"
+                        ],
+                        "rangeMin": 100
+                    },
+                    {
+                        "operation": "range",
+                        "fieldHierarchyList": [
+                            "vrrp",
+                            "timer"
+                        ],
+                        "rangeMin": 100
+                    },
+                    {
+                        "operation": "range",
+                        "fieldHierarchyList": [
+                            "shaping-rate"
+                        ],
+                        "rangeMin": 8
+                    },
+                    {
+                        "operation": "range",
+                        "fieldHierarchyList": [
+                            "arp-timeout"
+                        ],
+                        "rangeMax": 2147483
+                    }
+                ]
+            },
+            {
+                "fromFeatureName": "vpn-vedge-interface-gre",
+                "toFeatureName": "cisco_vpn_interface_gre",
+                "listOfTasks": [
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "clear-dont-fragment"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "keepalive",
+                            "retries"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "policer"
+                        ]
+                    },
+                    {
+                        "operation": "remove",
+                        "fieldHierarchyList": [
+                            "keepalive",
+                            "interval"
+                        ]
+                    },
+                    {
+                        "operation": "range",
+                        "fieldHierarchyList": [
+                            "tcp-mss-adjust"
+                        ],
+                        "rangeMax": 1460
+                    }
+                ]
+            },
+            {
+                "fromFeatureName": "vpn-vedge-interface-ipsec",
+                "toFeatureName": "cisco_vpn_interface_ipsec",
+                "listOfTasks": [
+                    {
+                        "operation": "range",
+                        "fieldHierarchyList": [
+                            "dead-peer-detection",
+                            "dpd-retries"
+                        ],
+                        "rangeMax": 60
+                    },
+                    {
+                        "operation": "range",
+                        "fieldHierarchyList": [
+                            "ike",
+                            "ike-rekey-interval"
+                        ],
+                        "rangeMax": 86400
+                    },
+                    {
+                        "operation": "range",
+                        "fieldHierarchyList": [
+                            "dead-peer-detection",
+                            "dpd-interval"
+                        ],
+                        "rangeMax": 3600
+                    },
+                    {
+                        "operation": "range",
+                        "fieldHierarchyList": [
+                            "dead-peer-detection",
+                            "dpd-interval"
+                        ],
+                        "rangeMin": 10
+                    },
+                    {
+                        "operation": "range",
+                        "fieldHierarchyList": [
+                            "dead-peer-detection",
+                            "dpd-retries"
+                        ],
+                        "rangeMin": 2
+                    },
+                    {
+                        "operation": "range",
+                        "fieldHierarchyList": [
+                            "tcp-mss-adjust"
+                        ],
+                        "rangeMax": 1460
+                    }
+                ]
+            },
+            {
+                "fromFeatureName": "security-vedge",
+                "toFeatureName": "cisco_security",
+                "listOfTasks": []
+            }
+        ]
+    }
+]

@@ -4,6 +4,9 @@
  cisco_sdwan.base.models_vmanage
  This module implements vManage API models
 """
+from typing import Iterable, Set
+from pathlib import Path
+from urllib.parse import quote_plus
 from .catalog import register
 from .models_base import ApiItem, IndexApiItem, ConfigItem, IndexConfigItem, ApiPath, IdName
 
@@ -136,10 +139,14 @@ class EdgeInventory(IndexApiItem):
     api_path = ApiPath('system/device/vedges', None, None, None)
     iter_fields = ('uuid', 'vedgeCertificateState')
 
+    extended_iter_fields = ('host-name', 'system-ip')
+
 
 class ControlInventory(IndexApiItem):
     api_path = ApiPath('system/device/controllers', None, None, None)
     iter_fields = ('uuid', 'validity')
+
+    extended_iter_fields = ('host-name', 'system-ip')
 
     @staticmethod
     def is_vsmart(device_type):
@@ -161,6 +168,51 @@ class ControlInventory(IndexApiItem):
 
 
 #
+# Device configuration
+#
+class DeviceConfig(ConfigItem):
+    api_path = ApiPath('template/config/attached', None, None, None)
+    store_path = ('device_configs', )
+    store_file = '{item_name}.txt'
+
+    def save(self, node_dir, ext_name=False, item_name=None, item_id=None):
+        """
+        Save data (i.e. self.data) to a json file
+
+        :param node_dir: String indicating directory under root_dir used for all files from a given vManage node.
+        :param ext_name: True indicates that item_names need to be extended (with item_id) in order to make their
+                         filename safe version unique. False otherwise.
+        :param item_name: (Optional) Name of the item being saved. Variable used to build the filename.
+        :param item_id: (Optional) UUID for the item being saved. Variable used to build the filename.
+        :return: True indicates data has been saved. False indicates no data to save (and no file has been created).
+        """
+        if self.is_empty:
+            return False
+
+        dir_path = Path(self.root_dir, node_dir, *self.store_path)
+        dir_path.mkdir(parents=True, exist_ok=True)
+
+        with open(dir_path.joinpath(self.get_filename(ext_name, item_name, item_id)), 'w') as write_f:
+            write_f.write(self.data['config'])
+
+        return True
+
+    @staticmethod
+    def api_params(device_id):
+        # Device uuid is not url-safe
+        return quote_plus(device_id)
+
+
+class DeviceConfigRFS(DeviceConfig):
+    store_file = '{item_name}_rfs.txt'
+
+    @staticmethod
+    def api_params(device_id):
+        # Device uuid is not url-safe
+        return '{safe_device_id}?type=RFS'.format(safe_device_id=quote_plus(device_id))
+
+
+#
 # Templates
 #
 class CliOrFeatureApiPath:
@@ -175,6 +227,22 @@ class CliOrFeatureApiPath:
         return self.api_path_cli if is_cli_template else self.api_path_feature
 
 
+CEDGE_SET = {"vedge-IR-1101", "vedge-ESR-6300", "vedge-ASR-1001-X", "vedge-ASR-1002-X", "vedge-ASR-1002-HX",
+             "vedge-ASR-1001-HX", "vedge-C8500L-8G4X", "vedge-C8500-12X4QC", "vedge-C8500-12X", "vedge-CSR-1000v",
+             "vedge-ISR-4331", "vedge-ISR-4431", "vedge-ISR-4461", "vedge-ISR-4451-X", "vedge-ISR-4321",
+             "vedge-ISR-4351", "vedge-ISR-4221", "vedge-ISR-4221X", "vedge-C1101-4P", "vedge-C1101-4PLTEP",
+             "vedge-C1111-4P", "vedge-C1161X-8P", "vedge-C1111-8P", "vedge-C1121X-8P", "vedge-C1111X-8P",
+             "vedge-C1111-8PW", "vedge-C1111-8PLTEEA", "vedge-C1121-8PLTEPW", "vedge-C1111-8PLTELAW",
+             "vedge-C1111-8PLTEEAW", "vedge-C1111-8PLTELA", "vedge-C1111-4PLTEEA", "vedge-C1101-4PLTEPW",
+             "vedge-C1109-4PLTE2PW", "vedge-C1109-4PLTE2P", "vedge-C1121X-8PLTEP", "vedge-C1161X-8PLTEP",
+             "vedge-C1113-8PMLTEEA", "vedge-C1111-4PLTELA", "vedge-C1116-4P", "vedge-C1116-4PLTEEA", "vedge-C1117-4P",
+             "vedge-C1117-4PM", "vedge-C1117-4PLTEEA", "vedge-C1126X-8PLTEP", "vedge-C1127X-8PLTEP",
+             "vedge-C1127X-8PMLTEP", "vedge-C1127-8PMLTEP", "vedge-C1117-4PLTELA", "vedge-C1117-4PMLTEEA", "vedge-ISRv",
+             "vedge-C8000V", "vedge-ccm", "vedge-C8200-1N-4T", "vedge-C8300-1N1S-4T2X", "vedge-C8300-1N1S-4G2X",
+             "vedge-C8300-1N1S-6T", "vedge-C8300-2N2S-6T", "vedge-C8300-2N2S-4T2X", "vmanage", "vedge-C9500-40X",
+             "vedge-C9500-48Y4C", "vedge-nfvis-ENCS5400", "vedge-nfvis-C8200-UCPE"}
+
+
 class DeviceTemplate(ConfigItem):
     api_path = CliOrFeatureApiPath(
         ApiPath('template/device/object', 'template/device/feature', 'template/device'),
@@ -182,15 +250,25 @@ class DeviceTemplate(ConfigItem):
     )
     store_path = ('device_templates', 'template')
     store_file = '{item_name}.json'
-    id_tag = 'templateId'
     name_tag = 'templateName'
     post_filtered_tags = ('feature', )
     skip_cmp_tag_set = {'createdOn', 'createdBy', 'lastUpdatedBy', 'lastUpdatedOn', '@rid', 'owner', 'infoTag',
                         'templateAttached', 'templateConfigurationEdited'}
 
     @property
-    def is_type_cli(self):
+    def is_type_cli(self) -> bool:
         return self.data.get('configType', 'template') == 'file'
+
+    @property
+    def is_cedge(self) -> bool:
+        return self.data['deviceType'] in CEDGE_SET
+
+    def contains_template(self, template_type: str) -> bool:
+        return template_type in self.find_key('templateType')
+
+    @property
+    def feature_templates(self) -> Set[str]:
+        return set(self.find_key('templateId', from_key='generalTemplates'))
 
 
 @register('template_device', 'device template', DeviceTemplate)
@@ -206,6 +284,10 @@ class DeviceTemplateIndex(IndexConfigItem):
     @staticmethod
     def is_not_vsmart(device_type, num_attached):
         return device_type != 'vsmart' and num_attached > 0
+
+    @staticmethod
+    def is_cedge(device_type, num_attached):
+        return device_type in CEDGE_SET
 
     def filtered_iter(self, filter_fn):
         return (
@@ -271,8 +353,31 @@ class FeatureTemplate(ConfigItem):
     store_file = '{item_name}.json'
     id_tag = 'templateId'
     name_tag = 'templateName'
+    type_tag = 'templateType'
     skip_cmp_tag_set = {'createdOn', 'createdBy', 'lastUpdatedBy', 'lastUpdatedOn', '@rid', 'owner', 'infoTag',
                         'devicesAttached', 'attachedMastersCount'}
+
+    @property
+    def device_types(self) -> Set[str]:
+        return set(self.data.get('deviceType', []))
+
+    @device_types.setter
+    def device_types(self, device_type_iter: Iterable[str]) -> None:
+        self.data['deviceType'] = [device_type for device_type in device_type_iter]
+
+    @property
+    def masters_attached(self) -> int:
+        """
+        Returns number of device templates (i.e. master templates) that utilize this feature template
+        """
+        return self.data.get('attachedMastersCount')
+
+    @property
+    def devices_attached(self) -> int:
+        """
+        Returns number of devices attached to device templates attached to this feature template
+        """
+        return self.data.get('devicesAttached')
 
 
 @register('template_feature', 'feature template', FeatureTemplate)
@@ -280,6 +385,28 @@ class FeatureTemplateIndex(IndexConfigItem):
     api_path = ApiPath('template/feature', None, None, None)
     store_file = 'feature_templates.json'
     iter_fields = IdName('templateId', 'templateName')
+
+    @staticmethod
+    def filter_type_default(desired_type: str, desired_is_default: bool, item_type: str, item_is_default: bool) -> bool:
+        """
+        Intended to be used along with partial to create a filter_fn that matches on desired_type and
+        desired_is_default values. Partial locks the desired_type and desired_is_default parameters.
+        :param desired_type: Desired feature templateType
+        :param desired_is_default: Whether to match only factoryDefault templates
+        :param item_type: templateType from feature template being matched
+        :param item_is_default: factoryDefault from feature template being matched
+        :returns: True if conditions matched, false otherwise
+        """
+        if desired_is_default and not item_is_default:
+            return False
+
+        return desired_type == item_type
+
+    def filtered_iter(self, filter_fn):
+        return (
+            (item_id, item_name) for item_type, item_is_default, item_id, item_name
+            in self.iter('templateType', 'factoryDefault', *self.iter_fields) if filter_fn(item_type, item_is_default)
+        )
 
 
 #
@@ -291,6 +418,7 @@ class PolicyVsmart(ConfigItem):
     store_path = ('policy_templates', 'vSmart')
     store_file = '{item_name}.json'
     name_tag = 'policyName'
+    type_tag = 'policyType'
     skip_cmp_tag_set = {'isPolicyActivated', }
 
 
@@ -321,6 +449,7 @@ class PolicyVedge(ConfigItem):
     store_path = ('policy_templates', 'vEdge')
     store_file = '{item_name}.json'
     name_tag = 'policyName'
+    type_tag = 'policyType'
 
 
 @register('policy_vedge', 'edge policy', PolicyVedge)
@@ -339,6 +468,7 @@ class PolicySecurity(ConfigItem):
     store_path = ('policy_templates', 'Security')
     store_file = '{item_name}.json'
     name_tag = 'policyName'
+    type_tag = 'policyType'
 
 
 @register('policy_security', 'security policy', PolicySecurity)
@@ -357,6 +487,7 @@ class PolicyVoice(ConfigItem):
     store_path = ('policy_templates', 'Voice')
     store_file = '{item_name}.json'
     name_tag = 'policyName'
+    type_tag = 'policyType'
 
 
 @register('policy_voice', 'voice policy', PolicyVoice, min_version='20.1')
@@ -375,6 +506,7 @@ class PolicyCustomApp(ConfigItem):
     store_path = ('policy_templates', 'CustomApp')
     store_file = '{item_name}.json'
     name_tag = 'policyName'
+    type_tag = 'policyType'
 
 
 @register('policy_customapp', 'custom application policy', PolicyCustomApp, min_version='20.1')
@@ -393,6 +525,7 @@ class PolicyDef(ConfigItem):
     store_file = '{item_name}.json'
     id_tag = 'definitionId'
     name_tag = 'name'
+    type_tag = 'type'
     skip_cmp_tag_set = {'lastUpdated', 'referenceCount', 'references', 'activatedId', 'isActivatedByVsmart',
                         'owner', 'infoTag'}
 
@@ -697,6 +830,7 @@ class PolicyList(ConfigItem):
     store_file = '{item_name}.json'
     id_tag = 'listId'
     name_tag = 'name'
+    type_tag = 'type'
     skip_cmp_tag_set = {'lastUpdated', 'referenceCount', 'references', 'activatedId', 'isActivatedByVsmart',
                         'owner', 'infoTag'}
 

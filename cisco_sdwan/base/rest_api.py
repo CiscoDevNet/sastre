@@ -28,8 +28,8 @@ class Rest:
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self.session is not None:
             # In 19.3, logging out actually de-authorize all sessions a user may have from the same IP address. For
-            # instance browser windows open from the same laptop. So for now, will not explicitly log out
-            # self.logout()
+            # instance browser windows open from the same laptop. This is fixed in 20.1.
+            self.logout()
             self.session.close()
 
         return False
