@@ -380,11 +380,14 @@ class WaitActionsException(TaskException):
 class Table:
     def __init__(self, *columns):
         self.header = tuple(columns)
-        self._row_class = namedtuple('Row', columns)
+        self._row_class = namedtuple('Row', (f'column_{i}' for i in range(len(columns))))
         self._rows = list()
 
     def add(self, *row_values):
         self._rows.append(self._row_class(*row_values))
+
+    def add_marker(self):
+        self._rows.append(None)
 
     def extend(self, row_values_iter):
         self._rows.extend(self._row_class(*row_values) for row_values in row_values_iter)
@@ -398,7 +401,7 @@ class Table:
     def _column_max_width(self, index):
         return max(
             len(self.header[index]),
-            max((len(row[index]) for row in self._rows)) if len(self._rows) > 0 else 0
+            max((len(row[index]) for row in self._rows if row is not None)) if len(self._rows) > 0 else 0
         )
 
     def pretty_iter(self):
@@ -411,15 +414,19 @@ class Table:
         yield border_line
         yield '|' + '|'.join(cell_format(width, value) for width, value in zip(col_width_list, self.header)) + '|'
         yield border_line
-        for row in self._rows:
-            yield '|' + '|'.join(cell_format(width, value) for width, value in zip(col_width_list, row)) + '|'
+        for row_num, row in enumerate(self._rows):
+            if row is not None:
+                yield '|' + '|'.join(cell_format(width, value) for width, value in zip(col_width_list, row)) + '|'
+            elif 0 < row_num < len(self._rows)-1:
+                yield border_line
+
         yield border_line
 
     def save(self, filename):
         with open(filename, 'w', newline='') as csv_file:
             writer = csv.writer(csv_file)
             writer.writerow(self.header)
-            writer.writerows(self._rows)
+            writer.writerows(row for row in self._rows if row is not None)
 
 
 def clean_dir(target_dir_name, max_saved=99):

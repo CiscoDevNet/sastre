@@ -256,15 +256,19 @@ class DeviceTemplate(ConfigItem):
                         'templateAttached', 'templateConfigurationEdited'}
 
     @property
-    def is_type_cli(self):
+    def is_type_cli(self) -> bool:
         return self.data.get('configType', 'template') == 'file'
 
     @property
-    def is_cedge(self):
+    def is_cedge(self) -> bool:
         return self.data['deviceType'] in CEDGE_SET
 
-    def contains_template(self, template_type):
+    def contains_template(self, template_type: str) -> bool:
         return template_type in self.find_key('templateType')
+
+    @property
+    def feature_templates(self) -> Set[str]:
+        return set(self.find_key('templateId', from_key='generalTemplates'))
 
 
 @register('template_device', 'device template', DeviceTemplate)
@@ -367,6 +371,13 @@ class FeatureTemplate(ConfigItem):
         Returns number of device templates (i.e. master templates) that utilize this feature template
         """
         return self.data.get('attachedMastersCount')
+
+    @property
+    def devices_attached(self) -> int:
+        """
+        Returns number of devices attached to device templates attached to this feature template
+        """
+        return self.data.get('devicesAttached')
 
 
 @register('template_feature', 'feature template', FeatureTemplate)

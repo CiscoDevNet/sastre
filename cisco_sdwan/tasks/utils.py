@@ -70,34 +70,6 @@ class TagOptions:
         return ', '.join([CATALOG_TAG_ALL] + sorted(catalog_tags()))
 
 
-class ShowOptions:
-    _show_options = {}
-
-    @classmethod
-    def option(cls, option_str):
-        option_fn = cls._show_options.get(option_str)
-        if option_fn is None:
-            raise argparse.ArgumentTypeError('Invalid show option. Options are: {ops}.'.format(ops=cls.options()))
-        return option_fn
-
-    @classmethod
-    def options(cls):
-        return ', '.join(cls._show_options)
-
-    @classmethod
-    def register(cls, option_str):
-        """
-        Decorator used for registering show task options.
-        :param option_str: String presented to the user in order to select a show option
-        :return: decorator
-        """
-        def decorator(option_fn):
-            cls._show_options[option_str] = option_fn
-            return option_fn
-
-        return decorator
-
-
 def regex_type(regex_str):
     try:
         re.compile(regex_str)
