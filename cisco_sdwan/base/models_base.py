@@ -322,11 +322,12 @@ class ConfigItem(ApiItem):
 
         return new_name, is_valid
 
-    def find_key(self, key):
+    def find_key(self, key, from_key=None):
         """
         Returns a list containing the values of all occurrences of key inside data. Matched values that are dict or list
         are not included.
         :param key: Key to search
+        :param from_key: Top-level key under which to start the search
         :return: List
         """
         match_list = []
@@ -345,7 +346,7 @@ class ConfigItem(ApiItem):
 
             return match_list
 
-        return find_in(self.data)
+        return find_in(self.data) if from_key is None else find_in(self.data[from_key])
 
 
 # Used for IndexConfigItem iter_fields when they follow (<item-id-label>, <item-name-label>) format
