@@ -813,9 +813,16 @@ class TaskShowTemplate(Task):
             if device is None:
                 cls.log_error('Failed to load device template %s', item_name)
                 continue
+            if device.is_type_cli:
+                continue
 
             for feature_id in device.feature_templates:
-                feature_dict[feature_id].device_templates.add(item_name)
+                feature_info = feature_dict.get(feature_id)
+                if feature_info is None:
+                    cls.log_warning('Template %s references a non-existing feature template: %s', item_name, feature_id)
+                    continue
+
+                feature_info.device_templates.add(item_name)
 
         cls.log_info('Creating references table')
         results = Table('Feature Template', 'Type', 'Devices Attached', 'Device Templates')
@@ -840,6 +847,8 @@ class TaskShowTemplate(Task):
                 cls.log_info('Table exported as %s', parsed_args.csv)
             else:
                 print('\n'.join(results.pretty_iter()))
+        else:
+            cls.log_warning('Table is empty, no items matched the criteria.')
 
 
 @TaskOptions.register('migrate')
@@ -906,6 +915,10 @@ class TaskMigrate(Task):
                                                      to_version=parsed_args.to_version)
             }
             cls.log_info('Loaded template migration recipes')
+
+            server_info = ServerInfo(server_version=parsed_args.to_version)
+            if server_info.save(parsed_args.output):
+                cls.log_info('Saved vManage server information')
 
             id_mapping = {}  # {<old_id>: <new_id>}
             for tag in ordered_tags(CATALOG_TAG_ALL, reverse=True):
@@ -984,9 +997,14 @@ class TaskMigrate(Task):
 
                     if issubclass(item_cls, FeatureTemplate):
                         for factory_default in (factory_cedge_aaa, factory_cedge_global):
-                            export_list.append(factory_default)
-                            id_hint_map[factory_default.name] = factory_default.uuid
-                            cls.log_debug('Added factory %s %s', info, factory_default.name)
+                            if any(factory_default.name == elem.name for elem in export_list):
+                                cls.log_debug('Using existing factory %s %s', info, factory_default.name)
+                                # Updating because device processor always use the built-in IDs
+                                id_mapping[factory_default.uuid] = id_hint_map[factory_default.name]
+                            else:
+                                export_list.append(factory_default)
+                                id_hint_map[factory_default.name] = factory_default.uuid
+                                cls.log_debug('Added factory %s %s', info, factory_default.name)
 
                     new_item_index = index_cls.create(export_list, id_hint_map)
                     if new_item_index.save(parsed_args.output):
