@@ -6,6 +6,7 @@
 """
 import requests
 import urllib3
+import json
 
 
 class Rest:
@@ -59,6 +60,8 @@ class Rest:
         if token is not None:
             self.session.headers['X-XSRF-TOKEN'] = token
 
+        self.session.headers['Content-Type'] = 'application/json'
+
         return True
 
     def logout(self):
@@ -76,7 +79,9 @@ class Rest:
         return response.json()
 
     def post(self, input_data, *path_entries):
-        response = self.session.post(self._url(*path_entries), json=input_data,
+        # With large input_data, vManage fails the post request if payload is encoded in compact form. Thus encoding
+        # with indent=1.
+        response = self.session.post(self._url(*path_entries), data=json.dumps(input_data, indent=1),
                                      timeout=self.timeout, verify=self.verify)
         raise_for_status(response)
 
@@ -84,7 +89,9 @@ class Rest:
         return response.json() if response.text else None
 
     def put(self, input_data, *path_entries):
-        response = self.session.put(self._url(*path_entries), json=input_data,
+        # With large input_data, vManage fails the put request if payload is encoded in compact form. Thus encoding
+        # with indent=1.
+        response = self.session.put(self._url(*path_entries), data=json.dumps(input_data, indent=1),
                                     timeout=self.timeout, verify=self.verify)
         raise_for_status(response)
 
