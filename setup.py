@@ -14,6 +14,9 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     url=__url__,
     packages=setuptools.find_packages(),
+    package_data={
+        "cisco_sdwan.migration": ["*.json", "feature_templates/*.json"]
+    },
     classifiers=[
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.6",
