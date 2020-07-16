@@ -65,15 +65,16 @@ class Rest:
         return True
 
     def logout(self):
-        response = self.session.get('{base_url}/logout?nocache'.format(base_url=self.base_url))
+        response = self.session.get('{base_url}/logout'.format(base_url=self.base_url))
         return response.status_code == requests.codes.ok
 
     @property
     def server_version(self):
         return self.server_facts.get('platformVersion')
 
-    def get(self, *path_entries):
+    def get(self, *path_entries, **params):
         response = self.session.get(self._url(*path_entries),
+                                    params=params if params else None,
                                     timeout=self.timeout, verify=self.verify)
         raise_for_status(response)
         return response.json()
