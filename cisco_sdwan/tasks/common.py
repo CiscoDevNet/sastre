@@ -422,6 +422,11 @@ class Table:
 
         yield border_line
 
+    def append(self, fileHandler):
+        concat = "\n".join(self.pretty_iter()) + "\n\n"
+        fileHandler.write(concat)
+        return fileHandler
+
     def save(self, filename):
         with open(filename, 'w', newline='') as csv_file:
             writer = csv.writer(csv_file)
