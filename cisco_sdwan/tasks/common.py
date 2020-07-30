@@ -44,6 +44,24 @@ class Tally:
         self._tally[item] += 1
 
 
+class TaskArgs:
+    def __init__(self, **kwargs):
+        self.data = kwargs
+
+    def __getattr__(self, field):
+        if field not in self.data:
+            raise AttributeError("'{cls_name}' object has no attribute '{attr}'".format(cls_name=type(self).__name__,
+                                                                                        attr=field))
+        return self.data[field]
+
+    @classmethod
+    def from_json(cls, json_obj, mapper=None):
+        mapper_dict = mapper or {}
+        kwargs = {arg_name: mapper_dict.get(arg_name, lambda x: x)(arg_value)
+                  for arg_name, arg_value in json_obj.items()}
+        return cls(**kwargs)
+
+
 class Task:
     # Configuration parameters for wait_actions
     ACTION_INTERVAL = 10
@@ -99,7 +117,7 @@ class Task:
         return True
 
     @classmethod
-    def runner(cls, parsed_args, api):
+    def runner(cls, parsed_args, api, task_output):
         raise NotImplementedError()
 
     @classmethod
@@ -421,11 +439,6 @@ class Table:
                 yield border_line
 
         yield border_line
-
-    def append(self, fileHandler):
-        concat = "\n".join(self.pretty_iter()) + "\n\n"
-        fileHandler.write(concat)
-        return fileHandler
 
     def save(self, filename):
         with open(filename, 'w', newline='') as csv_file:
