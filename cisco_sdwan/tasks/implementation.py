@@ -10,6 +10,7 @@ import argparse
 from pathlib import Path
 from uuid import uuid4
 from collections import namedtuple
+from datetime import date
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import RestAPIException, is_version_newer
 from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL, ordered_tags
@@ -24,7 +25,7 @@ from cisco_sdwan.migration.feature_migration import FeatureProcessor
 from cisco_sdwan.migration.device_migration import DeviceProcessor
 from .utils import (TaskOptions, TagOptions, existing_file_type, filename_type, regex_type, uuid_type,
                     version_type, default_workdir, ext_template_type)
-from .common import regex_search, clean_dir, Task, Table, WaitActionsException, TaskException
+from .common import regex_search, clean_dir, Task, TaskArgs, Table, WaitActionsException, TaskException
 
 
 @TaskOptions.register('backup')
@@ -52,7 +53,7 @@ class TaskBackup(Task):
         return task_parser.parse_args(task_args)
 
     @classmethod
-    def runner(cls, parsed_args, api):
+    def runner(cls, parsed_args, api, task_output=None):
         cls.log_info('Starting backup: vManage URL: "%s" -> Local workdir: "%s"', api.base_url, parsed_args.workdir)
 
         # Backup workdir must be empty for a new backup
@@ -162,7 +163,7 @@ class TaskRestore(Task):
         return task_parser.parse_args(task_args)
 
     @classmethod
-    def runner(cls, parsed_args, api):
+    def runner(cls, parsed_args, api, task_output=None):
         def load_items(index, item_cls):
             item_iter = (
                 (item_id, item_cls.load(parsed_args.workdir, index.need_extended_name, item_name, item_id))
@@ -381,7 +382,7 @@ class TaskDelete(Task):
         return task_parser.parse_args(task_args)
 
     @classmethod
-    def runner(cls, parsed_args, api):
+    def runner(cls, parsed_args, api, task_output=None):
         cls.log_info('Starting delete%s: vManage URL: "%s"',
                      ', DRY-RUN mode' if parsed_args.dryrun else '', api.base_url)
 
@@ -491,7 +492,7 @@ class TaskCertificate(Task):
         )
 
     @classmethod
-    def runner(cls, parsed_args, api):
+    def runner(cls, parsed_args, api, task_output=None):
         if parsed_args.command == 'restore':
             start_msg = f'Restore status workdir: "{parsed_args.workdir}" -> vManage URL: "{api.base_url}"'
         else:
@@ -593,7 +594,7 @@ class TaskList(Task):
         return parsed_args.workdir is None
 
     @classmethod
-    def runner(cls, parsed_args, api=None):
+    def runner(cls, parsed_args, api=None, task_output=None):
         source_info = f'Local workdir: "{parsed_args.workdir}"' if api is None else f'vManage URL: "{api.base_url}"'
         cls.log_info('Starting %s: %s', parsed_args.subtask_info, source_info)
 
@@ -604,6 +605,8 @@ class TaskList(Task):
             if parsed_args.csv is not None:
                 results.save(parsed_args.csv)
                 cls.log_info('Table exported as %s', parsed_args.csv)
+            elif task_output is not None:
+                task_output.extend(results.pretty_iter())
             else:
                 print('\n'.join(results.pretty_iter()))
 
@@ -708,15 +711,15 @@ class TaskShowTemplate(Task):
         return parsed_args.workdir is None
 
     @classmethod
-    def runner(cls, parsed_args, api=None):
+    def runner(cls, parsed_args, api=None, task_output=None):
         source_info = f'Local workdir: "{parsed_args.workdir}"' if api is None else f'vManage URL: "{api.base_url}"'
         cls.log_info('Starting show-template %s: %s', parsed_args.subtask_info, source_info)
 
         # Dispatch to the appropriate show handler
-        parsed_args.table_factory(parsed_args, api)
+        parsed_args.table_factory(parsed_args, api, task_output)
 
     @classmethod
-    def values_table(cls, parsed_args, api):
+    def values_table(cls, parsed_args, api, task_output):
         def item_matches(item_name, item_id):
             if parsed_args.id is not None:
                 return item_id == parsed_args.id
@@ -784,6 +787,8 @@ class TaskShowTemplate(Task):
         if len(print_buffer) > 0:
             if parsed_args.csv is not None:
                 cls.log_info('Files saved under directory %s', parsed_args.csv)
+            elif task_output is not None:
+                task_output.extend(print_buffer)
             else:
                 print('\n\n'.join(print_buffer))
         else:
@@ -791,7 +796,7 @@ class TaskShowTemplate(Task):
             cls.log_warning('No items found with the %s provided', match_type)
 
     @classmethod
-    def references_table(cls, parsed_args, api):
+    def references_table(cls, parsed_args, api, task_output):
         FeatureInfo = namedtuple('FeatureInfo', ['name', 'type', 'attached', 'device_templates'])
 
         backend = api or parsed_args.workdir
@@ -845,6 +850,8 @@ class TaskShowTemplate(Task):
             if parsed_args.csv is not None:
                 results.save(parsed_args.csv)
                 cls.log_info('Table exported as %s', parsed_args.csv)
+            elif task_output is not None:
+                task_output.extend(results.pretty_iter())
             else:
                 print('\n'.join(results.pretty_iter()))
         else:
@@ -888,7 +895,7 @@ class TaskMigrate(Task):
         return parsed_args.workdir is None
 
     @classmethod
-    def runner(cls, parsed_args, api=None):
+    def runner(cls, parsed_args, api=None, task_output=None):
         source_info = f'Local workdir: "{parsed_args.workdir}"' if api is None else f'vManage URL: "{api.base_url}"'
         cls.log_info('Starting migrate: %s %s -> %s Local output dir: "%s"', source_info, parsed_args.from_version,
                      parsed_args.to_version, parsed_args.output)
@@ -1017,3 +1024,48 @@ class TaskMigrate(Task):
 
         except (ProcessorException, TaskException) as ex:
             cls.log_critical('Migration aborted: %s', ex)
+
+
+@TaskOptions.register('report')
+class TaskReport(Task):
+    @staticmethod
+    def parser(task_args, target_address=None):
+        task_parser = argparse.ArgumentParser(description=f'{title}\nReport task:')
+        task_parser.prog = f'{task_parser.prog} report'
+        task_parser.formatter_class = argparse.RawDescriptionHelpFormatter
+
+        task_parser.add_argument('--file', metavar='<filename>', type=filename_type,
+                                 default=f'report_{date.today():%Y%m%d}.txt',
+                                 help='Report filename (default: %(default)s).')
+        task_parser.add_argument('--workdir', metavar='<directory>', type=existing_file_type,
+                                 help='If provided, report will read from the specified directory instead of the '
+                                      'target vManage.')
+
+        return task_parser.parse_args(task_args)
+
+    @staticmethod
+    def is_api_required(parsed_args):
+        return parsed_args.workdir is None
+
+    @classmethod
+    def runner(cls, parsed_args, api=None, task_output=None):
+        source_info = f'Local workdir: "{parsed_args.workdir}"' if api is None else f'vManage URL: "{api.base_url}"'
+        cls.log_info('Starting report: %s -> "%s"', source_info, parsed_args.file)
+
+        report_tasks = [
+            ('### List configuration ###', TaskList,
+             TaskArgs(csv=None, option='configuration', regex=None, subtask_info='list configuration',
+                      table_factory=TaskList.config_table, tags=['all'], workdir=parsed_args.workdir)),
+            ('### Show-template values ###', TaskShowTemplate,
+             TaskArgs(csv=None, id=None, name=None, option='values', regex='.+', subtask_info='values',
+                      table_factory=TaskShowTemplate.values_table, workdir=parsed_args.workdir)),
+        ]
+
+        report_buffer = []
+        for task_header, task, task_args in report_tasks:
+            report_buffer.append(task_header)
+            task.runner(task_args, api, task_output=report_buffer)
+            report_buffer.append('')
+
+        with open(parsed_args.file, 'w') as f:
+            f.write('\n'.join(report_buffer))
