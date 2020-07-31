@@ -489,7 +489,7 @@ def update_ids(id_mapping_dict, item_data):
 
 
 class ExtendedTemplate:
-    template_pattern = re.compile(r'{name(?:\s+(?P<regex>.*?))?\}')
+    template_pattern = re.compile(r'{name(?:\s+(?P<regex>.*?))?}')
 
     def __init__(self, template):
         self.src_template = template

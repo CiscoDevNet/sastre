@@ -10,7 +10,6 @@ import csv
 import re
 from pathlib import Path
 from shutil import rmtree
-from itertools import repeat
 from collections import namedtuple
 from cisco_sdwan.base.rest_api import Rest, RestAPIException
 from cisco_sdwan.base.models_base import DATA_DIR
@@ -34,14 +33,14 @@ def regex_search(regex, *fields):
 
 
 class Tally:
-    def __init__(self, *names):
-        self._tally = dict(zip(names, repeat(0)))
+    def __init__(self, *counters):
+        self._tally = {counter: 0 for counter in counters}
 
-    def __getattr__(self, item):
-        return self._tally[item]
+    def __getattr__(self, counter):
+        return self._tally[counter]
 
-    def incr(self, item):
-        self._tally[item] += 1
+    def incr(self, counter):
+        self._tally[counter] += 1
 
 
 class TaskArgs:
@@ -67,43 +66,36 @@ class Task:
     ACTION_INTERVAL = 10
     ACTION_TIMEOUT = 600
 
-    log_count = Tally('debug', 'info', 'warning', 'error', 'critical')
+    def __init__(self):
+        self.log_count = Tally('debug', 'info', 'warning', 'error', 'critical')
 
-    @classmethod
-    def log_debug(cls, *args):
-        cls._log('debug', *args)
+    def log_debug(self, *args):
+        self._log('debug', *args)
 
-    @classmethod
-    def log_info(cls, *args):
-        cls._log('info', *args)
+    def log_info(self, *args):
+        self._log('info', *args)
 
-    @classmethod
-    def log_warning(cls, *args):
-        cls._log('warning', *args)
+    def log_warning(self, *args):
+        self._log('warning', *args)
 
-    @classmethod
-    def log_error(cls, *args):
-        cls._log('error', *args)
+    def log_error(self, *args):
+        self._log('error', *args)
 
-    @classmethod
-    def log_critical(cls, *args):
-        cls._log('critical', *args)
+    def log_critical(self, *args):
+        self._log('critical', *args)
 
-    @classmethod
-    def _log(cls, level, *args):
-        logger = logging.getLogger(cls.__name__)
-        getattr(logger, level)(*args)
-        cls.log_count.incr(level)
+    def _log(self, level, *args):
+        getattr(logging.getLogger(type(self).__name__), level)(*args)
+        self.log_count.incr(level)
 
-    @classmethod
-    def outcome(cls, success_msg, failure_msg):
+    def outcome(self, success_msg, failure_msg):
         msg_list = list()
-        if cls.log_count.critical:
-            msg_list.append('{log.critical} critical'.format(log=cls.log_count))
-        if cls.log_count.error:
-            msg_list.append('{log.error} errors'.format(log=cls.log_count))
-        if cls.log_count.warning:
-            msg_list.append('{log.warning} warnings'.format(log=cls.log_count))
+        if self.log_count.critical:
+            msg_list.append(f'{self.log_count.critical} critical')
+        if self.log_count.error:
+            msg_list.append(f'{self.log_count.error} errors')
+        if self.log_count.warning:
+            msg_list.append(f'{self.log_count.warning} warnings')
 
         msg = failure_msg if len(msg_list) > 0 else success_msg
         return msg.format(tally=', '.join(msg_list))
@@ -116,12 +108,10 @@ class Task:
     def is_api_required(parsed_args):
         return True
 
-    @classmethod
-    def runner(cls, parsed_args, api, task_output):
+    def runner(self, parsed_args, api, task_output):
         raise NotImplementedError()
 
-    @classmethod
-    def index_iter(cls, backend, catalog_entry_iter):
+    def index_iter(self, backend, catalog_entry_iter):
         """
         Return an iterator of indexes loaded from backend. If backend is a Rest API instance, indexes are loaded
         from remote vManage via API. Otherwise items are loaded from local backup under the backend directory.
@@ -133,8 +123,9 @@ class Task:
 
         def load_index(index_cls, info):
             index = index_cls.get(backend) if is_api else index_cls.load(backend)
-            cls.log_debug('%s %s %s index',
-                          'No' if index is None else 'Loaded', 'remote' if is_api else 'local', info)
+            self.log_debug('%s %s %s index',
+                           'No' if index is None else 'Loaded',
+                           'remote' if is_api else 'local', info)
             return index
 
         all_index_iter = (
@@ -154,8 +145,7 @@ class Task:
     def index_get(index_cls, backend):
         return index_cls.get(backend) if isinstance(backend, Rest) else index_cls.load(backend)
 
-    @classmethod
-    def attach_template(cls, api, workdir, ext_name, templates_iter, target_uuid_set=None):
+    def attach_template(self, api, workdir, ext_name, templates_iter, target_uuid_set=None):
         """
         Attach templates considering local backup as the source of truth (i.e. where input values are)
         :param api: Instance of Rest API
@@ -170,15 +160,15 @@ class Task:
         """
         def load_template_input(template_name, saved_id, target_id):
             if target_id is None:
-                cls.log_debug('Skip %s, saved template is not on target node', template_name)
+                self.log_debug('Skip %s, saved template is not on target node', template_name)
                 return None
 
             saved_values = DeviceTemplateValues.load(workdir, ext_name, template_name, saved_id)
             if saved_values is None:
-                cls.log_error('DeviceTemplateValues file not found: %s, %s', template_name, saved_id)
+                self.log_error('DeviceTemplateValues file not found: %s, %s', template_name, saved_id)
                 return None
             if saved_values.is_empty:
-                cls.log_debug('Skip %s, saved template has no attachments', template_name)
+                self.log_debug('Skip %s, saved template has no attachments', template_name)
                 return None
 
             target_attached_uuid_set = {uuid for uuid, _ in DeviceTemplateAttached.get_raise(api, target_id)}
@@ -187,14 +177,14 @@ class Task:
             else:
                 saved_attached = DeviceTemplateAttached.load(workdir, ext_name, template_name, saved_id)
                 if saved_attached is None:
-                    cls.log_error('DeviceTemplateAttached file not found: %s, %s', template_name, saved_id)
+                    self.log_error('DeviceTemplateAttached file not found: %s, %s', template_name, saved_id)
                     return None
                 saved_attached_uuid_set = {uuid for uuid, _ in saved_attached}
                 allowed_uuid_set = target_uuid_set & saved_attached_uuid_set - target_attached_uuid_set
 
             input_list = saved_values.input_list(allowed_uuid_set)
             if len(input_list) == 0:
-                cls.log_debug('Skip %s, no devices to attach', template_name)
+                self.log_debug('Skip %s, no devices to attach', template_name)
                 return None
 
             return input_list
@@ -206,10 +196,9 @@ class Task:
             (name, target_id, load_template_input(name, saved_id, target_id), is_template_cli(name, saved_id))
             for name, saved_id, target_id in templates_iter
         ]
-        return cls._place_requests(api, template_input_list, is_edited=target_uuid_set is None)
+        return self._place_requests(api, template_input_list, is_edited=target_uuid_set is None)
 
-    @classmethod
-    def reattach_template(cls, api, templates_iter):
+    def reattach_template(self, api, templates_iter):
         """
         Reattach templates considering vManage as the source of truth (i.e. where input values are)
         :param api: Instance of Rest API
@@ -229,10 +218,9 @@ class Task:
             (template_name, template_id, get_template_input(template_id), is_template_cli(template_id))
             for template_name, template_id in templates_iter
         ]
-        return cls._place_requests(api, template_input_list, is_edited=True)
+        return self._place_requests(api, template_input_list, is_edited=True)
 
-    @classmethod
-    def _place_requests(cls, api, template_input_list, is_edited):
+    def _place_requests(self, api, template_input_list, is_edited):
         action_list = []
         # Attach requests for from-feature device templates
         feature_input_dict = {
@@ -245,7 +233,7 @@ class Task:
                 api.post(DeviceTemplateAttach.api_params(feature_input_dict.values(), is_edited),
                          DeviceTemplateAttach.api_path.post)
             )
-            cls.log_debug('Device template attach requested: %s', action_worker.uuid)
+            self.log_debug('Device template attach requested: %s', action_worker.uuid)
             action_list.append((action_worker, ','.join(feature_input_dict)))
 
         # Attach Requests for cli device templates
@@ -259,13 +247,12 @@ class Task:
                 api.post(DeviceTemplateCLIAttach.api_params(cli_input_dict.values(), is_edited),
                          DeviceTemplateCLIAttach.api_path.post)
             )
-            cls.log_debug('Device CLI template attach requested: %s', action_worker.uuid)
+            self.log_debug('Device CLI template attach requested: %s', action_worker.uuid)
             action_list.append((action_worker, ','.join(cli_input_dict)))
 
         return action_list
 
-    @classmethod
-    def detach_template(cls, api, template_index, filter_fn):
+    def detach_template(self, api, template_index, filter_fn):
         """
         :param api: Instance of Rest API
         :param template_index: Instance of DeviceTemplateIndex
@@ -276,7 +263,7 @@ class Task:
         for item_id, item_name in template_index.filtered_iter(filter_fn):
             devices_attached = DeviceTemplateAttached.get(api, item_id)
             if devices_attached is None:
-                cls.log_warning('Failed to retrieve %s attached devices from vManage', item_name)
+                self.log_warning('Failed to retrieve %s attached devices from vManage', item_name)
                 continue
 
             uuids, personalities = zip(*devices_attached)
@@ -284,13 +271,12 @@ class Task:
             action_worker = DeviceModeCli(
                 api.post(DeviceModeCli.api_params(personalities[0], *uuids), DeviceModeCli.api_path.post)
             )
-            cls.log_debug('Template detach requested: %s', action_worker.uuid)
+            self.log_debug('Template detach requested: %s', action_worker.uuid)
             action_list.append((action_worker, item_name))
 
         return action_list
 
-    @classmethod
-    def activate_policy(cls, api, policy_id, policy_name, is_edited=False):
+    def activate_policy(self, api, policy_id, policy_name, is_edited=False):
         """
         :param api: Instance of Rest API
         :param policy_id: ID of policy to activate
@@ -307,29 +293,27 @@ class Task:
         try:
             PolicyVsmartStatus.get_raise(api).raise_for_status()
         except (RestAPIException, PolicyVsmartStatusException):
-            cls.log_debug('vSmarts not in vManage mode or otherwise not ready to have policy activated')
+            self.log_debug('vSmarts not in vManage mode or otherwise not ready to have policy activated')
         else:
             action_worker = PolicyVsmartActivate(
                 api.post(PolicyVsmartActivate.api_params(is_edited), PolicyVsmartActivate.api_path.post, policy_id)
             )
-            cls.log_debug('Policy activate requested: %s', action_worker.uuid)
+            self.log_debug('Policy activate requested: %s', action_worker.uuid)
             action_list.append((action_worker, policy_name))
 
         return action_list
 
-    @classmethod
-    def deactivate_policy(cls, api):
+    def deactivate_policy(self, api):
         action_list = []
         item_id, item_name = PolicyVsmartIndex.get_raise(api).active_policy
         if item_id is not None and item_name is not None:
             action_worker = PolicyVsmartDeactivate(api.post({}, PolicyVsmartDeactivate.api_path.post, item_id))
-            cls.log_debug('Policy deactivate requested: %s', action_worker.uuid)
+            self.log_debug('Policy deactivate requested: %s', action_worker.uuid)
             action_list.append((action_worker, item_name))
 
         return action_list
 
-    @classmethod
-    def wait_actions(cls, api, action_list, log_context, raise_on_failure=False):
+    def wait_actions(self, api, action_list, log_context, raise_on_failure=False):
         """
         Wait for actions in action_list to complete
         :param api: Instance of Rest API
@@ -344,14 +328,14 @@ class Task:
         def upper_first(input_string):
             return input_string[0].upper() + input_string[1:] if len(input_string) > 0 else ''
 
-        cls.log_info(upper_first(log_context))
+        self.log_info(upper_first(log_context))
         result_list = []
-        time_budget = cls.ACTION_TIMEOUT
+        time_budget = Task.ACTION_TIMEOUT
         for action_worker, action_info in action_list:
             while True:
                 action = ActionStatus.get(api, action_worker.uuid)
                 if action is None:
-                    cls.log_warning('Failed to retrieve action status from vManage')
+                    self.log_warning('Failed to retrieve action status from vManage')
                     result_list.append(False)
                     break
 
@@ -359,28 +343,28 @@ class Task:
                     result_list.append(action.is_successful)
                     if action_info is not None:
                         if action.is_successful:
-                            cls.log_info('Completed %s', action_info)
+                            self.log_info('Completed %s', action_info)
                         else:
-                            cls.log_warning('Failed %s: %s', action_info, action.activity_details)
+                            self.log_warning('Failed %s: %s', action_info, action.activity_details)
 
                     break
 
-                time_budget -= cls.ACTION_INTERVAL
+                time_budget -= Task.ACTION_INTERVAL
                 if time_budget > 0:
-                    cls.log_info('Waiting...')
-                    time.sleep(cls.ACTION_INTERVAL)
+                    self.log_info('Waiting...')
+                    time.sleep(Task.ACTION_INTERVAL)
                 else:
-                    cls.log_warning('Wait time limit expired')
+                    self.log_warning('Wait time limit expired')
                     result_list.append(False)
                     break
 
         result = all(result_list)
         if result:
-            cls.log_info('Completed %s', log_context)
+            self.log_info('Completed %s', log_context)
         elif raise_on_failure:
             raise WaitActionsException('Failed {context}'.format(context=log_context))
         else:
-            cls.log_warning('Failed %s', log_context)
+            self.log_warning('Failed %s', log_context)
 
         return result
 

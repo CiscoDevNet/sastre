@@ -4,7 +4,8 @@
  cisco_sdwan.tasks.implementation
  This module contains the implementation of user-facing tasks
 """
-__all__ = ['TaskBackup', 'TaskRestore', 'TaskDelete', 'TaskCertificate', 'TaskList', 'TaskShowTemplate', 'TaskMigrate']
+__all__ = ['TaskBackup', 'TaskRestore', 'TaskDelete', 'TaskCertificate', 'TaskList', 'TaskShowTemplate',
+           'TaskMigrate', 'TaskReport']
 
 import argparse
 from pathlib import Path
@@ -52,53 +53,52 @@ class TaskBackup(Task):
                                       'device configurations.')
         return task_parser.parse_args(task_args)
 
-    @classmethod
-    def runner(cls, parsed_args, api, task_output=None):
-        cls.log_info('Starting backup: vManage URL: "%s" -> Local workdir: "%s"', api.base_url, parsed_args.workdir)
+    def runner(self, parsed_args, api, task_output=None):
+        self.log_info('Starting backup: vManage URL: "%s" -> Local workdir: "%s"', api.base_url, parsed_args.workdir)
 
         # Backup workdir must be empty for a new backup
         saved_workdir = clean_dir(parsed_args.workdir, max_saved=0 if parsed_args.no_rollover else 99)
         if saved_workdir:
-            cls.log_info('Previous backup under "%s" was saved as "%s"', parsed_args.workdir, saved_workdir)
+            self.log_info('Previous backup under "%s" was saved as "%s"', parsed_args.workdir, saved_workdir)
 
         target_info = ServerInfo(server_version=api.server_version)
         if target_info.save(parsed_args.workdir):
-            cls.log_info('Saved vManage server information')
+            self.log_info('Saved vManage server information')
 
         # Backup items not registered to the catalog, but to be included when tag is 'all'
         if CATALOG_TAG_ALL in parsed_args.tags:
             edge_certs = EdgeCertificate.get(api)
             if edge_certs is None:
-                cls.log_error('Failed backup WAN edge certificates')
+                self.log_error('Failed backup WAN edge certificates')
             elif edge_certs.save(parsed_args.workdir):
-                cls.log_info('Saved WAN edge certificates')
+                self.log_info('Saved WAN edge certificates')
 
             for inventory, info in ((EdgeInventory.get(api), 'WAN edge'), (ControlInventory.get(api), 'controller')):
                 if inventory is None:
-                    cls.log_error('Failed retrieving %s inventory', info)
+                    self.log_error('Failed retrieving %s inventory', info)
                     continue
 
                 for uuid, _, hostname, _ in inventory.extended_iter():
                     if hostname is None:
-                        cls.log_debug('Skipping %s, no hostname', uuid)
+                        self.log_debug('Skipping %s, no hostname', uuid)
                         continue
 
                     for item, config_type in ((DeviceConfig.get(api, DeviceConfig.api_params(uuid)), 'CFS'),
                                               (DeviceConfigRFS.get(api, DeviceConfigRFS.api_params(uuid)), 'RFS')):
                         if item is None:
-                            cls.log_error('Failed backup %s device configuration %s', config_type, hostname)
+                            self.log_error('Failed backup %s device configuration %s', config_type, hostname)
                             continue
                         if item.save(parsed_args.workdir, item_name=hostname, item_id=uuid):
-                            cls.log_info('Done %s device configuration %s', config_type, hostname)
+                            self.log_info('Done %s device configuration %s', config_type, hostname)
 
         # Backup items registered to the catalog
         for _, info, index_cls, item_cls in catalog_iter(*parsed_args.tags, version=api.server_version):
             item_index = index_cls.get(api)
             if item_index is None:
-                cls.log_debug('Skipped %s, item not supported by this vManage', info)
+                self.log_debug('Skipped %s, item not supported by this vManage', info)
                 continue
             if item_index.save(parsed_args.workdir):
-                cls.log_info('Saved %s index', info)
+                self.log_info('Saved %s index', info)
 
             matched_item_iter = (
                 (item_id, item_name) for item_id, item_name in item_index
@@ -107,21 +107,21 @@ class TaskBackup(Task):
             for item_id, item_name in matched_item_iter:
                 item = item_cls.get(api, item_id)
                 if item is None:
-                    cls.log_error('Failed backup %s %s', info, item_name)
+                    self.log_error('Failed backup %s %s', info, item_name)
                     continue
                 if item.save(parsed_args.workdir, item_index.need_extended_name, item_name, item_id):
-                    cls.log_info('Done %s %s', info, item_name)
+                    self.log_info('Done %s %s', info, item_name)
 
                 # Special case for DeviceTemplateAttached and DeviceTemplateValues
                 if isinstance(item, DeviceTemplate):
                     devices_attached = DeviceTemplateAttached.get(api, item_id)
                     if devices_attached is None:
-                        cls.log_error('Failed backup %s %s attached devices', info, item_name)
+                        self.log_error('Failed backup %s %s attached devices', info, item_name)
                         continue
                     if devices_attached.save(parsed_args.workdir, item_index.need_extended_name, item_name, item_id):
-                        cls.log_info('Done %s %s attached devices', info, item_name)
+                        self.log_info('Done %s %s attached devices', info, item_name)
                     else:
-                        cls.log_debug('Skipped %s %s attached devices, none found', info, item_name)
+                        self.log_debug('Skipped %s %s attached devices, none found', info, item_name)
                         continue
 
                     try:
@@ -129,9 +129,9 @@ class TaskBackup(Task):
                         values = DeviceTemplateValues(api.post(DeviceTemplateValues.api_params(item_id, uuid_list),
                                                                DeviceTemplateValues.api_path.post))
                         if values.save(parsed_args.workdir, item_index.need_extended_name, item_name, item_id):
-                            cls.log_info('Done %s %s values', info, item_name)
+                            self.log_info('Done %s %s values', info, item_name)
                     except RestAPIException as ex:
-                        cls.log_error('Failed backup %s %s values: %s', info, item_name, ex)
+                        self.log_error('Failed backup %s %s values: %s', info, item_name, ex)
 
 
 @TaskOptions.register('restore')
@@ -162,8 +162,7 @@ class TaskRestore(Task):
                                       f'{TagOptions.options()}. Special tag "{CATALOG_TAG_ALL}" selects all items.')
         return task_parser.parse_args(task_args)
 
-    @classmethod
-    def runner(cls, parsed_args, api, task_output=None):
+    def runner(self, parsed_args, api, task_output=None):
         def load_items(index, item_cls):
             item_iter = (
                 (item_id, item_cls.load(parsed_args.workdir, index.need_extended_name, item_name, item_id))
@@ -171,48 +170,48 @@ class TaskRestore(Task):
             )
             return ((item_id, item_obj) for item_id, item_obj in item_iter if item_obj is not None)
 
-        cls.log_info('Starting restore%s: Local workdir: "%s" -> vManage URL: "%s"',
-                     ', DRY-RUN mode' if parsed_args.dryrun else '', parsed_args.workdir, api.base_url)
+        self.log_info('Starting restore%s: Local workdir: "%s" -> vManage URL: "%s"',
+                      ', DRY-RUN mode' if parsed_args.dryrun else '', parsed_args.workdir, api.base_url)
 
         local_info = ServerInfo.load(parsed_args.workdir)
         # Server info file may not be present (e.g. backup from older Sastre releases)
         if local_info is not None and is_version_newer(api.server_version, local_info.server_version):
-            cls.log_warning('Target vManage release (%s) is older than the release used in backup (%s). '
-                            'Items may fail to be restored due to incompatibilities across releases.',
-                            api.server_version, local_info.server_version)
+            self.log_warning('Target vManage release (%s) is older than the release used in backup (%s). '
+                             'Items may fail to be restored due to incompatibilities across releases.',
+                             api.server_version, local_info.server_version)
         vbond = SettingsVbond.get(api)
         if vbond is None:
-            cls.log_warning('Failed retrieving vBond settings. Restoring template_device items will fail if vBond '
+            self.log_warning('Failed retrieving vBond settings. Restoring template_device items will fail if vBond '
                             'is not configured.')
 
-        cls.log_info('Loading existing items from target vManage')
+        self.log_info('Loading existing items from target vManage')
         target_all_items_map = {
             hash(type(index)): {item_name: item_id for item_id, item_name in index}
-            for _, _, index, item_cls in cls.index_iter(api, catalog_iter(CATALOG_TAG_ALL, version=api.server_version))
+            for _, _, index, item_cls in self.index_iter(api, catalog_iter(CATALOG_TAG_ALL, version=api.server_version))
         }
 
-        cls.log_info('Identifying items to be pushed')
+        self.log_info('Identifying items to be pushed')
         id_mapping = {}         # {<old_id>: <new_id>}, used to replace old (saved) item ids with new (target) ids
         restore_list = []       # [ (<info>, <index_cls>, [(<item_id>, <item>, <id_on_target>), ...]), ...]
         dependency_set = set()  # {<item_id>, ...}
         match_set = set()       # {<item_id>, ...}
         for tag in ordered_tags(parsed_args.tag):
             if tag == 'template_device' and vbond is not None and not vbond.is_configured:
-                cls.log_warning('Will skip %s items because vBond is not configured. '
-                                'On vManage, Administration > Settings > vBond.', tag)
+                self.log_warning('Will skip %s items because vBond is not configured. '
+                                 'On vManage, Administration > Settings > vBond.', tag)
                 continue
 
-            cls.log_info('Inspecting %s items', tag)
+            self.log_info('Inspecting %s items', tag)
             tag_iter = (
                 (info, index, load_items(index, item_cls))
-                for _, info, index, item_cls in cls.index_iter(parsed_args.workdir,
-                                                               catalog_iter(tag, version=api.server_version))
+                for _, info, index, item_cls in self.index_iter(parsed_args.workdir,
+                                                                catalog_iter(tag, version=api.server_version))
             )
             for info, index, loaded_items_iter in tag_iter:
                 target_item_map = target_all_items_map.get(hash(type(index)))
                 if target_item_map is None:
                     # Logging at warning level because the backup files did have this item
-                    cls.log_warning('Will skip %s, item not supported by target vManage', info)
+                    self.log_warning('Will skip %s, item not supported by target vManage', info)
                     continue
 
                 restore_item_list = []
@@ -225,11 +224,11 @@ class TaskRestore(Task):
 
                         if not parsed_args.force:
                             # Existing item on target vManage will be used, i.e. will not overwrite it
-                            cls.log_debug('Will skip %s %s, item already on target vManage', info, item.name)
+                            self.log_debug('Will skip %s %s, item already on target vManage', info, item.name)
                             continue
 
                     if item.is_readonly:
-                        cls.log_debug('Will skip read-only %s %s', info, item.name)
+                        self.log_debug('Will skip read-only %s %s', info, item.name)
                         continue
 
                     item_matches = (
@@ -249,7 +248,7 @@ class TaskRestore(Task):
 
         log_prefix = 'DRY-RUN: ' if parsed_args.dryrun else ''
         if len(restore_list) > 0:
-            cls.log_info('%sPushing items to vManage', log_prefix)
+            self.log_info('%sPushing items to vManage', log_prefix)
             # Items were added to restore_list following ordered_tags() order (i.e. higher level items before lower
             # level items). The reverse order needs to be followed on restore.
             for info, index, restore_item_list in reversed(restore_list):
@@ -262,7 +261,7 @@ class TaskRestore(Task):
                         if target_id is None:
                             # Create new item
                             if parsed_args.dryrun:
-                                cls.log_info('%s%s %s %s%s', log_prefix, op_info, info, item.name, reason)
+                                self.log_info('%s%s %s %s%s', log_prefix, op_info, info, item.name, reason)
                                 continue
                             # Not using item id returned from post because post can return empty (e.g. local policies)
                             api.post(item.post_data(id_mapping), item.api_path.post)
@@ -271,41 +270,41 @@ class TaskRestore(Task):
                             # Update existing item
                             update_data = item.put_data(id_mapping)
                             if item.get_raise(api, target_id).is_equal(update_data):
-                                cls.log_debug('%s%s skipped (no diffs) %s %s', log_prefix, op_info, info, item.name)
+                                self.log_debug('%s%s skipped (no diffs) %s %s', log_prefix, op_info, info, item.name)
                                 continue
 
                             if parsed_args.dryrun:
-                                cls.log_info('%s%s %s %s%s', log_prefix, op_info, info, item.name, reason)
+                                self.log_info('%s%s %s %s%s', log_prefix, op_info, info, item.name, reason)
                                 continue
 
                             put_eval = UpdateEval(api.put(update_data, item.api_path.put, target_id))
                             if put_eval.need_reattach:
                                 if put_eval.is_master:
-                                    cls.log_info('Updating %s %s requires reattach', info, item.name)
-                                    action_list = cls.attach_template(api, parsed_args.workdir,
-                                                                      index.need_extended_name,
-                                                                      [(item.name, item_id, target_id)])
+                                    self.log_info('Updating %s %s requires reattach', info, item.name)
+                                    action_list = self.attach_template(api, parsed_args.workdir,
+                                                                       index.need_extended_name,
+                                                                       [(item.name, item_id, target_id)])
                                 else:
-                                    cls.log_info('Updating %s %s requires reattach of affected templates',
-                                                 info, item.name)
+                                    self.log_info('Updating %s %s requires reattach of affected templates',
+                                                  info, item.name)
                                     target_templates = {item_id: item_name
                                                         for item_id, item_name in DeviceTemplateIndex.get_raise(api)}
                                     templates_iter = (
                                         (target_templates[tgt_id], tgt_id)
                                         for tgt_id in put_eval.templates_affected_iter()
                                     )
-                                    action_list = cls.reattach_template(api, templates_iter)
-                                cls.wait_actions(api, action_list, 'reattaching templates', raise_on_failure=True)
+                                    action_list = self.reattach_template(api, templates_iter)
+                                self.wait_actions(api, action_list, 'reattaching templates', raise_on_failure=True)
                             elif put_eval.need_reactivate:
-                                cls.log_info('Updating %s %s requires vSmart policy reactivate', info, item.name)
-                                action_list = cls.activate_policy(
+                                self.log_info('Updating %s %s requires vSmart policy reactivate', info, item.name)
+                                action_list = self.activate_policy(
                                     api, *PolicyVsmartIndex.get_raise(api).active_policy, is_edited=True
                                 )
-                                cls.wait_actions(api, action_list, 'reactivating vSmart policy', raise_on_failure=True)
+                                self.wait_actions(api, action_list, 'reactivating vSmart policy', raise_on_failure=True)
                     except (RestAPIException, WaitActionsException) as ex:
-                        cls.log_error('Failed %s %s %s%s: %s', op_info, info, item.name, reason, ex)
+                        self.log_error('Failed %s %s %s%s: %s', op_info, info, item.name, reason, ex)
                     else:
-                        cls.log_info('Done: %s %s %s%s', op_info, info, item.name, reason)
+                        self.log_info('Done: %s %s %s%s', op_info, info, item.name, reason)
 
                 # Read new ids from target and update id_mapping
                 try:
@@ -313,10 +312,10 @@ class TaskRestore(Task):
                     for item_name, old_item_id in pushed_item_dict.items():
                         id_mapping[old_item_id] = new_target_item_map[item_name]
                 except RestAPIException as ex:
-                    cls.log_critical('Failed retrieving %s: %s', info, ex)
+                    self.log_critical('Failed retrieving %s: %s', info, ex)
                     break
         else:
-            cls.log_info('%sNo items to push', log_prefix)
+            self.log_info('%sNo items to push', log_prefix)
 
         if parsed_args.attach:
             try:
@@ -330,11 +329,11 @@ class TaskRestore(Task):
                     for saved_id, saved_name in saved_template_index.filtered_iter(DeviceTemplateIndex.is_not_vsmart)
                 )
                 wan_edge_set = {uuid for uuid, _ in EdgeInventory.get_raise(api)}
-                action_list = cls.attach_template(*attach_common_args, edge_templates_iter, wan_edge_set)
+                action_list = self.attach_template(*attach_common_args, edge_templates_iter, wan_edge_set)
                 if len(action_list) == 0:
-                    cls.log_info('No WAN Edge attachments needed')
+                    self.log_info('No WAN Edge attachments needed')
                 else:
-                    cls.wait_actions(api, action_list, 'attaching WAN Edge templates')
+                    self.wait_actions(api, action_list, 'attaching WAN Edge templates')
                 # Attach vSmart template
                 vsmart_templates_iter = (
                     (saved_name, saved_id, target_templates.get(saved_name))
@@ -343,20 +342,20 @@ class TaskRestore(Task):
                 vsmart_set = {
                     uuid for uuid, _ in ControlInventory.get_raise(api).filtered_iter(ControlInventory.is_vsmart)
                 }
-                action_list = cls.attach_template(*attach_common_args, vsmart_templates_iter, vsmart_set)
+                action_list = self.attach_template(*attach_common_args, vsmart_templates_iter, vsmart_set)
                 if len(action_list) == 0:
-                    cls.log_info('No vSmart attachments needed')
+                    self.log_info('No vSmart attachments needed')
                 else:
-                    cls.wait_actions(api, action_list, 'attaching vSmart template')
+                    self.wait_actions(api, action_list, 'attaching vSmart template')
                 # Activate vSmart policy
                 _, policy_name = PolicyVsmartIndex.load(parsed_args.workdir, raise_not_found=True).active_policy
-                action_list = cls.activate_policy(api, target_policies.get(policy_name), policy_name)
+                action_list = self.activate_policy(api, target_policies.get(policy_name), policy_name)
                 if len(action_list) == 0:
-                    cls.log_info('No vSmart policy to activate')
+                    self.log_info('No vSmart policy to activate')
                 else:
-                    cls.wait_actions(api, action_list, 'activating vSmart policy')
+                    self.wait_actions(api, action_list, 'activating vSmart policy')
             except (RestAPIException, FileNotFoundError) as ex:
-                cls.log_critical('Attach failed: %s', ex)
+                self.log_critical('Attach failed: %s', ex)
 
 
 @TaskOptions.register('delete')
@@ -381,59 +380,58 @@ class TaskDelete(Task):
                                       f'{TagOptions.options()}. Special tag "{CATALOG_TAG_ALL}" selects all items.')
         return task_parser.parse_args(task_args)
 
-    @classmethod
-    def runner(cls, parsed_args, api, task_output=None):
-        cls.log_info('Starting delete%s: vManage URL: "%s"',
-                     ', DRY-RUN mode' if parsed_args.dryrun else '', api.base_url)
+    def runner(self, parsed_args, api, task_output=None):
+        self.log_info('Starting delete%s: vManage URL: "%s"',
+                      ', DRY-RUN mode' if parsed_args.dryrun else '', api.base_url)
 
         if parsed_args.detach:
             try:
                 template_index = DeviceTemplateIndex.get_raise(api)
                 # Detach WAN Edge templates
-                action_list = cls.detach_template(api, template_index, DeviceTemplateIndex.is_not_vsmart)
+                action_list = self.detach_template(api, template_index, DeviceTemplateIndex.is_not_vsmart)
                 if len(action_list) == 0:
-                    cls.log_info('No WAN Edge attached')
+                    self.log_info('No WAN Edge attached')
                 else:
-                    cls.wait_actions(api, action_list, 'detaching WAN Edge templates')
+                    self.wait_actions(api, action_list, 'detaching WAN Edge templates')
                 # Deactivate vSmart policy
-                action_list = cls.deactivate_policy(api)
+                action_list = self.deactivate_policy(api)
                 if len(action_list) == 0:
-                    cls.log_info('No vSmart policy activated')
+                    self.log_info('No vSmart policy activated')
                 else:
-                    cls.wait_actions(api, action_list, 'deactivating vSmart policy')
+                    self.wait_actions(api, action_list, 'deactivating vSmart policy')
                 # Detach vSmart template
-                action_list = cls.detach_template(api, template_index, DeviceTemplateIndex.is_vsmart)
+                action_list = self.detach_template(api, template_index, DeviceTemplateIndex.is_vsmart)
                 if len(action_list) == 0:
-                    cls.log_info('No vSmart attached')
+                    self.log_info('No vSmart attached')
                 else:
-                    cls.wait_actions(api, action_list, 'detaching vSmart template')
+                    self.wait_actions(api, action_list, 'detaching vSmart template')
             except RestAPIException as ex:
-                cls.log_critical('Detach failed: %s', ex)
+                self.log_critical('Detach failed: %s', ex)
 
         for tag in ordered_tags(parsed_args.tag, parsed_args.tag != CATALOG_TAG_ALL):
-            cls.log_info('Inspecting %s items', tag)
+            self.log_info('Inspecting %s items', tag)
             matched_item_iter = (
                 (item_name, item_id, item_cls, info)
-                for _, info, index, item_cls in cls.index_iter(api, catalog_iter(tag, version=api.server_version))
+                for _, info, index, item_cls in self.index_iter(api, catalog_iter(tag, version=api.server_version))
                 for item_id, item_name in index
                 if parsed_args.regex is None or regex_search(parsed_args.regex, item_name)
             )
             for item_name, item_id, item_cls, info in matched_item_iter:
                 item = item_cls.get(api, item_id)
                 if item is None:
-                    cls.log_warning('Failed retrieving %s %s', info, item_name)
+                    self.log_warning('Failed retrieving %s %s', info, item_name)
                     continue
                 if item.is_readonly or item.is_system:
-                    cls.log_debug('Skipped %s %s %s', 'read-only' if item.is_readonly else 'system', info, item_name)
+                    self.log_debug('Skipped %s %s %s', 'read-only' if item.is_readonly else 'system', info, item_name)
                     continue
                 if parsed_args.dryrun:
-                    cls.log_info('DRY-RUN: Delete %s %s', info, item_name)
+                    self.log_info('DRY-RUN: Delete %s %s', info, item_name)
                     continue
 
                 if api.delete(item_cls.api_path.delete, item_id):
-                    cls.log_info('Done: Delete %s %s', info, item_name)
+                    self.log_info('Done: Delete %s %s', info, item_name)
                 else:
-                    cls.log_warning('Failed deleting %s %s', info, item_name)
+                    self.log_warning('Failed deleting %s %s', info, item_name)
 
 
 @TaskOptions.register('certificate')
@@ -491,16 +489,15 @@ class TaskCertificate(Task):
             for uuid, status, hostname, chassis, serial, state in target_certs.extended_iter()
         )
 
-    @classmethod
-    def runner(cls, parsed_args, api, task_output=None):
+    def runner(self, parsed_args, api, task_output=None):
         if parsed_args.command == 'restore':
             start_msg = f'Restore status workdir: "{parsed_args.workdir}" -> vManage URL: "{api.base_url}"'
         else:
             start_msg = f'Set status to "{parsed_args.status}" -> vManage URL: "{api.base_url}"'
-        cls.log_info('Starting certificate%s: %s', ', DRY-RUN mode' if parsed_args.dryrun else '', start_msg)
+        self.log_info('Starting certificate%s: %s', ', DRY-RUN mode' if parsed_args.dryrun else '', start_msg)
 
         try:
-            cls.log_info('Loading WAN edge certificate list from target vManage')
+            self.log_info('Loading WAN edge certificate list from target vManage')
             target_certs = EdgeCertificate.get_raise(api)
 
             matched_items = (
@@ -509,29 +506,29 @@ class TaskCertificate(Task):
                 if parsed_args.regex is None or regex_search(parsed_args.regex, hostname or '-', uuid)
             )
             update_list = []
-            cls.log_info('Identifying items to be pushed')
+            self.log_info('Identifying items to be pushed')
             log_prefix = 'DRY-RUN: ' if parsed_args.dryrun else ''
             for uuid, current_status, hostname, new_status in matched_items:
                 if current_status == new_status:
-                    cls.log_debug('%sSkipping %s, no changes', log_prefix, hostname or uuid)
+                    self.log_debug('%sSkipping %s, no changes', log_prefix, hostname or uuid)
                     continue
 
-                cls.log_info('%sWill update %s status: %s -> %s',
-                             log_prefix, hostname or uuid, current_status, new_status)
+                self.log_info('%sWill update %s status: %s -> %s',
+                              log_prefix, hostname or uuid, current_status, new_status)
                 update_list.append((uuid, new_status))
 
             if len(update_list) > 0:
-                cls.log_info('%sPushing certificate status changes to vManage', log_prefix)
+                self.log_info('%sPushing certificate status changes to vManage', log_prefix)
                 if not parsed_args.dryrun:
                     api.post(target_certs.status_post_data(*update_list), EdgeCertificate.api_path.post)
                     action_worker = EdgeCertificateSync(api.post({}, EdgeCertificateSync.api_path.post))
-                    cls.wait_actions(api, [(action_worker, None)], 'certificate sync with controllers',
-                                     raise_on_failure=True)
+                    self.wait_actions(api, [(action_worker, None)], 'certificate sync with controllers',
+                                      raise_on_failure=True)
             else:
-                cls.log_info('%sNo certificate status updates to push', log_prefix)
+                self.log_info('%sNo certificate status updates to push', log_prefix)
 
         except (RestAPIException, FileNotFoundError, WaitActionsException) as ex:
-            cls.log_critical('Failed updating WAN edge certificate status: %s', ex)
+            self.log_critical('Failed updating WAN edge certificate status: %s', ex)
 
 
 @TaskOptions.register('list')
@@ -593,32 +590,30 @@ class TaskList(Task):
     def is_api_required(parsed_args):
         return parsed_args.workdir is None
 
-    @classmethod
-    def runner(cls, parsed_args, api=None, task_output=None):
+    def runner(self, parsed_args, api=None, task_output=None):
         source_info = f'Local workdir: "{parsed_args.workdir}"' if api is None else f'vManage URL: "{api.base_url}"'
-        cls.log_info('Starting %s: %s', parsed_args.subtask_info, source_info)
+        self.log_info('Starting %s: %s', parsed_args.subtask_info, source_info)
 
-        results = parsed_args.table_factory(parsed_args, api)
-        cls.log_info('List criteria matched %s items', len(results))
+        results = parsed_args.table_factory(self, parsed_args, api)
+        self.log_info('List criteria matched %s items', len(results))
 
         if len(results) > 0:
             if parsed_args.csv is not None:
                 results.save(parsed_args.csv)
-                cls.log_info('Table exported as %s', parsed_args.csv)
+                self.log_info('Table exported as %s', parsed_args.csv)
             elif task_output is not None:
                 task_output.extend(results.pretty_iter())
             else:
                 print('\n'.join(results.pretty_iter()))
 
-    @classmethod
-    def config_table(cls, parsed_args, api):
+    def config_table(self, parsed_args, api):
         backend = api or parsed_args.workdir
         # Only perform version-based filtering if backend is api
         version = None if api is None else api.server_version
 
         matched_item_iter = (
             (item_name, item_id, tag, info)
-            for tag, info, index, item_cls in cls.index_iter(backend, catalog_iter(*parsed_args.tags, version=version))
+            for tag, info, index, item_cls in self.index_iter(backend, catalog_iter(*parsed_args.tags, version=version))
             for item_id, item_name in index
             if parsed_args.regex is None or regex_search(parsed_args.regex, item_name, item_id)
         )
@@ -627,8 +622,7 @@ class TaskList(Task):
 
         return results
 
-    @classmethod
-    def cert_table(cls, parsed_args, api):
+    def cert_table(self, parsed_args, api):
         if api is None:
             certs = EdgeCertificate.load(parsed_args.workdir)
             if certs is None:
@@ -646,8 +640,7 @@ class TaskList(Task):
 
         return results
 
-    @classmethod
-    def xform_table(cls, parsed_args, api):
+    def xform_table(self, parsed_args, api):
         backend = api or parsed_args.workdir
         # Only perform version-based filtering if backend is api
         version = None if api is None else api.server_version
@@ -655,7 +648,7 @@ class TaskList(Task):
         name_regex = ExtendedTemplate(parsed_args.name_regex)
         matched_item_iter = (
             (item_name,  name_regex(item_name), tag, info)
-            for tag, info, index, item_cls in cls.index_iter(backend, catalog_iter(*parsed_args.tags, version=version))
+            for tag, info, index, item_cls in self.index_iter(backend, catalog_iter(*parsed_args.tags, version=version))
             for item_id, item_name in index
             if parsed_args.regex is None or regex_search(parsed_args.regex, item_name)
         )
@@ -710,16 +703,14 @@ class TaskShowTemplate(Task):
     def is_api_required(parsed_args):
         return parsed_args.workdir is None
 
-    @classmethod
-    def runner(cls, parsed_args, api=None, task_output=None):
+    def runner(self, parsed_args, api=None, task_output=None):
         source_info = f'Local workdir: "{parsed_args.workdir}"' if api is None else f'vManage URL: "{api.base_url}"'
-        cls.log_info('Starting show-template %s: %s', parsed_args.subtask_info, source_info)
+        self.log_info('Starting show-template %s: %s', parsed_args.subtask_info, source_info)
 
         # Dispatch to the appropriate show handler
-        parsed_args.table_factory(parsed_args, api, task_output)
+        parsed_args.table_factory(self, parsed_args, api, task_output)
 
-    @classmethod
-    def values_table(cls, parsed_args, api, task_output):
+    def values_table(self, parsed_args, api, task_output):
         def item_matches(item_name, item_id):
             if parsed_args.id is not None:
                 return item_id == parsed_args.id
@@ -732,12 +723,12 @@ class TaskShowTemplate(Task):
                 # Load from local backup
                 values = DeviceTemplateValues.load(parsed_args.workdir, ext_name, template_name, template_id)
                 if values is None:
-                    cls.log_debug('Skipped %s. No template values file found.', template_name)
+                    self.log_debug('Skipped %s. No template values file found.', template_name)
             else:
                 # Load from vManage via API
                 devices_attached = DeviceTemplateAttached.get(api, template_id)
                 if devices_attached is None:
-                    cls.log_error('Failed to retrieve %s attached devices', template_name)
+                    self.log_error('Failed to retrieve %s attached devices', template_name)
                     return None
 
                 try:
@@ -745,7 +736,7 @@ class TaskShowTemplate(Task):
                     values = DeviceTemplateValues(api.post(DeviceTemplateValues.api_params(template_id, uuid_list),
                                                            DeviceTemplateValues.api_path.post))
                 except RestAPIException:
-                    cls.log_error('Failed to retrieve %s values', template_name)
+                    self.log_error('Failed to retrieve %s values', template_name)
                     return None
 
             return values
@@ -757,7 +748,7 @@ class TaskShowTemplate(Task):
         backend = api or parsed_args.workdir
         matched_item_iter = (
             (index.need_extended_name, item_name, item_id, tag, info)
-            for tag, info, index, item_cls in cls.index_iter(backend, catalog_iter('template_device'))
+            for tag, info, index, item_cls in self.index_iter(backend, catalog_iter('template_device'))
             for item_id, item_name in index
             if item_matches(item_name, item_id) and issubclass(item_cls, DeviceTemplate)
         )
@@ -766,7 +757,7 @@ class TaskShowTemplate(Task):
             if attached_values is None:
                 continue
 
-            cls.log_info('Inspecting %s %s values', info, item_name)
+            self.log_info('Inspecting %s %s values', info, item_name)
             var_names = attached_values.title_dict()
             for csv_id, csv_name, entry in attached_values:
                 print_grp = [
@@ -786,37 +777,36 @@ class TaskShowTemplate(Task):
 
         if len(print_buffer) > 0:
             if parsed_args.csv is not None:
-                cls.log_info('Files saved under directory %s', parsed_args.csv)
+                self.log_info('Files saved under directory %s', parsed_args.csv)
             elif task_output is not None:
                 task_output.extend(print_buffer)
             else:
                 print('\n\n'.join(print_buffer))
         else:
             match_type = 'ID' if parsed_args.id is not None else 'name' if parsed_args.name is not None else 'regex'
-            cls.log_warning('No items found with the %s provided', match_type)
+            self.log_warning('No items found with the %s provided', match_type)
 
-    @classmethod
-    def references_table(cls, parsed_args, api, task_output):
+    def references_table(self, parsed_args, api, task_output):
         FeatureInfo = namedtuple('FeatureInfo', ['name', 'type', 'attached', 'device_templates'])
 
         backend = api or parsed_args.workdir
-        cls.log_info('Inspecting feature templates')
-        feature_index = cls.index_get(FeatureTemplateIndex, backend)
+        self.log_info('Inspecting feature templates')
+        feature_index = self.index_get(FeatureTemplateIndex, backend)
         feature_dict = {}
         for item_id, item_name in feature_index:
-            feature = cls.item_get(FeatureTemplate, backend, item_id, item_name, feature_index.need_extended_name)
+            feature = self.item_get(FeatureTemplate, backend, item_id, item_name, feature_index.need_extended_name)
             if feature is None:
-                cls.log_error('Failed to load feature template %s', item_name)
+                self.log_error('Failed to load feature template %s', item_name)
                 continue
 
             feature_dict[item_id] = FeatureInfo(item_name, feature.type, feature.devices_attached, set())
 
-        cls.log_info('Inspecting device templates')
-        device_index = cls.index_get(DeviceTemplateIndex, backend)
+        self.log_info('Inspecting device templates')
+        device_index = self.index_get(DeviceTemplateIndex, backend)
         for item_id, item_name in device_index:
-            device = cls.item_get(DeviceTemplate, backend, item_id, item_name, device_index.need_extended_name)
+            device = self.item_get(DeviceTemplate, backend, item_id, item_name, device_index.need_extended_name)
             if device is None:
-                cls.log_error('Failed to load device template %s', item_name)
+                self.log_error('Failed to load device template %s', item_name)
                 continue
             if device.is_type_cli:
                 continue
@@ -824,12 +814,12 @@ class TaskShowTemplate(Task):
             for feature_id in device.feature_templates:
                 feature_info = feature_dict.get(feature_id)
                 if feature_info is None:
-                    cls.log_warning('Template %s references a non-existing feature template: %s', item_name, feature_id)
+                    self.log_warning('Template %s references a non-existing feature template: %s', item_name, feature_id)
                     continue
 
                 feature_info.device_templates.add(item_name)
 
-        cls.log_info('Creating references table')
+        self.log_info('Creating references table')
         results = Table('Feature Template', 'Type', 'Devices Attached', 'Device Templates')
         matched_item_iter = (feature_info for feature_info in feature_dict.values()
                              if parsed_args.regex is None or regex_search(parsed_args.regex, feature_info.name))
@@ -849,13 +839,13 @@ class TaskShowTemplate(Task):
         if len(results) > 0:
             if parsed_args.csv is not None:
                 results.save(parsed_args.csv)
-                cls.log_info('Table exported as %s', parsed_args.csv)
+                self.log_info('Table exported as %s', parsed_args.csv)
             elif task_output is not None:
                 task_output.extend(results.pretty_iter())
             else:
                 print('\n'.join(results.pretty_iter()))
         else:
-            cls.log_warning('Table is empty, no items matched the criteria.')
+            self.log_warning('Table is empty, no items matched the criteria.')
 
 
 @TaskOptions.register('migrate')
@@ -894,16 +884,15 @@ class TaskMigrate(Task):
     def is_api_required(parsed_args):
         return parsed_args.workdir is None
 
-    @classmethod
-    def runner(cls, parsed_args, api=None, task_output=None):
+    def runner(self, parsed_args, api=None, task_output=None):
         source_info = f'Local workdir: "{parsed_args.workdir}"' if api is None else f'vManage URL: "{api.base_url}"'
-        cls.log_info('Starting migrate: %s %s -> %s Local output dir: "%s"', source_info, parsed_args.from_version,
-                     parsed_args.to_version, parsed_args.output)
+        self.log_info('Starting migrate: %s %s -> %s Local output dir: "%s"', source_info, parsed_args.from_version,
+                      parsed_args.to_version, parsed_args.output)
 
         # Output directory must be empty for a new migration
         saved_output = clean_dir(parsed_args.output, max_saved=0 if parsed_args.no_rollover else 99)
         if saved_output:
-            cls.log_info('Previous migration under "%s" was saved as "%s"', parsed_args.output, saved_output)
+            self.log_info('Previous migration under "%s" was saved as "%s"', parsed_args.output, saved_output)
 
         if api is None:
             backend = parsed_args.workdir
@@ -921,20 +910,20 @@ class TaskMigrate(Task):
                 DeviceTemplate: DeviceProcessor.load(from_version=parsed_args.from_version,
                                                      to_version=parsed_args.to_version)
             }
-            cls.log_info('Loaded template migration recipes')
+            self.log_info('Loaded template migration recipes')
 
             server_info = ServerInfo(server_version=parsed_args.to_version)
             if server_info.save(parsed_args.output):
-                cls.log_info('Saved vManage server information')
+                self.log_info('Saved vManage server information')
 
             id_mapping = {}  # {<old_id>: <new_id>}
             for tag in ordered_tags(CATALOG_TAG_ALL, reverse=True):
-                cls.log_info('Inspecting %s items', tag)
+                self.log_info('Inspecting %s items', tag)
 
                 for _, info, index_cls, item_cls in catalog_iter(tag, version=server_version):
-                    item_index = cls.index_get(index_cls, backend)
+                    item_index = self.index_get(index_cls, backend)
                     if item_index is None:
-                        cls.log_debug('Skipped %s, none found', info)
+                        self.log_debug('Skipped %s, none found', info)
                         continue
 
                     name_set = {item_name for item_id, item_name in item_index}
@@ -943,9 +932,9 @@ class TaskMigrate(Task):
                     export_list = []
                     id_hint_map = {item_name: item_id for item_id, item_name in item_index}
                     for item_id, item_name in item_index:
-                        item = cls.item_get(item_cls, backend, item_id, item_name, item_index.need_extended_name)
+                        item = self.item_get(item_cls, backend, item_id, item_name, item_index.need_extended_name)
                         if item is None:
-                            cls.log_error('Failed loading %s %s', info, item_name)
+                            self.log_error('Failed loading %s %s', info, item_name)
                             continue
 
                         try:
@@ -953,18 +942,18 @@ class TaskMigrate(Task):
                             if item_processor is None:
                                 raise StopProcessorException()
 
-                            cls.log_debug('Evaluating %s %s', info, item_name)
+                            self.log_debug('Evaluating %s %s', info, item_name)
                             if not item_processor.is_in_scope(item, migrate_all=(parsed_args.scope == 'all')):
-                                cls.log_debug('Skipping %s, migration not necessary', item_name)
+                                self.log_debug('Skipping %s, migration not necessary', item_name)
                                 raise StopProcessorException()
 
                             new_name, is_valid = item.get_new_name(parsed_args.name)
                             if not is_valid:
-                                cls.log_error('New %s name is not valid: %s', info, new_name)
+                                self.log_error('New %s name is not valid: %s', info, new_name)
                                 is_bad_name = True
                                 raise StopProcessorException()
                             if new_name in name_set:
-                                cls.log_error('New %s name collision: %s -> %s', info, item_name, new_name)
+                                self.log_error('New %s name collision: %s -> %s', info, item_name, new_name)
                                 is_bad_name = True
                                 raise StopProcessorException()
 
@@ -973,10 +962,10 @@ class TaskMigrate(Task):
                             new_id = str(uuid4())
                             new_payload, trace_log = item_processor.eval(item, new_name, new_id)
                             for trace in trace_log:
-                                cls.log_debug('Processor: %s', trace)
+                                self.log_debug('Processor: %s', trace)
 
                             if item.is_equal(new_payload):
-                                cls.log_debug('Skipping %s, no changes', item_name)
+                                self.log_debug('Skipping %s, no changes', item_name)
                                 raise StopProcessorException()
 
                             new_item = item_cls(update_ids(id_mapping, new_payload))
@@ -984,10 +973,10 @@ class TaskMigrate(Task):
                             id_hint_map[new_name] = new_id
 
                             if item_processor.replace_original():
-                                cls.log_debug('Migrated replaces original: %s -> %s', item_name, new_name)
+                                self.log_debug('Migrated replaces original: %s -> %s', item_name, new_name)
                                 item = new_item
                             else:
-                                cls.log_debug('Migrated adds to original: %s + %s', item_name, new_name)
+                                self.log_debug('Migrated adds to original: %s + %s', item_name, new_name)
                                 export_list.append(new_item)
 
                         except StopProcessorException:
@@ -999,31 +988,31 @@ class TaskMigrate(Task):
                         raise TaskException(f'One or more new {info} names are not valid')
 
                     if not export_list:
-                        cls.log_info('No %s migrated', info)
+                        self.log_info('No %s migrated', info)
                         continue
 
                     if issubclass(item_cls, FeatureTemplate):
                         for factory_default in (factory_cedge_aaa, factory_cedge_global):
                             if any(factory_default.name == elem.name for elem in export_list):
-                                cls.log_debug('Using existing factory %s %s', info, factory_default.name)
+                                self.log_debug('Using existing factory %s %s', info, factory_default.name)
                                 # Updating because device processor always use the built-in IDs
                                 id_mapping[factory_default.uuid] = id_hint_map[factory_default.name]
                             else:
                                 export_list.append(factory_default)
                                 id_hint_map[factory_default.name] = factory_default.uuid
-                                cls.log_debug('Added factory %s %s', info, factory_default.name)
+                                self.log_debug('Added factory %s %s', info, factory_default.name)
 
                     new_item_index = index_cls.create(export_list, id_hint_map)
                     if new_item_index.save(parsed_args.output):
-                        cls.log_info('Saved %s index', info)
+                        self.log_info('Saved %s index', info)
 
                     for new_item in export_list:
                         if new_item.save(parsed_args.output, new_item_index.need_extended_name, new_item.name,
                                          id_hint_map[new_item.name]):
-                            cls.log_info('Saved %s %s', info, new_item.name)
+                            self.log_info('Saved %s %s', info, new_item.name)
 
         except (ProcessorException, TaskException) as ex:
-            cls.log_critical('Migration aborted: %s', ex)
+            self.log_critical('Migration aborted: %s', ex)
 
 
 @TaskOptions.register('report')
@@ -1047,10 +1036,9 @@ class TaskReport(Task):
     def is_api_required(parsed_args):
         return parsed_args.workdir is None
 
-    @classmethod
-    def runner(cls, parsed_args, api=None, task_output=None):
+    def runner(self, parsed_args, api=None, task_output=None):
         source_info = f'Local workdir: "{parsed_args.workdir}"' if api is None else f'vManage URL: "{api.base_url}"'
-        cls.log_info('Starting report: %s -> "%s"', source_info, parsed_args.file)
+        self.log_info('Starting report: %s -> "%s"', source_info, parsed_args.file)
 
         report_tasks = [
             ('### List configuration ###', TaskList,
@@ -1064,7 +1052,7 @@ class TaskReport(Task):
         report_buffer = []
         for task_header, task, task_args in report_tasks:
             report_buffer.append(task_header)
-            task.runner(task_args, api, task_output=report_buffer)
+            task().runner(task_args, api, task_output=report_buffer)
             report_buffer.append('')
 
         with open(parsed_args.file, 'w') as f:

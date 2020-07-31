@@ -115,9 +115,10 @@ def main():
 
     # Dispatch task
     target_address = cli_args.address
-    parsed_task_args = cli_args.task.parser(cli_args.task_args, target_address=target_address)
+    task = cli_args.task()
+    parsed_task_args = task.parser(cli_args.task_args, target_address=target_address)
     try:
-        if cli_args.task.is_api_required(parsed_task_args):
+        if task.is_api_required(parsed_task_args):
             # Evaluate whether user must be prompted for additional arguments
             try:
                 for prompt_arg in getattr(cli_args, 'prompt_arguments', []):
@@ -128,17 +129,17 @@ def main():
 
             if target_address != cli_args.address:
                 # Target address changed, re-run parser
-                parsed_task_args = cli_args.task.parser(cli_args.task_args, target_address=cli_args.address)
+                parsed_task_args = task.parser(cli_args.task_args, target_address=cli_args.address)
 
             base_url = BASE_URL.format(address=cli_args.address, port=cli_args.port)
             with Rest(base_url, cli_args.user, cli_args.password, timeout=cli_args.timeout) as api:
                 # Dispatch to the appropriate task handler
-                cli_args.task.runner(parsed_task_args, api)
+                task.runner(parsed_task_args, api)
 
         else:
             # Dispatch to the appropriate task handler without api connection
-            cli_args.task.runner(parsed_task_args)
+            task.runner(parsed_task_args)
 
-        cli_args.task.log_info('Task completed %s', cli_args.task.outcome('successfully', 'with caveats: {tally}'))
+        task.log_info('Task completed %s', task.outcome('successfully', 'with caveats: {tally}'))
     except (LoginFailedException, ConnectionError, FileNotFoundError, ModelException) as ex:
         logging.getLogger(__name__).critical(ex)
