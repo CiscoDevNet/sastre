@@ -4,6 +4,9 @@ Sastre 1.4 []
 ####New features:
 - Report task
 
+####Fixes:
+- CustomApp policies were causing an exception during backup. This has been fixed.
+
 Sastre 1.3 [July 23, 2020]
 ============================
 
