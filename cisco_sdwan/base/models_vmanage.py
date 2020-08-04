@@ -508,15 +508,15 @@ class PolicyCustomApp(ConfigItem):
     api_path = ApiPath('template/policy/customapp')
     store_path = ('policy_templates', 'CustomApp')
     store_file = '{item_name}.json'
-    name_tag = 'policyName'
-    type_tag = 'policyType'
+    name_tag = 'appName'
+    id_tag = 'appId'
 
 
 @register('policy_customapp', 'custom application policy', PolicyCustomApp, min_version='20.1')
 class PolicyCustomAppIndex(IndexConfigItem):
     api_path = ApiPath('template/policy/customapp', None, None, None)
     store_file = 'policy_templates_customapp.json'
-    iter_fields = IdName('policyId', 'policyName')
+    iter_fields = IdName('appId', 'appName')
 
 
 #
