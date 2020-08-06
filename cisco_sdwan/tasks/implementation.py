@@ -1048,7 +1048,7 @@ class TaskReport(Task):
              TaskArgs(csv=None, id=None, name=None, option='values', regex='.+', subtask_info='values',
                       table_factory=TaskShowTemplate.values_table, workdir=parsed_args.workdir)),
             ('### Show-template references ###', TaskShowTemplate,
-             TaskArgs(csv=None, id=None, option='references', regex='.+', with_refs='', subtask_info='references',
+             TaskArgs(csv=None, option='references', regex=None, with_refs=False, subtask_info='references',
                       table_factory=TaskShowTemplate.references_table, workdir=parsed_args.workdir)),
         ]
 
