@@ -1040,25 +1040,13 @@ class TaskReport(Task):
         source_info = f'Local workdir: "{parsed_args.workdir}"' if api is None else f'vManage URL: "{api.base_url}"'
         self.log_info('Starting report: %s -> "%s"', source_info, parsed_args.file)
 
+        report_config_tasks = [
+            (f'### List configuration {tag} ###', TaskList,
+             TaskArgs(csv=None, option='configuration', regex=None, subtask_info='list configuration',
+                      table_factory=TaskList.config_table, tags=[tag], workdir=parsed_args.workdir))
+            for tag in ordered_tags(CATALOG_TAG_ALL)
+        ]
         report_tasks = [
-            ('### List configuration template_device ###', TaskList,
-             TaskArgs(csv=None, option='configuration', regex=None, subtask_info='list configuration',
-                      table_factory=TaskList.config_table, tags=['template_device'], workdir=parsed_args.workdir)),
-            ('### List configuration template_feature ###', TaskList,
-             TaskArgs(csv=None, option='configuration', regex=None, subtask_info='list configuration',
-                      table_factory=TaskList.config_table, tags=['template_feature'], workdir=parsed_args.workdir)),
-            ('### List configuration policy_vsmart ###', TaskList,
-             TaskArgs(csv=None, option='configuration', regex=None, subtask_info='list configuration',
-                      table_factory=TaskList.config_table, tags=['policy_vsmart'], workdir=parsed_args.workdir)),
-            ('### List configuration policy_vedge ###', TaskList,
-             TaskArgs(csv=None, option='configuration', regex=None, subtask_info='list configuration',
-                      table_factory=TaskList.config_table, tags=['policy_vedge'], workdir=parsed_args.workdir)),
-            ('### List configuration policy_definition ###', TaskList,
-             TaskArgs(csv=None, option='configuration', regex=None, subtask_info='list configuration',
-                      table_factory=TaskList.config_table, tags=['policy_definition'], workdir=parsed_args.workdir)),
-            ('### List configuration policy_list ###', TaskList,
-             TaskArgs(csv=None, option='configuration', regex=None, subtask_info='list configuration',
-                      table_factory=TaskList.config_table, tags=['policy_list'], workdir=parsed_args.workdir)),
             ('### List certificate ###', TaskList,
              TaskArgs(csv=None, option='certificate', regex=None, subtask_info='list certificate',
                       table_factory=TaskList.cert_table, workdir=parsed_args.workdir)),
@@ -1071,10 +1059,11 @@ class TaskReport(Task):
         ]
 
         report_buffer = []
-        for task_header, task, task_args in report_tasks:
-            report_buffer.append(task_header)
-            task().runner(task_args, api, task_output=report_buffer)
-            report_buffer.append('')
+        for task_header, task, task_args in report_config_tasks + report_tasks:
+            task_buffer = []
+            task().runner(task_args, api, task_output=task_buffer)
+            if task_buffer:
+                report_buffer.extend([task_header] + task_buffer + [''])
 
         with open(parsed_args.file, 'w') as f:
             f.write('\n'.join(report_buffer))
