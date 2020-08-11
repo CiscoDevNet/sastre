@@ -1,28 +1,28 @@
 Sastre 1.4 []
 ============================
 
-####New features:
-- Report task
+#### New features:
+- New Report task, which creates a report file consolidating the output of list configuration, list certificate, show-template values and show-template references.
 
-####Fixes:
+#### Fixes:
 - CustomApp policies were causing an exception during backup. This has been fixed.
 
 Sastre 1.3 [July 23, 2020]
 ============================
 
-####Enhancements:
+#### Enhancements:
 - Split into Sastre and Sastre-Pro. Sastre-Pro will contain additional features. Current plan is to maintain release numbers in sync between the two variants.
 
 Sastre 1.2 [June 22, 2020]
 ============================
 
-####New features:
+#### New features:
 - Migrate task, allowing migration of feature templates and device templates to be compatible with vManage 20.1.
 - Transform option added to list task, allowing user to test name-regex transforms against existing item names.
 - References option added to show-template task, providing information on which device-templates reference a particular
   feature template.
 
-####Enhancements:
+#### Enhancements:
 - vManage information (address, user and password) is no longer required when a task uses local workdir as
   source. For instance, list or show-template tasks when --workdir is provided.
 - Backup task now allows disabling of the automatic workdir rollover mechanism using the --no-rollover option. This
@@ -34,7 +34,7 @@ Sastre 1.2 [June 22, 2020]
 Sastre 0.37 [April 21, 2020]
 ============================
 
-####Fixes:
+#### Fixes:
 - Restore task with --attach option when one or more WAN Edges or vSmarts are offline would show a warning that the
   template attach failed, even though it was successfully attached (with sync pending for offline devices).
   Similarly, if one or more vSmarts are offline vSmart policy would not be activated (with sync pending).
@@ -44,7 +44,7 @@ Sastre 0.37 [April 21, 2020]
 Sastre 0.36 [April 10, 2020]
 ============================
 
-####Enhancements:
+#### Enhancements:
 - Validated support for vManage 20.1 and included new API endpoints:
     - Policy lists: media profile, translation profile, translation rules, supervisory disconnect, FQDN
     - Policy definitions: Dial peer, SRST phone profile, FXS port, FXO port, FXS-DID port, SSL decryption, SSL UTD profile
@@ -56,7 +56,7 @@ Sastre 0.36 [April 10, 2020]
 Sastre 0.35 [Mar 3, 2020]
 ==========================
 
-####Enhancements:
+#### Enhancements:
 - Backup task now also backup device certificates when the 'all' tag is used. The restore task does not restore
   certificates.
 - New certificate task, allowing device certificate validity status to be restored from a backup or set to a
@@ -72,7 +72,7 @@ Sastre 0.35 [Mar 3, 2020]
 Sastre 0.34 [Jan 9, 2020]
 ==========================
 
-####Enhancements:
+#### Enhancements:
 - Validated support for vManage 19.3 and included new API endpoints supporting device access policies.
 - Included vManage version check. A warning is displayed during restore task if the vManage version on backup is
   newer than the version on target vManage. Maintenance releases (i.e. 3rd digit in the version number) are ignored
@@ -82,7 +82,7 @@ Sastre 0.34 [Jan 9, 2020]
 Sastre 0.33 [Dec 6, 2019]
 ==========================
 
-####Enhancements:
+#### Enhancements:
 - Sastre is now published to PyPI as cisco-sdwan package. When installed via pip, sdwan or sastre can be used to
   run the application.
 - When installed via source on github, the application can now be called using sdwan.py or sastre.py.
@@ -91,7 +91,7 @@ Sastre 0.33 [Dec 6, 2019]
 Sastre 0.31 [Nov 18, 2019]
 ==========================
 
-####Enhancements:
+#### Enhancements:
 - Template attach and reattach functions now support CLI templates. This means that restore --attach and --force
   options now support CLI templates in addition to feature-based device templates.
 - Added --regex option to backup task, allowing finner granularity into items included in the backup.
@@ -100,13 +100,13 @@ Sastre 0.31 [Nov 18, 2019]
 Sastre 0.30 [Oct 25, 2019]
 ==========================
 
-####Enhancements:
+#### Enhancements:
 - Backups now always create a new workdir. If the target workdir is already present, Sastre will save it with a
   number extension. For instance, if the target workdir is 'backup_production_20191022' and there is already a
   backup under this directory, this existing backup is moved to 'backup_production_20191022_1'. The number extension
   can go up to 99. At this point Sastre starts deleting the previous backup.
 
-####Non-backwards compatible enhancements:
+#### Non-backwards compatible enhancements:
 - Backup database is changed in release 0.30. Individual items (e.g. device templates, feature templates, etc) are
   now stored with a filename containing the actual item name, as opposed to the item uuid. The directories where
   items are saved were also changed.
@@ -122,7 +122,7 @@ Sastre 0.30 [Oct 25, 2019]
 Sastre 0.22 [Oct 10, 2019]
 ==========================
 
-Enhancements:
+#### Enhancements:
 - Improved error handling for malformed json files in the backup. When backup json files fail to be loaded
   (i.e. parsed) additional details are now provided in the log message.
 
@@ -130,7 +130,7 @@ Enhancements:
 Sastre 0.21 [Oct 5, 2019]
 ==========================
 
-####Enhancements:
+#### Enhancements:
 - Added --force option to restore task. vManage items with the same name as backup items but with differences in
   their contents are updated with data from the backup. README file contains additional details.
 
