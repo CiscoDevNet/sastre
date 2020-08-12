@@ -1,4 +1,4 @@
-Sastre 1.4 []
+Sastre 1.4 [August 12, 2020]
 ============================
 
 #### New features:
