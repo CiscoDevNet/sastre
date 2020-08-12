@@ -7,6 +7,7 @@
 import requests
 import urllib3
 import json
+from time import time
 
 
 class Rest:
@@ -21,7 +22,7 @@ class Rest:
             urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
         if not self.login(username, password):
-            raise LoginFailedException('Login to {base_url} failed, check credentials'.format(base_url=self.base_url))
+            raise LoginFailedException(f'Login to {self.base_url} failed, check credentials')
 
     def __enter__(self):
         return self
@@ -42,7 +43,7 @@ class Rest:
         }
 
         session = requests.Session()
-        response = session.post('{base_url}/j_security_check'.format(base_url=self.base_url),
+        response = session.post(f'{self.base_url}/j_security_check',
                                 data=data, timeout=self.timeout, verify=self.verify)
         response.raise_for_status()
 
@@ -65,7 +66,7 @@ class Rest:
         return True
 
     def logout(self):
-        response = self.session.get('{base_url}/logout'.format(base_url=self.base_url))
+        response = self.session.get(f'{self.base_url}/logout', params={'nocache': str(int(time()))})
         return response.status_code == requests.codes.ok
 
     @property
@@ -105,8 +106,9 @@ class Rest:
         return response.status_code == requests.codes.ok
 
     def _url(self, *path_entries):
-        return '{base_url}/dataservice/{path}'.format(base_url=self.base_url,
-                                                      path='/'.join(path.strip('/') for path in path_entries))
+        path = '/'.join(path.strip('/') for path in path_entries)
+
+        return f'{self.base_url}/dataservice/{path}'
 
 
 def raise_for_status(response_obj):
