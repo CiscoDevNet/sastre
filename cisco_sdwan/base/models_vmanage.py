@@ -510,6 +510,7 @@ class PolicyCustomApp(ConfigItem):
     store_file = '{item_name}.json'
     name_tag = 'appName'
     id_tag = 'appId'
+    skip_cmp_tag_set = {'lastUpdated', }
 
 
 @register('policy_customapp', 'custom application policy', PolicyCustomApp, min_version='20.1')
