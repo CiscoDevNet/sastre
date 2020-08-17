@@ -10,7 +10,7 @@ import argparse
 from datetime import date
 from getpass import getpass
 from pathlib import Path
-from cisco_sdwan.base.catalog import catalog_tags, CATALOG_TAG_ALL
+from cisco_sdwan.base.catalog import catalog_tags, rt_catalog_tags, CATALOG_TAG_ALL
 from cisco_sdwan.base.models_base import filename_safe, DATA_DIR, ExtendedTemplate
 from .common import Task
 
@@ -29,7 +29,7 @@ class TaskOptions:
     def task(cls, task_str):
         task_cls = cls._task_options.get(task_str)
         if task_cls is None:
-            raise argparse.ArgumentTypeError('Invalid task. Options are: {ops}.'.format(ops=cls.options()))
+            raise argparse.ArgumentTypeError(f'Invalid task. Options are: {cls.options()}.')
         return task_cls
 
     @classmethod
@@ -46,7 +46,7 @@ class TaskOptions:
         """
         def decorator(task_cls):
             if not isinstance(task_cls, type) or not issubclass(task_cls, Task):
-                raise SastreException('Invalid task registration attempt: {name}'.format(name=task_cls.__name__))
+                raise SastreException(f'Invalid task registration attempt: {task_cls.__name__}')
 
             cls._task_options[task_name] = task_cls
             return task_cls
@@ -60,28 +60,31 @@ class TagOptions:
     @classmethod
     def tag(cls, tag_str):
         if tag_str not in cls.tag_options:
-            raise argparse.ArgumentTypeError(
-                '"{tag}" is not a valid tag. Available tags: {ops}.'.format(tag=tag_str, ops=cls.options())
-            )
+            raise argparse.ArgumentTypeError(f'"{tag_str}" is not a valid tag. Available tags: {cls.options()}.')
+
         return tag_str
 
     @classmethod
     def options(cls):
-        return ', '.join([CATALOG_TAG_ALL] + sorted(catalog_tags()))
+        return ', '.join(sorted(cls.tag_options, key=lambda x: '' if x == CATALOG_TAG_ALL else x))
+
+
+class RealtimeTagOptions(TagOptions):
+    tag_options = rt_catalog_tags() | {CATALOG_TAG_ALL}
 
 
 def regex_type(regex_str):
     try:
         re.compile(regex_str)
     except re.error:
-        raise argparse.ArgumentTypeError('"{regex}" is not a valid regular expression.'.format(regex=regex_str))
+        raise argparse.ArgumentTypeError(f'"{regex_str}" is not a valid regular expression.')
 
     return regex_str
 
 
 def existing_file_type(workdir_str):
     if not Path(DATA_DIR, workdir_str).exists():
-        raise argparse.ArgumentTypeError('Work directory "{directory}" not found.'.format(directory=workdir_str))
+        raise argparse.ArgumentTypeError(f'Work directory "{workdir_str}" not found.')
 
     return workdir_str
 
@@ -90,14 +93,14 @@ def filename_type(name_str):
     # Also allow . on filename, on top of what's allowed by filename_safe
     if re.sub(r'\.', '_', name_str) != filename_safe(name_str):
         raise argparse.ArgumentTypeError(
-            'Invalid name "{name}". Only alphanumeric characters, "-", "_", and "." are allowed.'.format(name=name_str)
+            f'Invalid name "{name_str}". Only alphanumeric characters, "-", "_", and "." are allowed.'
         )
     return name_str
 
 
 def uuid_type(uuid_str):
     if re.match(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', uuid_str) is None:
-        raise argparse.ArgumentTypeError('"{uuid}" is not a valid item ID.'.format(uuid=uuid_str))
+        raise argparse.ArgumentTypeError(f'"{uuid_str}" is not a valid item ID.')
 
     return uuid_str
 
@@ -145,7 +148,7 @@ class PromptArg:
             try:
                 value = self.validate(self.prompt_func(self.prompt))
             except argparse.ArgumentTypeError as ex:
-                print('{msg} Please try again, or ^C to terminate.'.format(msg=ex))
+                print(f'{ex} Please try again, or ^C to terminate.')
             else:
                 return value
 

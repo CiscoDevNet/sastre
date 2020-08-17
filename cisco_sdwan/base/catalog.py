@@ -5,16 +5,25 @@
  This module implements vManage API Catalog
 """
 from collections import namedtuple
-from .models_base import IndexConfigItem, ConfigItem
+from .models_base import IndexConfigItem, ConfigItem, RealtimeItem
 from .rest_api import is_version_newer
 
 
+CATALOG_TAG_ALL = 'all'
+
+# Catalog of configuration items
 _catalog = list()   # [(<tag>, <info>, <index_cls>, <item_cls>, <min_version>), ...]
 
 CatalogEntry = namedtuple('CatalogEntry', ['tag', 'info', 'index_cls', 'item_cls', 'min_version'])
 
-CATALOG_TAG_ALL = 'all'
+# Catalog of realtime items
+_rt_catalog = list()  # [(<tag>, <info>, <rt_cls>, <min_version>), ...]
 
+RTCatalogEntry = namedtuple('RTCatalogEntry', ['tag', 'info', 'rt_cls', 'min_version'])
+
+#
+# Configuration catalog functions
+#
 # Order in which config items need to be deleted (i.e. reverse order in which they need to be pushed), considering
 # their high-level dependencies.
 _tag_dependency_list = [
@@ -67,21 +76,16 @@ def register(tag, info, item_cls, min_version=None):
     """
     def decorator(index_cls):
         if not isinstance(index_cls, type) or not issubclass(index_cls, IndexConfigItem):
-            raise CatalogException(
-                'Invalid config item index class register attempt: {}'.format(index_cls.__name__)
-            )
+            raise CatalogException(f'Invalid config item index class register attempt: {index_cls.__name__}')
         if not isinstance(item_cls, type) or not issubclass(item_cls, ConfigItem):
             raise CatalogException(
-                'invalid config item class register attempt {}: {}'.format(index_cls.__name__, item_cls.__name__)
+                f'Invalid config item class register attempt {index_cls.__name__}: {item_cls.__name__}'
             )
         if not isinstance(tag, str) or tag.lower() == CATALOG_TAG_ALL:
-            raise CatalogException(
-                'Invalid tag provided for class {}: {}'.format(index_cls.__name__, tag)
-            )
+            raise CatalogException(f'Invalid tag provided for class {index_cls.__name__}: {tag}')
         if tag not in _tag_dependency_list:
-            raise CatalogException(
-                'Unknown tag provided: {}'.format(tag)
-            )
+            raise CatalogException(f'Unknown tag provided: {tag}')
+
         _catalog.append(CatalogEntry(tag, info, index_cls, item_cls, min_version))
 
         return index_cls
@@ -125,6 +129,69 @@ def catalog_tags():
     :return: Set of unique tags
     """
     return {entry.tag for entry in _catalog}
+
+
+#
+# Realtime catalog functions
+#
+def rt_register(tag, info, min_version=None):
+    """
+    Decorator used for registering realtime items with the realtime catalog.
+    The class being decorated needs to be a subclass of RealtimeItem.
+    :param tag: Tag string associated with this item. String 'all' is reserved and cannot be used.
+    :param info: Item information used for logging purposes
+    :param min_version: (optional) Minimum vManage version that supports this catalog item.
+    :return: decorator
+    """
+    def decorator(realtime_cls):
+        if not isinstance(realtime_cls, type) or not issubclass(realtime_cls, RealtimeItem):
+            raise CatalogException(f'Invalid realtime item class register attempt: {realtime_cls.__name__}')
+        if not isinstance(tag, str) or tag.lower() == CATALOG_TAG_ALL:
+            raise CatalogException(f'Invalid tag provided for class {realtime_cls.__name__}: {tag}')
+
+        _rt_catalog.append(RTCatalogEntry(tag, info, realtime_cls, min_version))
+
+        return realtime_cls
+
+    return decorator
+
+
+def rt_catalog_size():
+    """
+    Return number of entries in the realtime catalog
+    :return: integer
+    """
+    return len(_rt_catalog)
+
+
+def rt_catalog_iter(*tags, version=None):
+    """
+    Return an iterator of (<tag>, <info>, <rt_cls>) tuples matching the specified tag(s) and supported
+    by vManage version.
+    :param tags: tags indicating catalog entries to return
+    :param version: Target vManage version. Only returns catalog items supported by the target vManage.
+                    If not specified or None, version is not verified.
+    :return: iterator of (<tag>, <info>, <rt_cls>) tuples from the realtime catalog
+    """
+    def match_tags(catalog_entry):
+        return CATALOG_TAG_ALL in tags or catalog_entry.tag in tags
+
+    def match_version(catalog_entry):
+        return catalog_entry.min_version is None or version is None or not is_version_newer(version,
+                                                                                            catalog_entry.min_version)
+
+    return (
+        (entry.tag, entry.info, entry.rt_cls)
+        for entry in _rt_catalog if match_tags(entry) and match_version(entry)
+    )
+
+
+def rt_catalog_tags():
+    """
+    Return unique tags used by items registered with the realtime catalog
+    :return: Set of unique tags
+    """
+    return {entry.tag for entry in _rt_catalog}
 
 
 class CatalogException(Exception):

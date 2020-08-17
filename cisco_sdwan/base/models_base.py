@@ -64,6 +64,58 @@ class ApiPath:
             setattr(self, field, value)
 
 
+class RealtimeItem:
+    api_path = None
+    api_params = ('deviceId',)
+
+    def __init__(self, payload):
+        self.timestamp = payload['header']['generatedOn']
+        self._meta = {attribute_safe(field['property']): field for field in payload['header']['columns']}
+        self._data = payload['data']
+
+    def __getattr__(self, field_name):
+        field_property = self._meta.get(field_name, {}).get('property')
+        if field_property is None:
+            raise AttributeError(f"'{type(self).__name__}' object has no attribute '{field_name}'")
+
+        return (entry.get(field_property) for entry in self._data)
+
+    @property
+    def field_names(self):
+        return tuple(self._meta.keys())
+
+    def field_info(self, *field_names, info='title'):
+        return tuple(entry.get(info) for entry in itemgetter(*field_names)(self._meta))
+
+    def field_value_iter(self, *field_names):
+        field_properties = self.field_info(*field_names, info='property')
+
+        return (itemgetter(*field_properties)(entry) for entry in self._data)
+
+    @classmethod
+    def get(cls, api, *args, **kwargs):
+        try:
+            instance = cls.get_raise(api, *args, **kwargs)
+            return instance
+        except RestAPIException:
+            return None
+
+    @classmethod
+    def get_raise(cls, api, *args, **kwargs):
+        params = kwargs or dict(zip(cls.api_params, args))
+        return cls(api.get(cls.api_path.get, **params))
+
+    def __str__(self):
+        return json.dumps(self._data, indent=2)
+
+    def __repr__(self):
+        return json.dumps(self._data)
+
+
+def attribute_safe(raw_attribute):
+    return re.sub(r'[^a-zA-Z0-9_]', '_', raw_attribute)
+
+
 class ApiItem:
     """
     ApiItem represents a vManage API element defined by an ApiPath with GET, POST, PUT and DELETE paths. An instance
@@ -424,8 +476,7 @@ class ServerInfo:
     def __getattr__(self, item):
         attr = self.data.get(item)
         if attr is None:
-            raise AttributeError("'{cls_name}' object has no attribute '{attr}'".format(cls_name=type(self).__name__,
-                                                                                        attr=item))
+            raise AttributeError(f"'{type(self).__name__}' object has no attribute '{item}'")
         return attr
 
     @classmethod
@@ -444,7 +495,7 @@ class ServerInfo:
         except FileNotFoundError:
             return None
         except json.decoder.JSONDecodeError as ex:
-            raise ModelException('Invalid JSON file: {file}: {msg}'.format(file=file_path, msg=ex))
+            raise ModelException(f"Invalid JSON file: {file_path}: {ex}")
         else:
             return cls(**data)
 
