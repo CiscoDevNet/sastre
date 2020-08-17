@@ -7,8 +7,8 @@
 from typing import Iterable, Set
 from pathlib import Path
 from urllib.parse import quote_plus
-from .catalog import register
-from .models_base import ApiItem, IndexApiItem, ConfigItem, IndexConfigItem, ApiPath, IdName
+from .catalog import register, rt_register
+from .models_base import ApiItem, IndexApiItem, ConfigItem, IndexConfigItem, RealtimeItem, ApiPath, IdName
 
 
 #
@@ -1255,3 +1255,41 @@ class EdgeCertificate(IndexConfigItem):
             }
             for uuid, status, hostname, chassis, serial, state in self.extended_iter() if uuid in new_status_dict
         ]
+
+
+#
+# Realtime items
+#
+@rt_register('system', 'system status')
+class SystemStatus(RealtimeItem):
+    api_path = ApiPath('device/system/status', None, None, None)
+
+
+@rt_register('system', 'system syncd status')
+class SystemSyncdStatus(RealtimeItem):
+    api_path = ApiPath('device/system/synced/status', None, None, None)
+
+
+@rt_register('bfd', 'bfd sessions')
+class BfdSessions(RealtimeItem):
+    api_path = ApiPath('device/bfd/sessions', None, None, None)
+
+
+@rt_register('bfd', 'bfd syncd sessions')
+class BfdSyncdSessions(RealtimeItem):
+    api_path = ApiPath('device/bfd/synced/sessions', None, None, None)
+
+
+@rt_register('control', 'control connections')
+class DeviceControlConnections(RealtimeItem):
+    api_path = ApiPath('device/control/connections', None, None, None)
+
+
+@rt_register('control', 'control local properties')
+class DeviceControlLocalProperties(RealtimeItem):
+    api_path = ApiPath('device/control/localproperties', None, None, None)
+
+
+@rt_register('interface', 'interface')
+class InterfaceIpv4(RealtimeItem):
+    api_path = ApiPath('device/interface', None, None, None)
