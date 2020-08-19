@@ -10,7 +10,7 @@ import argparse
 from datetime import date
 from getpass import getpass
 from pathlib import Path
-from cisco_sdwan.base.catalog import catalog_tags, rt_catalog_tags, CATALOG_TAG_ALL
+from cisco_sdwan.base.catalog import catalog_tags, rt_catalog_tags, rt_catalog_commands, CATALOG_TAG_ALL
 from cisco_sdwan.base.models_base import filename_safe, DATA_DIR, ExtendedTemplate
 from .common import Task
 
@@ -69,8 +69,24 @@ class TagOptions:
         return ', '.join(sorted(cls.tag_options, key=lambda x: '' if x == CATALOG_TAG_ALL else x))
 
 
-class RealtimeTagOptions(TagOptions):
-    tag_options = rt_catalog_tags() | {CATALOG_TAG_ALL}
+class RealtimeCmdOptions:
+    cmd_options = rt_catalog_tags() | rt_catalog_commands() | {CATALOG_TAG_ALL}
+
+    @classmethod
+    def options(cls):
+        return ', '.join(sorted(cls.cmd_options, key=lambda x: '' if x == CATALOG_TAG_ALL else x))
+
+
+class CmdSemantics(argparse.Action):
+    # Using an action as opposed to a type check so that it can evaluate the full command line passed as opposed to
+    # individual tokens.
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        full_command = ' '.join(values)
+        if full_command not in RealtimeCmdOptions.cmd_options:
+            raise argparse.ArgumentError(self, f'"{full_command}" is not valid. Options are {RealtimeCmdOptions.options()}')
+
+        setattr(namespace, self.dest, values)
 
 
 def regex_type(regex_str):
@@ -111,6 +127,24 @@ def non_empty_type(src_str):
         raise argparse.ArgumentTypeError('Value cannot be empty.')
 
     return out_str
+
+
+def ipv4_type(ipv4_str):
+    if re.match(r'\d+(?:\.\d+){3}$', ipv4_str) is None:
+        raise argparse.ArgumentTypeError(f'"{ipv4_str}" is not a valid IPv4 address.')
+
+    return ipv4_str
+
+
+def site_id_type(site_id_str):
+    try:
+        site_id = int(site_id_str)
+        if not 0 <= site_id <= 4294967295:
+            raise ValueError()
+    except ValueError:
+        raise argparse.ArgumentTypeError(f'"{site_id_str}" is not a valid site-id.')
+
+    return site_id_str
 
 
 def version_type(version_str):

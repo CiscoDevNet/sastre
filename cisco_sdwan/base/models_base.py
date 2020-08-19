@@ -67,6 +67,8 @@ class ApiPath:
 class RealtimeItem:
     api_path = None
     api_params = ('deviceId',)
+    fields_std = None
+    fields_ext = None
 
     def __init__(self, payload):
         self.timestamp = payload['header']['generatedOn']
@@ -90,7 +92,7 @@ class RealtimeItem:
     def field_value_iter(self, *field_names):
         field_properties = self.field_info(*field_names, info='property')
 
-        return (itemgetter(*field_properties)(entry) for entry in self._data)
+        return (default_getter(*field_properties, default='')(entry) for entry in self._data)
 
     @classmethod
     def get(cls, api, *args, **kwargs):
@@ -188,9 +190,6 @@ class IndexApiItem(ApiItem):
         None is returned on any fields that are missing in an entry
         :return: The iterator
         """
-        def default_getter(*fields):
-            return lambda row: tuple(row.get(field) for field in fields)
-
         return (default_getter(*self.iter_fields, *self.extended_iter_fields)(elem) for elem in self.data)
 
 
@@ -457,9 +456,6 @@ class IndexConfigItem(ConfigItem):
         None is returned on any fields that are missing in an entry
         :return: The iterator
         """
-        def default_getter(*fields):
-            return lambda row: tuple(row.get(field) for field in fields)
-
         return (default_getter(*self.iter_fields, *self.extended_iter_fields)(elem) for elem in self.data)
 
 
@@ -570,6 +566,17 @@ class ExtendedTemplate:
             raise KeyError('template must include {name} variable')
 
         return template.format(**self.label_value_map)
+
+
+def default_getter(*fields, default=None):
+    if len(fields) == 1:
+        def getter_fn(obj):
+            return obj.get(fields[0], default)
+    else:
+        def getter_fn(obj):
+            return tuple(obj.get(field, default) for field in fields)
+
+    return getter_fn
 
 
 class ModelException(Exception):

@@ -135,6 +135,14 @@ class ActionStatus(ApiItem):
 #
 # Device Inventory
 #
+
+class Device(IndexApiItem):
+    api_path = ApiPath('device', None, None, None)
+    iter_fields = ('deviceId', 'host-name')
+
+    extended_iter_fields = ('site-id', 'reachability', 'device-type', 'device-model')
+
+
 class EdgeInventory(IndexApiItem):
     api_path = ApiPath('system/device/vedges', None, None, None)
     iter_fields = ('uuid', 'vedgeCertificateState')
@@ -1260,36 +1268,38 @@ class EdgeCertificate(IndexConfigItem):
 #
 # Realtime items
 #
-@rt_register('system', 'system status')
+@rt_register('system', 'status', 'System status')
 class SystemStatus(RealtimeItem):
     api_path = ApiPath('device/system/status', None, None, None)
+    fields_std = ('state', 'cpu_user', 'cpu_system', 'mem_total', 'mem_free')
+    fields_ext = ('disk_size', 'disk_used')
 
 
-@rt_register('system', 'system syncd status')
-class SystemSyncdStatus(RealtimeItem):
-    api_path = ApiPath('device/system/synced/status', None, None, None)
-
-
-@rt_register('bfd', 'bfd sessions')
+@rt_register('bfd', 'sessions', 'BFD sessions')
 class BfdSessions(RealtimeItem):
     api_path = ApiPath('device/bfd/sessions', None, None, None)
+    fields_std = ('system_ip', 'site_id', 'local_color', 'color', 'state')
+    fields_ext = ('src_ip', 'src_port', 'dst_ip', 'dst_port')
 
 
-@rt_register('bfd', 'bfd syncd sessions')
-class BfdSyncdSessions(RealtimeItem):
-    api_path = ApiPath('device/bfd/synced/sessions', None, None, None)
-
-
-@rt_register('control', 'control connections')
+@rt_register('control', 'connections', 'Control connections')
 class DeviceControlConnections(RealtimeItem):
     api_path = ApiPath('device/control/connections', None, None, None)
+    fields_std = ('system_ip',  'site_id', 'peer_type', 'domain_id', 'local_color', 'remote_color', 'state')
+    fields_ext = ('private_ip', 'private_port', 'public_ip', 'public_port', 'instance', 'protocol')
 
 
-@rt_register('control', 'control local properties')
+@rt_register('control', 'local-properties', 'Control local-properties')
 class DeviceControlLocalProperties(RealtimeItem):
     api_path = ApiPath('device/control/localproperties', None, None, None)
+    fields_std = ('system_ip', 'site_id', 'device_type', 'organization_name', 'domain_id', 'port_hopped')
+    fields_ext = ('protocol', 'tls_port', 'certificate_status', 'root_ca_chain_status', 'certificate_validity',
+                  'certificate_not_valid_after')
 
 
-@rt_register('interface', 'interface')
+@rt_register('interface', 'info', 'Interface info')
 class InterfaceIpv4(RealtimeItem):
     api_path = ApiPath('device/interface', None, None, None)
+    fields_std = ('vpn_id', 'ifname', 'af_type', 'ip_address', 'ipv6_address', 'if_admin_status', 'if_oper_status',
+                  'desc')
+    fields_ext = ('tx_drops', 'rx_drops', 'tx_kbps', 'rx_kbps')

@@ -17,9 +17,9 @@ _catalog = list()   # [(<tag>, <info>, <index_cls>, <item_cls>, <min_version>), 
 CatalogEntry = namedtuple('CatalogEntry', ['tag', 'info', 'index_cls', 'item_cls', 'min_version'])
 
 # Catalog of realtime items
-_rt_catalog = list()  # [(<tag>, <info>, <rt_cls>, <min_version>), ...]
+_rt_catalog = list()  # [(<tag>, <selector>, <info>, <rt_cls>, <min_version>), ...]
 
-RTCatalogEntry = namedtuple('RTCatalogEntry', ['tag', 'info', 'rt_cls', 'min_version'])
+RTCatalogEntry = namedtuple('RTCatalogEntry', ['tag', 'selector', 'info', 'rt_cls', 'min_version'])
 
 #
 # Configuration catalog functions
@@ -134,11 +134,12 @@ def catalog_tags():
 #
 # Realtime catalog functions
 #
-def rt_register(tag, info, min_version=None):
+def rt_register(tag, selector, info, min_version=None):
     """
     Decorator used for registering realtime items with the realtime catalog.
     The class being decorated needs to be a subclass of RealtimeItem.
     :param tag: Tag string associated with this item. String 'all' is reserved and cannot be used.
+    :param selector: String used to further filter entries that match the tags.
     :param info: Item information used for logging purposes
     :param min_version: (optional) Minimum vManage version that supports this catalog item.
     :return: decorator
@@ -148,8 +149,10 @@ def rt_register(tag, info, min_version=None):
             raise CatalogException(f'Invalid realtime item class register attempt: {realtime_cls.__name__}')
         if not isinstance(tag, str) or tag.lower() == CATALOG_TAG_ALL:
             raise CatalogException(f'Invalid tag provided for class {realtime_cls.__name__}: {tag}')
+        if not isinstance(selector, str) or selector.lower() == CATALOG_TAG_ALL:
+            raise CatalogException(f'Invalid selector provided for class {realtime_cls.__name__}: {selector}')
 
-        _rt_catalog.append(RTCatalogEntry(tag, info, realtime_cls, min_version))
+        _rt_catalog.append(RTCatalogEntry(tag, selector, info, realtime_cls, min_version))
 
         return realtime_cls
 
@@ -166,23 +169,34 @@ def rt_catalog_size():
 
 def rt_catalog_iter(*tags, version=None):
     """
-    Return an iterator of (<tag>, <info>, <rt_cls>) tuples matching the specified tag(s) and supported
+    Return an iterator of (<info>, <rt_cls>) tuples matching the specified tag(s), selector and supported
     by vManage version.
-    :param tags: tags indicating catalog entries to return
+    :param tags: Tags to filter catalog entries to return. If 2 or more tags are provided, the last one is considered
+                 a selector.
     :param version: Target vManage version. Only returns catalog items supported by the target vManage.
                     If not specified or None, version is not verified.
-    :return: iterator of (<tag>, <info>, <rt_cls>) tuples from the realtime catalog
+    :return: iterator of (<info>, <rt_cls>) tuples from the realtime catalog
     """
-    def match_tags(catalog_entry):
-        return CATALOG_TAG_ALL in tags or catalog_entry.tag in tags
+    if len(tags) > 1:
+        group_list = tags[:-1]
+        selector = tags[-1]
+    else:
+        group_list = tags
+        selector = None
+
+    def match_groups(catalog_entry):
+        return CATALOG_TAG_ALL in group_list or catalog_entry.tag in group_list
+
+    def match_selector(catalog_entry):
+        return selector is None or catalog_entry.selector == selector
 
     def match_version(catalog_entry):
         return catalog_entry.min_version is None or version is None or not is_version_newer(version,
                                                                                             catalog_entry.min_version)
 
     return (
-        (entry.tag, entry.info, entry.rt_cls)
-        for entry in _rt_catalog if match_tags(entry) and match_version(entry)
+        (entry.info, entry.rt_cls)
+        for entry in _rt_catalog if match_groups(entry) and match_selector(entry) and match_version(entry)
     )
 
 
@@ -192,6 +206,14 @@ def rt_catalog_tags():
     :return: Set of unique tags
     """
     return {entry.tag for entry in _rt_catalog}
+
+
+def rt_catalog_commands():
+    """
+    Return set of commands registered with the realtime catalog. These are the combination of tags and selectors
+    :return: Set of commands
+    """
+    return {f'{entry.tag} {entry.selector}' for entry in _rt_catalog}
 
 
 class CatalogException(Exception):
