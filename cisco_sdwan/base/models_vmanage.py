@@ -1285,8 +1285,8 @@ class BfdSessions(RealtimeItem):
 @rt_register('control', 'connections', 'Control connections')
 class DeviceControlConnections(RealtimeItem):
     api_path = ApiPath('device/control/connections', None, None, None)
-    fields_std = ('system_ip',  'site_id', 'peer_type', 'domain_id', 'local_color', 'remote_color', 'state')
-    fields_ext = ('private_ip', 'private_port', 'public_ip', 'public_port', 'instance', 'protocol')
+    fields_std = ('system_ip',  'site_id', 'peer_type', 'local_color', 'remote_color', 'state')
+    fields_ext = ('private_ip', 'private_port', 'public_ip', 'public_port', 'instance', 'protocol', 'domain_id')
 
 
 @rt_register('control', 'local-properties', 'Control local-properties')
@@ -1303,3 +1303,19 @@ class InterfaceIpv4(RealtimeItem):
     fields_std = ('vpn_id', 'ifname', 'af_type', 'ip_address', 'ipv6_address', 'if_admin_status', 'if_oper_status',
                   'desc')
     fields_ext = ('tx_drops', 'rx_drops', 'tx_kbps', 'rx_kbps')
+
+
+@rt_register('app-route', 'stats', 'Application-aware route statistics')
+class AppRouteStats(RealtimeItem):
+    api_path = ApiPath('device/app-route/statistics', None, None, None)
+    fields_std = ('index', 'remote_system_ip', 'local_color', 'remote_color', 'total_packets',
+                  'loss', 'average_latency', 'average_jitter')
+    fields_ext = ('src_ip', 'dst_ip', 'sla_class_index')
+
+
+@rt_register('app-route', 'sla-class', 'Application-aware SLA class')
+class AppRouteSlaClass(RealtimeItem):
+    api_path = ApiPath('device/app-route/sla-class', None, None, None)
+    fields_std = ('name', 'loss', 'latency', 'jitter')
+    fields_ext = ('index', )
+
