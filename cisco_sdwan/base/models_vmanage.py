@@ -1310,7 +1310,7 @@ class AppRouteStats(RealtimeItem):
     api_path = ApiPath('device/app-route/statistics', None, None, None)
     fields_std = ('index', 'remote_system_ip', 'local_color', 'remote_color', 'total_packets',
                   'loss', 'average_latency', 'average_jitter')
-    fields_ext = ('src_ip', 'dst_ip', 'sla_class_index')
+    fields_ext = ('mean_loss', 'mean_latency', 'mean_jitter', 'sla_class_index')
 
 
 @rt_register('app-route', 'sla-class', 'Application-aware SLA class')
