@@ -75,24 +75,30 @@ class RealtimeItem:
         self._meta = {attribute_safe(field['property']): field for field in payload['header']['columns']}
         self._data = payload['data']
 
-    def __getattr__(self, field_name):
-        field_property = self._meta.get(field_name, {}).get('property')
-        if field_property is None:
-            raise AttributeError(f"'{type(self).__name__}' object has no attribute '{field_name}'")
-
-        return (entry.get(field_property) for entry in self._data)
-
     @property
     def field_names(self):
         return tuple(self._meta.keys())
 
     def field_info(self, *field_names, info='title'):
+        if len(field_names) == 1:
+            return self._meta[field_names[0]].get(info),
+
         return tuple(entry.get(info) for entry in itemgetter(*field_names)(self._meta))
 
-    def field_value_iter(self, *field_names):
+    def field_value_iter(self, *field_names, **conv_fn_map):
+        FieldValue = namedtuple('FieldValue', field_names)
+
+        def default_conv_fn(field_val):
+            return field_val if field_val is not None else ''
+
+        conv_fn_list = [conv_fn_map.get(field_name, default_conv_fn) for field_name in field_names]
         field_properties = self.field_info(*field_names, info='property')
 
-        return (default_getter(*field_properties, default='')(entry) for entry in self._data)
+        def getter_fn(obj):
+            return FieldValue._make(conv_fn(obj.get(field_property))
+                                    for conv_fn, field_property in zip(conv_fn_list, field_properties))
+
+        return (getter_fn(entry) for entry in self._data)
 
     @classmethod
     def get(cls, api, *args, **kwargs):
