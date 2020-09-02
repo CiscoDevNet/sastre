@@ -182,7 +182,7 @@ class TaskRestore(Task):
         vbond = SettingsVbond.get(api)
         if vbond is None:
             self.log_warning('Failed retrieving vBond settings. Restoring template_device items will fail if vBond '
-                            'is not configured.')
+                             'is not configured.')
 
         self.log_info('Loading existing items from target vManage')
         target_all_items_map = {
@@ -814,7 +814,8 @@ class TaskShowTemplate(Task):
             for feature_id in device.feature_templates:
                 feature_info = feature_dict.get(feature_id)
                 if feature_info is None:
-                    self.log_warning('Template %s references a non-existing feature template: %s', item_name, feature_id)
+                    self.log_warning('Template %s references a non-existing feature template: %s',
+                                     item_name, feature_id)
                     continue
 
                 feature_info.device_templates.add(item_name)

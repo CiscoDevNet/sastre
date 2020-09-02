@@ -398,12 +398,16 @@ class Table:
         return iter(self._rows)
 
     def __len__(self):
-        return len(self._rows)
+        total_len = len(self._rows) - self._rows.count(None)
+        return total_len if total_len > 0 else 0
 
     def _column_max_width(self, index):
+        def cell_length(cell_value):
+            return len(cell_value) if isinstance(cell_value, str) else len(str(cell_value))
+
         return max(
-            len(self.header[index]),
-            max((len(row[index]) for row in self._rows if row is not None)) if len(self._rows) > 0 else 0
+            cell_length(self.header[index]),
+            max((cell_length(row[index]) for row in self._rows if row is not None)) if len(self) > 0 else 0
         )
 
     def pretty_iter(self):
@@ -416,13 +420,18 @@ class Table:
         yield border_line
         yield '|' + '|'.join(cell_format(width, value) for width, value in zip(col_width_list, self.header)) + '|'
         yield border_line
-        for row_num, row in enumerate(self._rows):
+
+        done_content_row = False
+        for row in self._rows:
             if row is not None:
+                done_content_row = True
                 yield '|' + '|'.join(cell_format(width, value) for width, value in zip(col_width_list, row)) + '|'
-            elif 0 < row_num < len(self._rows)-1:
+            elif done_content_row:
+                done_content_row = False
                 yield border_line
 
-        yield border_line
+        if done_content_row:
+            yield border_line
 
     def save(self, filename):
         with open(filename, 'w', newline='') as csv_file:

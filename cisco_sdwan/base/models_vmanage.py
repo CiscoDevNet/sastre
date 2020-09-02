@@ -7,8 +7,8 @@
 from typing import Iterable, Set
 from pathlib import Path
 from urllib.parse import quote_plus
-from .catalog import register
-from .models_base import ApiItem, IndexApiItem, ConfigItem, IndexConfigItem, ApiPath, IdName
+from .catalog import register, rt_register
+from .models_base import ApiItem, IndexApiItem, ConfigItem, IndexConfigItem, RealtimeItem, ApiPath, IdName
 
 
 #
@@ -135,6 +135,14 @@ class ActionStatus(ApiItem):
 #
 # Device Inventory
 #
+
+class Device(IndexApiItem):
+    api_path = ApiPath('device', None, None, None)
+    iter_fields = ('deviceId', 'host-name')
+
+    extended_iter_fields = ('site-id', 'reachability', 'device-type', 'device-model')
+
+
 class EdgeInventory(IndexApiItem):
     api_path = ApiPath('system/device/vedges', None, None, None)
     iter_fields = ('uuid', 'vedgeCertificateState')
@@ -1255,3 +1263,80 @@ class EdgeCertificate(IndexConfigItem):
             }
             for uuid, status, hostname, chassis, serial, state in self.extended_iter() if uuid in new_status_dict
         ]
+
+
+#
+# Realtime items
+#
+@rt_register('system', 'status', 'System status')
+class SystemStatus(RealtimeItem):
+    api_path = ApiPath('device/system/status', None, None, None)
+    fields_std = ('state', 'cpu_user', 'cpu_system', 'mem_total', 'mem_free')
+    fields_ext = ('disk_size', 'disk_used')
+
+
+@rt_register('bfd', 'sessions', 'BFD sessions')
+class BfdSessions(RealtimeItem):
+    api_path = ApiPath('device/bfd/sessions', None, None, None)
+    fields_std = ('system_ip', 'site_id', 'local_color', 'color', 'state')
+    fields_ext = ('src_ip', 'src_port', 'dst_ip', 'dst_port')
+
+
+@rt_register('control', 'connections', 'Control connections')
+class DeviceControlConnections(RealtimeItem):
+    api_path = ApiPath('device/control/connections', None, None, None)
+    fields_std = ('system_ip',  'site_id', 'peer_type', 'local_color', 'remote_color', 'state')
+    fields_ext = ('private_ip', 'private_port', 'public_ip', 'public_port', 'instance', 'protocol', 'domain_id')
+
+
+@rt_register('control', 'local-properties', 'Control local-properties')
+class DeviceControlLocalProperties(RealtimeItem):
+    api_path = ApiPath('device/control/localproperties', None, None, None)
+    fields_std = ('system_ip', 'site_id', 'device_type', 'organization_name', 'domain_id', 'port_hopped')
+    fields_ext = ('protocol', 'tls_port', 'certificate_status', 'root_ca_chain_status', 'certificate_validity',
+                  'certificate_not_valid_after')
+
+
+@rt_register('interface', 'info', 'Interface info')
+class InterfaceIpv4(RealtimeItem):
+    api_path = ApiPath('device/interface', None, None, None)
+    fields_std = ('vpn_id', 'ifname', 'af_type', 'ip_address', 'ipv6_address', 'if_admin_status', 'if_oper_status',
+                  'desc')
+    fields_ext = ('tx_drops', 'rx_drops', 'tx_kbps', 'rx_kbps')
+
+
+@rt_register('app-route', 'stats', 'Application-aware route statistics')
+class AppRouteStats(RealtimeItem):
+    api_path = ApiPath('device/app-route/statistics', None, None, None)
+    fields_std = ('index', 'remote_system_ip', 'local_color', 'remote_color', 'total_packets',
+                  'loss', 'average_latency', 'average_jitter')
+    fields_ext = ('mean_loss', 'mean_latency', 'mean_jitter', 'sla_class_index')
+
+
+@rt_register('app-route', 'sla-class', 'Application-aware SLA class')
+class AppRouteSlaClass(RealtimeItem):
+    api_path = ApiPath('device/app-route/sla-class', None, None, None)
+    fields_std = ('name', 'loss', 'latency', 'jitter')
+    fields_ext = ('index', )
+
+
+@rt_register('omp', 'summary', 'OMP summary')
+class DeviceOmpSummary(RealtimeItem):
+    api_path = ApiPath('device/omp/summary', None, None, None)
+    fields_std = ('operstate', 'ompuptime', 'vsmart_peers', 'routes_received', 'routes_installed', 'routes_sent',
+                  'tlocs_received', 'tlocs_installed', 'tlocs_sent')
+    fields_ext = ('services_received', 'services_installed', 'services_sent', 'policy_received', 'policy_sent')
+
+
+@rt_register('omp', 'peers', 'OMP peers')
+class DeviceOmpPeers(RealtimeItem):
+    api_path = ApiPath('device/omp/peers', None, None, None)
+    fields_std = ('peer', 'type', 'site_id', 'state')
+    fields_ext = ('domain_id', 'up_time')
+
+
+@rt_register('tunnel', 'stats', 'Tunnel statistics')
+class DeviceTunnelStats(RealtimeItem):
+    api_path = ApiPath('device/tunnel/statistics', None, None, None)
+    fields_std = ('system_ip', 'local_color', 'remote_color', 'tunnel_protocol', 'tunnel_mtu', 'tcp_mss_adjust')
+    fields_ext = ('source_ip', 'dest_ip', 'source_port', 'dest_port')
