@@ -1,3 +1,9 @@
+Sastre 1.5 [September 2, 2020]
+============================
+
+#### New features:
+- New Show task available only on Sastre-Pro. Enable execution of select real-time commands across multiple devices and easy visualization in tables.
+
 Sastre 1.4 [August 12, 2020]
 ============================
 

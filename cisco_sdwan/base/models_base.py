@@ -64,6 +64,66 @@ class ApiPath:
             setattr(self, field, value)
 
 
+class RealtimeItem:
+    api_path = None
+    api_params = ('deviceId',)
+    fields_std = None
+    fields_ext = None
+
+    def __init__(self, payload):
+        self.timestamp = payload['header']['generatedOn']
+        self._meta = {attribute_safe(field['property']): field for field in payload['header']['columns']}
+        self._data = payload['data']
+
+    @property
+    def field_names(self):
+        return tuple(self._meta.keys())
+
+    def field_info(self, *field_names, info='title'):
+        if len(field_names) == 1:
+            return self._meta[field_names[0]].get(info),
+
+        return tuple(entry.get(info) for entry in itemgetter(*field_names)(self._meta))
+
+    def field_value_iter(self, *field_names, **conv_fn_map):
+        FieldValue = namedtuple('FieldValue', field_names)
+
+        def default_conv_fn(field_val):
+            return field_val if field_val is not None else ''
+
+        conv_fn_list = [conv_fn_map.get(field_name, default_conv_fn) for field_name in field_names]
+        field_properties = self.field_info(*field_names, info='property')
+
+        def getter_fn(obj):
+            return FieldValue._make(conv_fn(obj.get(field_property))
+                                    for conv_fn, field_property in zip(conv_fn_list, field_properties))
+
+        return (getter_fn(entry) for entry in self._data)
+
+    @classmethod
+    def get(cls, api, *args, **kwargs):
+        try:
+            instance = cls.get_raise(api, *args, **kwargs)
+            return instance
+        except RestAPIException:
+            return None
+
+    @classmethod
+    def get_raise(cls, api, *args, **kwargs):
+        params = kwargs or dict(zip(cls.api_params, args))
+        return cls(api.get(cls.api_path.get, **params))
+
+    def __str__(self):
+        return json.dumps(self._data, indent=2)
+
+    def __repr__(self):
+        return json.dumps(self._data)
+
+
+def attribute_safe(raw_attribute):
+    return re.sub(r'[^a-zA-Z0-9_]', '_', raw_attribute)
+
+
 class ApiItem:
     """
     ApiItem represents a vManage API element defined by an ApiPath with GET, POST, PUT and DELETE paths. An instance
@@ -136,9 +196,6 @@ class IndexApiItem(ApiItem):
         None is returned on any fields that are missing in an entry
         :return: The iterator
         """
-        def default_getter(*fields):
-            return lambda row: tuple(row.get(field) for field in fields)
-
         return (default_getter(*self.iter_fields, *self.extended_iter_fields)(elem) for elem in self.data)
 
 
@@ -405,9 +462,6 @@ class IndexConfigItem(ConfigItem):
         None is returned on any fields that are missing in an entry
         :return: The iterator
         """
-        def default_getter(*fields):
-            return lambda row: tuple(row.get(field) for field in fields)
-
         return (default_getter(*self.iter_fields, *self.extended_iter_fields)(elem) for elem in self.data)
 
 
@@ -424,8 +478,7 @@ class ServerInfo:
     def __getattr__(self, item):
         attr = self.data.get(item)
         if attr is None:
-            raise AttributeError("'{cls_name}' object has no attribute '{attr}'".format(cls_name=type(self).__name__,
-                                                                                        attr=item))
+            raise AttributeError(f"'{type(self).__name__}' object has no attribute '{item}'")
         return attr
 
     @classmethod
@@ -444,7 +497,7 @@ class ServerInfo:
         except FileNotFoundError:
             return None
         except json.decoder.JSONDecodeError as ex:
-            raise ModelException('Invalid JSON file: {file}: {msg}'.format(file=file_path, msg=ex))
+            raise ModelException(f"Invalid JSON file: {file_path}: {ex}")
         else:
             return cls(**data)
 
@@ -519,6 +572,17 @@ class ExtendedTemplate:
             raise KeyError('template must include {name} variable')
 
         return template.format(**self.label_value_map)
+
+
+def default_getter(*fields, default=None):
+    if len(fields) == 1:
+        def getter_fn(obj):
+            return obj.get(fields[0], default)
+    else:
+        def getter_fn(obj):
+            return tuple(obj.get(field, default) for field in fields)
+
+    return getter_fn
 
 
 class ModelException(Exception):
