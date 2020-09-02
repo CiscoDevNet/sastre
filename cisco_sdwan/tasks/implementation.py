@@ -5,7 +5,7 @@
  This module contains the implementation of user-facing tasks
 """
 __all__ = ['TaskBackup', 'TaskRestore', 'TaskDelete', 'TaskCertificate', 'TaskList', 'TaskShowTemplate',
-           'TaskMigrate', 'TaskReport', 'TaskShow']
+           'TaskMigrate', 'TaskReport']
 
 import argparse
 from pathlib import Path
@@ -14,18 +14,18 @@ from collections import namedtuple
 from datetime import date
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import RestAPIException, is_version_newer
-from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL, ordered_tags, rt_catalog_iter
+from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL, ordered_tags
 from cisco_sdwan.base.models_base import UpdateEval, filename_safe, update_ids, ServerInfo, ExtendedTemplate
 from cisco_sdwan.base.models_vmanage import (DeviceConfig, DeviceConfigRFS, DeviceTemplate, DeviceTemplateAttached,
                                              DeviceTemplateValues, DeviceTemplateIndex, FeatureTemplate,
                                              FeatureTemplateIndex, PolicyVsmartIndex, EdgeInventory, ControlInventory,
-                                             EdgeCertificate, EdgeCertificateSync, SettingsVbond, Device)
+                                             EdgeCertificate, EdgeCertificateSync, SettingsVbond)
 from cisco_sdwan.base.processor import StopProcessorException, ProcessorException
 from cisco_sdwan.migration import factory_cedge_aaa, factory_cedge_global
 from cisco_sdwan.migration.feature_migration import FeatureProcessor
 from cisco_sdwan.migration.device_migration import DeviceProcessor
-from .utils import (TaskOptions, TagOptions, existing_file_type, filename_type, regex_type, uuid_type, CmdSemantics,
-                    version_type, default_workdir, ext_template_type, ipv4_type, site_id_type, RealtimeCmdOptions)
+from .utils import (TaskOptions, TagOptions, existing_file_type, filename_type, regex_type, uuid_type,
+                    version_type, default_workdir, ext_template_type)
 from .common import regex_search, clean_dir, Task, TaskArgs, Table, WaitActionsException, TaskException
 
 
@@ -1068,96 +1068,3 @@ class TaskReport(Task):
 
         with open(parsed_args.file, 'w') as f:
             f.write('\n'.join(report_buffer))
-
-
-@TaskOptions.register('show')
-class TaskShow(Task):
-    @staticmethod
-    def parser(task_args, target_address=None):
-        task_parser = argparse.ArgumentParser(description=f'{title}\nShow task:')
-        task_parser.prog = f'{task_parser.prog} show'
-        task_parser.formatter_class = argparse.RawDescriptionHelpFormatter
-
-        sub_tasks = task_parser.add_subparsers(title='options', dest='option', help='show options')
-        sub_tasks.required = True
-
-        rt_parser = sub_tasks.add_parser('realtime', aliases=['rt'], help='Show realtime commands.')
-        rt_parser.set_defaults(subtask_handler=TaskShow.realtime)
-        rt_parser.set_defaults(subtask_info='realtime')
-        rt_parser.add_argument('cmds', metavar='<cmd>', nargs='+', action=CmdSemantics,
-                               help='Select a group of commands or specific commands to execute. '
-                                    f'Available options: {RealtimeCmdOptions.options()}. '
-                                    f'Special keyword "{CATALOG_TAG_ALL}" selects all commands.')
-        rt_parser.add_argument('--detail', action='store_true', help='Detailed output.')
-
-        dev_parser = sub_tasks.add_parser('devices', aliases=['dev'], help='Show device list.')
-        dev_parser.set_defaults(subtask_handler=TaskShow.devices)
-        dev_parser.set_defaults(subtask_info='devices')
-
-        for sub_task in (rt_parser, dev_parser):
-            sub_task.add_argument('--regex', metavar='<regex>', type=regex_type,
-                                  help='Regular expression matching device name, type or model to display.')
-            sub_task.add_argument('--reachable', action='store_true', help='Display only reachable devices.')
-            sub_task.add_argument('--site', metavar='<id>', type=site_id_type, help='Filter by site ID.')
-            sub_task.add_argument('--system-ip', metavar='<ipv4>', type=ipv4_type, help='Filter by system IP.')
-
-        return task_parser.parse_args(task_args)
-
-    def runner(self, parsed_args, api=None, task_output=None):
-        self.log_info(f'Starting show {parsed_args.subtask_info}: vManage URL: "{api.base_url}"')
-
-        matched_items = [
-            (hostname, system_ip, site_id, reachability, device_type, model)
-            for system_ip, hostname, site_id, reachability, device_type, model in Device.get(api).extended_iter()
-            if (
-                (parsed_args.regex is None or regex_search(parsed_args.regex, hostname, device_type, model)) and
-                (not parsed_args.reachable or reachability == 'reachable') and
-                (parsed_args.site is None or site_id == parsed_args.site) and
-                (parsed_args.system_ip is None or system_ip == parsed_args.system_ip)
-            )
-        ]
-
-        # Dispatch to the appropriate show handler
-        parsed_args.subtask_handler(self, parsed_args, api, matched_items, task_output)
-
-    def realtime(self, parsed_args, api, matched_devices, task_output):
-        print_buffer = []
-        for info, rt_cls in rt_catalog_iter(*parsed_args.cmds, version=api.server_version):
-            self.log_info(f'Retrieving {info.lower()} for {len(matched_devices)} devices')
-
-            table = None
-            columns = rt_cls.fields_std + rt_cls.fields_ext if parsed_args.detail else rt_cls.fields_std
-            for hostname, system_ip, *_ in matched_devices:
-                rt_result = rt_cls.get(api, system_ip)
-                if rt_result is None:
-                    self.log_error(f'Failed to retrieve {info} from {hostname}')
-                    continue
-
-                if table is None:
-                    table = Table('Device', *rt_result.field_info(*columns))
-
-                table.extend((hostname, *columns) for columns in rt_result.field_value_iter(*columns))
-                table.add_marker()
-
-            if table:
-                print_grp = [f'{info}:']
-                print_grp.extend(table.pretty_iter())
-                print_buffer.append('\n'.join(print_grp))
-
-        if print_buffer:
-            if task_output is not None:
-                task_output.extend(print_buffer)
-            else:
-                print('\n\n'.join(print_buffer))
-
-    def devices(self, parsed_args, api, matched_devices, task_output):
-        results = Table('Name', 'System IP', 'Site ID', 'Reachability', 'Type', 'Model')
-        results.extend(matched_devices)
-
-        self.log_info(f'Selection criteria match {len(results)} devices')
-
-        if results:
-            if task_output is not None:
-                task_output.extend(results.pretty_iter())
-            else:
-                print('\n'.join(results.pretty_iter()))
