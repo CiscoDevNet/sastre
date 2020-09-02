@@ -1319,3 +1319,24 @@ class AppRouteSlaClass(RealtimeItem):
     fields_std = ('name', 'loss', 'latency', 'jitter')
     fields_ext = ('index', )
 
+
+@rt_register('omp', 'summary', 'OMP summary')
+class DeviceOmpSummary(RealtimeItem):
+    api_path = ApiPath('device/omp/summary', None, None, None)
+    fields_std = ('operstate', 'ompuptime', 'vsmart_peers', 'routes_received', 'routes_installed', 'routes_sent',
+                  'tlocs_received', 'tlocs_installed', 'tlocs_sent')
+    fields_ext = ('services_received', 'services_installed', 'services_sent', 'policy_received', 'policy_sent')
+
+
+@rt_register('omp', 'peers', 'OMP peers')
+class DeviceOmpPeers(RealtimeItem):
+    api_path = ApiPath('device/omp/peers', None, None, None)
+    fields_std = ('peer', 'type', 'site_id', 'state')
+    fields_ext = ('domain_id', 'up_time')
+
+
+@rt_register('tunnel', 'stats', 'Tunnel statistics')
+class DeviceTunnelStats(RealtimeItem):
+    api_path = ApiPath('device/tunnel/statistics', None, None, None)
+    fields_std = ('system_ip', 'local_color', 'remote_color', 'tunnel_protocol', 'tunnel_mtu', 'tcp_mss_adjust')
+    fields_ext = ('source_ip', 'dest_ip', 'source_port', 'dest_port')
