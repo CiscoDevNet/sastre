@@ -1,3 +1,13 @@
+Sastre 1.6 [September 2, 2020]
+============================
+
+#### Enhancements:
+- Show software added to show task (Sastre-Pro feature).
+
+#### Fixes:
+- Improved show task to gracefully handle cases where older vManage/device releases may not have all queried table fields available. Whenever a particular device doesn't have a table field, "N/A" is returned.
+- Report task would fail with no report generated if any of its subtasks fail. This has been fixed, a report is still created containing the output of all non-failed subtasks. 
+
 Sastre 1.5 [September 2, 2020]
 ============================
 

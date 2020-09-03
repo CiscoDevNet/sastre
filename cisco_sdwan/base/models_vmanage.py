@@ -158,11 +158,11 @@ class ControlInventory(IndexApiItem):
 
     @staticmethod
     def is_vsmart(device_type):
-        return device_type == 'vsmart'
+        return device_type is not None and device_type == 'vsmart'
 
     @staticmethod
     def is_vbond(device_type):
-        return device_type == 'vbond'
+        return device_type is not None and device_type == 'vbond'
 
     @staticmethod
     def is_manage(device_type):
@@ -290,11 +290,11 @@ class DeviceTemplateIndex(IndexConfigItem):
 
     @staticmethod
     def is_vsmart(device_type, num_attached):
-        return device_type == 'vsmart' and num_attached > 0
+        return device_type is not None and device_type == 'vsmart' and num_attached > 0
 
     @staticmethod
     def is_not_vsmart(device_type, num_attached):
-        return device_type != 'vsmart' and num_attached > 0
+        return device_type is not None and device_type != 'vsmart' and num_attached > 0
 
     @staticmethod
     def is_cedge(device_type, num_attached):
@@ -1340,3 +1340,10 @@ class DeviceTunnelStats(RealtimeItem):
     api_path = ApiPath('device/tunnel/statistics', None, None, None)
     fields_std = ('system_ip', 'local_color', 'remote_color', 'tunnel_protocol', 'tunnel_mtu', 'tcp_mss_adjust')
     fields_ext = ('source_ip', 'dest_ip', 'source_port', 'dest_port')
+
+
+@rt_register('software', 'info', 'Software info')
+class DeviceSoftware(RealtimeItem):
+    api_path = ApiPath('device/software', None, None, None)
+    fields_std = ('version', )
+    fields_ext = ('active', 'default', 'confirmed')
