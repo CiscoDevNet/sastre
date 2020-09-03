@@ -1061,10 +1061,13 @@ class TaskReport(Task):
 
         report_buffer = []
         for task_header, task, task_args in report_config_tasks + report_tasks:
-            task_buffer = []
-            task().runner(task_args, api, task_output=task_buffer)
-            if task_buffer:
-                report_buffer.extend([task_header] + task_buffer + [''])
+            try:
+                task_buffer = []
+                task().runner(task_args, api, task_output=task_buffer)
+                if task_buffer:
+                    report_buffer.extend([task_header] + task_buffer + [''])
+            except (TaskException, FileNotFoundError) as ex:
+                self.log_error(f'Task {task.__name__} error: {ex}')
 
         with open(parsed_args.file, 'w') as f:
             f.write('\n'.join(report_buffer))

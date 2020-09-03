@@ -403,7 +403,7 @@ class Table:
 
     def _column_max_width(self, index):
         def cell_length(cell_value):
-            return len(cell_value) if isinstance(cell_value, str) else len(str(cell_value))
+            return len(str(cell_value))
 
         return max(
             cell_length(self.header[index]),
@@ -412,7 +412,7 @@ class Table:
 
     def pretty_iter(self):
         def cell_format(width, value):
-            return ' {value:{width}} '.format(value=value, width=width-2)
+            return ' {value:{width}} '.format(value=str(value), width=width-2)
 
         col_width_list = [2+self._column_max_width(index) for index in range(len(self.header))]
         border_line = '+' + '+'.join(('-'*col_width for col_width in col_width_list)) + '+'

@@ -8,9 +8,8 @@ import json
 import re
 from pathlib import Path
 from itertools import zip_longest
-from operator import itemgetter
 from collections import namedtuple
-from typing import Sequence, Dict, Tuple
+from typing import Sequence, Dict, Tuple, Union, Iterable, Callable, NamedTuple
 from .rest_api import RestAPIException
 
 
@@ -65,6 +64,10 @@ class ApiPath:
 
 
 class RealtimeItem:
+    """
+    RealtimeItem represents a vManage realtime monitoring API elements defined by an ApiPath with a GET path.
+    An instance of this class can be created to retrieve and parse realtime endpoints.
+    """
     api_path = None
     api_params = ('deviceId',)
     fields_std = None
@@ -76,27 +79,46 @@ class RealtimeItem:
         self._data = payload['data']
 
     @property
-    def field_names(self):
+    def field_names(self) -> Tuple:
         return tuple(self._meta.keys())
 
-    def field_info(self, *field_names, info='title'):
+    def field_info(self, *field_names: Sequence[str], info: str = 'title', default: Union[None, str] = 'N/A') -> Tuple:
+        """
+        Retrieve metadata about one or more fields.
+        :param field_names: One or more field name to retrieve metadata from.
+        :param info: Indicate which metadata to retrieve. By default, field title is returned.
+        :param default: Value to be returned when a field_name does not exist.
+        :return: tuple with one or more elements representing the desired metadata for each field requested.
+        """
         if len(field_names) == 1:
-            return self._meta[field_names[0]].get(info),
+            return self._meta.get(field_names[0], {}).get(info, default),
 
-        return tuple(entry.get(info) for entry in itemgetter(*field_names)(self._meta))
+        return tuple(entry.get(info, default) for entry in default_getter(*field_names, default={})(self._meta))
 
-    def field_value_iter(self, *field_names, **conv_fn_map):
+    def field_value_iter(self, *field_names: Union[str, Sequence[str]],
+                         **conv_fn_map: Dict[str, Callable]) -> Iterable[NamedTuple]:
+        """
+        Iterate over entries of a realtime instance. Only fields/columns defined by field_names are yield. Type
+        conversion of one or more fields is supported by passing a callable that takes one argument (i.e. the field
+        value) and returns the converted value. E.g. passing average_latency=int will convert a string average_latency
+        field to an integer.
+        :param field_names: Specify one or more field names to retrieve.
+        :param conv_fn_map: Keyword arguments passed allow type conversions on fields.
+        :return: A FieldValue object (named tuple) with attributes for each field_name.
+        """
         FieldValue = namedtuple('FieldValue', field_names)
 
         def default_conv_fn(field_val):
             return field_val if field_val is not None else ''
 
         conv_fn_list = [conv_fn_map.get(field_name, default_conv_fn) for field_name in field_names]
-        field_properties = self.field_info(*field_names, info='property')
+        field_properties = self.field_info(*field_names, info='property', default=None)
 
         def getter_fn(obj):
-            return FieldValue._make(conv_fn(obj.get(field_property))
-                                    for conv_fn, field_property in zip(conv_fn_list, field_properties))
+            return FieldValue._make(
+                conv_fn(obj.get(field_property)) if field_property is not None else 'N/A'
+                for conv_fn, field_property in zip(conv_fn_list, field_properties)
+            )
 
         return (getter_fn(entry) for entry in self._data)
 
@@ -188,15 +210,17 @@ class IndexApiItem(ApiItem):
         return self.iter(*self.iter_fields)
 
     def iter(self, *iter_fields):
-        return (itemgetter(*iter_fields)(elem) for elem in self.data)
+        return (default_getter(*iter_fields)(elem) for elem in self.data)
 
-    def extended_iter(self):
+    def extended_iter(self, default=None):
         """
         Returns an iterator where each entry is composed of the combined fields of iter_fields and extended_iter_fields.
         None is returned on any fields that are missing in an entry
+        :param default: Value to return when a field does not exist
         :return: The iterator
         """
-        return (default_getter(*self.iter_fields, *self.extended_iter_fields)(elem) for elem in self.data)
+        return (default_getter(*self.iter_fields, *self.extended_iter_fields, default=default)(elem)
+                for elem in self.data)
 
 
 class ConfigItem(ApiItem):
@@ -454,15 +478,17 @@ class IndexConfigItem(ConfigItem):
         return self.iter(*self.iter_fields)
 
     def iter(self, *iter_fields):
-        return (itemgetter(*iter_fields)(elem) for elem in self.data)
+        return (default_getter(*iter_fields)(elem) for elem in self.data)
 
-    def extended_iter(self):
+    def extended_iter(self, default=None):
         """
         Returns an iterator where each entry is composed of the combined fields of iter_fields and extended_iter_fields.
         None is returned on any fields that are missing in an entry
+        :param default: Value to return when a field does not exist
         :return: The iterator
         """
-        return (default_getter(*self.iter_fields, *self.extended_iter_fields)(elem) for elem in self.data)
+        return (default_getter(*self.iter_fields, *self.extended_iter_fields, default=default)(elem)
+                for elem in self.data)
 
 
 class ServerInfo:
