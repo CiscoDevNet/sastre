@@ -1345,5 +1345,5 @@ class DeviceTunnelStats(RealtimeItem):
 @rt_register('software', 'info', 'Software info')
 class DeviceSoftware(RealtimeItem):
     api_path = ApiPath('device/software', None, None, None)
-    fields_std = ('version', )
-    fields_ext = ('active', 'default', 'confirmed')
+    fields_std = ('version', 'active', 'default')
+    fields_ext = ('confirmed', )
