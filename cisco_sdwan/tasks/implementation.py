@@ -436,6 +436,8 @@ class TaskDelete(Task):
 
 @TaskOptions.register('certificate')
 class TaskCertificate(Task):
+    SAVINGS_FACTOR = 0.2
+
     @staticmethod
     def parser(task_args, target_address=None):
         task_parser = argparse.ArgumentParser(description=f'{title}\nCertificate task:')

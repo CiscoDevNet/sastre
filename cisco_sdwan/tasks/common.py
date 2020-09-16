@@ -66,6 +66,8 @@ class Task:
     ACTION_INTERVAL = 10
     ACTION_TIMEOUT = 600
 
+    SAVINGS_FACTOR = 1
+
     def __init__(self):
         self.log_count = Tally('debug', 'info', 'warning', 'error', 'critical')
 
@@ -99,6 +101,13 @@ class Task:
 
         msg = failure_msg if len(msg_list) > 0 else success_msg
         return msg.format(tally=', '.join(msg_list))
+
+    @property
+    def savings(self):
+        """
+        Estimate number of hours saved when running this task, when compared with performing the same steps manually.
+        """
+        return self.SAVINGS_FACTOR * self.log_count.info / 60
 
     @staticmethod
     def parser(task_args, **kwargs):
