@@ -20,10 +20,12 @@ Currently available tasks:
 - List: List configuration items or device certificate information from vManage or a local backup. Display as table or export as csv file.
 - Show-template: Show details about device templates on vManage or from a local backup. Display as table or export as csv file.
 - Migrate: Migrate configuration items from a vManage release to another. Currently only 18.4, 19.2 or 19.3 to 20.1 is supported. Minor revision numbers (e.g. 20.1.1) are not relevant for the template migration.
+- Report: Generate a report file containing the output from all list and show-template commands.
+- Show (Sastre-Pro only): Run vManage real-time commands across one or more devices.
 
 Notes:
 - Either 'sdwan' or 'sastre' can be used as the main command.
-- The command line described above, and in all examples that follow, assume Sastre was installed from PyPI, via PIP. 
+- The command line described above, and in all examples that follow, assume Sastre was installed via PIP. 
 - If Sastre was download from GitHub, then 'sdwan.py' or 'sastre.py' should used instead. Please check the installation section for more details.
 
 ### Base parameters
@@ -34,13 +36,14 @@ Notes:
     Sastre - Automation Tools for Cisco SD-WAN Powered by Viptela
     
     positional arguments:
-      <task>                task to be performed (backup, restore, delete, certificate, list, show-template, migrate)
+      <task>                task to be performed (backup, restore, delete, certificate, list, show-template, migrate, report, show)
       <arguments>           task parameters, if any
     
     optional arguments:
       -h, --help            show this help message and exit
       -a <vmanage-ip>, --address <vmanage-ip>
-                            vManage IP address, can also be defined via VMANAGE_IP environment variable. If neither is provided user is prompted for the address.
+                            vManage IP address, can also be defined via VMANAGE_IP environment variable. If neither is provided user is prompted for the
+                            address.
       -u <user>, --user <user>
                             username, can also be defined via VMANAGE_USER environment variable. If neither is provided user is prompted for username.
       -p <password>, --password <password>
@@ -57,7 +60,9 @@ vManage address (-a/--address), user name (-u/--user) and password (-p/--passwor
 
 A good approach to reduce the number of parameters that need to be provided at execution is to create rc text files exporting those environment variables for a particular vManage. This is demonstrated in the Getting Started section below.
 
-For any of these arguments, vManage address, user and password; user is prompted for a value if they are not provided via the environment variables or command line arguments.
+A good approach to reduce the number of parameters that need to be provided at execution time is to create rc text files exporting those environment variables for a particular vManage. This is demonstrated in the Getting Started section below.
+
+For any of these arguments, vManage address, user, password and CX pid; user is prompted for a value if they are not provided via the environment variables or command line arguments.
 
 ### Task-specific parameters
 

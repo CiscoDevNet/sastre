@@ -1,3 +1,9 @@
+Sastre 1.7 [September 16, 2020]
+============================
+
+#### Enhancements:
+- (Sastre-Pro) Including per-task time savings to AIDE metric collection. Also added support for CX project ID parameter.
+
 Sastre 1.6 [September 2, 2020]
 ============================
 
