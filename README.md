@@ -2,7 +2,7 @@
 
 # Sastre - Automation Tools for Cisco SD-WAN Powered by Viptela
 
-Sastre provides functions to assist with managing configuration elements and visualize information in Cisco SD-WAN deployments. 
+Sastre provides functions to assist with managing configuration elements and visualize information from Cisco SD-WAN deployments. 
 
 Some of the use-cases include:
 - Transfer configuration from one vManage to another. E.g. Lab/POC to production, on-prem to cloud, etc.
