@@ -1347,3 +1347,10 @@ class DeviceSoftware(RealtimeItem):
     api_path = ApiPath('device/software', None, None, None)
     fields_std = ('version', 'active', 'default')
     fields_ext = ('confirmed', )
+
+
+@rt_register('dpi', 'summary', 'DPI summary')
+class DeviceDpiSummary(RealtimeItem):
+    api_path = ApiPath('device/dpi/summary', None, None, None)
+    fields_std = ('status', 'current_flows', 'peak_flows', 'current_rate', 'peak_rate')
+    fields_ext = ('flows_created', 'flows_expired')

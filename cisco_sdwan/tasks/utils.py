@@ -70,11 +70,16 @@ class TagOptions:
 
 
 class RealtimeCmdOptions:
-    cmd_options = rt_catalog_tags() | rt_catalog_commands() | {CATALOG_TAG_ALL}
+    groups = rt_catalog_tags()
+    commands = rt_catalog_commands()
 
     @classmethod
-    def options(cls):
-        return ', '.join(sorted(cls.cmd_options, key=lambda x: '' if x == CATALOG_TAG_ALL else x))
+    def grp_options(cls):
+        return ', '.join(sorted(cls.groups | {CATALOG_TAG_ALL}, key=lambda x: '' if x == CATALOG_TAG_ALL else x))
+
+    @classmethod
+    def cmd_options(cls):
+        return ', '.join(sorted(cls.commands))
 
 
 class CmdSemantics(argparse.Action):
@@ -83,8 +88,15 @@ class CmdSemantics(argparse.Action):
 
     def __call__(self, parser, namespace, values, option_string=None):
         full_command = ' '.join(values)
-        if full_command not in RealtimeCmdOptions.cmd_options:
-            raise argparse.ArgumentError(self, f'"{full_command}" is not valid. Options are {RealtimeCmdOptions.options()}')
+        pass_options = [
+            len(values) == 1 and CATALOG_TAG_ALL in values,
+            len(values) == 1 and set(values) <= RealtimeCmdOptions.groups,
+            full_command in RealtimeCmdOptions.commands
+        ]
+        if not any(pass_options):
+            raise argparse.ArgumentError(self, f'"{full_command}" is not valid. '
+                                               f'Group options: {RealtimeCmdOptions.grp_options()}. '
+                                               f'Command options: {RealtimeCmdOptions.cmd_options()}.')
 
         setattr(namespace, self.dest, values)
 
