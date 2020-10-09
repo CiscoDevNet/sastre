@@ -2,8 +2,7 @@ Sastre 1.8 [October 2, 2020]
 ============================
 
 #### Enhancements:
-- (Sastre-Pro) Added Dockerfile and instructions to build and run the container (in the readme file).
-
+- Added Dockerfile and instructions to build and run the container (in the readme file).
 
 Sastre 1.7 [September 16, 2020]
 ============================

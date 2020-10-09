@@ -9,9 +9,7 @@ COPY /dcloud-lab.sh ./rc/
 
 RUN mkdir logs && \
     mkdir data && \
-    apk add --no-cache git && \
-    pip install --no-cache-dir git+https://wwwin-github.cisco.com/AIDE/aide-python-agent.git && \
-    pip install --no-cache-dir git+https://wwwin-github.cisco.com/AIDE/Sastre-Pro.git
+    pip install --no-cache-dir cisco-sdwan
 
 VOLUME /sastre/rc /sastre/logs /sastre/data
 
