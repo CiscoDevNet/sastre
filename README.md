@@ -667,3 +667,28 @@ Move to the clone directory:
 Verify that Sastre can run:
 
     % python3 sdwan.py --version
+
+### Docker install
+
+Build the docker container:
+- Proceed with the Github install as above.
+- Move to the clone directory (cd Sastre-Pro).
+- Then proceed as follows 
+
+
+    % docker build -t sastre-pro .
+    Sending build context to Docker daemon  179.4MB
+    Step 1/9 : ARG http_proxy
+    Step 2/9 : ARG https_proxy
+    Step 3/9 : ARG no_proxy
+    Step 4/9 : FROM python:3.8-alpine
+     ---> 0f03316d4a27
+    <snip>
+
+Start the docker container:
+
+    docker run -it --rm \
+     --mount type=bind,source="$(pwd)"/data,target=/sastre/data \
+     --mount type=bind,source="$(pwd)"/logs,target=/sastre/logs \
+     --mount type=bind,source="$(pwd)"/rc,target=/sastre/rc \
+     sastre-pro:latest
