@@ -6,4 +6,4 @@ __copyright__    = "Copyright (c) 2019-2020 Cisco Systems, Inc. and/or its affil
 __version__      = "1.8"
 __author__       = "Marcelo Reis"
 __email__        = "mareis@cisco.com"
-__url__          = "https://github.com/reismarcelo/sastre"
+__url__          = "https://github.com/CiscoDevNet/sastre"

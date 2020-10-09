@@ -2,10 +2,30 @@
 
 # Sastre - Automation Tools for Cisco SD-WAN Powered by Viptela
 
-Sastre provides functions to assist with managing configuration elements in Cisco vManage, including backup, restore and delete tasks.
+Sastre provides functions to assist with managing configuration elements and visualize information in Cisco SD-WAN deployments. 
+
+Some of the use-cases include:
+- Transfer configuration from one vManage to another. E.g. Lab/POC to production, on-prem to cloud, etc.
+- Backup, restore and delete configuration items. Tags and regular expressions can be used to select all or a subset of items.
+- Visualize state across multiple devices. For instance, display status of control connections from multiple devices in a single table.
+
+## Sastre and Sastre-Pro
+
+Sastre is available in two flavors:
+- Sastre: Public open-source under MIT license available on [Cisco DevNet repository](https://github.com/CiscoDevNet/sastre). Supports a limited set of tasks.
+- Sastre-Pro: Cisco licensed version, supporting the full feature-set. 
+
+Both flavors follow the same release numbering. For instance, if support for certain new vManage release is added to Sastre-Pro 1.9, Sastre 1.9 will also have the same support (across its supported tasks).
+
+The command "sdwan --version" will indicate the flavor that is installed.
+
+    % sdwan --version
+    Sastre-Pro Version 1.8. Catalog: 63 configuration items, 12 realtime items.
+
+Tasks only available on Sastre-Pro are labeled as such in the [Introduction](#introduction) section.
 
 ## Introduction
- 
+
 Sastre has a set of base parameters as well as task-specific arguments. 
 
 The command line is structured as follows:
@@ -16,12 +36,12 @@ Currently available tasks:
 - Backup: Save vManage configuration items to a local backup.
 - Restore: Restore configuration items from a local backup to vManage.
 - Delete: Delete configuration items on vManage.
-- Certificate: Restore device certificate validity status from a backup or set to a desired value (i.e. valid, invalid or staging).
-- List: List configuration items or device certificate information from vManage or a local backup. Display as table or export as csv file.
-- Show-template: Show details about device templates on vManage or from a local backup. Display as table or export as csv file.
 - Migrate: Migrate configuration items from a vManage release to another. Currently only 18.4, 19.2 or 19.3 to 20.1 is supported. Minor revision numbers (e.g. 20.1.1) are not relevant for the template migration.
-- Report: Generate a report file containing the output from all list and show-template commands.
-- Show (Sastre-Pro only): Run vManage real-time commands across one or more devices.
+- Certificate (Sastre-Pro): Restore device certificate validity status from a backup or set to a desired value (i.e. valid, invalid or staging).
+- List (Sastre-Pro): List configuration items or device certificate information from vManage or a local backup. Display as table or export as csv file.
+- Show-template (Sastre-Pro): Show details about device templates on vManage or from a local backup. Display as table or export as csv file.
+- Report (Sastre-Pro): Generate a report file containing the output from all list and show-template commands.
+- Show (Sastre-Pro): Run vManage real-time commands across one or more devices.
 
 Notes:
 - Either 'sdwan' or 'sastre' can be used as the main command.
@@ -31,9 +51,9 @@ Notes:
 ### Base parameters
 
     % sdwan -h
-    usage: sdwan [-h] [-a <vmanage-ip>] [-u <user>] [-p <password>] [--port <port>] [--timeout <timeout>] [--verbose] [--version] <task> ...
+    usage: sdwan [-h] [-a <vmanage-ip>] [-u <user>] [-p <password>] [--pid <pid>] [--port <port>] [--timeout <timeout>] [--verbose] [--version] <task> ...
     
-    Sastre - Automation Tools for Cisco SD-WAN Powered by Viptela
+    Sastre-Pro - Automation Tools for Cisco SD-WAN Powered by Viptela
     
     positional arguments:
       <task>                task to be performed (backup, restore, delete, certificate, list, show-template, migrate, report, show)
@@ -48,6 +68,7 @@ Notes:
                             username, can also be defined via VMANAGE_USER environment variable. If neither is provided user is prompted for username.
       -p <password>, --password <password>
                             password, can also be defined via VMANAGE_PASSWORD environment variable. If neither is provided user is prompted for password.
+      --pid <pid>           CX project id, can also be defined via CX_PID environment variable. This is collected for AIDE reporting purposes only.
       --port <port>         vManage TCP port number (default: 8443)
       --timeout <timeout>   REST API timeout (default: 300)
       --verbose             increase output verbosity
@@ -58,11 +79,14 @@ vManage address (-a/--address), user name (-u/--user) and password (-p/--passwor
 - VMANAGE_USER
 - VMANAGE_PASSWORD
 
-A good approach to reduce the number of parameters that need to be provided at execution is to create rc text files exporting those environment variables for a particular vManage. This is demonstrated in the Getting Started section below.
+Similarly, CX project ID (--pid) can also be provided via environment variable:
+- CX_PID
 
 A good approach to reduce the number of parameters that need to be provided at execution time is to create rc text files exporting those environment variables for a particular vManage. This is demonstrated in the Getting Started section below.
 
 For any of these arguments, vManage address, user, password and CX pid; user is prompted for a value if they are not provided via the environment variables or command line arguments.
+
+CX project ID is only applicable to Sastre-Pro. CX_PID and --pid option are not available in Sastre (std).
 
 ### Task-specific parameters
 
@@ -658,7 +682,7 @@ Install required Python packages:
 
 Clone from the github repository:
 
-    % git clone https://github.com/reismarcelo/sastre
+    % git clone https://github.com/CiscoDevNet/sastre
     
 Move to the clone directory:
     
@@ -672,11 +696,11 @@ Verify that Sastre can run:
 
 Build the docker container:
 - Proceed with the Github install as above.
-- Move to the clone directory (cd Sastre-Pro).
+- Move to the clone directory (cd sastre).
 - Then proceed as follows
 
 
-    % docker build -t sastre-pro .
+    % docker build -t sastre .
     Sending build context to Docker daemon  179.4MB
     Step 1/9 : ARG http_proxy
     Step 2/9 : ARG https_proxy
@@ -691,13 +715,13 @@ Start the docker container:
      --mount type=bind,source="$(pwd)"/data,target=/sastre/data \
      --mount type=bind,source="$(pwd)"/logs,target=/sastre/logs \
      --mount type=bind,source="$(pwd)"/rc,target=/sastre/rc \
-     sastre-pro:latest
+     sastre:latest
      
     /sastre # ls
     data  logs  rc
     
     /sastre # sdwan --version
-    Sastre-Pro Version 1.8. Catalog: 63 configuration items, 12 realtime items.
+    Sastre Version 1.8. Catalog: 63 configuration items, 12 realtime items.
     /sastre # 
 
 Notes:
