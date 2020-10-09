@@ -673,7 +673,7 @@ Verify that Sastre can run:
 Build the docker container:
 - Proceed with the Github install as above.
 - Move to the clone directory (cd Sastre-Pro).
-- Then proceed as follows 
+- Then proceed as follows
 
 
     % docker build -t sastre-pro .
@@ -692,3 +692,19 @@ Start the docker container:
      --mount type=bind,source="$(pwd)"/logs,target=/sastre/logs \
      --mount type=bind,source="$(pwd)"/rc,target=/sastre/rc \
      sastre-pro:latest
+     
+    /sastre # ls
+    data  logs  rc
+    
+    /sastre # sdwan --version
+    Sastre-Pro Version 1.8. Catalog: 63 configuration items, 12 realtime items.
+    /sastre # 
+
+Notes:
+- When set, host proxy environment variables (http_proxy, https_proxy and no_proxy) are used during the build and execution of the container.
+- The container uses 3 volumes:
+    - /sastre/data - Used as the vManage backup data repository
+    - /sastre/logs - Where the logs are saved
+    - /sastre/rc - Used to store 'rc' files defining environment variables used by Sastre: VMANAGE_IP, VMANAGE_USER, etc.
+- The suggested docker run command above bind-mounts those volumes, i.e. they are mapped to host system directories. This facilitates transferring of data to/from the container (e.g. vManage backups). The host directories are relative to the location where the docker run command is executed.
+- Docker run will spin-up the container and open an interactive session to it using the ash shell. Sdwan commands (e.g. sdwan backup all, etc) can be executed at this point. Typing 'exit' will leave the ash shell, stop and remove the container. Everything under data, rc and logs is persisted to the corresponding host system directories.
