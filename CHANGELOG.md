@@ -1,3 +1,9 @@
+Sastre 1.9 [October 13, 2020]
+============================
+
+#### Fixes:
+- [#27] CustomApp Policy restore failure in 20.3.1. 
+
 Sastre 1.8 [October 2, 2020]
 ============================
 
