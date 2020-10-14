@@ -520,6 +520,15 @@ class PolicyCustomApp(ConfigItem):
     id_tag = 'appId'
     skip_cmp_tag_set = {'lastUpdated', }
 
+    def __init__(self, data):
+        """
+        :param data: dict containing the information to be associated with this API item.
+        """
+        # In 20.3.1 the payload returned by vManage contains a 'data' key with the policy definition in it. This is
+        # different than on previous versions or other ConfigItems. Overwriting the default __init__ in order to
+        # handle both options.
+        super().__init__(data.get('data', data))
+
 
 @register('policy_customapp', 'custom application policy', PolicyCustomApp, min_version='20.1')
 class PolicyCustomAppIndex(IndexConfigItem):
