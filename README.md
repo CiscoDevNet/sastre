@@ -13,7 +13,7 @@ Some of the use-cases include:
 
 Sastre is available in two flavors:
 - Sastre: Public open-source under MIT license available on [Cisco DevNet repository](https://github.com/CiscoDevNet/sastre). Supports a limited set of tasks.
-- Sastre-Pro: Cisco licensed version, supporting the full feature-set. 
+- Sastre-Pro: Cisco licensed version, supporting the full feature-set. Sastre-Pro is available for customers with a CX BCS subscription and internally at Cisco.
 
 Both flavors follow the same release numbering. For instance, if support for certain new vManage release is added to Sastre-Pro 1.9, Sastre 1.9 will also have the same support (across its supported tasks).
 
@@ -22,17 +22,19 @@ The command "sdwan --version" will indicate the flavor that is installed.
     % sdwan --version
     Sastre-Pro Version 1.8. Catalog: 63 configuration items, 12 realtime items.
 
-Tasks only available on Sastre-Pro are labeled as such in the [Introduction](#introduction) section.
+Tasks only available on Sastre-Pro are labeled as such in the [Introduction](#introduction) section below.
 
 ## Introduction
 
-Sastre has a set of base parameters as well as task-specific arguments. 
+Sastre can be installed via pip, as a container or cloned from the git repository. Please refer to the [Installing](#installing) section for details.
 
-The command line is structured as follows:
+The command line is structured as a set of base parameters, the task specification followed by task-specific parameters:
 
     sdwan <base parameters> <task> <task-specific parameters>
 
-Currently available tasks: 
+Base parameters define global options such as verbosity level, vManage credentials, etc.
+
+Task indicates the operation to be performed. The following tasks are currently available: 
 - Backup: Save vManage configuration items to a local backup.
 - Restore: Restore configuration items from a local backup to vManage.
 - Delete: Delete configuration items on vManage.
@@ -43,10 +45,12 @@ Currently available tasks:
 - Report (Sastre-Pro): Generate a report file containing the output from all list and show-template commands.
 - Show (Sastre-Pro): Run vManage real-time commands across one or more devices.
 
+Task-specific parameters are provided after the task argument, customizing the task behavior. For instance, whether to execute a restore task in dry-run mode or the destination directory for a backup task. 
+
 Notes:
 - Either 'sdwan' or 'sastre' can be used as the main command.
 - The command line described above, and in all examples that follow, assume Sastre was installed via PIP. 
-- If Sastre was download from GitHub, then 'sdwan.py' or 'sastre.py' should used instead. Please check the installation section for more details.
+- If Sastre was cloned from the git repository, then 'sdwan.py' or 'sastre.py' should used instead. Please check the installation section for more details.
 
 ### Base parameters
 
