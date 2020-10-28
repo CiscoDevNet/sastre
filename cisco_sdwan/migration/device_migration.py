@@ -1,5 +1,5 @@
 from copy import deepcopy
-from collections import Hashable
+from collections.abc import Hashable
 from cisco_sdwan.base.processor import Operation, Processor, ProcessorException
 from . import module_dir, factory_cedge_aaa, factory_cedge_global
 
