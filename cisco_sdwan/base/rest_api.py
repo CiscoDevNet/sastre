@@ -116,8 +116,7 @@ def raise_for_status(response_obj):
         try:
             reply_data = response_obj.json() if response_obj.text else {}
         except json.decoder.JSONDecodeError:
-            reply_data = {
-                'error': {'message': 'Forbidden, check user permissions'}} if response_obj.status_code == 403 else {}
+            reply_data = {'error': {'message': 'Check user permissions'}} if response_obj.status_code == 403 else {}
 
         raise RestAPIException('{r.reason} ({r.status_code}): {error} [{r.request.method} {r.url}]'.format(
                 r=response_obj, error=reply_data.get('error', {}).get('message', 'Unspecified error message')))

@@ -13,14 +13,14 @@ Some of the use-cases include:
 
 Sastre is available in two flavors:
 - Sastre: Public open-source under MIT license available on [Cisco DevNet repository](https://github.com/CiscoDevNet/sastre). Supports a limited set of tasks.
-- Sastre-Pro: Cisco licensed version, supporting the full feature-set. Sastre-Pro is available for customers with a CX BCS subscription and internally at Cisco.
+- Sastre-Pro: Cisco licensed version, supporting the full feature-set. Sastre-Pro is available for customers with a CX BCS subscription and Cisco internal at [Cisco eStore](https://cxtools.cisco.com/cxestore/#/toolDetail/46810).
 
 Both flavors follow the same release numbering. For instance, if support for certain new vManage release is added to Sastre-Pro 1.9, Sastre 1.9 will also have the same support (across its supported tasks).
 
 The command "sdwan --version" will indicate the flavor that is installed.
 
     % sdwan --version
-    Sastre-Pro Version 1.8. Catalog: 63 configuration items, 12 realtime items.
+    Sastre-Pro Version 1.10. Catalog: 63 configuration items, 12 realtime items.
 
 Tasks only available on Sastre-Pro are labeled as such in the [Introduction](#introduction) section below.
 
@@ -66,22 +66,23 @@ Notes:
     optional arguments:
       -h, --help            show this help message and exit
       -a <vmanage-ip>, --address <vmanage-ip>
-                            vManage IP address, can also be defined via VMANAGE_IP environment variable. If neither is provided user is prompted for the
-                            address.
+                            vManage IP address, can also be defined via VMANAGE_IP environment variable. If neither is provided user is prompted for the address.
       -u <user>, --user <user>
                             username, can also be defined via VMANAGE_USER environment variable. If neither is provided user is prompted for username.
       -p <password>, --password <password>
                             password, can also be defined via VMANAGE_PASSWORD environment variable. If neither is provided user is prompted for password.
       --pid <pid>           CX project id, can also be defined via CX_PID environment variable. This is collected for AIDE reporting purposes only.
-      --port <port>         vManage TCP port number (default: 8443)
+      --port <port>         vManage port number, can also be defined via VMANAGE_PORT environment variable (default: 8443)
       --timeout <timeout>   REST API timeout (default: 300)
       --verbose             increase output verbosity
       --version             show program's version number and exit
 
-vManage address (-a/--address), user name (-u/--user) and password (-p/--password) can also be provided via environment variables:
+
+vManage address (-a/--address), user name (-u/--user), password (-p/--password) or port (--port) can also be provided via environment variables:
 - VMANAGE_IP
 - VMANAGE_USER
 - VMANAGE_PASSWORD
+- VMANAGE_PORT
 
 Similarly, CX project ID (--pid) can also be provided via environment variable:
 - CX_PID

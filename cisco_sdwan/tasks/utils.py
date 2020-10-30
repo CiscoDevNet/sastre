@@ -174,7 +174,7 @@ class EnvVar(argparse.Action):
         if envvar is None:
             raise ValueError('envvar is required')
 
-        default = default or os.environ.get(envvar)
+        default = os.environ.get(envvar) or default
         required = required and default is None
         super().__init__(default=default, required=required, **kwargs)
 

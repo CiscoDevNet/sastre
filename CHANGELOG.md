@@ -1,3 +1,13 @@
+Sastre 1.10 [November 2, 2020]
+============================
+
+#### Enhancements:
+- [#29] Support for VMANAGE_PORT environment variable as an option to set TCP port for target vManage.
+- [#25] Python 3.9 support verified.
+
+#### Fixes:
+- [#10] A traceback would be generated on API authorization issues. E.g. read-only account used for a backup task (which requires POST calls). This has been fixed and a clear error message is now displayed.
+
 Sastre 1.9 [October 13, 2020]
 ============================
 
