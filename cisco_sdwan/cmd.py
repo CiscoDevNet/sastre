@@ -81,8 +81,9 @@ def main():
                             envvar='VMANAGE_PASSWORD', type=non_empty_type,
                             help='password, can also be defined via VMANAGE_PASSWORD environment variable. '
                                  ' If neither is provided user is prompted for password.')
-    cli_parser.add_argument('--port', metavar='<port>', default=VMANAGE_PORT,
-                            help='vManage TCP port number (default: %(default)s)')
+    cli_parser.add_argument('--port', metavar='<port>', default=VMANAGE_PORT, action=EnvVar, envvar='VMANAGE_PORT',
+                            help='vManage port number, can also be defined via VMANAGE_PORT environment variable '
+                                 '(default: %(default)s)')
     cli_parser.add_argument('--timeout', metavar='<timeout>', type=int, default=REST_TIMEOUT,
                             help='REST API timeout (default: %(default)s)')
     cli_parser.add_argument('--verbose', action='store_true',
