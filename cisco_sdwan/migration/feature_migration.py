@@ -7,7 +7,7 @@ from . import module_dir
 
 DEVICE_TYPES_TO_FILTER = {"vedge-ISR1100-6G", "vedge-ISR1100-4G", "vedge-ISR1100-4GLTE", "vedge-cloud", "vedge-1000",
                           "vedge-2000", "vedge-5000", "vedge-100", "vedge-100-B", "vedge-100-M", "vedge-100-WM",
-                          "vsmart", "vbond"}
+                          "vsmart", "vbond", "vmanage"}
 
 
 _operations = {}  # {<operation_key>: Operation ...}
