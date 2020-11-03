@@ -849,6 +849,17 @@ class PolicyDefUTDProfileIndex(PolicyDefIndex):
     store_file = 'policy_definitions_sslutdprofile.json'
 
 
+class PolicyDefPriisdnPort(PolicyDef):
+    api_path = ApiPath('template/policy/definition/priisdnport')
+    store_path = ('policy_definitions', 'PriisdnPort')
+
+
+@register('policy_definition', 'priisdnport policy definition', PolicyDefPriisdnPort)
+class PolicyDefPriisdnPortIndex(PolicyDefIndex):
+    api_path = ApiPath('template/policy/definition/priisdnport', None, None, None)
+    store_file = 'policy_definitions_priisdnport.json'
+
+
 #
 # Policy lists
 #
@@ -1211,6 +1222,38 @@ class PolicyListMediaProfileIndex(PolicyListIndex):
     api_path = ApiPath('template/policy/list/mediaprofile', None, None, None)
     store_file = 'policy_lists_mediaprofile.json'
 
+
+class PolicyListFaxProtocol(PolicyList):
+    api_path = ApiPath('template/policy/list/faxprotocol')
+    store_path = ('policy_lists', 'FaxProtocol')
+
+
+@register('policy_list', 'fax protocol list', PolicyListFaxProtocol, min_version='20.3')
+class PolicyListFaxProtocolIndex(PolicyListIndex):
+    api_path = ApiPath('template/policy/list/faxprotocol', None, None, None)
+    store_file = 'policy_lists_faxprotocol.json'
+
+
+class PolicyListModemPassthrough(PolicyList):
+    api_path = ApiPath('template/policy/list/modempassthrough')
+    store_path = ('policy_lists', 'ModemPassthrough')
+
+
+@register('policy_list', 'modem passthrough list', PolicyListModemPassthrough, min_version='20.3')
+class PolicyListModemPassthroughIndex(PolicyListIndex):
+    api_path = ApiPath('template/policy/list/modempassthrough', None, None, None)
+    store_file = 'policy_lists_modempassthrough.json'
+
+
+class PolicyListTrunkGroup(PolicyList):
+    api_path = ApiPath('template/policy/list/trunkgroup')
+    store_path = ('policy_lists', 'TrunkGroup')
+
+
+@register('policy_list', 'trunk group list', PolicyListTrunkGroup, min_version='20.3')
+class PolicyListTrunkGroupIndex(PolicyListIndex):
+    api_path = ApiPath('template/policy/list/trunkgroup', None, None, None)
+    store_file = 'policy_lists_trunkgroup.json'
 
 #
 # Admin Settings
