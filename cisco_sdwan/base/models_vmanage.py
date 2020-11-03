@@ -132,10 +132,17 @@ class ActionStatus(ApiItem):
         return ', '.join(device_details(entry) for entry in data_list)
 
 
+class CheckVBond(ApiItem):
+    api_path = ApiPath('template/device/config/vbond', None, None, None)
+
+    @property
+    def is_configured(self):
+        return self.data.get('isVbondConfigured', False)
+
+
 #
 # Device Inventory
 #
-
 class Device(IndexApiItem):
     api_path = ApiPath('device', None, None, None)
     iter_fields = ('deviceId', 'host-name')

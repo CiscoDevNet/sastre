@@ -139,7 +139,7 @@ class DeviceProcessor(Processor):
         super().__init__(matched_recipes)
 
     def is_in_scope(self, device_template, **kwargs):
-        return device_template.is_cedge
+        return device_template.is_cedge and not device_template.is_type_cli
 
     def eval(self, device_template, new_name, new_id):
         migrated_payload = deepcopy(device_template.data)

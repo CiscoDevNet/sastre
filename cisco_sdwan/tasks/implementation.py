@@ -13,9 +13,8 @@ from cisco_sdwan.base.rest_api import RestAPIException, is_version_newer
 from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL, ordered_tags
 from cisco_sdwan.base.models_base import UpdateEval, update_ids, ServerInfo
 from cisco_sdwan.base.models_vmanage import (DeviceConfig, DeviceConfigRFS, DeviceTemplate, DeviceTemplateAttached,
-                                             DeviceTemplateValues, DeviceTemplateIndex, FeatureTemplate,
-                                             PolicyVsmartIndex, EdgeInventory, ControlInventory,
-                                             EdgeCertificate, SettingsVbond)
+                                             DeviceTemplateValues, DeviceTemplateIndex, FeatureTemplate, CheckVBond,
+                                             PolicyVsmartIndex, EdgeInventory, ControlInventory, EdgeCertificate)
 from cisco_sdwan.base.processor import StopProcessorException, ProcessorException
 from cisco_sdwan.migration import factory_cedge_aaa, factory_cedge_global
 from cisco_sdwan.migration.feature_migration import FeatureProcessor
@@ -175,10 +174,12 @@ class TaskRestore(Task):
             self.log_warning('Target vManage release (%s) is older than the release used in backup (%s). '
                              'Items may fail to be restored due to incompatibilities across releases.',
                              api.server_version, local_info.server_version)
-        vbond = SettingsVbond.get(api)
-        if vbond is None:
-            self.log_warning('Failed retrieving vBond settings. Restoring template_device items will fail if vBond '
-                             'is not configured.')
+        check_vbond = CheckVBond.get(api)
+        if check_vbond is None:
+            self.log_warning('Failed retrieving vBond configuration status.')
+            is_vbond_set = False
+        else:
+            is_vbond_set = check_vbond.is_configured
 
         self.log_info('Loading existing items from target vManage')
         target_all_items_map = {
@@ -192,7 +193,7 @@ class TaskRestore(Task):
         dependency_set = set()  # {<item_id>, ...}
         match_set = set()       # {<item_id>, ...}
         for tag in ordered_tags(parsed_args.tag):
-            if tag == 'template_device' and vbond is not None and not vbond.is_configured:
+            if tag == 'template_device' and not is_vbond_set:
                 self.log_warning('Will skip %s items because vBond is not configured. '
                                  'On vManage, Administration > Settings > vBond.', tag)
                 continue

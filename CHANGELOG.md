@@ -7,6 +7,8 @@ Sastre 1.10 [November 2, 2020]
 
 #### Fixes:
 - [#10] A traceback would be generated on API authorization issues. E.g. read-only account used for a backup task (which requires POST calls). This has been fixed and a clear error message is now displayed.
+- [#35] vBond configuration check on restore task not working on multi-tenant mode. This has been fixed.
+- [#36] Migrate task would fail migration of cli-based device templates and feature templates containing a mix of vmanage and cEdge devices. This has been fixed.
 
 Sastre 1.9 [October 13, 2020]
 ============================
