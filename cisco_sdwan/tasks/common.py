@@ -44,6 +44,9 @@ class Tally:
 
 
 class TaskArgs:
+    """
+    Used to store arguments for a task
+    """
     def __init__(self, **kwargs):
         self.data = kwargs
 
@@ -55,9 +58,18 @@ class TaskArgs:
 
     @classmethod
     def from_json(cls, json_obj, mapper=None):
+        """
+        Returns a TaskArgs instance off the provided json_obj
+        :param json_obj: A json object parsed from a json encoded string
+        :param mapper: An optional dictionary mapping arg_name strings to a conversion function. This conversion
+                       function is called with the arg_value from json_object and should return the converted (python
+                       native) value associated with arg_value.
+        :return: TaskArgs instance
+        """
         mapper_dict = mapper or {}
         kwargs = {arg_name: mapper_dict.get(arg_name, lambda x: x)(arg_value)
                   for arg_name, arg_value in json_obj.items()}
+
         return cls(**kwargs)
 
 

@@ -296,11 +296,11 @@ class ConfigItem(ApiItem):
         except FileNotFoundError:
             if raise_not_found:
                 has_detail = item_name is not None and item_id is not None
-                detail = ': {name}, {id}'.format(name=item_name, id=item_id) if has_detail else ''
-                raise FileNotFoundError('{owner} file not found{detail}'.format(owner=cls.__name__, detail=detail))
+                detail = f': {item_name}, {item_id}' if has_detail else ''
+                raise FileNotFoundError(f'{cls.__name__} file not found{detail}') from None
             return None
         except json.decoder.JSONDecodeError as ex:
-            raise ModelException('Invalid JSON file: {file}: {msg}'.format(file=file_path, msg=ex))
+            raise ModelException(f'Invalid JSON file: {file_path}: {ex}') from None
         else:
             return cls(data)
 
@@ -523,7 +523,7 @@ class ServerInfo:
         except FileNotFoundError:
             return None
         except json.decoder.JSONDecodeError as ex:
-            raise ModelException(f"Invalid JSON file: {file_path}: {ex}")
+            raise ModelException(f"Invalid JSON file: {file_path}: {ex}") from None
         else:
             return cls(**data)
 

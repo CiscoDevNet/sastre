@@ -1,3 +1,10 @@
+Sastre 1.11 [November xx, 2020]
+============================
+
+#### Fixes:
+- [#40] User not prompted for cx pid when it was not provided via cli or environment variable, if the task didn't require api. This has been fixed.
+
+
 Sastre 1.10 [November 2, 2020]
 ============================
 

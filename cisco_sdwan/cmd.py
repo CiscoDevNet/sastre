@@ -95,7 +95,7 @@ def main():
                             help=f'task to be performed ({TaskOptions.options()})')
     cli_parser.add_argument('task_args', metavar='<arguments>', nargs=argparse.REMAINDER,
                             help='task parameters, if any')
-    cli_parser.set_defaults(prompt_arguments=[
+    cli_parser.set_defaults(prompt_arguments_api=[
         PromptArg('address', 'vManage address: '),
         PromptArg('user', 'vManage user: '),
         PromptArg('password', 'vManage password: ', secure_prompt=True)
@@ -114,20 +114,26 @@ def main():
 
     logging.config.dictConfig(logging_config)
 
-    # Dispatch task
-    target_address = cli_args.address
+    # Prepare task
     task = cli_args.task()
+    target_address = cli_args.address
     parsed_task_args = task.parser(cli_args.task_args, target_address=target_address)
-    try:
-        if task.is_api_required(parsed_task_args):
-            # Evaluate whether user must be prompted for additional arguments
-            try:
-                for prompt_arg in getattr(cli_args, 'prompt_arguments', []):
-                    if getattr(cli_args, prompt_arg.argument) is None:
-                        setattr(cli_args, prompt_arg.argument, prompt_arg())
-            except KeyboardInterrupt:
-                sys.exit(1)
+    is_api_required = task.is_api_required(parsed_task_args)
 
+    # Evaluate whether user must be prompted for additional arguments
+    prompt_args_list = getattr(cli_args, 'prompt_arguments', [])
+    if is_api_required:
+        prompt_args_list.extend(getattr(cli_args, 'prompt_arguments_api', []))
+    try:
+        for prompt_arg in prompt_args_list:
+            if getattr(cli_args, prompt_arg.argument) is None:
+                setattr(cli_args, prompt_arg.argument, prompt_arg())
+    except KeyboardInterrupt:
+        sys.exit(1)
+
+    # Dispatch task
+    try:
+        if is_api_required:
             if target_address != cli_args.address:
                 # Target address changed, re-run parser
                 parsed_task_args = task.parser(cli_args.task_args, target_address=cli_args.address)
