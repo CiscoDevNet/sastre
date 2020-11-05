@@ -65,6 +65,10 @@ class TagOptions:
         return tag_str
 
     @classmethod
+    def tag_list(cls, tag_str_list):
+        return [cls.tag(tag_str) for tag_str in tag_str_list]
+
+    @classmethod
     def options(cls):
         return ', '.join(sorted(cls.tag_options, key=lambda x: '' if x == CATALOG_TAG_ALL else x))
 
@@ -104,8 +108,9 @@ class CmdSemantics(argparse.Action):
 def regex_type(regex_str):
     try:
         re.compile(regex_str)
-    except re.error:
-        raise argparse.ArgumentTypeError(f'"{regex_str}" is not a valid regular expression.')
+    except (re.error, TypeError):
+        if regex_str is not None:
+            raise argparse.ArgumentTypeError(f'"{regex_str}" is not a valid regular expression.') from None
 
     return regex_str
 
@@ -154,7 +159,7 @@ def site_id_type(site_id_str):
         if not 0 <= site_id <= 4294967295:
             raise ValueError()
     except ValueError:
-        raise argparse.ArgumentTypeError(f'"{site_id_str}" is not a valid site-id.')
+        raise argparse.ArgumentTypeError(f'"{site_id_str}" is not a valid site-id.') from None
 
     return site_id_str
 
@@ -203,9 +208,9 @@ def ext_template_type(template_str):
     try:
         ExtendedTemplate(template_str)('test')
     except re.error:
-        raise argparse.ArgumentTypeError('regular expression is invalid')
+        raise argparse.ArgumentTypeError('regular expression is invalid') from None
     except (KeyError, ValueError) as ex:
-        raise argparse.ArgumentTypeError(ex)
+        raise argparse.ArgumentTypeError(ex) from None
 
     return template_str
 

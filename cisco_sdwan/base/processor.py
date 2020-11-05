@@ -42,19 +42,18 @@ class Processor:
                 data = json.load(read_f)
             assert isinstance(data, list)
         except FileNotFoundError:
-            raise ProcessorException('Migration recipe file not found: {file}'.format(file=cls.recipe_file))
+            raise ProcessorException(f'Migration recipe file not found: {cls.recipe_file}') from None
         except json.decoder.JSONDecodeError as ex:
-            raise ProcessorException('Invalid JSON in recipe file: {file}: {msg}'.format(file=cls.recipe_file, msg=ex))
+            raise ProcessorException(f'Invalid JSON in recipe file: {cls.recipe_file}: {ex}') from None
         except AssertionError:
-            raise ProcessorException('Invalid recipe file: {file}: Top level must be a list'.format(
-                file=cls.recipe_file)
-            )
+            raise ProcessorException(f'Invalid recipe file: {cls.recipe_file}: Top level must be a list') from None
 
         # Enforce mandatory_keys
         violations = cls.validate_recipe_data(data)
         if violations:
-            raise ProcessorException('Invalid recipe file: {file}: Missing mandatory keys: {details}'.format(
-                file=cls.recipe_file, details=', '.join(violations)))
+            raise ProcessorException(
+                f"Invalid recipe file: {cls.recipe_file}: Missing mandatory keys: {', '.join(violations)}"
+            )
 
         return cls(data, **kwargs)
 
