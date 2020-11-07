@@ -854,7 +854,7 @@ class PolicyDefPriisdnPort(PolicyDef):
     store_path = ('policy_definitions', 'PriisdnPort')
 
 
-@register('policy_definition', 'priisdnport policy definition', PolicyDefPriisdnPort)
+@register('policy_definition', 'pri isdn port policy definition', PolicyDefPriisdnPort, min_version='20.3')
 class PolicyDefPriisdnPortIndex(PolicyDefIndex):
     api_path = ApiPath('template/policy/definition/priisdnport', None, None, None)
     store_file = 'policy_definitions_priisdnport.json'
