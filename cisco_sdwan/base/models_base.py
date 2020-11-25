@@ -15,7 +15,8 @@ from .rest_api import RestAPIException
 
 
 # Top-level directory for local data store
-DATA_DIR = str(Path(environ.get('SASTRE_ROOT_DIR', Path.cwd()), 'data'))
+SASTRE_ROOT_DIR = Path(environ.get('SASTRE_ROOT_DIR', Path.cwd()))
+DATA_DIR = str(Path(SASTRE_ROOT_DIR, 'data'))
 
 
 class UpdateEval:

@@ -14,7 +14,7 @@ from pathlib import Path
 from requests.exceptions import ConnectionError
 from .base.rest_api import Rest, LoginFailedException
 from .base.catalog import catalog_size, rt_catalog_size
-from .base.models_base import ModelException
+from .base.models_base import ModelException, SASTRE_ROOT_DIR
 from .__version__ import __version__ as version
 from .__version__ import __doc__ as title
 from .tasks.utils import TaskOptions, EnvVar, non_empty_type, PromptArg
@@ -110,6 +110,7 @@ def main():
 
     file_handler = logging_config.get('handlers', {}).get('file')
     if file_handler is not None:
+        file_handler['filename'] = str(Path(SASTRE_ROOT_DIR, file_handler['filename']))
         Path(file_handler['filename']).parent.mkdir(parents=True, exist_ok=True)
 
     logging.config.dictConfig(logging_config)
