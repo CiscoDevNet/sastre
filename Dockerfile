@@ -2,16 +2,21 @@ ARG http_proxy
 ARG https_proxy
 ARG no_proxy
 
-FROM python:3.8-alpine
+FROM python:3.9-alpine
 
-WORKDIR /sastre
+ENV SASTRE_ROOT_DIR="/shared-data"
+
+WORKDIR /sastre-init
 COPY /dcloud-lab.sh ./rc/
+COPY /container-init.sh /etc/profile.d/sastre_init.sh
 
-RUN mkdir logs && \
-    mkdir data && \
+RUN apk update && apk upgrade && apk add --no-cache git && \
+    pip install --no-cache-dir --upgrade pip setuptools && \
     pip install --no-cache-dir cisco-sdwan
 
-VOLUME /sastre/rc /sastre/logs /sastre/data
+VOLUME /shared-data
 
-CMD ["/bin/ash"]
+WORKDIR /shared-data
+
+CMD ["/bin/ash", "-l"]
 

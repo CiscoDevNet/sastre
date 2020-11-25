@@ -5,6 +5,7 @@ rc/
 logs/
 build/
 dist/
+sastre-volume/
 *.egg-info/
 *.csv
 *.txt

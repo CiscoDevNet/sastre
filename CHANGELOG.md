@@ -1,9 +1,15 @@
-Sastre 1.11 [November xx, 2020]
+Sastre 1.11 [November 25, 2020]
 ============================
+
+#### Enhancements:
+- [#20] Validated support for vManage 20.3.x and included new API endpoints:
+    - Policy lists: fax protocol, modem passthrough, trunk group
+    - Policy definitions: PRI ISDN port
+- [#47] The data store location can now be customized via the SASTRE_ROOT_DIR environment variable. When SASTRE_ROOT_DIR is not set, the data store is data/ under the directory where Sastre is run. This is the default behavior, as in all previous releases. When SASTRE_ROOT_DIR is set, the data store becomes $SASTRE_ROOT_DIR/data/.
+- [#48] Updated Dockerfile and container run instructions for better integration with CX CAT tool
 
 #### Fixes:
 - [#40] User not prompted for cx pid when it was not provided via cli or environment variable, if the task didn't require api. This has been fixed.
-
 
 Sastre 1.10 [November 2, 2020]
 ============================
