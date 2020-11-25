@@ -6,6 +6,7 @@
 """
 import json
 import re
+from os import environ
 from pathlib import Path
 from itertools import zip_longest
 from collections import namedtuple
@@ -14,7 +15,7 @@ from .rest_api import RestAPIException
 
 
 # Top-level directory for local data store
-DATA_DIR = 'data'
+DATA_DIR = str(Path(environ.get('SASTRE_ROOT_DIR', Path.cwd()), 'data'))
 
 
 class UpdateEval:

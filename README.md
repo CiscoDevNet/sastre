@@ -9,6 +9,8 @@ Some of the use-cases include:
 - Backup, restore and delete configuration items. Tags and regular expressions can be used to select all or a subset of items.
 - Visualize state across multiple devices. For instance, display status of control connections from multiple devices in a single table.
 
+Please send your support questions to sastre-support@cisco.com.
+
 ## Sastre and Sastre-Pro
 
 Sastre is available in two flavors:
@@ -706,34 +708,59 @@ Build the docker container:
 
 
     % docker build -t sastre .
-    Sending build context to Docker daemon  179.4MB
-    Step 1/9 : ARG http_proxy
-    Step 2/9 : ARG https_proxy
-    Step 3/9 : ARG no_proxy
-    Step 4/9 : FROM python:3.8-alpine
-     ---> 0f03316d4a27
+    Sending build context to Docker daemon    220MB
+    Step 1/12 : ARG http_proxy
+    Step 2/12 : ARG https_proxy
+    Step 3/12 : ARG no_proxy
+    Step 4/12 : FROM python:3.9-alpine
+     ---> 77a605933afb
     <snip>
+
+Create host directory to be mounted into the container:
+
+    mkdir sastre-volume
 
 Start the docker container:
 
-    docker run -it --rm \
-     --mount type=bind,source="$(pwd)"/data,target=/sastre/data \
-     --mount type=bind,source="$(pwd)"/logs,target=/sastre/logs \
-     --mount type=bind,source="$(pwd)"/rc,target=/sastre/rc \
+    docker run -it --rm --hostname sastre \
+     --mount type=bind,source="$(pwd)"/sastre-volume,target=/shared-data \
      sastre:latest
-     
-    /sastre # ls
-    data  logs  rc
+
+    usage: sdwan [-h] [-a <vmanage-ip>] [-u <user>] [-p <password>] [--pid <pid>] [--port <port>] [--timeout <timeout>] [--verbose] [--version] <task> ...
     
-    /sastre # sdwan --version
-    Sastre Version 1.8. Catalog: 63 configuration items, 12 realtime items.
-    /sastre # 
+    Sastre - Automation Tools for Cisco SD-WAN Powered by Viptela
+    
+    positional arguments:
+      <task>                task to be performed (backup, restore, delete, certificate, list, show-template, migrate, report, show)
+      <arguments>           task parameters, if any
+    
+    optional arguments:
+      -h, --help            show this help message and exit
+      -a <vmanage-ip>, --address <vmanage-ip>
+                            vManage IP address, can also be defined via VMANAGE_IP environment variable. If neither is provided user is prompted for the address.
+      -u <user>, --user <user>
+                            username, can also be defined via VMANAGE_USER environment variable. If neither is provided user is prompted for username.
+      -p <password>, --password <password>
+                            password, can also be defined via VMANAGE_PASSWORD environment variable. If neither is provided user is prompted for password.
+      --port <port>         vManage port number, can also be defined via VMANAGE_PORT environment variable (default: 8443)
+      --timeout <timeout>   REST API timeout (default: 300)
+      --verbose             increase output verbosity
+      --version             show program's version number and exit
+    sastre:/shared-data#
+    
+    sastre:/shared-data# sdwan --version
+    Sastre Version 1.11. Catalog: 63 configuration items, 12 realtime items.
+
+    sastre:/shared-data#
 
 Notes:
 - When set, host proxy environment variables (http_proxy, https_proxy and no_proxy) are used during the build and execution of the container.
-- The container uses 3 volumes:
-    - /sastre/data - Used as the vManage backup data repository
-    - /sastre/logs - Where the logs are saved
-    - /sastre/rc - Used to store 'rc' files defining environment variables used by Sastre: VMANAGE_IP, VMANAGE_USER, etc.
-- The suggested docker run command above bind-mounts those volumes, i.e. they are mapped to host system directories. This facilitates transferring of data to/from the container (e.g. vManage backups). The host directories are relative to the location where the docker run command is executed.
+- The container has a /shared-data volume.
+- Sastre data/ and logs/ directories are created under /shared-data.
+- A sample dcloud-lab.sh is copied to /shared-data/rc if no /shared-data/rc directory is present.
+- Directory structure:
+    - /shared-data/data - Used as the vManage backup data repository
+    - /shared-data/logs - Where the logs are saved
+    - /shared-data/rc - Used to store 'rc' files defining environment variables used by Sastre: VMANAGE_IP, VMANAGE_USER, etc.
+- The suggested docker run command above bind-mounts the /shared-data volume, i.e. it is mapped to a host system directory. This facilitates transferring of data to/from the container (e.g. vManage backups). The host directory is relative to the location where the docker run command is executed.
 - Docker run will spin-up the container and open an interactive session to it using the ash shell. Sdwan commands (e.g. sdwan backup all, etc) can be executed at this point. Typing 'exit' will leave the ash shell, stop and remove the container. Everything under data, rc and logs is persisted to the corresponding host system directories.
