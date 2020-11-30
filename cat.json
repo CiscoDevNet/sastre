@@ -1,19 +1,21 @@
 {
-  "Hostname": "sastre",
-  "Cmd": ["/bin/ash", "-l"],
-  "Env": [],
-  "Tty": true,
-  "Image": "containers.cisco.com/aide/sastre-pro",
-  "Labels": {
-    "com.cisco.cx": "aide"
-  },
-  "OpenStdin": true,
-  "StdinOnce": true,
-  "HostConfig": {
-    "AutoRemove": true,
-    "NetworkMode": "default"
-  },
-  "AttachStdin": true,
-  "AttachStderr": true,
-  "AttachStdout": true
+  "docker_run_parameters": {
+    "Hostname": "sastre",
+    "Cmd": ["/bin/ash", "-l"],
+    "Env": [],
+    "Tty": true,
+    "Image": "containers.cisco.com/aide/sastre-pro",
+    "Labels": {
+      "com.cisco.cx": "aide"
+    },
+    "OpenStdin": true,
+    "StdinOnce": true,
+    "HostConfig": {
+      "AutoRemove": true,
+      "NetworkMode": "default"
+    },
+    "AttachStdin": true,
+    "AttachStderr": true,
+    "AttachStdout": true
+  }
 }
