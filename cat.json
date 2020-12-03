@@ -1,7 +1,7 @@
 {
   "docker_run_parameters": {
     "Hostname": "sastre",
-    "Cmd": ["/bin/ash", "-l"],
+    "Cmd": ["/bin/bash"],
     "Env": [],
     "Tty": true,
     "Image": "containers.cisco.com/aide/sastre-pro",
