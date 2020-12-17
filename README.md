@@ -701,11 +701,13 @@ Verify that Sastre can run:
 
 ### Docker install
 
-Build the docker container:
-- Proceed with the Github install as above.
-- Move to the clone directory (cd sastre).
-- Then proceed as follows
+First, proceed with the [GitHub install](#Github-install) outlined above.
 
+Ensure you are within the directory cloned from GitHub:
+
+    % cd Sastre-Pro
+
+Then proceed as follows to build the docker container:
 
     % docker build -t sastre .
     Sending build context to Docker daemon    220MB
