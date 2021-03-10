@@ -145,9 +145,9 @@ class CheckVBond(ApiItem):
 #
 class Device(IndexApiItem):
     api_path = ApiPath('device', None, None, None)
-    iter_fields = ('deviceId', 'host-name')
+    iter_fields = ('uuid', 'host-name')
 
-    extended_iter_fields = ('site-id', 'reachability', 'device-type', 'device-model')
+    extended_iter_fields = ('deviceId', 'site-id', 'reachability', 'device-type', 'device-model')
 
 
 class EdgeInventory(IndexApiItem):
@@ -352,6 +352,10 @@ class DeviceTemplateValues(ConfigItem):
         """
         return [entry for entry in self.data.get('data', [])
                 if allowed_uuid_set is None or entry.get('csv-deviceId') in allowed_uuid_set]
+
+    @staticmethod
+    def input_list_devices(input_list: list) -> Iterable[str]:
+        return (entry.get('csv-host-name') for entry in input_list)
 
     def values_iter(self):
         return (
@@ -1254,6 +1258,7 @@ class PolicyListTrunkGroup(PolicyList):
 class PolicyListTrunkGroupIndex(PolicyListIndex):
     api_path = ApiPath('template/policy/list/trunkgroup', None, None, None)
     store_file = 'policy_lists_trunkgroup.json'
+
 
 #
 # Admin Settings

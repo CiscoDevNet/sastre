@@ -172,6 +172,19 @@ def version_type(version_str):
     return '.'.join(([str(int(v)) for v in version_str.replace('-', '.').split('.')] + ['0', ])[:2])
 
 
+def chunk_size_type(chunk_size_str):
+    _MIN, _MAX = 1, 200
+    try:
+        chunk_size = int(chunk_size_str)
+        if not _MIN <= chunk_size <= _MAX:
+            raise ValueError()
+    except ValueError:
+        raise argparse.ArgumentTypeError(f'"{chunk_size_str}" is not valid. Chunk size must be an integer between '
+                                         f'{_MIN} and {_MAX}, inclusive.') from None
+
+    return chunk_size
+
+
 class EnvVar(argparse.Action):
     def __init__(self, nargs=None, envvar=None, required=True, default=None, **kwargs):
         if nargs is not None:

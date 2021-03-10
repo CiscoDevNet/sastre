@@ -142,11 +142,10 @@ class TaskRestore(Task):
                                  help='Restore source (default: %(default)s).')
         task_parser.add_argument('--regex', metavar='<regex>', type=regex_type,
                                  help='Regular expression matching item names to be restored, within selected tags.')
-        xor_group = task_parser.add_mutually_exclusive_group(required=False)
-        xor_group.add_argument('--dryrun', action='store_true',
-                               help='Dry-run mode. Items to be restored are listed but not pushed to vManage.')
-        xor_group.add_argument('--attach', action='store_true',
-                               help='Attach devices to templates and activate vSmart policy after restoring items.')
+        task_parser.add_argument('--dryrun', action='store_true',
+                                 help='Dry-run mode. Items to be restored are listed but not pushed to vManage.')
+        task_parser.add_argument('--attach', action='store_true',
+                                 help='Attach devices to templates and activate vSmart policy after restoring items.')
         task_parser.add_argument('--force', action='store_true',
                                  help='Target vManage items with the same name as the corresponding item in workdir '
                                       'are updated with the contents from workdir. Without this option, those items '
@@ -278,9 +277,10 @@ class TaskRestore(Task):
                             if put_eval.need_reattach:
                                 if put_eval.is_master:
                                     self.log_info('Updating %s %s requires reattach', info, item.name)
-                                    action_list = self.attach_template(api, parsed_args.workdir,
-                                                                       index.need_extended_name,
-                                                                       [(item.name, item_id, target_id)])
+                                    attach_data = self.attach_template_data(
+                                        api, parsed_args.workdir, index.need_extended_name,
+                                        [(item.name, item_id, target_id)]
+                                    )
                                 else:
                                     self.log_info('Updating %s %s requires reattach of affected templates',
                                                   info, item.name)
@@ -290,8 +290,10 @@ class TaskRestore(Task):
                                         (target_templates[tgt_id], tgt_id)
                                         for tgt_id in put_eval.templates_affected_iter()
                                     )
-                                    action_list = self.reattach_template(api, templates_iter)
-                                self.wait_actions(api, action_list, 'reattaching templates', raise_on_failure=True)
+                                    attach_data = self.reattach_template_data(api, templates_iter)
+
+                                num_attach = self.attach(api, *attach_data, log_context='reattaching templates')
+                                self.log_debug('Attach requests processed: %s', num_attach)
                             elif put_eval.need_reactivate:
                                 self.log_info('Updating %s %s requires vSmart policy reactivate', info, item.name)
                                 action_list = self.activate_policy(
@@ -319,18 +321,22 @@ class TaskRestore(Task):
                 target_templates = {item_name: item_id for item_id, item_name in DeviceTemplateIndex.get_raise(api)}
                 target_policies = {item_name: item_id for item_id, item_name in PolicyVsmartIndex.get_raise(api)}
                 saved_template_index = DeviceTemplateIndex.load(parsed_args.workdir, raise_not_found=True)
-                attach_common_args = (api, parsed_args.workdir, saved_template_index.need_extended_name)
+
                 # Attach WAN Edge templates
                 edge_templates_iter = (
                     (saved_name, saved_id, target_templates.get(saved_name))
                     for saved_id, saved_name in saved_template_index.filtered_iter(DeviceTemplateIndex.is_not_vsmart)
                 )
-                wan_edge_set = {uuid for uuid, _ in EdgeInventory.get_raise(api)}
-                action_list = self.attach_template(*attach_common_args, edge_templates_iter, wan_edge_set)
-                if len(action_list) == 0:
-                    self.log_info('No WAN Edge attachments needed')
+                attach_data = self.attach_template_data(
+                    api, parsed_args.workdir, saved_template_index.need_extended_name, edge_templates_iter,
+                    target_uuid_set={uuid for uuid, _ in EdgeInventory.get_raise(api)}
+                )
+                reqs = self.attach(api, *attach_data, dryrun=parsed_args.dryrun, log_context='attaching WAN Edges')
+                if reqs:
+                    self.log_debug('%sAttach requests processed: %s', log_prefix, reqs)
                 else:
-                    self.wait_actions(api, action_list, 'attaching WAN Edge templates')
+                    self.log_info('No WAN Edge attachments needed')
+
                 # Attach vSmart template
                 vsmart_templates_iter = (
                     (saved_name, saved_id, target_templates.get(saved_name))
@@ -339,19 +345,24 @@ class TaskRestore(Task):
                 vsmart_set = {
                     uuid for uuid, _ in ControlInventory.get_raise(api).filtered_iter(ControlInventory.is_vsmart)
                 }
-                action_list = self.attach_template(*attach_common_args, vsmart_templates_iter, vsmart_set)
-                if len(action_list) == 0:
+                attach_data = self.attach_template_data(api, parsed_args.workdir,
+                                                        saved_template_index.need_extended_name, vsmart_templates_iter,
+                                                        target_uuid_set=vsmart_set)
+                reqs = self.attach(api, *attach_data, dryrun=parsed_args.dryrun, log_context="attaching vSmarts")
+                if reqs:
+                    self.log_debug('%sAttach requests processed: %s', log_prefix, reqs)
+                else:
                     self.log_info('No vSmart attachments needed')
-                else:
-                    self.wait_actions(api, action_list, 'attaching vSmart template')
+
                 # Activate vSmart policy
-                _, policy_name = PolicyVsmartIndex.load(parsed_args.workdir, raise_not_found=True).active_policy
-                action_list = self.activate_policy(api, target_policies.get(policy_name), policy_name)
-                if len(action_list) == 0:
-                    self.log_info('No vSmart policy to activate')
-                else:
-                    self.wait_actions(api, action_list, 'activating vSmart policy')
-            except (RestAPIException, FileNotFoundError) as ex:
+                if not parsed_args.dryrun:
+                    _, policy_name = PolicyVsmartIndex.load(parsed_args.workdir, raise_not_found=True).active_policy
+                    action_list = self.activate_policy(api, target_policies.get(policy_name), policy_name)
+                    if len(action_list) == 0:
+                        self.log_info('No vSmart policy to activate')
+                    else:
+                        self.wait_actions(api, action_list, 'activating vSmart policy', raise_on_failure=True)
+            except (RestAPIException, FileNotFoundError, WaitActionsException) as ex:
                 self.log_critical('Attach failed: %s', ex)
 
 
@@ -365,13 +376,12 @@ class TaskDelete(Task):
 
         task_parser.add_argument('--regex', metavar='<regex>', type=regex_type,
                                  help='Regular expression matching item names to be deleted, within selected tags.')
-        xor_group = task_parser.add_mutually_exclusive_group(required=False)
-        xor_group.add_argument('--dryrun', action='store_true',
-                               help='Dry-run mode. Items matched for removal are listed but not deleted.')
-        xor_group.add_argument('--detach', action='store_true',
-                               help='USE WITH CAUTION! Detach devices from templates and deactivate vSmart policy '
-                                    'before deleting items. This allows deleting items that are associated with '
-                                    'attached templates and active policies.')
+        task_parser.add_argument('--dryrun', action='store_true',
+                                 help='Dry-run mode. Items matched for removal are listed but not deleted.')
+        task_parser.add_argument('--detach', action='store_true',
+                                 help='USE WITH CAUTION! Detach devices from templates and deactivate vSmart policy '
+                                      'before deleting items. This allows deleting items that are associated with '
+                                      'attached templates and active policies.')
         task_parser.add_argument('tag', metavar='<tag>', type=TagOptions.tag,
                                  help='Tag for selecting items to be deleted. Available tags: '
                                       f'{TagOptions.options()}. Special tag "{CATALOG_TAG_ALL}" selects all items.')
@@ -380,30 +390,35 @@ class TaskDelete(Task):
     def runner(self, parsed_args, api, task_output=None):
         self.log_info('Starting delete%s: vManage URL: "%s"',
                       ', DRY-RUN mode' if parsed_args.dryrun else '', api.base_url)
+        log_prefix = 'DRY-RUN: ' if parsed_args.dryrun else ''
 
         if parsed_args.detach:
             try:
                 template_index = DeviceTemplateIndex.get_raise(api)
                 # Detach WAN Edge templates
-                action_list = self.detach_template(api, template_index, DeviceTemplateIndex.is_not_vsmart)
-                if len(action_list) == 0:
+                reqs = self.detach(api, template_index.filtered_iter(DeviceTemplateIndex.is_not_vsmart),
+                                   dryrun=parsed_args.dryrun, log_context='detaching WAN Edges')
+                if reqs:
+                    self.log_debug('%sDetach requests processed: %s', log_prefix, reqs)
+                else:
                     self.log_info('No WAN Edge attached')
-                else:
-                    self.wait_actions(api, action_list, 'detaching WAN Edge templates')
                 # Deactivate vSmart policy
-                action_list = self.deactivate_policy(api)
-                if len(action_list) == 0:
-                    self.log_info('No vSmart policy activated')
-                else:
-                    self.wait_actions(api, action_list, 'deactivating vSmart policy')
+                if not parsed_args.dryrun:
+                    action_list = self.deactivate_policy(api)
+                    if len(action_list) == 0:
+                        self.log_info('No vSmart policy activated')
+                    else:
+                        self.wait_actions(api, action_list, 'deactivating vSmart policy', raise_on_failure=True)
                 # Detach vSmart template
-                action_list = self.detach_template(api, template_index, DeviceTemplateIndex.is_vsmart)
-                if len(action_list) == 0:
-                    self.log_info('No vSmart attached')
+                reqs = self.detach(api, template_index.filtered_iter(DeviceTemplateIndex.is_vsmart),
+                                   dryrun=parsed_args.dryrun, log_context='detaching vSmarts')
+                if reqs:
+                    self.log_debug('%sDetach requests processed: %s', log_prefix, reqs)
                 else:
-                    self.wait_actions(api, action_list, 'detaching vSmart template')
-            except RestAPIException as ex:
+                    self.log_info('No vSmart attached')
+            except (RestAPIException, WaitActionsException) as ex:
                 self.log_critical('Detach failed: %s', ex)
+                return
 
         for tag in ordered_tags(parsed_args.tag, parsed_args.tag != CATALOG_TAG_ALL):
             self.log_info('Inspecting %s items', tag)

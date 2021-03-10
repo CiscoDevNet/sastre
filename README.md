@@ -4,7 +4,7 @@
 
 Sastre provides functions to assist with managing configuration elements and visualize information from Cisco SD-WAN deployments. 
 
-Some of the use-cases include:
+Some use-cases include:
 - Transfer configuration from one vManage to another. E.g. Lab/POC to production, on-prem to cloud, etc.
 - Backup, restore and delete configuration items. Tags and regular expressions can be used to select all or a subset of items.
 - Visualize state across multiple devices. For instance, display status of control connections from multiple devices in a single table.
@@ -22,7 +22,7 @@ Both flavors follow the same release numbering. For instance, if support for cer
 The command "sdwan --version" will indicate the flavor that is installed.
 
     % sdwan --version
-    Sastre-Pro Version 1.10. Catalog: 63 configuration items, 12 realtime items.
+    Sastre-Pro Version 1.12. Catalog: 63 configuration items, 12 realtime items.
 
 Tasks only available on Sastre-Pro are labeled as such in the [Introduction](#introduction) section below.
 
@@ -41,6 +41,8 @@ Task indicates the operation to be performed. The following tasks are currently 
 - Restore: Restore configuration items from a local backup to vManage.
 - Delete: Delete configuration items on vManage.
 - Migrate: Migrate configuration items from a vManage release to another. Currently only 18.4, 19.2 or 19.3 to 20.1 is supported. Minor revision numbers (e.g. 20.1.1) are not relevant for the template migration.
+- Attach (Sastre-Pro): Attach WAN Edges/vSmarts to templates. Allows further customization on top of the functionality available via "restore --attach".
+- Detach (Sastre-Pro): Detach WAN Edges/vSmarts from templates. Allows further customization on top of the functionality available via "delete --detach".
 - Certificate (Sastre-Pro): Restore device certificate validity status from a backup or set to a desired value (i.e. valid, invalid or staging).
 - List (Sastre-Pro): List configuration items or device certificate information from vManage or a local backup. Display as table or export as csv file.
 - Show-template (Sastre-Pro): Show details about device templates on vManage or from a local backup. Display as table or export as csv file.
@@ -62,7 +64,7 @@ Notes:
     Sastre-Pro - Automation Tools for Cisco SD-WAN Powered by Viptela
     
     positional arguments:
-      <task>                task to be performed (backup, restore, delete, certificate, list, show-template, migrate, report, show)
+      <task>                task to be performed (backup, restore, delete, attach, detach, certificate, list, show-template, migrate, report, show)
       <arguments>           task parameters, if any
     
     optional arguments:
@@ -507,8 +509,8 @@ Set certificate validity status to a desired value:
     INFO: Completed certificate sync with controllers
     INFO: Task completed successfully
 
-### Migrating templates to 20.1
-- Template migration from 18.4, 19.2 or 19.3 to 20.1 is supported. Maintenance numbers are not relevant to the migration. That is, 20.1 and 20.1.1 can be specified without any difference in terms of template migration.
+### Migrating templates from pre-20.1 to post-20.1
+- Template migration from pre-20.1 to post-20.1 format is supported. Maintenance numbers are not relevant to the migration. That is, 20.1 and 20.1.1 can be specified without any difference in terms of template migration.
 - The source of templates can be a live vManage or a backup. The destination is always a local directory. A restore task is then used to push migrated items to the target vManage.
 - Device attachments and template values are currently not handled by the migrate task. For instance, devices attached to a device template are left on that same template even when a new migrated template is created. 
 
@@ -605,6 +607,39 @@ Example:
     INFO: Saved device template G_Branch_201_Single_cE4451-X_2xWAN_DHCP_L2_v01
     INFO: Task completed successfully
 
+### Selectively attach/detach devices to/from templates
+
+The attach and detach tasks expose a number of knobs to select templates and devices to include:
+- Templates regular expression selecting templates to attach. Match on template name.
+- Devices regular expression selecting devices to attach. Match on device name.
+- Reachable state
+- Site-ID
+- System-IP
+
+When multiple filters are provided, the result is an AND of all filters provided. Dry-run can be used to verify the filters used.
+
+The number of devices to include per attach/detach request (to vManage) can be defined with the --batch option.
+
+Using dry-run mode to validate what templates and devices would be included with the attach task:
+
+    % sdwan --verbose attach edge --workdir dcloud_base --dryrun
+    INFO: Starting attach templates, DRY-RUN mode: Local workdir: "dcloud_base" -> vManage URL: "https://198.18.1.10:8443"
+    INFO: DRY-RUN: Template attach: DC-vEdges (DC1-VEDGE1, DC1-VEDGE2), migrated_CSR_BranchType1Template-CSR (BR1-CEDGE2, BR1-CEDGE1)
+    INFO: Task completed successfully
+
+Selecting devices to include in the attach task:
+
+    % sdwan --verbose attach edge --workdir dcloud_base --templates "DC" --devices "VEDGE2"         
+    INFO: Starting attach templates: Local workdir: "dcloud_base" -> vManage URL: "https://198.18.1.10:8443"
+    INFO: Template attach: DC-vEdges (DC1-VEDGE2)
+    INFO: Attaching WAN Edges
+    INFO: Waiting...
+    INFO: Waiting...
+    INFO: Waiting...
+    INFO: Completed DC-vEdges
+    INFO: Completed attaching WAN Edges
+    INFO: Task completed successfully
+
 ## Notes
 
 ### Regular Expressions
@@ -663,9 +698,9 @@ The implication is that if modified child templates (e.g. feature template) defi
 
 ## Installing
 
-Sastre requires Python 3.6 or newer. This can be verified by pasting the following to a terminal window:
+Sastre requires Python 3.8 or newer. This can be verified by pasting the following to a terminal window:
 
-    % python3 -c "import sys;assert sys.version_info>(3,6)" && echo "ALL GOOD"
+    % python3 -c "import sys;assert sys.version_info>(3,8)" && echo "ALL GOOD"
 
 If 'ALL GOOD' is printed it means Python requirements are met. If not, download and install the latest 3.x version at Python.org (https://www.python.org/downloads/).
 

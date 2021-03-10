@@ -1,3 +1,22 @@
+Sastre 1.12 [March 10, 2021]
+============================
+
+#### Enhancements:
+- [#59] Template attach requests used in restore task (--attach and --force options) are improved to split attachment 
+  requests in chunks of up to 10 devices. Dry-run mode is now supported with --attach option.
+- [#63] Template detach requests used in delete task (--detach option) are improved to split detach requests in chunks of
+  up to 10 devices. Dry-run mode is now supported with --detach option.
+- [#64] (Sastre-Pro) New attach task providing further customization on device template attach operations. Templates and 
+  devices can be filtered by regular expressions and device properties (reachability, system-ip, etc). Also, the maximum 
+  number of devices per vManage template attach request can be customized. By default, Sastre will split attach 
+  requests in chunks of up to 10 devices.
+- [#65] (Sastre-Pro) New detach task providing further customization on device template detach operations. Templates and 
+  devices can be filtered by regular expressions and device properties (reachability, system-ip, etc). Also, the maximum 
+  number of devices per vManage template detach request can be customized. By default, Sastre will split detach 
+  requests in chunks of up to 10 devices.
+  
+In this version we are also bumping up the minimal Python requirements to 3.8.
+
 Sastre 1.11 [November 25, 2020]
 ============================
 
