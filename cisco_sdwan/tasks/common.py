@@ -11,12 +11,14 @@ import re
 from pathlib import Path
 from shutil import rmtree
 from collections import namedtuple
+from typing import List, Tuple, Iterator, Union, Optional
 from cisco_sdwan.base.rest_api import Rest, RestAPIException
 from cisco_sdwan.base.models_base import DATA_DIR
 from cisco_sdwan.base.models_vmanage import (DeviceTemplate, DeviceTemplateValues, DeviceTemplateAttached,
                                              DeviceTemplateAttach, DeviceTemplateCLIAttach, DeviceModeCli,
                                              ActionStatus, PolicyVsmartStatus, PolicyVsmartStatusException,
-                                             PolicyVsmartActivate, PolicyVsmartIndex, PolicyVsmartDeactivate)
+                                             PolicyVsmartActivate, PolicyVsmartIndex, PolicyVsmartDeactivate,
+                                             Device)
 
 
 def regex_search(regex, *fields):
@@ -166,9 +168,10 @@ class Task:
     def index_get(index_cls, backend):
         return index_cls.get(backend) if isinstance(backend, Rest) else index_cls.load(backend)
 
-    def attach_template(self, api, workdir, ext_name, templates_iter, target_uuid_set=None):
+    def attach_template_data(self, api: Rest, workdir: str, ext_name: bool, templates_iter: Iterator[tuple],
+                             target_uuid_set: Optional[set] = None) -> Tuple[list, bool]:
         """
-        Attach templates considering local backup as the source of truth (i.e. where input values are)
+        Prepare data for template attach considering local backup as the source of truth (i.e. where input values are)
         :param api: Instance of Rest API
         :param workdir: Directory containing saved items
         :param ext_name: Boolean passed to .load methods indicating whether extended item names should be used.
@@ -177,9 +180,9 @@ class Task:
                                 When provided, attach only devices that were previously attached (on saved) and are on
                                 target node but are not yet attached.
                                 When absent, re-attach all currently attached devices on target.
-        :return: List of worker actions to monitor [(<action_worker>, <template_name>), ...]
+        :return: Tuple containing attach data (<template input list>, <isEdited>)
         """
-        def load_template_input(template_name, saved_id, target_id):
+        def load_template_input(template_name: str, saved_id: str, target_id: str) -> Union[list, None]:
             if target_id is None:
                 self.log_debug('Skip %s, saved template is not on target node', template_name)
                 return None
@@ -210,21 +213,22 @@ class Task:
 
             return input_list
 
-        def is_template_cli(template_name, saved_id):
+        def is_template_cli(template_name: str, saved_id: str) -> bool:
             return DeviceTemplate.load(workdir, ext_name, template_name, saved_id, raise_not_found=True).is_type_cli
 
         template_input_list = [
             (name, target_id, load_template_input(name, saved_id, target_id), is_template_cli(name, saved_id))
             for name, saved_id, target_id in templates_iter
         ]
-        return self._place_requests(api, template_input_list, is_edited=target_uuid_set is None)
+        return template_input_list, target_uuid_set is None
 
-    def reattach_template(self, api, templates_iter):
+    @staticmethod
+    def reattach_template_data(api: Rest, templates_iter: Iterator[tuple]) -> Tuple[list, bool]:
         """
-        Reattach templates considering vManage as the source of truth (i.e. where input values are)
+        Prepare data for template reattach considering vManage as the source of truth (i.e. where input values are)
         :param api: Instance of Rest API
         :param templates_iter: Iterator of (<template_name>, <target_template_id>)
-        :return: List of worker actions to monitor [(<action_worker>, <template_name>), ...]
+        :return: Tuple containing attach data (<template input list>, <isEdited>)
         """
         def get_template_input(template_id):
             uuid_list = [uuid for uuid, _ in DeviceTemplateAttached.get_raise(api, template_id)]
@@ -239,65 +243,133 @@ class Task:
             (template_name, template_id, get_template_input(template_id), is_template_cli(template_id))
             for template_name, template_id in templates_iter
         ]
-        return self._place_requests(api, template_input_list, is_edited=True)
+        return template_input_list, True
 
-    def _place_requests(self, api, template_input_list, is_edited):
-        action_list = []
-        # Attach requests for from-feature device templates
-        feature_input_dict = {
-            template_name: (template_id, input_list)
-            for template_name, template_id, input_list, is_cli in template_input_list
-            if input_list is not None and not is_cli
-        }
-        if len(feature_input_dict) > 0:
-            action_worker = DeviceTemplateAttach(
-                api.post(DeviceTemplateAttach.api_params(feature_input_dict.values(), is_edited),
-                         DeviceTemplateAttach.api_path.post)
-            )
-            self.log_debug('Device template attach requested: %s', action_worker.uuid)
-            action_list.append((action_worker, ','.join(feature_input_dict)))
+    def attach(self, api: Rest, template_input_list: List[tuple], is_edited: bool, *, chunk_size: int = 10,
+               dryrun: bool = False, log_context: str, raise_on_failure: bool = True) -> int:
+        """
+        Attach device templates to devices
+        :param api: Instance of Rest API
+        :param template_input_list: List containing payload for template attachment
+        :param is_edited: Boolean corresponding to the isEdited tag in the template attach payload
+        :param chunk_size: Maximum number of device attachments per request
+        :param dryrun: Indicates dryrun mode
+        :param raise_on_failure: If True, raise exception on action failures
+        :param log_context: Message to log during wait actions
+        :return: Number of attachment requests processed
+        """
+        def grouper(attach_cls, request_list):
+            while True:
+                section_dict = yield from chopper(chunk_size)
+                if not section_dict:
+                    continue
+
+                request_details = (
+                    f"{template_name} ({', '.join(DeviceTemplateValues.input_list_devices(input_list))})"
+                    for template_name, key_dict in section_dict.items() for _, input_list in key_dict.items()
+                )
+                self.log_info('%sTemplate attach: %s', 'DRY-RUN: ' if dryrun else '', ', '.join(request_details))
+
+                if not dryrun:
+                    template_input_iter = (
+                        (template_id, input_list)
+                        for key_dict in section_dict.values() for template_id, input_list in key_dict.items()
+                    )
+                    action_worker = attach_cls(
+                        api.post(attach_cls.api_params(template_input_iter, is_edited), attach_cls.api_path.post)
+                    )
+                    self.log_debug('Device template attach requested: %s', action_worker.uuid)
+                    self.wait_actions(api, [(action_worker, ', '.join(section_dict))], log_context, raise_on_failure)
+
+                request_list.append(...)
+
+        def feeder(attach_cls, attach_data_iter):
+            attach_reqs = []
+            group = grouper(attach_cls, attach_reqs)
+            next(group)
+            for template_name, template_id, input_list in attach_data_iter:
+                for input_entry in input_list:
+                    group.send((template_name, template_id, input_entry))
+            group.send(None)
+
+            return attach_reqs
+
+        # Attach requests for feature-based device templates
+        feature_based_iter = ((template_name, template_id, input_list)
+                              for template_name, template_id, input_list, is_cli in template_input_list
+                              if input_list is not None and not is_cli)
+        feature_based_reqs = feeder(DeviceTemplateAttach, feature_based_iter)
 
         # Attach Requests for cli device templates
-        cli_input_dict = {
-            template_name: (template_id, input_list)
-            for template_name, template_id, input_list, is_cli in template_input_list
-            if input_list is not None and is_cli
-        }
-        if len(cli_input_dict) > 0:
-            action_worker = DeviceTemplateCLIAttach(
-                api.post(DeviceTemplateCLIAttach.api_params(cli_input_dict.values(), is_edited),
-                         DeviceTemplateCLIAttach.api_path.post)
-            )
-            self.log_debug('Device CLI template attach requested: %s', action_worker.uuid)
-            action_list.append((action_worker, ','.join(cli_input_dict)))
+        cli_based_iter = ((template_name, template_id, input_list)
+                          for template_name, template_id, input_list, is_cli in template_input_list
+                          if input_list is not None and is_cli)
+        cli_based_reqs = feeder(DeviceTemplateCLIAttach, cli_based_iter)
 
-        return action_list
+        return len(feature_based_reqs + cli_based_reqs)
 
-    def detach_template(self, api, template_index, filter_fn):
+    def detach(self, api: Rest, template_iter: Iterator[tuple], device_map: Optional[dict] = None, *,
+               chunk_size: int = 10, dryrun: bool = False, log_context: str, raise_on_failure: bool = True) -> int:
         """
+        Detach devices from device templates
         :param api: Instance of Rest API
-        :param template_index: Instance of DeviceTemplateIndex
-        :param filter_fn: Function used to filter elements to be returned
-        :return: List of worker actions to monitor [(<action_worker>, <template_name>), ...]
+        :param template_iter: An iterator of (<template id>, <template name>) tuples containing templates to detach
+        :param device_map: {<uuid>: <name>, ...} dict containing allowed devices for the detach. If None, all attached
+                           devices are detached.
+        :param chunk_size: Maximum number of device detachments per request
+        :param dryrun: Indicates dryrun mode
+        :param raise_on_failure: If True, raise exception on action failures
+        :param log_context: Message to log during wait actions
+        :return: Number of detach requests processed
         """
-        action_list = []
-        for item_id, item_name in template_index.filtered_iter(filter_fn):
-            devices_attached = DeviceTemplateAttached.get(api, item_id)
+        def grouper(request_list):
+            while True:
+                section_dict = yield from chopper(chunk_size)
+                if not section_dict:
+                    continue
+
+                wait_list = []
+                for device_type, key_dict in section_dict.items():
+                    request_details = (
+                        f"{t_name} ({', '.join(device_map.get(device_id, '-') for device_id in device_id_list)})"
+                        for t_name, device_id_list in key_dict.items()
+                    )
+                    self.log_info('%sTemplate detach: %s', 'DRY-RUN: ' if dryrun else '', ', '.join(request_details))
+
+                    if not dryrun:
+                        id_list = (device_id for device_id_list in key_dict.values() for device_id in device_id_list)
+                        action_worker = DeviceModeCli(
+                            api.post(DeviceModeCli.api_params(device_type, *id_list), DeviceModeCli.api_path.post)
+                        )
+                        wait_list.append((action_worker, ', '.join(key_dict)))
+                        self.log_debug('Device template attach requested: %s', action_worker.uuid)
+
+                    request_list.append(...)
+
+                if wait_list:
+                    self.wait_actions(api, wait_list, log_context, raise_on_failure)
+
+        detach_reqs = []
+        group = grouper(detach_reqs)
+        next(group)
+
+        if device_map is None:
+            device_map = dict(device_iter(api))
+
+        for template_id, template_name in template_iter:
+            devices_attached = DeviceTemplateAttached.get(api, template_id)
             if devices_attached is None:
-                self.log_warning('Failed to retrieve %s attached devices from vManage', item_name)
+                self.log_warning('Failed to retrieve %s attached devices from vManage', template_name)
                 continue
+            for uuid, personality in devices_attached:
+                if uuid in device_map:
+                    group.send((personality, template_name, uuid))
+        group.send(None)
 
-            uuids, personalities = zip(*devices_attached)
-            # Personalities for all devices attached to the same template are always the same
-            action_worker = DeviceModeCli(
-                api.post(DeviceModeCli.api_params(personalities[0], *uuids), DeviceModeCli.api_path.post)
-            )
-            self.log_debug('Template detach requested: %s', action_worker.uuid)
-            action_list.append((action_worker, item_name))
+        return len(detach_reqs)
 
-        return action_list
-
-    def activate_policy(self, api, policy_id, policy_name, is_edited=False):
+    def activate_policy(self, api: Rest, policy_id: Optional[str], policy_name: Optional[str],
+                        is_edited: bool = False) -> List[tuple]:
         """
         :param api: Instance of Rest API
         :param policy_id: ID of policy to activate
@@ -324,7 +396,7 @@ class Task:
 
         return action_list
 
-    def deactivate_policy(self, api):
+    def deactivate_policy(self, api: Rest) -> List[tuple]:
         action_list = []
         item_id, item_name = PolicyVsmartIndex.get_raise(api).active_policy
         if item_id is not None and item_name is not None:
@@ -334,7 +406,7 @@ class Task:
 
         return action_list
 
-    def wait_actions(self, api, action_list, log_context, raise_on_failure=False):
+    def wait_actions(self, api: Rest, action_list: List[tuple], log_context: str, raise_on_failure: bool) -> bool:
         """
         Wait for actions in action_list to complete
         :param api: Instance of Rest API
@@ -398,6 +470,40 @@ class TaskException(Exception):
 class WaitActionsException(TaskException):
     """ Exception indicating failure in one or more actions being monitored """
     pass
+
+
+def chopper(section_size: int):
+    section = {}
+    for _ in range(section_size):
+        data = yield
+        if data is None:
+            break
+        primary_key, secondary_key, item = data
+        section.setdefault(primary_key, {}).setdefault(secondary_key, []).append(item)
+    return section
+
+
+def device_iter(api: Rest, match_name_regex: Optional[str] = None, match_reachable: bool = False,
+                match_site_id: Optional[str] = None, match_system_ip: Optional[str] = None) -> Iterator[tuple]:
+    """
+    Return an iterator over device inventory, filtered by optional conditions.
+    :param api: Instance of Rest API
+    :param match_name_regex: Regular expression matching device host-name
+    :param match_reachable: Boolean indicating whether to include reachable devices only
+    :param match_site_id: When present, only include devices with provided site-id
+    :param match_system_ip: If present, only include device with provided system-ip
+    :return: Iterator of (<device-uuid>, <device-name>) tuples.
+    """
+    return (
+        (uuid, name)
+        for uuid, name, system_ip, site_id, reachability, *_ in Device.get_raise(api).extended_iter(default='-')
+        if (
+            (match_name_regex is None or regex_search(match_name_regex, name)) and
+            (not match_reachable or reachability == 'reachable') and
+            (match_site_id is None or site_id == match_site_id) and
+            (match_system_ip is None or system_ip == match_system_ip)
+        )
+    )
 
 
 class Table:
