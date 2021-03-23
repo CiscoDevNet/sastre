@@ -1399,6 +1399,13 @@ class DeviceOmpPeers(RealtimeItem):
     fields_ext = ('domain_id', 'up_time')
 
 
+@rt_register('omp', 'adv-routes', 'OMP advertised routes')
+class DeviceOmpRoutesAdv(RealtimeItem):
+    api_path = ApiPath('device/omp/routes/advertised', None, None, None)
+    fields_std = ('vpn_id', 'prefix', 'to_peer', 'color', 'ip', 'protocol', 'metric', 'preference')
+    fields_ext = ('tag', 'originator', 'site_id')
+
+
 @rt_register('tunnel', 'stats', 'Tunnel statistics')
 class DeviceTunnelStats(RealtimeItem):
     api_path = ApiPath('device/tunnel/statistics', None, None, None)
