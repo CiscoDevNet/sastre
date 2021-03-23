@@ -1,3 +1,11 @@
+Sastre 1.13 [April xx, 2021]
+============================
+
+#### Enhancements:
+[#67] Perfomance improvements to show realtime commands. Thread pool is now used to send multiple requests in parallel. 
+      Pool size is fixed to 10.
+[#68] Added show realtime omp adv-routes command, displaying advertised OMP routes from one or more WAN edges / vSmarts.
+
 Sastre 1.12 [March 10, 2021]
 ============================
 
