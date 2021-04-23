@@ -21,26 +21,25 @@ class TaskMigrate(Task):
         task_parser.formatter_class = argparse.RawDescriptionHelpFormatter
 
         task_parser.add_argument('scope', choices=['all', 'attached'],
-                                 help='Select whether to evaluate all feature templates, or only feature templates '
+                                 help='select whether to evaluate all feature templates, or only feature templates '
                                       'attached to device templates.')
         task_parser.add_argument('output', metavar='<directory>', type=filename_type,
-                                 help='Directory to save migrated templates.')
+                                 help='directory to save migrated templates')
         task_parser.add_argument('--no-rollover', action='store_true',
-                                 help='By default, if the output directory already exists it is renamed using a '
+                                 help='by default, if the output directory already exists it is renamed using a '
                                       'rolling naming scheme. This option disables this automatic rollover.')
         task_parser.add_argument('--name', metavar='<format>', type=ext_template_type, default='migrated_{name}',
-                                 help='Format used to name the migrated templates (default: %(default)s). '
+                                 help='format used to name the migrated templates (default: %(default)s). '
                                       'Variable {name} is replaced with the original template name. Sections of the '
                                       'original template name can be selected using the {name <regex>} format. Where '
                                       '<regex> is a regular expression that must contain at least one capturing group. '
                                       'Capturing groups identify sections of the original name to keep.')
         task_parser.add_argument('--from', metavar='<version>', type=version_type, dest='from_version', default='18.4',
-                                 help='vManage version from source templates (default: %(default)s).')
+                                 help='vManage version from source templates (default: %(default)s)')
         task_parser.add_argument('--to', metavar='<version>', type=version_type, dest='to_version', default='20.1',
-                                 help='Target vManage version for template migration (default: %(default)s).')
+                                 help='target vManage version for template migration (default: %(default)s)')
         task_parser.add_argument('--workdir', metavar='<directory>', type=existing_file_type,
-                                 help='If provided, migrate will read from the specified directory. '
-                                      'Otherwise it reads from the target vManage.')
+                                 help='migrate will read from the specified directory instead of target vManage')
 
         return task_parser.parse_args(task_args)
 

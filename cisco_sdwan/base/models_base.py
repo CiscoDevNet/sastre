@@ -10,8 +10,9 @@ from os import environ
 from pathlib import Path
 from itertools import zip_longest
 from collections import namedtuple
-from typing import Sequence, Dict, Tuple, Union, Iterable, Callable, NamedTuple
-from .rest_api import RestAPIException
+from typing import Sequence, Dict, Tuple, Union, Iterator, Callable, Mapping, Any
+from operator import attrgetter
+from .rest_api import RestAPIException, Rest
 
 
 # Top-level directory for local data store
@@ -65,26 +66,33 @@ class ApiPath:
             setattr(self, field, value)
 
 
-class RealtimeItem:
+class OperationalItem:
     """
-    RealtimeItem represents a vManage realtime monitoring API elements defined by an ApiPath with a GET path.
-    An instance of this class can be created to retrieve and parse realtime endpoints.
+    Base class for operational data API elements
     """
     api_path = None
-    api_params = ('deviceId',)
+    api_params = None
     fields_std = None
     fields_ext = None
+    field_conversion_fns = {}
 
-    def __init__(self, payload):
+    def __init__(self, payload: Mapping[str, Any]) -> None:
         self.timestamp = payload['header']['generatedOn']
-        self._meta = {attribute_safe(field['property']): field for field in payload['header']['columns']}
+
         self._data = payload['data']
 
+        # Some vManage endpoints don't provide all properties in the 'columns' list, which is where 'title' is
+        # defined. For those properties without a title, infer one based on the property name.
+        self._meta = {attribute_safe(field['property']): field for field in payload['header']['fields']}
+        title_dict = {attribute_safe(field['property']): field['title'] for field in payload['header']['columns']}
+        for field_property, field in self._meta.items():
+            field['title'] = title_dict.get(field_property, field['property'].replace('_', ' ').title())
+
     @property
-    def field_names(self) -> Tuple:
+    def field_names(self) -> Tuple[str, ...]:
         return tuple(self._meta.keys())
 
-    def field_info(self, *field_names: Sequence[str], info: str = 'title', default: Union[None, str] = 'N/A') -> Tuple:
+    def field_info(self, *field_names: str, info: str = 'title', default: Union[None, str] = 'N/A') -> tuple:
         """
         Retrieve metadata about one or more fields.
         :param field_names: One or more field name to retrieve metadata from.
@@ -97,8 +105,7 @@ class RealtimeItem:
 
         return tuple(entry.get(info, default) for entry in default_getter(*field_names, default={})(self._meta))
 
-    def field_value_iter(self, *field_names: Union[str, Sequence[str]],
-                         **conv_fn_map: Dict[str, Callable]) -> Iterable[NamedTuple]:
+    def field_value_iter(self, *field_names: str, **conv_fn_map: Mapping[str, Callable]) -> Iterator[namedtuple]:
         """
         Iterate over entries of a realtime instance. Only fields/columns defined by field_names are yield. Type
         conversion of one or more fields is supported by passing a callable that takes one argument (i.e. the field
@@ -125,7 +132,7 @@ class RealtimeItem:
         return (getter_fn(entry) for entry in self._data)
 
     @classmethod
-    def get(cls, api, *args, **kwargs):
+    def get(cls, api: Rest, *args, **kwargs):
         try:
             instance = cls.get_raise(api, *args, **kwargs)
             return instance
@@ -133,15 +140,164 @@ class RealtimeItem:
             return None
 
     @classmethod
-    def get_raise(cls, api, *args, **kwargs):
+    def get_raise(cls, api: Rest, *args, **kwargs):
+        raise NotImplementedError()
+
+    def __str__(self) -> str:
+        return json.dumps(self._data, indent=2)
+
+    def __repr__(self) -> str:
+        return json.dumps(self._data)
+
+
+class RealtimeItem(OperationalItem):
+    """
+    RealtimeItem represents a vManage realtime monitoring API element defined by an ApiPath with a GET path.
+    An instance of this class can be created to retrieve and parse realtime endpoints.
+    """
+    api_params = ('deviceId',)
+
+    def __init__(self, payload: Mapping[str, Any]) -> None:
+        super().__init__(payload)
+
+    @classmethod
+    def get_raise(cls, api: Rest, *args, **kwargs):
         params = kwargs or dict(zip(cls.api_params, args))
         return cls(api.get(cls.api_path.get, **params))
 
-    def __str__(self):
-        return json.dumps(self._data, indent=2)
 
-    def __repr__(self):
-        return json.dumps(self._data)
+class BulkStatsItem(OperationalItem):
+    """
+    BulkStatsItem represents a vManage bulk statistics API element defined by an ApiPath with a GET path. It supports
+    vManage pagination protocol internally, abstracting it from the user.
+    An instance of this class can be created to retrieve and parse bulk statistics endpoints.
+    """
+    api_params = ('endDate', 'startDate', 'count', 'timeZone')
+    fields_to_avg = tuple()
+    field_node_id = 'vdevice_name'
+    field_entry_time = 'entry_time'
+
+    def __init__(self, payload: Mapping[str, Any]) -> None:
+        super().__init__(payload)
+        self._page_info = payload['pageInfo']
+
+    @property
+    def next_page(self) -> Union[str, None]:
+        return self._page_info['scrollId'] if self._page_info['hasMoreData'] else None
+
+    def add_payload(self, payload: Mapping[str, Any]) -> None:
+        self._data.extend(payload['data'])
+        self._page_info = payload['pageInfo']
+
+    @classmethod
+    def get_raise(cls, api: Rest, *args, **kwargs):
+        params = kwargs or dict(zip(cls.api_params, args))
+        obj = cls(api.get(cls.api_path.get, **params))
+        while True:
+            next_page = obj.next_page
+            if next_page is None:
+                break
+            payload = api.get(cls.api_path.get, scrollId=next_page)
+            obj.add_payload(payload)
+
+        return obj
+
+    @staticmethod
+    def time_series_key(sample: namedtuple) -> str:
+        """
+        Default key used to split a BulkStatsItem into its different time series. Subclasses need to override this as
+        needed for the particular endpoint in question
+        """
+        return sample.vdevice_name
+
+    @staticmethod
+    def last_n_secs(n_secs: int, sample_list: Sequence[namedtuple]) -> Iterator[namedtuple]:
+        yield sample_list[0]
+
+        oldest_ts = sample_list[0].entry_time - n_secs * 1000
+        for sample in sample_list[1:]:
+            if sample.entry_time < oldest_ts:
+                break
+            yield sample
+
+    @staticmethod
+    def average_fields(sample_list: Sequence[namedtuple], *fields_to_avg: str) -> dict:
+        def average(values):
+            avg = sum(values) / len(values)
+            # If original values were integer, convert average back to integer
+            return round(avg) if isinstance(values[0], int) else avg
+
+        values_get_fn = attrgetter(*fields_to_avg)
+        values_iter = (values_get_fn(sample) for sample in sample_list)
+
+        return dict(zip(fields_to_avg, (average(field_samples) for field_samples in zip(*values_iter))))
+
+    def aggregated_value_iter(self, interval_secs: int, *field_names: str,
+                              **conv_fn_map: Mapping[str, Callable]) -> Iterator[namedtuple]:
+        # Split bulk stats samples into different time series
+        time_series_dict = {}
+        for sample in self.field_value_iter(self.field_entry_time, *field_names, **conv_fn_map):
+            time_series_dict.setdefault(self.time_series_key(sample), []).append(sample)
+
+        # Sort each time series by entry_time with newest samples first
+        sort_key = attrgetter(self.field_entry_time)
+        for time_series in time_series_dict.values():
+            time_series.sort(key=sort_key, reverse=True)
+
+        # Aggregation over newest n samples
+        Aggregate = namedtuple('Aggregate', field_names)
+        values_get_fn = attrgetter(*field_names)
+        fields_to_avg = set(field_names) & set(self.fields_to_avg)
+        for time_series_name, time_series in time_series_dict.items():
+            if not time_series:
+                continue
+
+            series_last_n = list(self.last_n_secs(interval_secs, time_series))
+            newest_sample = Aggregate._make(values_get_fn(series_last_n[0]))
+
+            if fields_to_avg:
+                yield newest_sample._replace(**self.average_fields(series_last_n, *fields_to_avg))
+            else:
+                yield newest_sample
+
+
+class BulkStateItem(OperationalItem):
+    """
+    BulkStateItem represents a vManage bulk state API element defined by an ApiPath with a GET path. It supports
+    vManage pagination protocol internally, abstracting it from the user.
+    An instance of this class can be created to retrieve and parse bulk state endpoints.
+    """
+    api_params = ('count', )
+    field_node_id = 'vdevice_name'
+
+    def __init__(self, payload: Mapping[str, Any]) -> None:
+        super().__init__(payload)
+        self._page_info = payload['pageInfo']
+
+    @property
+    def next_page(self) -> Union[str, None]:
+        return self._page_info['endId'] if self._page_info['moreEntries'] else None
+
+    def add_payload(self, payload: Mapping[str, Any]) -> None:
+        self._data.extend(payload['data'])
+        self._page_info = payload['pageInfo']
+
+    @property
+    def page_item_count(self) -> int:
+        return self._page_info['count']
+
+    @classmethod
+    def get_raise(cls, api: Rest, *args, **kwargs):
+        params = kwargs or dict(zip(cls.api_params, args))
+        obj = cls(api.get(cls.api_path.get, **params))
+        while True:
+            next_page = obj.next_page
+            if next_page is None:
+                break
+            payload = api.get(cls.api_path.get, startId=next_page, count=obj.page_item_count)
+            obj.add_payload(payload)
+
+        return obj
 
 
 def attribute_safe(raw_attribute):
@@ -545,7 +701,7 @@ class ServerInfo:
         return True
 
 
-def filename_safe(name, lower=False):
+def filename_safe(name: str, lower: bool = False) -> str:
     """
     Perform the necessary replacements in <name> to make it filename safe.
     Any char that is not a-z, A-Z, 0-9, '_', ' ', or '-' is replaced with '_'. Convert to lowercase, if lower=True.

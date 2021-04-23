@@ -77,8 +77,8 @@ class TaskArgs:
 
 class Task:
     # Configuration parameters for wait_actions
-    ACTION_INTERVAL = 10
-    ACTION_TIMEOUT = 600
+    ACTION_INTERVAL = 10    # seconds
+    ACTION_TIMEOUT = 1200   # 20 minutes
 
     SAVINGS_FACTOR = 1
 
@@ -245,7 +245,7 @@ class Task:
         ]
         return template_input_list, True
 
-    def attach(self, api: Rest, template_input_list: List[tuple], is_edited: bool, *, chunk_size: int = 10,
+    def attach(self, api: Rest, template_input_list: List[tuple], is_edited: bool, *, chunk_size: int = 200,
                dryrun: bool = False, log_context: str, raise_on_failure: bool = True) -> int:
         """
         Attach device templates to devices
@@ -309,7 +309,7 @@ class Task:
         return len(feature_based_reqs + cli_based_reqs)
 
     def detach(self, api: Rest, template_iter: Iterator[tuple], device_map: Optional[dict] = None, *,
-               chunk_size: int = 10, dryrun: bool = False, log_context: str, raise_on_failure: bool = True) -> int:
+               chunk_size: int = 200, dryrun: bool = False, log_context: str, raise_on_failure: bool = True) -> int:
         """
         Detach devices from device templates
         :param api: Instance of Rest API
@@ -507,19 +507,27 @@ def device_iter(api: Rest, match_name_regex: Optional[str] = None, match_reachab
 
 
 class Table:
-    def __init__(self, *columns):
+    DECIMAL_DIGITS = 1  # Number of decimal digits for float values
+
+    def __init__(self, *columns: str, name: Optional[str] = None, meta: Optional[str] = None) -> None:
         self.header = tuple(columns)
+        self.name = name
+        self.meta = meta
         self._row_class = namedtuple('Row', (f'column_{i}' for i in range(len(columns))))
         self._rows = list()
 
+    @staticmethod
+    def process_value(value):
+        return round(value, Table.DECIMAL_DIGITS) if isinstance(value, float) else value
+
     def add(self, *row_values):
-        self._rows.append(self._row_class(*row_values))
+        self._rows.append(self._row_class(*map(self.process_value, row_values)))
 
     def add_marker(self):
         self._rows.append(None)
 
     def extend(self, row_values_iter):
-        self._rows.extend(self._row_class(*row_values) for row_values in row_values_iter)
+        self._rows.extend(self._row_class(*map(self.process_value, row_values)) for row_values in row_values_iter)
 
     def __iter__(self):
         return iter(self._rows)
@@ -541,12 +549,19 @@ class Table:
         def cell_format(width, value):
             return ' {value:{width}} '.format(value=str(value), width=width-2)
 
-        col_width_list = [2+self._column_max_width(index) for index in range(len(self.header))]
-        border_line = '+' + '+'.join(('-'*col_width for col_width in col_width_list)) + '+'
+        def border(line_ch: str, int_edge_ch: str = '+', ext_edge_ch: str = '+') -> str:
+            return ext_edge_ch + int_edge_ch.join((line_ch*col_width for col_width in col_width_list)) + ext_edge_ch
 
-        yield border_line
+        col_width_list = [2+self._column_max_width(index) for index in range(len(self.header))]
+        border_line = border('-')
+        header_border_line = border('=', '=')
+
+        if self.name is not None:
+            yield f"*** {self.name} ***"
+
+        yield header_border_line
         yield '|' + '|'.join(cell_format(width, value) for width, value in zip(col_width_list, self.header)) + '|'
-        yield border_line
+        yield header_border_line
 
         done_content_row = False
         for row in self._rows:

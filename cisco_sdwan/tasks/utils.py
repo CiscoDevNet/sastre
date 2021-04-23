@@ -10,7 +10,7 @@ import argparse
 from datetime import date
 from getpass import getpass
 from pathlib import Path
-from cisco_sdwan.base.catalog import catalog_tags, rt_catalog_tags, rt_catalog_commands, CATALOG_TAG_ALL
+from cisco_sdwan.base.catalog import catalog_tags, op_catalog_tags, op_catalog_commands, CATALOG_TAG_ALL, OpType
 from cisco_sdwan.base.models_base import filename_safe, DATA_DIR, ExtendedTemplate
 from .common import Task
 
@@ -73,36 +73,48 @@ class TagOptions:
         return ', '.join(sorted(cls.tag_options, key=lambda x: '' if x == CATALOG_TAG_ALL else x))
 
 
-class RealtimeCmdOptions:
-    groups = rt_catalog_tags()
-    commands = rt_catalog_commands()
+class OpCmdOptions:
+    @classmethod
+    def tags(cls, op_type: OpType) -> str:
+        return ', '.join(
+            sorted(op_catalog_tags(op_type) | {CATALOG_TAG_ALL}, key=lambda x: '' if x == CATALOG_TAG_ALL else x)
+        )
 
     @classmethod
-    def grp_options(cls):
-        return ', '.join(sorted(cls.groups | {CATALOG_TAG_ALL}, key=lambda x: '' if x == CATALOG_TAG_ALL else x))
-
-    @classmethod
-    def cmd_options(cls):
-        return ', '.join(sorted(cls.commands))
+    def commands(cls, op_type: OpType) -> str:
+        return ', '.join(sorted(op_catalog_commands(op_type)))
 
 
-class CmdSemantics(argparse.Action):
+class OpCmdSemantics(argparse.Action):
     # Using an action as opposed to a type check so that it can evaluate the full command line passed as opposed to
     # individual tokens.
+    op_type: OpType = None
 
     def __call__(self, parser, namespace, values, option_string=None):
         full_command = ' '.join(values)
         pass_options = [
             len(values) == 1 and CATALOG_TAG_ALL in values,
-            len(values) == 1 and set(values) <= RealtimeCmdOptions.groups,
-            full_command in RealtimeCmdOptions.commands
+            len(values) == 1 and set(values) <= op_catalog_tags(self.op_type),
+            full_command in op_catalog_commands(self.op_type)
         ]
         if not any(pass_options):
             raise argparse.ArgumentError(self, f'"{full_command}" is not valid. '
-                                               f'Group options: {RealtimeCmdOptions.grp_options()}. '
-                                               f'Command options: {RealtimeCmdOptions.cmd_options()}.')
+                                               f'Group options: {OpCmdOptions.tags(self.op_type)}. '
+                                               f'Command options: {OpCmdOptions.commands(self.op_type)}.')
 
         setattr(namespace, self.dest, values)
+
+
+class RTCmdSemantics(OpCmdSemantics):
+    op_type: OpType = OpType.RT
+
+
+class StateCmdSemantics(OpCmdSemantics):
+    op_type: OpType = OpType.STATE
+
+
+class StatsCmdSemantics(OpCmdSemantics):
+    op_type: OpType = OpType.STATS
 
 
 def regex_type(regex_str):
@@ -172,17 +184,16 @@ def version_type(version_str):
     return '.'.join(([str(int(v)) for v in version_str.replace('-', '.').split('.')] + ['0', ])[:2])
 
 
-def chunk_size_type(chunk_size_str):
-    _MIN, _MAX = 1, 200
+def int_type(min_val, max_val, value_str):
     try:
-        chunk_size = int(chunk_size_str)
-        if not _MIN <= chunk_size <= _MAX:
+        value_int = int(value_str)
+        if not min_val <= value_int <= max_val:
             raise ValueError()
     except ValueError:
-        raise argparse.ArgumentTypeError(f'"{chunk_size_str}" is not valid. Chunk size must be an integer between '
-                                         f'{_MIN} and {_MAX}, inclusive.') from None
+        raise argparse.ArgumentTypeError(f'Invalid value: "{value_str}". Must be an integer between '
+                                         f'{min_val} and {max_val}, inclusive.') from None
 
-    return chunk_size
+    return value_int
 
 
 class EnvVar(argparse.Action):

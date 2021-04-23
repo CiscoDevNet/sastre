@@ -19,19 +19,19 @@ class TaskRestore(Task):
 
         task_parser.add_argument('--workdir', metavar='<directory>', type=existing_file_type,
                                  default=default_workdir(target_address),
-                                 help='Restore source (default: %(default)s).')
+                                 help='restore source (default: %(default)s)')
         task_parser.add_argument('--regex', metavar='<regex>', type=regex_type,
-                                 help='Regular expression matching item names to be restored, within selected tags.')
+                                 help='regular expression matching item names to be restored, within selected tags')
         task_parser.add_argument('--dryrun', action='store_true',
-                                 help='Dry-run mode. Items to be restored are listed but not pushed to vManage.')
+                                 help='dry-run mode. Items to be restored are listed but not pushed to vManage.')
         task_parser.add_argument('--attach', action='store_true',
-                                 help='Attach devices to templates and activate vSmart policy after restoring items.')
+                                 help='attach devices to templates and activate vSmart policy after restoring items')
         task_parser.add_argument('--force', action='store_true',
-                                 help='Target vManage items with the same name as the corresponding item in workdir '
+                                 help='target vManage items with the same name as the corresponding item in workdir '
                                       'are updated with the contents from workdir. Without this option, those items '
                                       'are skipped and not overwritten.')
         task_parser.add_argument('tag', metavar='<tag>', type=TagOptions.tag,
-                                 help='Tag for selecting items to be restored. Items that are dependencies of the '
+                                 help='tag for selecting items to be restored. Items that are dependencies of the '
                                       'specified tag are automatically included. Available tags: '
                                       f'{TagOptions.options()}. Special tag "{CATALOG_TAG_ALL}" selects all items.')
         return task_parser.parse_args(task_args)
@@ -172,7 +172,10 @@ class TaskRestore(Task):
                                     )
                                     attach_data = self.reattach_template_data(api, templates_iter)
 
-                                num_attach = self.attach(api, *attach_data, log_context='reattaching templates')
+                                # All re-attachments need to be done in a single request, thus 9999 for chunk_size
+                                num_attach = self.attach(
+                                    api, *attach_data, log_context='reattaching templates', chunk_size=9999
+                                )
                                 self.log_debug('Attach requests processed: %s', num_attach)
                             elif put_eval.need_reactivate:
                                 self.log_info('Updating %s %s requires vSmart policy reactivate', info, item.name)
