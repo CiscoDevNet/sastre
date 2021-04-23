@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 from requests.exceptions import ConnectionError
 from .base.rest_api import Rest, LoginFailedException
-from .base.catalog import catalog_size, rt_catalog_size
+from .base.catalog import catalog_size, op_catalog_size
 from .base.models_base import ModelException, SASTRE_ROOT_DIR
 from .__version__ import __version__ as version
 from .__version__ import __doc__ as title
@@ -90,7 +90,7 @@ def main():
                             help='increase output verbosity')
     cli_parser.add_argument('--version', action='version',
                             version=f'Sastre Version {version}. Catalog: {catalog_size()} configuration items, '
-                                    f'{rt_catalog_size()} realtime items.')
+                                    f'{op_catalog_size()} operational items.')
     cli_parser.add_argument('task', metavar='<task>', type=TaskOptions.task,
                             help=f'task to be performed ({TaskOptions.options()})')
     cli_parser.add_argument('task_args', metavar='<arguments>', nargs=argparse.REMAINDER,

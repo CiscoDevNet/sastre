@@ -19,15 +19,15 @@ class TaskBackup(Task):
 
         task_parser.add_argument('--workdir', metavar='<directory>', type=filename_type,
                                  default=default_workdir(target_address),
-                                 help='Backup destination (default: %(default)s).')
+                                 help='backup destination (default: %(default)s)')
         task_parser.add_argument('--no-rollover', action='store_true',
-                                 help='By default, if workdir already exists (before a new backup is saved) the old '
+                                 help='by default, if workdir already exists (before a new backup is saved) the old '
                                       'workdir is renamed using a rolling naming scheme. This option disables this '
                                       'automatic rollover.')
         task_parser.add_argument('--regex', metavar='<regex>', type=regex_type,
-                                 help='Regular expression matching item names to be backed up, within selected tags.')
+                                 help='regular expression matching item names to be backed up, within selected tags')
         task_parser.add_argument('tags', metavar='<tag>', nargs='+', type=TagOptions.tag,
-                                 help='One or more tags for selecting items to be backed up. Multiple tags should be '
+                                 help='one or more tags for selecting items to be backed up. Multiple tags should be '
                                       f'separated by space. Available tags: {TagOptions.options()}. Special tag '
                                       f'"{CATALOG_TAG_ALL}" selects all items, including WAN edge certificates and '
                                       'device configurations.')

@@ -16,15 +16,15 @@ class TaskDelete(Task):
         task_parser.formatter_class = argparse.RawDescriptionHelpFormatter
 
         task_parser.add_argument('--regex', metavar='<regex>', type=regex_type,
-                                 help='Regular expression matching item names to be deleted, within selected tags.')
+                                 help='regular expression matching item names to be deleted, within selected tags')
         task_parser.add_argument('--dryrun', action='store_true',
-                                 help='Dry-run mode. Items matched for removal are listed but not deleted.')
+                                 help='dry-run mode. Items matched for removal are listed but not deleted.')
         task_parser.add_argument('--detach', action='store_true',
                                  help='USE WITH CAUTION! Detach devices from templates and deactivate vSmart policy '
                                       'before deleting items. This allows deleting items that are associated with '
                                       'attached templates and active policies.')
         task_parser.add_argument('tag', metavar='<tag>', type=TagOptions.tag,
-                                 help='Tag for selecting items to be deleted. Available tags: '
+                                 help='tag for selecting items to be deleted. Available tags: '
                                       f'{TagOptions.options()}. Special tag "{CATALOG_TAG_ALL}" selects all items.')
         return task_parser.parse_args(task_args)
 

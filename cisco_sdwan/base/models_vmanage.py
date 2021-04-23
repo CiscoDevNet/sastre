@@ -6,9 +6,11 @@
 """
 from typing import Iterable, Set
 from pathlib import Path
+from collections import namedtuple
 from urllib.parse import quote_plus
-from .catalog import register, rt_register
-from .models_base import ApiItem, IndexApiItem, ConfigItem, IndexConfigItem, RealtimeItem, ApiPath, IdName
+from .catalog import register, op_register
+from .models_base import (ApiItem, IndexApiItem, ConfigItem, IndexConfigItem, RealtimeItem, BulkStatsItem,
+                          BulkStateItem, ApiPath, IdName)
 
 
 #
@@ -1332,28 +1334,28 @@ class EdgeCertificate(IndexConfigItem):
 #
 # Realtime items
 #
-@rt_register('system', 'status', 'System status')
+@op_register('system', 'status', 'System status')
 class SystemStatus(RealtimeItem):
     api_path = ApiPath('device/system/status', None, None, None)
     fields_std = ('state', 'cpu_user', 'cpu_system', 'mem_total', 'mem_free')
     fields_ext = ('disk_size', 'disk_used')
 
 
-@rt_register('bfd', 'sessions', 'BFD sessions')
+@op_register('bfd', 'sessions', 'BFD sessions')
 class BfdSessions(RealtimeItem):
     api_path = ApiPath('device/bfd/sessions', None, None, None)
     fields_std = ('system_ip', 'site_id', 'local_color', 'color', 'state')
     fields_ext = ('src_ip', 'src_port', 'dst_ip', 'dst_port')
 
 
-@rt_register('control', 'connections', 'Control connections')
+@op_register('control', 'connections', 'Control connections')
 class DeviceControlConnections(RealtimeItem):
     api_path = ApiPath('device/control/connections', None, None, None)
     fields_std = ('system_ip',  'site_id', 'peer_type', 'local_color', 'remote_color', 'state')
     fields_ext = ('private_ip', 'private_port', 'public_ip', 'public_port', 'instance', 'protocol', 'domain_id')
 
 
-@rt_register('control', 'local-properties', 'Control local-properties')
+@op_register('control', 'local-properties', 'Control local-properties')
 class DeviceControlLocalProperties(RealtimeItem):
     api_path = ApiPath('device/control/localproperties', None, None, None)
     fields_std = ('system_ip', 'site_id', 'device_type', 'organization_name', 'domain_id', 'port_hopped')
@@ -1361,7 +1363,7 @@ class DeviceControlLocalProperties(RealtimeItem):
                   'certificate_not_valid_after')
 
 
-@rt_register('interface', 'info', 'Interface info')
+@op_register('interface', 'info', 'Interface info')
 class InterfaceIpv4(RealtimeItem):
     api_path = ApiPath('device/interface', None, None, None)
     fields_std = ('vpn_id', 'ifname', 'af_type', 'ip_address', 'ipv6_address', 'if_admin_status', 'if_oper_status',
@@ -1369,22 +1371,22 @@ class InterfaceIpv4(RealtimeItem):
     fields_ext = ('tx_drops', 'rx_drops', 'tx_kbps', 'rx_kbps')
 
 
-@rt_register('app-route', 'stats', 'Application-aware route statistics')
+@op_register('app-route', 'stats', 'Application-aware route statistics')
 class AppRouteStats(RealtimeItem):
     api_path = ApiPath('device/app-route/statistics', None, None, None)
-    fields_std = ('index', 'remote_system_ip', 'local_color', 'remote_color', 'total_packets',
-                  'loss', 'average_latency', 'average_jitter')
+    fields_std = ('index', 'remote_system_ip', 'local_color', 'remote_color', 'total_packets', 'loss',
+                  'average_latency', 'average_jitter')
     fields_ext = ('mean_loss', 'mean_latency', 'mean_jitter', 'sla_class_index')
 
 
-@rt_register('app-route', 'sla-class', 'Application-aware SLA class')
+@op_register('app-route', 'sla-class', 'Application-aware SLA class')
 class AppRouteSlaClass(RealtimeItem):
     api_path = ApiPath('device/app-route/sla-class', None, None, None)
     fields_std = ('name', 'loss', 'latency', 'jitter')
     fields_ext = ('index', )
 
 
-@rt_register('omp', 'summary', 'OMP summary')
+@op_register('omp', 'summary', 'OMP summary')
 class DeviceOmpSummary(RealtimeItem):
     api_path = ApiPath('device/omp/summary', None, None, None)
     fields_std = ('operstate', 'ompuptime', 'vsmart_peers', 'routes_received', 'routes_installed', 'routes_sent',
@@ -1392,36 +1394,132 @@ class DeviceOmpSummary(RealtimeItem):
     fields_ext = ('services_received', 'services_installed', 'services_sent', 'policy_received', 'policy_sent')
 
 
-@rt_register('omp', 'peers', 'OMP peers')
+@op_register('omp', 'peers', 'OMP peers')
 class DeviceOmpPeers(RealtimeItem):
     api_path = ApiPath('device/omp/peers', None, None, None)
     fields_std = ('peer', 'type', 'site_id', 'state')
     fields_ext = ('domain_id', 'up_time')
 
 
-@rt_register('omp', 'adv-routes', 'OMP advertised routes')
+@op_register('omp', 'adv-routes', 'OMP advertised routes')
 class DeviceOmpRoutesAdv(RealtimeItem):
     api_path = ApiPath('device/omp/routes/advertised', None, None, None)
     fields_std = ('vpn_id', 'prefix', 'to_peer', 'color', 'ip', 'protocol', 'metric', 'preference')
     fields_ext = ('tag', 'originator', 'site_id')
 
 
-@rt_register('tunnel', 'stats', 'Tunnel statistics')
+@op_register('tunnel', 'stats', 'Tunnel statistics')
 class DeviceTunnelStats(RealtimeItem):
     api_path = ApiPath('device/tunnel/statistics', None, None, None)
     fields_std = ('system_ip', 'local_color', 'remote_color', 'tunnel_protocol', 'tunnel_mtu', 'tcp_mss_adjust')
     fields_ext = ('source_ip', 'dest_ip', 'source_port', 'dest_port')
 
 
-@rt_register('software', 'info', 'Software info')
+@op_register('software', 'info', 'Software info')
 class DeviceSoftware(RealtimeItem):
     api_path = ApiPath('device/software', None, None, None)
     fields_std = ('version', 'active', 'default')
     fields_ext = ('confirmed', )
 
 
-@rt_register('dpi', 'summary', 'DPI summary')
+@op_register('dpi', 'summary', 'DPI summary')
 class DeviceDpiSummary(RealtimeItem):
     api_path = ApiPath('device/dpi/summary', None, None, None)
     fields_std = ('status', 'current_flows', 'peak_flows', 'current_rate', 'peak_rate')
     fields_ext = ('flows_created', 'flows_expired')
+
+
+#
+# Bulk Statistics Items
+#
+@op_register('app-route', 'stats', 'Application-aware route statistics')
+class BulkAppRoute(BulkStatsItem):
+    api_path = ApiPath('data/device/statistics/approutestatsstatistics', None, None, None)
+    fields_std = ('local_system_ip', 'remote_system_ip', 'local_color', 'remote_color', 'total', 'loss', 'latency',
+                  'jitter', 'name')
+    fields_ext = ('tx_pkts', 'rx_pkts', 'tx_octets', 'rx_octets')
+    fields_to_avg = ('total', 'loss', 'latency', 'jitter')
+
+    @staticmethod
+    def time_series_key(sample: namedtuple) -> str:
+        return sample.name
+
+
+@op_register('interface', 'info', 'Interface info')
+class BulkInterfaceStats(BulkStatsItem):
+    api_path = ApiPath('data/device/statistics/interfacestatistics', None, None, None)
+    fields_std = ('vpn_id', 'interface', 'tx_kbps', 'rx_kbps', 'tx_pps', 'rx_pps')
+    fields_ext = ('rx_pkts', 'tx_pkts', 'rx_drops', 'tx_drops', 'rx_errors', 'tx_errors')
+    fields_to_avg = ('tx_kbps', 'rx_kbps', 'tx_pps', 'rx_pps')
+
+    @staticmethod
+    def time_series_key(sample: namedtuple) -> str:
+        return f"{sample.vdevice_name}_{sample.vpn_id}_{sample.interface}"
+
+
+@op_register('system', 'status', 'System status')
+class BulkSystemStats(BulkStatsItem):
+    api_path = ApiPath('data/device/statistics/devicesystemstatusstatistics', None, None, None)
+    fields_std = ('cpu_user', 'cpu_system', 'mem_util')
+    fields_ext = ('mem_used', 'mem_free', 'disk_used', 'disk_avail')
+    fields_to_avg = ('cpu_user', 'cpu_system', 'mem_util', 'mem_used', 'mem_free', 'disk_used', 'disk_avail')
+    field_conversion_fns = {
+        'cpu_system': abs,
+        'mem_util': lambda x: 100 * x
+    }
+
+
+#
+# Bulk State Items
+#
+@op_register('system', 'info', 'System info')
+class BulkSystemStatus(BulkStateItem):
+    api_path = ApiPath('data/device/state/SystemStatus', None, None, None)
+    fields_std = ('state', 'total_cpu_count', 'fp_cpu_count', 'linux_cpu_count', 'tcpd_cpu_count')
+    fields_ext = ('reboot_reason', 'reboot_type')
+
+
+@op_register('bfd', 'sessions', 'BFD sessions')
+class BulkBfdSessions(BulkStateItem):
+    api_path = ApiPath('data/device/state/BFDSessions', None, None, None)
+    fields_std = ('system_ip', 'site_id', 'local_color', 'color', 'state')
+    fields_ext = ('src_ip', 'src_port', 'dst_ip', 'dst_port', 'transitions', 'uptime_date')
+
+
+@op_register('control', 'connections', 'Control connections')
+class BulkControlConnections(BulkStateItem):
+    api_path = ApiPath('data/device/state/ControlConnection', None, None, None)
+    fields_std = ('system_ip',  'site_id', 'peer_type', 'local_color', 'remote_color', 'state')
+    fields_ext = ('private_ip', 'private_port', 'public_ip', 'public_port', 'instance', 'protocol', 'domain_id',
+                  'uptime_date')
+
+
+@op_register('control', 'local-properties', 'Control local-properties')
+class BulkControlLocalProperties(BulkStateItem):
+    api_path = ApiPath('data/device/state/ControlLocalProperty', None, None, None)
+    fields_std = ('system_ip', 'site_id', 'device_type', 'organization_name', 'domain_id', 'port_hopped')
+    fields_ext = ('protocol', 'tls_port', 'certificate_status', 'root_ca_chain_status', 'certificate_validity',
+                  'certificate_not_valid_after')
+
+
+@op_register('interface', 'vedge', 'vEdge interfaces')
+class BulkInterfaceVedge(BulkStateItem):
+    api_path = ApiPath('data/device/state/Interface', None, None, None)
+    fields_std = ('vpn_id', 'ifname', 'af_type', 'ip_address', 'ipv6_address', 'if_admin_status',
+                  'if_oper_status', 'desc')
+    fields_ext = ('mtu', 'hwaddr', 'speed_mbps', 'port_type')
+
+
+@op_register('interface', 'cedge', 'cEdge interfaces')
+class BulkInterfaceCedge(BulkStateItem):
+    api_path = ApiPath('data/device/state/CEdgeInterface', None, None, None)
+    fields_std = ('vpn_id', 'ifname', 'ip_address', 'ipv4_subnet_mask', 'ipv6_addrs', 'if_admin_status',
+                  'if_oper_status', 'description')
+    fields_ext = ('mtu', 'hwaddr', 'speed_mbps')
+
+
+@op_register('omp', 'peers', 'OMP peers')
+class BulkOmpPeers(BulkStateItem):
+    api_path = ApiPath('data/device/state/OMPPeer', None, None, None)
+    fields_std = ('peer', 'type', 'site_id', 'state')
+    fields_ext = ('domain_id', )

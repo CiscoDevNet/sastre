@@ -2,24 +2,50 @@
  Sastre - Automation Tools for Cisco SD-WAN Powered by Viptela
 
  cisco_sdwan.base.catalog
- This module implements vManage API Catalog
+ This module implements vManage API Catalogs
 """
-from collections import namedtuple
-from .models_base import IndexConfigItem, ConfigItem, RealtimeItem
+from typing import NamedTuple, Union, Optional, Iterator
+from enum import Enum
+from .models_base import IndexConfigItem, ConfigItem, RealtimeItem, BulkStateItem, BulkStatsItem
 from .rest_api import is_version_newer
 
 
 CATALOG_TAG_ALL = 'all'
 
-# Catalog of configuration items
+
+# Catalog for configuration data items
+class CatalogItem(NamedTuple):
+    tag: str
+    info: str
+    index_cls: type
+    item_cls: type
+    min_version: Union[str, None]
+
+
 _catalog = list()   # [(<tag>, <info>, <index_cls>, <item_cls>, <min_version>), ...]
 
-CatalogEntry = namedtuple('CatalogEntry', ['tag', 'info', 'index_cls', 'item_cls', 'min_version'])
 
-# Catalog of realtime items
-_rt_catalog = list()  # [(<tag>, <selector>, <info>, <rt_cls>, <min_version>), ...]
+# Catalog for operational data items
+class OpType(Enum):
+    STATS = BulkStatsItem
+    STATE = BulkStateItem
+    RT = RealtimeItem
 
-RTCatalogEntry = namedtuple('RTCatalogEntry', ['tag', 'selector', 'info', 'rt_cls', 'min_version'])
+    @classmethod
+    def from_subclass(cls, op_cls):
+        return cls(op_cls.__bases__[0])
+
+
+class OpCatalogItem(NamedTuple):
+    tag: str
+    selector: str
+    info: str
+    op_cls: type
+    min_version: Union[str, None]
+
+
+_op_catalog = dict()  # {<OpType>: [(<tag>, <selector>, <info>, <op_cls>, <min_version>), ...]}
+
 
 #
 # Configuration catalog functions
@@ -40,7 +66,7 @@ _tag_dependency_list = [
 ]
 
 
-def ordered_tags(tag, single=False, reverse=False):
+def ordered_tags(tag: str, single: bool = False, reverse: bool = False) -> Iterator[str]:
     """
     Generator which yields the specified tag plus any 'child' tags (i.e. dependent tags), following the order in which
     items need to be removed based on their dependencies (e.g. template_device before template_feature). The overall
@@ -64,7 +90,7 @@ def ordered_tags(tag, single=False, reverse=False):
             break
 
 
-def register(tag, info, item_cls, min_version=None):
+def register(tag: str, info: str, item_cls: type, min_version: Optional[str] = None):
     """
     Decorator used for registering config item index/handler classes with the catalog.
     The class being decorated needs to be a subclass of IndexConfigItem.
@@ -86,14 +112,14 @@ def register(tag, info, item_cls, min_version=None):
         if tag not in _tag_dependency_list:
             raise CatalogException(f'Unknown tag provided: {tag}')
 
-        _catalog.append(CatalogEntry(tag, info, index_cls, item_cls, min_version))
+        _catalog.append(CatalogItem(tag, info, index_cls, item_cls, min_version))
 
         return index_cls
 
     return decorator
 
 
-def catalog_size():
+def catalog_size() -> int:
     """
     Return number of entries in the catalog
     :return: integer
@@ -101,7 +127,7 @@ def catalog_size():
     return len(_catalog)
 
 
-def catalog_iter(*tags, version=None):
+def catalog_iter(*tags: str, version: Optional[str] = None) -> Iterator[tuple]:
     """
     Return an iterator of (<tag>, <info>, <index_cls>, <item_cls>) tuples matching the specified tag(s) and supported
     by vManage version.
@@ -110,20 +136,19 @@ def catalog_iter(*tags, version=None):
                     If not specified or None, version is not verified.
     :return: iterator of (<tag>, <info>, <index_cls>, <item_cls>) tuples from the catalog
     """
-    def match_tags(catalog_entry):
-        return CATALOG_TAG_ALL in tags or catalog_entry.tag in tags
+    def match_tags(clog_item):
+        return CATALOG_TAG_ALL in tags or clog_item.tag in tags
 
-    def match_version(catalog_entry):
-        return catalog_entry.min_version is None or version is None or not is_version_newer(version,
-                                                                                            catalog_entry.min_version)
+    def match_version(clog_item):
+        return clog_item.min_version is None or version is None or not is_version_newer(version, clog_item.min_version)
 
     return (
-        (entry.tag, entry.info, entry.index_cls, entry.item_cls)
-        for entry in _catalog if match_tags(entry) and match_version(entry)
+        (item.tag, item.info, item.index_cls, item.item_cls)
+        for item in _catalog if match_tags(item) and match_version(item)
     )
 
 
-def catalog_tags():
+def catalog_tags() -> set:
     """
     Return unique tags used by items registered with the catalog
     :return: Set of unique tags
@@ -132,50 +157,54 @@ def catalog_tags():
 
 
 #
-# Realtime catalog functions
+# Operational data catalog functions
 #
-def rt_register(tag, selector, info, min_version=None):
+def op_register(tag: str, selector: str, info: str, min_version: Optional[str] = None):
     """
-    Decorator used for registering realtime items with the realtime catalog.
-    The class being decorated needs to be a subclass of RealtimeItem.
+    Decorator used for registering operational-data items with the op catalog.
+    The class being decorated needs to be a subclass of OperationalItem.
     :param tag: Tag string associated with this item. String 'all' is reserved and cannot be used.
     :param selector: String used to further filter entries that match the tags.
     :param info: Item information used for logging purposes
     :param min_version: (optional) Minimum vManage version that supports this catalog item.
     :return: decorator
     """
-    def decorator(realtime_cls):
-        if not isinstance(realtime_cls, type) or not issubclass(realtime_cls, RealtimeItem):
-            raise CatalogException(f'Invalid realtime item class register attempt: {realtime_cls.__name__}')
+    def decorator(op_cls):
+        try:
+            op_type = OpType.from_subclass(op_cls)
+        except ValueError:
+            raise CatalogException(f'Invalid operational-data class register attempt: {op_cls.__name__}') from None
+
         if not isinstance(tag, str) or tag.lower() == CATALOG_TAG_ALL:
-            raise CatalogException(f'Invalid tag provided for class {realtime_cls.__name__}: {tag}')
+            raise CatalogException(f'Invalid tag provided for class {op_cls.__name__}: {tag}')
         if not isinstance(selector, str) or selector.lower() == CATALOG_TAG_ALL:
-            raise CatalogException(f'Invalid selector provided for class {realtime_cls.__name__}: {selector}')
+            raise CatalogException(f'Invalid selector provided for class {op_cls.__name__}: {selector}')
 
-        _rt_catalog.append(RTCatalogEntry(tag, selector, info, realtime_cls, min_version))
+        _op_catalog.setdefault(op_type, []).append(OpCatalogItem(tag, selector, info, op_cls, min_version))
 
-        return realtime_cls
+        return op_cls
 
     return decorator
 
 
-def rt_catalog_size():
+def op_catalog_size() -> int:
     """
-    Return number of entries in the realtime catalog
+    Return number of entries in the operational-data catalog
     :return: integer
     """
-    return len(_rt_catalog)
+    return sum(len(entries) for entries in _op_catalog.values())
 
 
-def rt_catalog_iter(*tags, version=None):
+def op_catalog_iter(op_type: OpType, *tags: str, version: Optional[str] = None) -> Iterator[tuple]:
     """
-    Return an iterator of (<info>, <rt_cls>) tuples matching the specified tag(s), selector and supported
+    Return an iterator of (<info>, <op_cls>) tuples matching the specified tag(s), selector and supported
     by vManage version.
+    :param op_type: OpType enum indicating type of operational-data
     :param tags: Tags to filter catalog entries to return. If 2 or more tags are provided, the last one is considered
                  a selector.
     :param version: Target vManage version. Only returns catalog items supported by the target vManage.
                     If not specified or None, version is not verified.
-    :return: iterator of (<info>, <rt_cls>) tuples from the realtime catalog
+    :return: iterator of (<info>, <op_cls>) tuples from the operational-data catalog
     """
     if len(tags) > 1:
         group_list = tags[:-1]
@@ -184,36 +213,38 @@ def rt_catalog_iter(*tags, version=None):
         group_list = tags
         selector = None
 
-    def match_groups(catalog_entry):
-        return CATALOG_TAG_ALL in group_list or catalog_entry.tag in group_list
+    def match_group(clog_item):
+        return CATALOG_TAG_ALL in group_list or clog_item.tag in group_list
 
-    def match_selector(catalog_entry):
-        return selector is None or catalog_entry.selector == selector
+    def match_selector(clog_item):
+        return selector is None or clog_item.selector == selector
 
-    def match_version(catalog_entry):
-        return catalog_entry.min_version is None or version is None or not is_version_newer(version,
-                                                                                            catalog_entry.min_version)
+    def match_version(clog_item):
+        return clog_item.min_version is None or version is None or not is_version_newer(version, clog_item.min_version)
 
     return (
-        (entry.info, entry.rt_cls)
-        for entry in _rt_catalog if match_groups(entry) and match_selector(entry) and match_version(entry)
+        (item.info, item.op_cls)
+        for item in _op_catalog.get(op_type, []) if match_group(item) and match_selector(item) and match_version(item)
     )
 
 
-def rt_catalog_tags():
+def op_catalog_tags(op_type: OpType) -> set:
     """
-    Return unique tags used by items registered with the realtime catalog
+    Return unique tags used by items registered with the operational-data catalog group
+    :param op_type: OpType enum indicating type of operational-data
     :return: Set of unique tags
     """
-    return {entry.tag for entry in _rt_catalog}
+    return {entry.tag for entry in _op_catalog.get(op_type, [])}
 
 
-def rt_catalog_commands():
+def op_catalog_commands(op_type: OpType) -> set:
     """
-    Return set of commands registered with the realtime catalog. These are the combination of tags and selectors
+    Return set of commands registered with the operational-data catalog group. These are the combination of tags and
+    selectors
+    :param op_type: OpType enum indicating type of operational-data
     :return: Set of commands
     """
-    return {f'{entry.tag} {entry.selector}' for entry in _rt_catalog}
+    return {f'{entry.tag} {entry.selector}' for entry in _op_catalog.get(op_type, [])}
 
 
 class CatalogException(Exception):
