@@ -22,7 +22,7 @@ Both flavors follow the same release numbering. For instance, if support for cer
 The command "sdwan --version" will indicate the flavor that is installed.
 
     % sdwan --version
-    Sastre-Pro Version 1.12. Catalog: 63 configuration items, 12 realtime items.
+    Sastre-Pro Version 1.13. Catalog: 67 configuration items, 23 operational items.
 
 Tasks only available on Sastre-Pro are labeled as such in the [Introduction](#introduction) section below.
 
@@ -40,14 +40,14 @@ Task indicates the operation to be performed. The following tasks are currently 
 - Backup: Save vManage configuration items to a local backup.
 - Restore: Restore configuration items from a local backup to vManage.
 - Delete: Delete configuration items on vManage.
-- Migrate: Migrate configuration items from a vManage release to another. Currently only 18.4, 19.2 or 19.3 to 20.1 is supported. Minor revision numbers (e.g. 20.1.1) are not relevant for the template migration.
+- Migrate: Migrate configuration items from a vManage release to another. Currently, only 18.4, 19.2 or 19.3 to 20.1 is supported. Minor revision numbers (e.g. 20.1.1) are not relevant for the template migration.
 - Attach (Sastre-Pro): Attach WAN Edges/vSmarts to templates. Allows further customization on top of the functionality available via "restore --attach".
 - Detach (Sastre-Pro): Detach WAN Edges/vSmarts from templates. Allows further customization on top of the functionality available via "delete --detach".
 - Certificate (Sastre-Pro): Restore device certificate validity status from a backup or set to a desired value (i.e. valid, invalid or staging).
 - List (Sastre-Pro): List configuration items or device certificate information from vManage or a local backup. Display as table or export as csv file.
 - Show-template (Sastre-Pro): Show details about device templates on vManage or from a local backup. Display as table or export as csv file.
 - Report (Sastre-Pro): Generate a report file containing the output from all list and show-template commands.
-- Show (Sastre-Pro): Run vManage real-time commands across one or more devices.
+- Show (Sastre-Pro): Run vManage real-time, state or statistics commands; collecting data from one or more devices.
 
 Task-specific parameters are provided after the task argument, customizing the task behavior. For instance, whether to execute a restore task in dry-run mode or the destination directory for a backup task. 
 
@@ -64,7 +64,7 @@ Notes:
     Sastre-Pro - Automation Tools for Cisco SD-WAN Powered by Viptela
     
     positional arguments:
-      <task>                task to be performed (backup, restore, delete, attach, detach, certificate, list, show-template, migrate, report, show)
+      <task>                task to be performed (backup, restore, delete, migrate, attach, detach, certificate, list, show-template, report, show)
       <arguments>           task parameters, if any
     
     optional arguments:
@@ -104,26 +104,24 @@ Task-specific parameters and options are defined after the task is provided. Eac
     % sdwan backup -h
     usage: sdwan backup [-h] [--workdir <directory>] [--no-rollover] [--regex <regex>] <tag> [<tag> ...]
     
-    Sastre - Automation Tools for Cisco SD-WAN Powered by Viptela
+    Sastre-Pro - Automation Tools for Cisco SD-WAN Powered by Viptela
     
     Backup task:
     
     positional arguments:
-      <tag>                 One or more tags for selecting items to be backed up. Multiple tags should be separated by space. Available tags: all, policy_customapp,
-                            policy_definition, policy_list, policy_profile, policy_security, policy_vedge, policy_voice, policy_vsmart, template_device, template_feature. Special
-                            tag "all" selects all items, including WAN edge certificates and device configurations.
+      <tag>                 one or more tags for selecting items to be backed up. Multiple tags should be separated by space. Available tags: all, policy_customapp, policy_definition, policy_list, policy_profile, policy_security, policy_vedge, policy_voice, policy_vsmart,
+                            template_device, template_feature. Special tag "all" selects all items, including WAN edge certificates and device configurations.
     
     optional arguments:
       -h, --help            show this help message and exit
       --workdir <directory>
-                            Backup destination (default: backup_VMANAGE-ADDRESS_20200617).
-      --no-rollover         By default, if workdir already exists (before a new backup is saved) the old workdir is renamed using a rolling naming scheme. This option disables
-                            this automatic rollover.
-      --regex <regex>       Regular expression matching item names to be backed up, within selected tags.
+                            backup destination (default: backup_192.168.251.40_20210424)
+      --no-rollover         by default, if workdir already exists (before a new backup is saved) the old workdir is renamed using a rolling naming scheme. This option disables this automatic rollover.
+      --regex <regex>       regular expression matching item names to be backed up, within selected tags
 
 #### Important concepts:
-- vManage URL: Built from the provided vManage IP address and TCP port (default 8443). All operations target this vManage.
-- Workdir: Defines the location (in the local machine) where vManage data files are located. By default it follows the format "backup_\<vmanage-ip\>_\<yyyymmdd\>". The --workdir parameter can be used to specify a different location.  Workdir is under a 'data' directory. This 'data' directory is relative to the directory where Sastre is run.
+- vManage URL: Constructed from the provided vManage IP address and TCP port (default 8443). All operations target this vManage.
+- Workdir: Defines the location (in the local machine) where vManage data files are located. By default, it follows the format "backup_\<vmanage-ip\>_\<yyyymmdd\>". The --workdir parameter can be used to specify a different location.  Workdir is under a 'data' directory. This 'data' directory is relative to the directory where Sastre is run.
 - Tag: vManage configuration items are grouped by tags, such as policy_apply, policy_definition, policy_list, template_device, etc. The special tag 'all' is used to refer to all configuration elements. Depending on the task, one or more tags can be specified in order to select groups of configuration elements.
 
 ## Getting Started
@@ -138,8 +136,8 @@ When Sastre is executed, data/ and logs/ directories are created as needed to st
 Create an rc-example.sh file to include vManage details and source that file:
 
     % cat <<EOF > rc-example.sh
-     export VMANAGE_IP='10.85.136.253'
-     export VMANAGE_USER='admin'
+    export VMANAGE_IP='198.18.1.10'
+    export VMANAGE_USER='admin'
     EOF
     % source rc-example.sh
 
@@ -159,7 +157,7 @@ Test vManage credentials by running a simple query listing configured device tem
     | BRANCH_BASIC    | cc2f7a24-4c93-49ed-8e6b-1c107797ba95 | template_device | device template |
     +-----------------+--------------------------------------+-----------------+-----------------+
 
-Any those vManage parameters can also be provided via command line:
+Any of those vManage parameters can be provided via command line as well:
 
     % sdwan -p admin list configuration template_device
 
@@ -371,16 +369,16 @@ The --detach option performs the necessary template detach and vSmart policy dea
 
 ### Listing items from vManage or from a backup:
 
-The list task can be used to list items from a target vManage, or a backup directory, matching a criteria of item tag(s) and regular expression.
+The list task can be used to show items from a target vManage, or a backup directory. Matching criteria can contain item tag(s) and regular expression.
 
 List device templates and feature templates from target vManage:
 
     % sdwan --verbose list configuration template_device template_feature
     INFO: Starting list configuration: vManage URL: "https://198.18.1.10:8443"
     INFO: List criteria matched 45 items
-    +---------------------------+--------------------------------------+------------------+------------------+
+    +========================================================================================================+
     | Name                      | ID                                   | Tag              | Type             |
-    +---------------------------+--------------------------------------+------------------+------------------+
+    +========================================================================================================+
     | BRANCH_ADVANCED           | 6ece1f27-fbfa-4730-9a8f-b61bfd380047 | template_device  | device template  |
     | VSMART_v1                 | ba623cf6-5d2c-4676-a763-11b9cf866074 | template_device  | device template  |
     | BRANCH_BASIC              | 5e362c85-8251-428a-b650-d364f8e15a22 | template_device  | device template  |
@@ -394,9 +392,9 @@ List all items from target vManage with name starting with 'DC':
     % sdwan --verbose list configuration all --regex "^DC"
     INFO: Starting list configuration: vManage URL: "https://198.18.1.10:8443"
     INFO: List criteria matched 2 items
-    +-------------+--------------------------------------+-----------------+-----------------+
+    +========================================================================================+
     | Name        | ID                                   | Tag             | Type            |
-    +-------------+--------------------------------------+-----------------+-----------------+
+    +========================================================================================+
     | DC_BASIC    | 2ba8c66a-eadd-4a63-97c9-50d58a43b6b5 | template_device | device template |
     | DC_ADVANCED | b042ed29-3875-4118-b800-a0b00542b58e | template_device | device template |
     +-------------+--------------------------------------+-----------------+-----------------+
@@ -407,9 +405,9 @@ List all items from backup directory with name starting with 'DC':
     % sdwan --verbose list configuration all --regex "^DC" --workdir backup_10.85.136.253_20191206
     INFO: Starting list configuration: Local workdir: "backup_10.85.136.253_20191206"
     INFO: List criteria matched 2 items
-    +-------------+--------------------------------------+-----------------+-----------------+
+    +========================================================================================+
     | Name        | ID                                   | Tag             | Type            |
-    +-------------+--------------------------------------+-----------------+-----------------+
+    +========================================================================================+
     | DC_ADVANCED | bf322748-8dfd-4cb0-a9e4-5d758be239a0 | template_device | device template |
     | DC_BASIC    | 09c02518-9557-4ae2-9031-7e6b3e7323fc | template_device | device template |
     +-------------+--------------------------------------+-----------------+-----------------+
@@ -420,9 +418,9 @@ List also allows displaying device certificate information.
     % sdwan --verbose list certificate                     
     INFO: Starting list certificates: vManage URL: "https://198.18.1.10:8443"
     INFO: List criteria matched 5 items
-    +------------+------------------------------------------+----------------------------------+----------------------------+--------+
+    +================================================================================================================================+
     | Hostname   | Chassis                                  | Serial                           | State                      | Status |
-    +------------+------------------------------------------+----------------------------------+----------------------------+--------+
+    +================================================================================================================================+
     | DC1-VEDGE1 | ebdc8bd9-17e5-4eb3-a5e0-f438403a83de     | ee08f743                         | certificate installed      | valid  |
     | -          | 52c7911f-c5b0-45df-b826-3155809a2a1a     | 24801375888299141d620fbdb02de2d4 | bootstrap config generated | valid  |
     | DC1-VEDGE2 | f21dbb35-30b3-47f4-93bb-d2b2fe092d35     | b02445f6                         | certificate installed      | valid  |
@@ -432,13 +430,13 @@ List also allows displaying device certificate information.
     INFO: Task completed successfully
 
 
-Similar to the list task, show tasks can be used to show items from a target vManage, or a backup. With show tasks, additional details about the selected items are displayed. The item id, name or a regular expression can be used to identify which item(s) to display.
+Similar to the list task, show-template tasks can be used to display items from a target vManage, or a backup. With show-template, additional details about the selected items are displayed. The item id, name, or a regular expression can be used to select which item(s) to display.
 
     % sdwan show-template values --name DC_BASIC
-    Device template DC_BASIC, values for vedge-dc1:
-    +-----------------------------------+--------------------------------------+--------------------------------------------------------------------+
+    *** Template DC_BASIC, device vedge-dc1 ***
+    +===============================================================================================================================================+
     | Name                              | Value                                | Variable                                                           |
-    +-----------------------------------+--------------------------------------+--------------------------------------------------------------------+
+    +===============================================================================================================================================+
     | Status                            | complete                             | csv-status                                                         |
     | Chassis Number                    | b693be59-c03f-62d0-f9a4-2675374536b8 | csv-deviceId                                                       |
     | System IP                         | 10.255.101.1                         | csv-deviceIP                                                       |
@@ -453,11 +451,11 @@ Similar to the list task, show tasks can be used to show items from a target vMa
     | Remote AS(bgp_neighbor_remote_as) | 65111                                | /20//router/bgp/neighbor/bgp_neighbor_address/remote-as            |
     | Preference(transport1_preference) | 100                                  | /0/ge0/0/interface/tunnel-interface/encapsulation/ipsec/preference |
     +-----------------------------------+--------------------------------------+--------------------------------------------------------------------+
-    
-    Device template DC_BASIC, values for vedge-dc2:
-    +-----------------------------------+--------------------------------------+--------------------------------------------------------------------+
+
+    *** Template DC_BASIC, device vedge-dc2 ***
+    +===============================================================================================================================================+
     | Name                              | Value                                | Variable                                                           |
-    +-----------------------------------+--------------------------------------+--------------------------------------------------------------------+
+    +===============================================================================================================================================+
     | Status                            | complete                             | csv-status                                                         |
     | Chassis Number                    | 0dd49ace-f6de-ce86-5d73-ca74d6db1747 | csv-deviceId                                                       |
     | System IP                         | 10.255.102.1                         | csv-deviceIP                                                       |
@@ -609,14 +607,14 @@ Example:
 
 ### Selectively attach/detach devices to/from templates
 
-The attach and detach tasks expose a number of knobs to select templates and devices to include:
-- Templates regular expression selecting templates to attach. Match on template name.
-- Devices regular expression selecting devices to attach. Match on device name.
-- Reachable state
+The attach and detach tasks expose a number of knobs to select templates and devices to be included:
+- Templates regular expression, selecting templates to attach. Match on template name.
+- Devices regular expression, selecting devices to attach. Match on device name.
+- Reachability state
 - Site-ID
 - System-IP
 
-When multiple filters are provided, the result is an AND of all filters provided. Dry-run can be used to verify the filters used.
+When multiple filters are defined, the result is an AND of all filters. Dry-run can be used to validate the expected outcome.
 
 The number of devices to include per attach/detach request (to vManage) can be defined with the --batch option.
 
@@ -638,6 +636,119 @@ Selecting devices to include in the attach task:
     INFO: Waiting...
     INFO: Completed DC-vEdges
     INFO: Completed attaching WAN Edges
+    INFO: Task completed successfully
+
+### Verifying device operational data
+
+The show task provides commands to display operational data from devices. 
+
+They all share the same set of options to filter devices to display:
+  - --regex <regex> - Regular expression matching device name, type or model to display
+  - --reachable - Display only reachable devices
+  - --site <id> - Filter by site ID
+  - --system-ip <ipv4> - Filter by system IP
+
+There is also a --csv option that allows exporting any of the show command tables as CSV files.
+
+Verifying inventory of devices that are reachable and name starting with "pEdge3" or "pEdge4":
+
+    % sdwan show devices --reachable --regex "pEdge[3-4]"
+    +==================================================================================+
+    | Name             | System IP   | Site ID | Reachability | Type  | Model          |
+    +==================================================================================+
+    | pEdge3-ISR4331-1 | 100.1.140.1 | 140     | reachable    | vedge | vedge-ISR-4331 |
+    | pEdge4-ISR4331-2 | 100.1.140.2 | 140     | reachable    | vedge | vedge-ISR-4331 |
+    +------------------+-------------+---------+--------------+-------+----------------+
+
+Listing the advertised routes from those two devices:
+
+    % sdwan show realtime omp adv-routes --reachable --regex "pEdge[3-4]"
+    *** OMP advertised routes ***
+    +=====================================================================================================================================+
+    | Device           | VPN ID | Prefix           | To Peer     | Tloc color   | Tloc IP     | Protocol        | Metric | OMP Preference |
+    +=====================================================================================================================================+
+    | pEdge3-ISR4331-1 | 1      | 10.5.113.0/24    | 100.1.9.104 | mpls         | 100.1.140.1 | OSPF-external-2 | 20     |                |
+    | pEdge3-ISR4331-1 | 1      | 10.5.113.0/24    | 100.1.9.104 | biz-internet | 100.1.140.1 | OSPF-external-2 | 20     |                |
+    <snip>
+    | pEdge3-ISR4331-1 | 1      | 172.18.31.0/24   | 100.1.9.105 | biz-internet | 100.1.140.1 | OSPF-intra-area | 2      |                |
+    +------------------+--------+------------------+-------------+--------------+-------------+-----------------+--------+----------------+
+    | pEdge4-ISR4331-2 | 1      | 10.5.113.0/24    | 100.1.9.104 | mpls         | 100.1.140.2 | OSPF-external-2 | 20     |                |
+    | pEdge4-ISR4331-2 | 1      | 10.5.113.0/24    | 100.1.9.104 | biz-internet | 100.1.140.2 | OSPF-external-2 | 20     |                |
+    <snip>
+    | pEdge4-ISR4331-2 | 1      | 172.18.31.0/24   | 100.1.9.105 | biz-internet | 100.1.140.2 | OSPF-intra-area | 2      |                |
+    +------------------+--------+------------------+-------------+--------------+-------------+-----------------+--------+----------------+
+
+Checking control connections and local-properties:
+
+    % sdwan show state control --reachable --regex "pEdge[3-4]"
+    *** Control connections ***
+    +===============================================================================================+
+    | Device           | Peer System IP | Site ID | Peer Type | Local Color  | Remote Color | State |
+    +===============================================================================================+
+    | pEdge3-ISR4331-1 | 100.1.9.105    | 9       | vsmart    | biz-internet | default      | up    |
+    | pEdge3-ISR4331-1 | 100.1.9.104    | 9       | vsmart    | biz-internet | default      | up    |
+    | pEdge3-ISR4331-1 | 100.1.9.104    | 9       | vsmart    | mpls         | default      | up    |
+    | pEdge3-ISR4331-1 | 100.1.9.103    | 9       | vmanage   | biz-internet | default      | up    |
+    | pEdge3-ISR4331-1 | 100.1.9.105    | 9       | vsmart    | mpls         | default      | up    |
+    +------------------+----------------+---------+-----------+--------------+--------------+-------+
+    | pEdge4-ISR4331-2 | 100.1.9.105    | 9       | vsmart    | biz-internet | default      | up    |
+    | pEdge4-ISR4331-2 | 100.1.9.104    | 9       | vsmart    | biz-internet | default      | up    |
+    | pEdge4-ISR4331-2 | 100.1.9.101    | 9       | vmanage   | mpls         | default      | up    |
+    | pEdge4-ISR4331-2 | 100.1.9.104    | 9       | vsmart    | mpls         | default      | up    |
+    | pEdge4-ISR4331-2 | 100.1.9.105    | 9       | vsmart    | mpls         | default      | up    |
+    +------------------+----------------+---------+-----------+--------------+--------------+-------+
+    
+    *** Control local-properties ***
+    +======================================================================================================+
+    | Device           | System IP   | Site ID | Device Type | Organization Name | Domain ID | Port Hopped |
+    +======================================================================================================+
+    | pEdge3-ISR4331-1 | 100.1.140.1 | 140     | vedge       | AS_RTP_SDA_SDWAN  | 1         | TRUE        |
+    +------------------+-------------+---------+-------------+-------------------+-----------+-------------+
+    | pEdge4-ISR4331-2 | 100.1.140.2 | 140     | vedge       | AS_RTP_SDA_SDWAN  | 1         | TRUE        |
+    +------------------+-------------+---------+-------------+-------------------+-----------+-------------+
+
+Verifying app-route data:
+
+    % sdwan show statistics app-route --reachable --regex "pEdge[3-4]"
+    *** Application-aware route statistics ***
+    +===========================================================================================================================================================================+
+    | Device           | Local System Ip | Remote System Ip | Local Color  | Remote Color | Total | Loss | Latency | Jitter | Name                                              |
+    +===========================================================================================================================================================================+
+    | pEdge3-ISR4331-1 | 100.1.140.1     | 100.1.150.2      | mpls         | mpls         | 132   | 0    | 30      | 3      | 100.1.140.1:mpls-100.1.150.2:mpls                 |
+    | pEdge3-ISR4331-1 | 100.1.140.1     | 100.1.150.1      | mpls         | mpls         | 133   | 0    | 30      | 3      | 100.1.140.1:mpls-100.1.150.1:mpls                 |
+    | pEdge3-ISR4331-1 | 100.1.140.1     | 100.1.111.1      | biz-internet | biz-internet | 133   | 0    | 146     | 64     | 100.1.140.1:biz-internet-100.1.111.1:biz-internet |
+    | pEdge3-ISR4331-1 | 100.1.140.1     | 100.1.150.1      | biz-internet | biz-internet | 133   | 0    | 145     | 62     | 100.1.140.1:biz-internet-100.1.150.1:biz-internet |
+    | pEdge3-ISR4331-1 | 100.1.140.1     | 100.1.150.2      | biz-internet | biz-internet | 133   | 0    | 144     | 65     | 100.1.140.1:biz-internet-100.1.150.2:biz-internet |
+    +------------------+-----------------+------------------+--------------+--------------+-------+------+---------+--------+---------------------------------------------------+
+    | pEdge4-ISR4331-2 | 100.1.140.2     | 100.1.150.1      | biz-internet | biz-internet | 132   | 0    | 145     | 62     | 100.1.140.2:biz-internet-100.1.150.1:biz-internet |
+    | pEdge4-ISR4331-2 | 100.1.140.2     | 100.1.150.2      | biz-internet | biz-internet | 132   | 0    | 146     | 70     | 100.1.140.2:biz-internet-100.1.150.2:biz-internet |
+    | pEdge4-ISR4331-2 | 100.1.140.2     | 100.1.111.1      | biz-internet | biz-internet | 132   | 0    | 148     | 65     | 100.1.140.2:biz-internet-100.1.111.1:biz-internet |
+    | pEdge4-ISR4331-2 | 100.1.140.2     | 100.1.150.1      | mpls         | mpls         | 132   | 0    | 30      | 3      | 100.1.140.2:mpls-100.1.150.1:mpls                 |
+    | pEdge4-ISR4331-2 | 100.1.140.2     | 100.1.150.2      | mpls         | mpls         | 133   | 0    | 30      | 3      | 100.1.140.2:mpls-100.1.150.2:mpls                 |
+    +------------------+-----------------+------------------+--------------+--------------+-------+------+---------+--------+---------------------------------------------------+
+
+Verifying app-route data from 4 days ago:
+
+    % sdwan --verbose show statistics app-route --days 4 --reachable --regex "pEdge[3-4]" 
+    INFO: Starting show statistics: vManage URL: "https://10.122.41.140:443"
+    INFO: Query timestamp: 2021-04-26 15:36:12 UTC
+    INFO: Retrieving application-aware route statistics from 2 devices
+    *** Application-aware route statistics ***
+    +===========================================================================================================================================================================+
+    | Device           | Local System Ip | Remote System Ip | Local Color  | Remote Color | Total | Loss | Latency | Jitter | Name                                              |
+    +===========================================================================================================================================================================+
+    | pEdge3-ISR4331-1 | 100.1.140.1     | 100.1.150.2      | biz-internet | biz-internet | 133   | 0    | 59      | 6      | 100.1.140.1:biz-internet-100.1.150.2:biz-internet |
+    | pEdge3-ISR4331-1 | 100.1.140.1     | 100.1.111.1      | biz-internet | biz-internet | 133   | 0    | 60      | 6      | 100.1.140.1:biz-internet-100.1.111.1:biz-internet |
+    | pEdge3-ISR4331-1 | 100.1.140.1     | 100.1.150.1      | biz-internet | biz-internet | 132   | 0    | 59      | 6      | 100.1.140.1:biz-internet-100.1.150.1:biz-internet |
+    | pEdge3-ISR4331-1 | 100.1.140.1     | 100.1.150.1      | mpls         | mpls         | 133   | 0    | 30      | 3      | 100.1.140.1:mpls-100.1.150.1:mpls                 |
+    | pEdge3-ISR4331-1 | 100.1.140.1     | 100.1.150.2      | mpls         | mpls         | 132   | 0    | 30      | 3      | 100.1.140.1:mpls-100.1.150.2:mpls                 |
+    +------------------+-----------------+------------------+--------------+--------------+-------+------+---------+--------+---------------------------------------------------+
+    | pEdge4-ISR4331-2 | 100.1.140.2     | 100.1.111.1      | biz-internet | biz-internet | 133   | 0    | 60      | 7      | 100.1.140.2:biz-internet-100.1.111.1:biz-internet |
+    | pEdge4-ISR4331-2 | 100.1.140.2     | 100.1.150.2      | biz-internet | biz-internet | 132   | 0    | 60      | 7      | 100.1.140.2:biz-internet-100.1.150.2:biz-internet |
+    | pEdge4-ISR4331-2 | 100.1.140.2     | 100.1.150.1      | biz-internet | biz-internet | 133   | 0    | 60      | 6      | 100.1.140.2:biz-internet-100.1.150.1:biz-internet |
+    | pEdge4-ISR4331-2 | 100.1.140.2     | 100.1.150.1      | mpls         | mpls         | 133   | 0    | 30      | 3      | 100.1.140.2:mpls-100.1.150.1:mpls                 |
+    | pEdge4-ISR4331-2 | 100.1.140.2     | 100.1.150.2      | mpls         | mpls         | 133   | 0    | 30      | 3      | 100.1.140.2:mpls-100.1.150.2:mpls                 |
+    +------------------+-----------------+------------------+--------------+--------------+-------+------+---------+--------+---------------------------------------------------+
     INFO: Task completed successfully
 
 ## Notes
@@ -666,9 +777,9 @@ Example:
     In order to get the migrated name as "G_Branch_201_Single_cE4451-X_2xWAN_DHCP_L2_v01", one can use --name "{name (G_.+)_184_.+}_201_{name G.+_184_(.+)}".
     
     % sdwan list transform template_device --regex "G_Branch_184_Single_cE4451" --workdir sastre_cx_golden_repo "{name (G_.+)_184_.+}_201_{name G.+_184_(.+)}"
-    +---------------------------------------------------------------+---------------------------------------------------------------+-----------------+-----------------+
+    +===================================================================================================================================================================+
     | Name                                                          | Transformed                                                   | Tag             | Type            |
-    +---------------------------------------------------------------+---------------------------------------------------------------+-----------------+-----------------+
+    +===================================================================================================================================================================+
     | G_Branch_184_Single_cE4451-X_2xWAN_Static_2xSLAN_Trunk_L2_v01 | G_Branch_201_Single_cE4451-X_2xWAN_Static_2xSLAN_Trunk_L2_v01 | template_device | device template |
     | G_Branch_184_Single_cE4451-X_2xWAN_DHCP_L2_v01                | G_Branch_201_Single_cE4451-X_2xWAN_DHCP_L2_v01                | template_device | device template |
     +---------------------------------------------------------------+---------------------------------------------------------------+-----------------+-----------------+

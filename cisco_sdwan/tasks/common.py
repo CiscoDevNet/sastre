@@ -78,7 +78,7 @@ class TaskArgs:
 class Task:
     # Configuration parameters for wait_actions
     ACTION_INTERVAL = 10    # seconds
-    ACTION_TIMEOUT = 1200   # 20 minutes
+    ACTION_TIMEOUT = 1800   # 30 minutes
 
     SAVINGS_FACTOR = 1
 
