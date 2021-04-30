@@ -12,6 +12,7 @@ from itertools import zip_longest
 from collections import namedtuple
 from typing import Sequence, Dict, Tuple, Union, Iterator, Callable, Mapping, Any
 from operator import attrgetter
+from requests.exceptions import Timeout
 from .rest_api import RestAPIException, Rest
 
 
@@ -136,7 +137,9 @@ class OperationalItem:
         try:
             instance = cls.get_raise(api, *args, **kwargs)
             return instance
-        except RestAPIException:
+        except (RestAPIException, Timeout):
+            # Timeouts are more common with operational items, while less severe. Capturing here to allow execution to
+            # proceed and not fail the whole task
             return None
 
     @classmethod
