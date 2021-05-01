@@ -147,9 +147,9 @@ Test vManage credentials by running a simple query listing configured device tem
 
     % sdwan list configuration template_device
     vManage password: 
-    +-----------------+--------------------------------------+-----------------+-----------------+
+    +============================================================================================+
     | Name            | ID                                   | Tag             | Type            |
-    +-----------------+--------------------------------------+-----------------+-----------------+
+    +============================================================================================+
     | DC_ADVANCED     | bf322748-8dfd-4cb0-a9e4-5d758be239a0 | template_device | device template |
     | DC_BASIC        | 09c02518-9557-4ae2-9031-7e6b3e7323fc | template_device | device template |
     | VSMART_v1       | 15c1962f-740e-4b89-a269-69f2cbfba296 | template_device | device template |
