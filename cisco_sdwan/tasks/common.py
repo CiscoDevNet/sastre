@@ -21,17 +21,23 @@ from cisco_sdwan.base.models_vmanage import (DeviceTemplate, DeviceTemplateValue
                                              Device)
 
 
-def regex_search(regex, *fields):
+def regex_search(regex, *fields, **kwargs):
     """
     Execute regular expression search on provided fields. Match fields in the order provided, stop on first match.
     :param regex: Pattern to match
     :param fields: One or more strings to match
     :return: True if a match is found on any field, False otherwise.
     """
-    for match_field in fields:
-        if re.search(regex, match_field):
-            return True
-    return False
+    if kwargs.get('inverse'):
+        for match_field in fields:
+            if not re.search(regex, match_field):
+                return True
+        return False
+    else:
+        for match_field in fields:
+            if re.search(regex, match_field):
+                return True
+        return False
 
 
 class Tally:
