@@ -26,6 +26,9 @@ class TaskBackup(Task):
                                       'automatic rollover.')
         task_parser.add_argument('--regex', metavar='<regex>', type=regex_type,
                                  help='regular expression matching item names to be backed up, within selected tags')
+        task_parser.add_argument('--not-regex', metavar='<not_regex>', type=regex_type,
+                                 help='Inverse regular expression matching item names to be backed up, within selected '
+                                      'tags.')
         task_parser.add_argument('tags', metavar='<tag>', nargs='+', type=TagOptions.tag,
                                  help='one or more tags for selecting items to be backed up. Multiple tags should be '
                                       f'separated by space. Available tags: {TagOptions.options()}. Special tag '
@@ -82,7 +85,8 @@ class TaskBackup(Task):
 
             matched_item_iter = (
                 (item_id, item_name) for item_id, item_name in item_index
-                if parsed_args.regex is None or regex_search(parsed_args.regex, item_name)
+                if (parsed_args.regex is None or regex_search(parsed_args.regex, item_name)) and
+                   (parsed_args.not_regex is None or regex_search(parsed_args.not_regex, item_name, inverse=True))
             )
             for item_id, item_name in matched_item_iter:
                 item = item_cls.get(api, item_id)
