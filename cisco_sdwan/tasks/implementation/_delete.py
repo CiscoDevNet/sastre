@@ -17,6 +17,9 @@ class TaskDelete(Task):
 
         task_parser.add_argument('--regex', metavar='<regex>', type=regex_type,
                                  help='regular expression matching item names to be deleted, within selected tags')
+        task_parser.add_argument('--not-regex', metavar='<not_regex>', type=regex_type,
+                                 help='Inverse regular expression matching item names to be deleted, within selected '
+                                      'tags.')
         task_parser.add_argument('--dryrun', action='store_true',
                                  help='dry-run mode. Items matched for removal are listed but not deleted.')
         task_parser.add_argument('--detach', action='store_true',
@@ -67,7 +70,8 @@ class TaskDelete(Task):
                 (item_name, item_id, item_cls, info)
                 for _, info, index, item_cls in self.index_iter(api, catalog_iter(tag, version=api.server_version))
                 for item_id, item_name in index
-                if parsed_args.regex is None or regex_search(parsed_args.regex, item_name)
+                if (parsed_args.regex is None or regex_search(parsed_args.regex, item_name)) and
+                   (parsed_args.not_regex is None or regex_search(parsed_args.not_regex, item_name, inverse=True))
             )
             for item_name, item_id, item_cls, info in matched_item_iter:
                 item = item_cls.get(api, item_id)
