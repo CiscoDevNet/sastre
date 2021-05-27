@@ -22,6 +22,9 @@ class TaskRestore(Task):
                                  help='restore source (default: %(default)s)')
         task_parser.add_argument('--regex', metavar='<regex>', type=regex_type,
                                  help='regular expression matching item names to be restored, within selected tags')
+        task_parser.add_argument('--not-regex', metavar='<not_regex>', type=regex_type,
+                                 help='inverse regular expression matching item names to be restored, '
+                                      'within selected tags')
         task_parser.add_argument('--dryrun', action='store_true',
                                  help='dry-run mode. Items to be restored are listed but not pushed to vManage.')
         task_parser.add_argument('--attach', action='store_true',
@@ -109,7 +112,9 @@ class TaskRestore(Task):
 
                     item_matches = (
                         (parsed_args.tag == CATALOG_TAG_ALL or parsed_args.tag == tag) and
-                        (parsed_args.regex is None or regex_search(parsed_args.regex, item.name))
+                        (parsed_args.regex is None or regex_search(parsed_args.regex, item.name) and
+                         (parsed_args.not_regex is None or regex_search(parsed_args.not_regex, item.name,
+                                                                        inverse=True)))
                     )
                     if item_matches:
                         match_set.add(item_id)
