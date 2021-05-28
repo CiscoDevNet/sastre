@@ -490,7 +490,8 @@ def chopper(section_size: int):
 
 
 def device_iter(api: Rest, match_name_regex: Optional[str] = None, match_reachable: bool = False,
-                match_site_id: Optional[str] = None, match_system_ip: Optional[str] = None) -> Iterator[tuple]:
+                match_site_id: Optional[str] = None, match_system_ip: Optional[str] = None,
+                match_inverse: bool = False) -> Iterator[tuple]:
     """
     Return an iterator over device inventory, filtered by optional conditions.
     :param api: Instance of Rest API
@@ -504,7 +505,7 @@ def device_iter(api: Rest, match_name_regex: Optional[str] = None, match_reachab
         (uuid, name)
         for uuid, name, system_ip, site_id, reachability, *_ in Device.get_raise(api).extended_iter(default='-')
         if (
-            (match_name_regex is None or regex_search(match_name_regex, name)) and
+            (match_name_regex is None or regex_search(match_name_regex, name, inverse=match_inverse)) and
             (not match_reachable or reachability == 'reachable') and
             (match_site_id is None or site_id == match_site_id) and
             (match_system_ip is None or system_ip == match_system_ip)
