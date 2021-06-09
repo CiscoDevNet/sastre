@@ -102,22 +102,25 @@ CX project ID is only applicable to Sastre-Pro. CX_PID and --pid option are not 
 Task-specific parameters and options are defined after the task is provided. Each task has its own set of parameters.
 
     % sdwan backup -h
-    usage: sdwan backup [-h] [--workdir <directory>] [--no-rollover] [--regex <regex>] <tag> [<tag> ...]
+    usage: sdwan backup [-h] [--workdir <directory>] [--no-rollover] [--regex <regex> | --not-regex <regex>] <tag> [<tag> ...]
     
     Sastre-Pro - Automation Tools for Cisco SD-WAN Powered by Viptela
     
     Backup task:
     
     positional arguments:
-      <tag>                 one or more tags for selecting items to be backed up. Multiple tags should be separated by space. Available tags: all, policy_customapp, policy_definition, policy_list, policy_profile, policy_security, policy_vedge, policy_voice, policy_vsmart,
-                            template_device, template_feature. Special tag "all" selects all items, including WAN edge certificates and device configurations.
+      <tag>                 one or more tags for selecting items to be backed up. Multiple tags should be separated by space. Available tags: all, policy_customapp, policy_definition,
+                            policy_list, policy_profile, policy_security, policy_vedge, policy_voice, policy_vsmart, template_device, template_feature. Special tag "all" selects all items,
+                            including WAN edge certificates and device configurations.
     
     optional arguments:
       -h, --help            show this help message and exit
       --workdir <directory>
-                            backup destination (default: backup_192.168.251.40_20210424)
-      --no-rollover         by default, if workdir already exists (before a new backup is saved) the old workdir is renamed using a rolling naming scheme. This option disables this automatic rollover.
-      --regex <regex>       regular expression matching item names to be backed up, within selected tags
+                            backup destination (default: backup_198.18.1.10_20210608)
+      --no-rollover         by default, if workdir already exists (before a new backup is saved) the old workdir is renamed using a rolling naming scheme. This option disables this automatic
+                            rollover.
+      --regex <regex>       regular expression matching item names to backup, within selected tags.
+      --not-regex <regex>   regular expression matching item names NOT to backup, within selected tags.
 
 #### Important concepts:
 - vManage URL: Constructed from the provided vManage IP address and TCP port (default 8443). All operations target this vManage.
@@ -315,7 +318,7 @@ Example:
 
 Dry-run, just list without deleting items matching the specified tag and regular expression:
 
-    % sdwan --verbose delete all --regex "^DC"  --dryrun
+    % sdwan --verbose delete all --regex "^DC" --dryrun
     INFO: Starting delete, DRY-RUN mode: vManage URL: "https://10.85.136.253:8443"
     INFO: Inspecting template_device items
     INFO: DRY-RUN: Delete device template DC_BASIC
@@ -430,9 +433,9 @@ List also allows displaying device certificate information.
     INFO: Task completed successfully
 
 
-Similar to the list task, show-template tasks can be used to display items from a target vManage, or a backup. With show-template, additional details about the selected items are displayed. The item id, name, or a regular expression can be used to select which item(s) to display.
+Similar to the list task, show-template tasks can be used to display items from a target vManage, or a backup. With show-template values, additional details about the selected items are displayed. A regular expression can be used to select which device templates to inspect. If the inspected templates have devices attached their values are displayed.
 
-    % sdwan show-template values --name DC_BASIC
+    % sdwan show-template values --regex DC_BASIC
     *** Template DC_BASIC, device vedge-dc1 ***
     +===============================================================================================================================================+
     | Name                              | Value                                | Variable                                                           |
@@ -644,6 +647,7 @@ The show task provides commands to display operational data from devices.
 
 They all share the same set of options to filter devices to display:
   - --regex <regex> - Regular expression matching device name, type or model to display
+  - --not-regex <regex> - Regular expression matching device name, type or model NOT to display.
   - --reachable - Display only reachable devices
   - --site <id> - Filter by site ID
   - --system-ip <ipv4> - Filter by system IP
@@ -764,6 +768,12 @@ This is to prevent the shell from interpreting special characters that could be 
 Matching done by --regex is un-anchored. That is, unless anchor marks are provided (e.g. ^ or $), the specified pattern matches if present anywhere in the string. In other words, this is a search function.
 
 The regular expression syntax supported is described in https://docs.python.org/3/library/re.html
+
+#### Behavior of --regex and --not-regex:
+- --regex is used to select items to include (i.e. perform task operation)
+- --not-regex is used to define items not to include. That is, select all items, except the ones matching --not-regex.
+- When --regex match on multiple fields (e.g. item name, item ID), an item is selected if the item name OR item ID match the regular expression provided.
+- With --not-regex, when it matches on multiple fields (e.g. item name, item ID), all items are selected, except the ones where item name OR item ID match the regular expression.
 
 ### Migrate task template name manipulation
 

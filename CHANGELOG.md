@@ -1,15 +1,25 @@
+Sastre 1.14 [June xx, 2021]
+============================
+
+#### Enhancements:
+- [#22] Most tasks with a --regex option now also include a --not-regex option. While --regex is used to select items to 
+  include (i.e. perform task operation), --not-regex is used to define items not to include. That is, include all items, 
+  except the ones matching --not-regex.
+- [#79] "show-template values" now have --regex and --not-regex matching on template name or ID, which is similar to the
+  behavior of the "list config" task. The individual --name and --id options became redundant and were removed.
+
 Sastre 1.13 [April 30, 2021]
 ============================
 
 #### Enhancements:
-[#67] Performance improvements to show realtime commands. Thread pool is now used to send multiple requests in parallel. 
+- [#67] Performance improvements to show realtime commands. Thread pool is now used to send multiple requests in parallel. 
       Pool size is fixed to 10.
-[#68] Added show realtime omp adv-routes command, displaying advertised OMP routes from one or more WAN edges / vSmarts.
-[#71] Validation of template attach/detach, in a testbed with 200 devices. Action timeout increased to 20 minutes.
-[#72] Show-template values now by default display values for all templates with attachments when no match criteria is
-   provided (i.e. no --name, --id or --regex).
-[#70] All show command output can now be exported as CSV files.
-[#60] Show task has been expanded with state and statistics subcommands.
+- [#68] Added show realtime omp adv-routes command, displaying advertised OMP routes from one or more WAN edges / vSmarts.
+- [#71] Validation of template attach/detach, in a testbed with 200 devices. Action timeout increased to 20 minutes.
+- [#72] Show-template values now by default display values for all templates with attachments when no match criteria is
+  provided (i.e. no --name, --id or --regex).
+- [#70] All show command output can now be exported as CSV files.
+- [#60] Show task has been expanded with state and statistics subcommands.
 
 Sastre 1.12 [March 10, 2021]
 ============================

@@ -20,11 +20,11 @@ class TaskRestore(Task):
         task_parser.add_argument('--workdir', metavar='<directory>', type=existing_file_type,
                                  default=default_workdir(target_address),
                                  help='restore source (default: %(default)s)')
-        task_parser.add_argument('--regex', metavar='<regex>', type=regex_type,
-                                 help='regular expression matching item names to be restored, within selected tags')
-        task_parser.add_argument('--not-regex', metavar='<not_regex>', type=regex_type,
-                                 help='inverse regular expression matching item names to be restored, '
-                                      'within selected tags')
+        mutex = task_parser.add_mutually_exclusive_group()
+        mutex.add_argument('--regex', metavar='<regex>', type=regex_type,
+                           help='regular expression matching item names to restore, within selected tags.')
+        mutex.add_argument('--not-regex', metavar='<regex>', type=regex_type,
+                           help='regular expression matching item names NOT to restore, within selected tags.')
         task_parser.add_argument('--dryrun', action='store_true',
                                  help='dry-run mode. Items to be restored are listed but not pushed to vManage.')
         task_parser.add_argument('--attach', action='store_true',
@@ -110,11 +110,10 @@ class TaskRestore(Task):
                         self.log_debug('Will skip read-only %s %s', info, item.name)
                         continue
 
+                    regex = parsed_args.regex or parsed_args.not_regex
                     item_matches = (
                         (parsed_args.tag == CATALOG_TAG_ALL or parsed_args.tag == tag) and
-                        (parsed_args.regex is None or regex_search(parsed_args.regex, item.name) and
-                         (parsed_args.not_regex is None or regex_search(parsed_args.not_regex, item.name,
-                                                                        inverse=True)))
+                        (regex is None or regex_search(regex, item.name, inverse=parsed_args.regex is None))
                     )
                     if item_matches:
                         match_set.add(item_id)
