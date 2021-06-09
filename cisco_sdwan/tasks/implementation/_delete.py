@@ -15,11 +15,11 @@ class TaskDelete(Task):
         task_parser.prog = f'{task_parser.prog} delete'
         task_parser.formatter_class = argparse.RawDescriptionHelpFormatter
 
-        task_parser.add_argument('--regex', metavar='<regex>', type=regex_type,
-                                 help='regular expression matching item names to be deleted, within selected tags')
-        task_parser.add_argument('--not-regex', metavar='<not_regex>', type=regex_type,
-                                 help='Inverse regular expression matching item names to be deleted, within selected '
-                                      'tags.')
+        mutex = task_parser.add_mutually_exclusive_group()
+        mutex.add_argument('--regex', metavar='<regex>', type=regex_type,
+                           help='regular expression matching item names to delete, within selected tags.')
+        mutex.add_argument('--not-regex', metavar='<regex>', type=regex_type,
+                           help='regular expression matching item names NOT to delete, within selected tags.')
         task_parser.add_argument('--dryrun', action='store_true',
                                  help='dry-run mode. Items matched for removal are listed but not deleted.')
         task_parser.add_argument('--detach', action='store_true',
@@ -66,12 +66,12 @@ class TaskDelete(Task):
 
         for tag in ordered_tags(parsed_args.tag, parsed_args.tag != CATALOG_TAG_ALL):
             self.log_info('Inspecting %s items', tag)
+            regex = parsed_args.regex or parsed_args.not_regex
             matched_item_iter = (
                 (item_name, item_id, item_cls, info)
                 for _, info, index, item_cls in self.index_iter(api, catalog_iter(tag, version=api.server_version))
                 for item_id, item_name in index
-                if (parsed_args.regex is None or regex_search(parsed_args.regex, item_name)) and
-                   (parsed_args.not_regex is None or regex_search(parsed_args.not_regex, item_name, inverse=True))
+                if regex is None or regex_search(regex, item_name, inverse=parsed_args.regex is None)
             )
             for item_name, item_id, item_cls, info in matched_item_iter:
                 item = item_cls.get(api, item_id)

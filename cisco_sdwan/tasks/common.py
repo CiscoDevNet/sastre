@@ -21,23 +21,18 @@ from cisco_sdwan.base.models_vmanage import (DeviceTemplate, DeviceTemplateValue
                                              Device)
 
 
-def regex_search(regex, *fields, **kwargs):
+def regex_search(regex: str, *fields: str, inverse: bool = False) -> bool:
     """
-    Execute regular expression search on provided fields. Match fields in the order provided, stop on first match.
+    Execute regular expression search on provided fields. Match fields in the order provided. Behavior is determined
+    by the inverse field. With inverse False (default), returns True (i.e. match) if pattern matches any field. When
+    inverse is True, returns True if pattern does not match all fields
     :param regex: Pattern to match
     :param fields: One or more strings to match
+    :param inverse: False (default), or True to invert the match behavior.
     :return: True if a match is found on any field, False otherwise.
     """
-    if kwargs.get('inverse'):
-        for match_field in fields:
-            if not re.search(regex, match_field):
-                return True
-        return False
-    else:
-        for match_field in fields:
-            if re.search(regex, match_field):
-                return True
-        return False
+    op_fn = all if inverse else any    # Logical AND across all fields, else logical OR
+    return op_fn(inverse ^ bool(re.search(regex, match_field)) for match_field in fields)
 
 
 class Tally:
@@ -490,8 +485,7 @@ def chopper(section_size: int):
 
 
 def device_iter(api: Rest, match_name_regex: Optional[str] = None, match_reachable: bool = False,
-                match_site_id: Optional[str] = None, match_system_ip: Optional[str] = None,
-                match_inverse: bool = False) -> Iterator[tuple]:
+                match_site_id: Optional[str] = None, match_system_ip: Optional[str] = None) -> Iterator[tuple]:
     """
     Return an iterator over device inventory, filtered by optional conditions.
     :param api: Instance of Rest API
@@ -505,7 +499,7 @@ def device_iter(api: Rest, match_name_regex: Optional[str] = None, match_reachab
         (uuid, name)
         for uuid, name, system_ip, site_id, reachability, *_ in Device.get_raise(api).extended_iter(default='-')
         if (
-            (match_name_regex is None or regex_search(match_name_regex, name, inverse=match_inverse)) and
+            (match_name_regex is None or regex_search(match_name_regex, name)) and
             (not match_reachable or reachability == 'reachable') and
             (match_site_id is None or site_id == match_site_id) and
             (match_system_ip is None or system_ip == match_system_ip)
