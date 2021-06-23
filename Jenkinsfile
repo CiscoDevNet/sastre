@@ -1,18 +1,9 @@
 pipeline {
     environment {
         GIT_CREDS = credentials('345c79bc-9def-4981-94b5-d8190fdd2304') // as-ci-user.gen
-        WEBEX_ROOM = 'Y2lzY29zcGFyazovL3VzL1JPT00vMGEwMDA2YjAtNDQ2ZC0xMWViLWJmODEtMDlmNGNmYTBjNmU3' // Room: H@H Team7 Accordion - CICD Notifications
-        WEBEX_CREDS = '0599727a-b4c8-4605-bb91-a7925e3a7ea4'    // cicdnotifier@webex.bot
-        // DOCKER_CREDS = 'tbd'
-        // DOCKER_REGISTRY_ = 'containers.cisco.com'
-        // DOCKER_ORG = 'tbd'
-        // DOCKER_REPO = 'tbd'
-        // DOCKER_PATH = "$DOCKER_REGISTRY_/$DOCKER_ORG"
-        LAB_SERVER_USER = 'cisco'
-        LAB_SERVER_IP = '152.22.242.56'
-        CMDS = "cd /home/cisco && mv CXHackHome_Team7Accordion_master Team7Accordion-\$(date '+%Y.%m.%d-%H.%M')"
+        WEBEX_ROOM = 'Y2lzY29zcGFyazovL3VzL1JPT00vZTMxNTUzZjAtZDNiMS0xMWViLWJjNzktMTUxMzcwZjZlOTYz' // Sastre - CICD Notifications
+        WEBEX_CREDS = '16fdd237-afe3-4d7f-9fe5-7bde6d1275e0'    // sastre-cicd@webex.bot
     }
-    // agent { label "AMER-REGION && !amer-sio-slv01 && !amer-sio-slv07 && !amer-sio-slv09" }
     agent { label "AMER-REGION" }
     stages {
         stage("Build App") {
@@ -22,7 +13,7 @@ pipeline {
         }
         stage("Code Quality Test") {
             steps {
-                echo "Build"
+                echo "Code Quality"
             }
         }
         stage("Deploy to Staging") {
@@ -36,11 +27,6 @@ pipeline {
             steps {
                 echo "Deploy to Staging"
 
-                sshagent(['24c6d4c8-1949-491d-8d9b-ae5f53108bc3']) {
-                    // sh "ssh -o StrictHostKeyChecking=no ${DEV_SERVER_USER}@${DEV_SERVER_IP} \"${cmds}\""
-                    sh "ssh -o StrictHostKeyChecking=no ${LAB_SERVER_USER}@${LAB_SERVER_IP} -oKexAlgorithms=+diffie-hellman-group1-sha1 -p 8113 \"${CMDS}\""
-                    sh "scp -o StrictHostKeyChecking=no -o KexAlgorithms=+diffie-hellman-group1-sha1 -P 8113 -r ${env.WORKSPACE} ${LAB_SERVER_USER}@${LAB_SERVER_IP}:/home/cisco/"
-                }
             }
         }
     }
