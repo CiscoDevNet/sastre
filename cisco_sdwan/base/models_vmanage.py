@@ -866,6 +866,16 @@ class PolicyDefPriisdnPortIndex(PolicyDefIndex):
     store_file = 'policy_definitions_priisdnport.json'
 
 
+class PolicyDefRuleSet(PolicyDef):
+    api_path = ApiPath('template/policy/definition/ruleset')
+    store_path = ('policy_definitions', 'RuleSet')
+
+
+@register('policy_definition', 'rule set policy definition', PolicyDefRuleSet, min_version='20.4')
+class PolicyDefRuleSetIndex(PolicyDefIndex):
+    api_path = ApiPath('template/policy/definition/ruleset', None, None, None)
+    store_file = 'policy_definitions_ruleset.json'
+
 #
 # Policy lists
 #
@@ -1260,6 +1270,62 @@ class PolicyListTrunkGroup(PolicyList):
 class PolicyListTrunkGroupIndex(PolicyListIndex):
     api_path = ApiPath('template/policy/list/trunkgroup', None, None, None)
     store_file = 'policy_lists_trunkgroup.json'
+
+
+class PolicyAppProbe(PolicyList):
+    api_path = ApiPath('template/policy/list/appprobe')
+    sotre_path = ('policy_lists', 'AppProbe')
+
+
+@register('policy_list', 'probe class builder list', PolicyAppProbe, min_version='20.4')
+class PolicyAppProbeIndex(PolicyListIndex):
+    api_path = ApiPath('template/policy/list/appprobe', None, None, None)
+    store_file = 'policy_lists_appprobe.json'
+
+
+class PolicyListPort(PolicyList):
+    api_path = ApiPath('template/policy/list/port')
+    store_path = ('policy_lists', 'Port')
+
+
+@register('policy_list', 'port list', PolicyListPort, min_version='20.4')
+class PolicyListPortIndex(PolicyListIndex):
+    api_path = ApiPath('template/policy/list/port', None, None, None)
+    store_file = 'policy_lists_port.json'
+
+
+class PolicyListProtocol(PolicyList):
+    api_path = ApiPath('template/policy/list/protocolname')
+    store_path = ('policy_lists', 'Protocol')
+
+
+@register('policy_list', 'protocol list', PolicyListProtocol, min_version='20.4')
+class PolicyListProtocolIndex(PolicyListIndex):
+    api_path = ApiPath('template/policy/list/protocolname', None, None, None)
+    store_file = 'policy_lists_protocol.json'
+
+
+class PolicyListPrefixAll(PolicyList):
+    api_path = ApiPath('template/policy/list/ipprefixall')
+    store_path = ('policy_lists', 'Prefix All')
+
+
+@register('policy_list', 'prefix all list', PolicyListPrefixAll, min_version='20.4')
+class PolicyListPrefixAllIndex(PolicyListIndex):
+    api_path = ApiPath('template/policy/list/ipprefixall', None, None, None)
+    store_file = 'policy_lists_prefix_all.json'
+
+# Review DataPrefixFQDN list with Marcelo, looks like there were problems adding it
+
+class PolicyListDataPrefixFQDN(PolicyList):
+    api_path = ApiPath('template/policy/list/dataprefixfqdn')
+    store_path = ('policy_lists', 'DataPrefixFQDN')
+
+
+@register('policy_list', 'data prefix FQDN list', PolicyListDataPrefixFQDN, min_version='20.4')
+class PolicyListDataPrefixFQDNIndex(PolicyListIndex):
+    api_path = ApiPath('template/policy/list/dataprefixfqdn', None, None, None)
+    store_file = 'policy_lists_dataprefixfqdn.json'
 
 
 #
