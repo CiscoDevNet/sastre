@@ -1274,7 +1274,7 @@ class PolicyListTrunkGroupIndex(PolicyListIndex):
 
 class PolicyAppProbe(PolicyList):
     api_path = ApiPath('template/policy/list/appprobe')
-    sotre_path = ('policy_lists', 'AppProbe')
+    store_path = ('policy_lists', 'AppProbe')
 
 
 @register('policy_list', 'probe class builder list', PolicyAppProbe, min_version='20.4')
