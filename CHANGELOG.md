@@ -10,6 +10,9 @@ Sastre 1.14 [July 13, 2021]
   except the ones matching --not-regex.
 - [#79] "show-template values" now have --regex and --not-regex matching on template name or ID, which is similar to the
   behavior of the "list config" task. The individual --name and --id options became redundant and were removed.
+  
+#### Fixes:
+- [#84] Version validator used by migrate task was violating Dlint DUO138. This has been fixed.
 
 Sastre 1.13 [April 30, 2021]
 ============================

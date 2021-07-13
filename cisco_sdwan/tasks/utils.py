@@ -178,7 +178,7 @@ def site_id_type(site_id_str):
 
 def version_type(version_str):
     # Development versions may follow this format: '20.1.999-98'
-    if re.match(r'(\d+[.-])*\d+$', version_str) is None:
+    if re.match(r'\d+([.-]\d+){1,3}$', version_str) is None:
         raise argparse.ArgumentTypeError(f'"{version_str}" is not a valid version identifier.')
 
     return '.'.join(([str(int(v)) for v in version_str.replace('-', '.').split('.')] + ['0', ])[:2])
