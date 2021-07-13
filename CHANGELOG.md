@@ -1,7 +1,10 @@
-Sastre 1.14 [June xx, 2021]
+Sastre 1.14 [July 13, 2021]
 ============================
 
 #### Enhancements:
+- [#55] Support for vManage 20.4.x and included new API endpoints:
+    - Policy lists: Protocol, Port, App-Probe
+    - Policy definitions: Rule Set
 - [#22] Most tasks with a --regex option now also include a --not-regex option. While --regex is used to select items to 
   include (i.e. perform task operation), --not-regex is used to define items not to include. That is, include all items, 
   except the ones matching --not-regex.
@@ -13,7 +16,7 @@ Sastre 1.13 [April 30, 2021]
 
 #### Enhancements:
 - [#67] Performance improvements to show realtime commands. Thread pool is now used to send multiple requests in parallel. 
-      Pool size is fixed to 10.
+  Pool size is fixed at 10.
 - [#68] Added show realtime omp adv-routes command, displaying advertised OMP routes from one or more WAN edges / vSmarts.
 - [#71] Validation of template attach/detach, in a testbed with 200 devices. Action timeout increased to 20 minutes.
 - [#72] Show-template values now by default display values for all templates with attachments when no match criteria is
