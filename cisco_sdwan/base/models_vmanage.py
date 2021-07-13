@@ -189,7 +189,7 @@ class ControlInventory(IndexApiItem):
 #
 class DeviceConfig(ConfigItem):
     api_path = ApiPath('template/config/attached', None, None, None)
-    store_path = ('device_configs', )
+    store_path = ('device_configs',)
     store_file = '{item_name}.txt'
 
     def save(self, node_dir, ext_name=False, item_name=None, item_id=None):
@@ -244,7 +244,7 @@ class CliOrFeatureApiPath:
         return self.api_path_cli if is_cli_template else self.api_path_feature
 
 
-# Set of device types that use cedge template class. Updated as of vManage 20.3.2
+# Set of device types that use cedge template class. Updated as of vManage 20.4.1
 CEDGE_SET = {
     "vedge-CSR-1000v", "vedge-ISR-4331", "vedge-ISR-4431", "vedge-ISR-4461", "vedge-ISR-4451-X",
     "vedge-C8300-1N1S-4T2X", "vedge-IR-1101", "vedge-C8300-1N1S-6T", "vedge-ISRv", "vedge-ISR-4321", "vedge-ISR-4351",
@@ -259,7 +259,15 @@ CEDGE_SET = {
     "vedge-C1127-8PLTEP", "vedge-C1161-8P", "vedge-C1117-4P", "vedge-C1117-4PM", "vedge-C1117-4PLTEEA",
     "vedge-C1126X-8PLTEP", "vedge-C1127X-8PLTEP", "vedge-C1121X-8PLTEPW", "vedge-C1127X-8PMLTEP", "vedge-C1127-8PMLTEP",
     "vedge-C1117-4PLTELA", "vedge-nfvis-ENCS5400", 'vedge-C1113-8PLTEW', 'vedge-ESR-6300', "vedge-C8300-2N2S-6T",
-    "vedge-C8300-2N2S-4T2X", "vedge-C1117-4PMLTEEA"
+    "vedge-C8300-2N2S-4T2X", "vedge-C1117-4PMLTEEA", "vedge-C1113-8PW", "vedge-ISR1100-4GLTENA-XE",
+    "vedge-C1117-4PMLTEEAWE", "vedge-ASR-1006-X", "vedge-ISR1100X-6G-XE", "vedge-C1113-8PM", "vedge-C1116-4PWE",
+    "vedge-IR-1835", "vedge-C8500L-8S4X", "vedge-C1113-8PLTEEAW", "vedge-C1117-4PLTELAWZ", "vedge-C1112-8PWE",
+    "cellular-gateway-CG522-E", "vedge-C1117-4PLTEEAW", "vedge-C1116-4PLTEEAWE", "vedge-C1112-8PLTEEAWE",
+    "vedge-C1113-8PLTELAWZ", "cellular-gateway-CG418-E", "vedge-ISR1100-6G-XE", "vedge-C1113-8PMWE", "vedge-C1111-4PW",
+    "vedge-C1113-8PLTELA", "vedge-C1118-8P", "vedge-C1112-8P", "vedge-ISR1100-4G-XE", "vedge-IR-1833",
+    "vedge-ISR1100X-4G-XE", "vedge-C1117-4PMWE", "vedge-IR-1821", "vedge-C1161-8PLTEP", "vedge-ISR1100-4GLTEGB-XE",
+    "vedge-nfvis-C8200-UCPE", "vedge-C8000V", "vedge-C1117-4PW", "vedge-C8200-1N-4T", "vedge-C1112-8PLTEEA",
+    "vedge-C1113-8P", "vedge-IR-1831"
 }
 
 
@@ -271,7 +279,7 @@ class DeviceTemplate(ConfigItem):
     store_path = ('device_templates', 'template')
     store_file = '{item_name}.json'
     name_tag = 'templateName'
-    post_filtered_tags = ('feature', )
+    post_filtered_tags = ('feature',)
     skip_cmp_tag_set = {'createdOn', 'createdBy', 'lastUpdatedBy', 'lastUpdatedOn', '@rid', 'owner', 'infoTag',
                         'templateAttached', 'templateConfigurationEdited'}
 
@@ -373,7 +381,7 @@ class DeviceTemplateValues(ConfigItem):
 
 class FeatureTemplate(ConfigItem):
     api_path = ApiPath('template/feature/object', 'template/feature')
-    store_path = ('feature_templates', )
+    store_path = ('feature_templates',)
     store_file = '{item_name}.json'
     id_tag = 'templateId'
     name_tag = 'templateName'
@@ -871,10 +879,11 @@ class PolicyDefRuleSet(PolicyDef):
     store_path = ('policy_definitions', 'RuleSet')
 
 
-@register('policy_definition', 'rule set policy definition', PolicyDefRuleSet, min_version='20.4')
+@register('policy_definition', 'rule-set security policy definition', PolicyDefRuleSet, min_version='20.4')
 class PolicyDefRuleSetIndex(PolicyDefIndex):
     api_path = ApiPath('template/policy/definition/ruleset', None, None, None)
     store_file = 'policy_definitions_ruleset.json'
+
 
 #
 # Policy lists
@@ -972,17 +981,6 @@ class PolicyListUmbrellaDataIndex(PolicyListIndex):
     store_file = 'policy_lists_umbrelladata.json'
 
 
-class PolicyListPrefix(PolicyList):
-    api_path = ApiPath('template/policy/list/prefix')
-    store_path = ('policy_lists', 'Prefix')
-
-
-@register('policy_list', 'prefix list', PolicyListPrefix)
-class PolicyListPrefixIndex(PolicyListIndex):
-    api_path = ApiPath('template/policy/list/prefix', None, None, None)
-    store_file = 'policy_lists_prefix.json'
-
-
 class PolicyListSite(PolicyList):
     api_path = ApiPath('template/policy/list/site')
     store_path = ('policy_lists', 'Site')
@@ -1007,6 +1005,7 @@ class PolicyListExtcommunityIndex(PolicyListIndex):
 
 # Data Prefix All (template/policy/list/dataprefixall) was purposely not included as it seems to collide with, meaning
 # error, Data Prefix (template/policy/list/dataprefix).
+# Data Prefix FQDN (template/policy/list/dataprefixfqdn) was also not included for the same reason.
 class PolicyListDataprefix(PolicyList):
     api_path = ApiPath('template/policy/list/dataprefix')
     store_path = ('policy_lists', 'DataPrefix')
@@ -1016,6 +1015,17 @@ class PolicyListDataprefix(PolicyList):
 class PolicyListDataprefixIndex(PolicyListIndex):
     api_path = ApiPath('template/policy/list/dataprefix', None, None, None)
     store_file = 'policy_lists_dataprefix.json'
+
+
+class PolicyListDataipv6prefix(PolicyList):
+    api_path = ApiPath('template/policy/list/dataipv6prefix')
+    store_path = ('policy_lists', 'DataIPv6Prefix')
+
+
+@register('policy_list', 'data-ipv6-prefix list', PolicyListDataipv6prefix)
+class PolicyListDataipv6prefixIndex(PolicyListIndex):
+    api_path = ApiPath('template/policy/list/dataipv6prefix', None, None, None)
+    store_file = 'policy_lists_dataipv6prefix.json'
 
 
 class PolicyListMirror(PolicyList):
@@ -1106,15 +1116,17 @@ class PolicyListTlocIndex(PolicyListIndex):
     store_file = 'policy_lists_tloc.json'
 
 
-class PolicyListDataipv6prefix(PolicyList):
-    api_path = ApiPath('template/policy/list/dataipv6prefix')
-    store_path = ('policy_lists', 'DataIPv6Prefix')
+# IP Prefix All (template/policy/list/ipprefixall) was purposely not included as it seems to collide with, meaning
+# error, IP Prefix (template/policy/list/prefix).
+class PolicyListPrefix(PolicyList):
+    api_path = ApiPath('template/policy/list/prefix')
+    store_path = ('policy_lists', 'Prefix')
 
 
-@register('policy_list', 'data-ipv6-prefix list', PolicyListDataipv6prefix)
-class PolicyListDataipv6prefixIndex(PolicyListIndex):
-    api_path = ApiPath('template/policy/list/dataipv6prefix', None, None, None)
-    store_file = 'policy_lists_dataipv6prefix.json'
+@register('policy_list', 'prefix list', PolicyListPrefix)
+class PolicyListPrefixIndex(PolicyListIndex):
+    api_path = ApiPath('template/policy/list/prefix', None, None, None)
+    store_file = 'policy_lists_prefix.json'
 
 
 class PolicyListIpv6prefix(PolicyList):
@@ -1126,6 +1138,17 @@ class PolicyListIpv6prefix(PolicyList):
 class PolicyListIpv6prefixIndex(PolicyListIndex):
     api_path = ApiPath('template/policy/list/ipv6prefix', None, None, None)
     store_file = 'policy_lists_ipv6prefix.json'
+
+
+class PolicyListFQDN(PolicyList):
+    api_path = ApiPath('template/policy/list/fqdn')
+    store_path = ('policy_lists', 'FQDN')
+
+
+@register('policy_list', 'FQDN list', PolicyListFQDN, min_version='20.1')
+class PolicyListFQDNIndex(PolicyListIndex):
+    api_path = ApiPath('template/policy/list/fqdn', None, None, None)
+    store_file = 'policy_lists_fqdn.json'
 
 
 class PolicyListLocaldomain(PolicyList):
@@ -1171,28 +1194,6 @@ class PolicyListTGApiKey(PolicyList):
 class PolicyListTGApiKeyIndex(PolicyListIndex):
     api_path = ApiPath('template/policy/list/tgapikey', None, None, None)
     store_file = 'policy_lists_tgapikey.json'
-
-
-class PolicyListFQDN(PolicyList):
-    api_path = ApiPath('template/policy/list/fqdn')
-    store_path = ('policy_lists', 'FQDN')
-
-
-@register('policy_list', 'FQDN list', PolicyListFQDN, min_version='20.1')
-class PolicyListFQDNIndex(PolicyListIndex):
-    api_path = ApiPath('template/policy/list/fqdn', None, None, None)
-    store_file = 'policy_lists_fqdn.json'
-
-# Shows up in SWAGGER for 20.1 but it is failing to be retrieved
-# class PolicyListDataPrefixFQDN(PolicyList):
-#     api_path = ApiPath('template/policy/list/dataprefixfqdn')
-#     store_path = ('policy_lists', 'DataPrefixFQDN')
-#
-#
-# @register('policy_list', 'data prefix FQDN list', PolicyListDataPrefixFQDN)
-# class PolicyListDataPrefixFQDNIndex(PolicyListIndex):
-#    api_path = ApiPath('template/policy/list/dataprefixfqdn', None, None, None)
-#    store_file = 'policy_lists_dataprefixfqdn.json'
 
 
 class PolicyListTransRules(PolicyList):
@@ -1277,7 +1278,7 @@ class PolicyAppProbe(PolicyList):
     store_path = ('policy_lists', 'AppProbe')
 
 
-@register('policy_list', 'probe class builder list', PolicyAppProbe, min_version='20.4')
+@register('policy_list', 'app-probe class list', PolicyAppProbe, min_version='20.4')
 class PolicyAppProbeIndex(PolicyListIndex):
     api_path = ApiPath('template/policy/list/appprobe', None, None, None)
     store_file = 'policy_lists_appprobe.json'
@@ -1288,7 +1289,7 @@ class PolicyListPort(PolicyList):
     store_path = ('policy_lists', 'Port')
 
 
-@register('policy_list', 'port list', PolicyListPort, min_version='20.4')
+@register('policy_list', 'port security list', PolicyListPort, min_version='20.4')
 class PolicyListPortIndex(PolicyListIndex):
     api_path = ApiPath('template/policy/list/port', None, None, None)
     store_file = 'policy_lists_port.json'
@@ -1299,33 +1300,10 @@ class PolicyListProtocol(PolicyList):
     store_path = ('policy_lists', 'Protocol')
 
 
-@register('policy_list', 'protocol list', PolicyListProtocol, min_version='20.4')
+@register('policy_list', 'protocol security list', PolicyListProtocol, min_version='20.4')
 class PolicyListProtocolIndex(PolicyListIndex):
     api_path = ApiPath('template/policy/list/protocolname', None, None, None)
     store_file = 'policy_lists_protocol.json'
-
-
-class PolicyListPrefixAll(PolicyList):
-    api_path = ApiPath('template/policy/list/ipprefixall')
-    store_path = ('policy_lists', 'Prefix All')
-
-
-@register('policy_list', 'prefix all list', PolicyListPrefixAll, min_version='20.4')
-class PolicyListPrefixAllIndex(PolicyListIndex):
-    api_path = ApiPath('template/policy/list/ipprefixall', None, None, None)
-    store_file = 'policy_lists_prefix_all.json'
-
-# Review DataPrefixFQDN list with Marcelo, looks like there were problems adding it
-
-class PolicyListDataPrefixFQDN(PolicyList):
-    api_path = ApiPath('template/policy/list/dataprefixfqdn')
-    store_path = ('policy_lists', 'DataPrefixFQDN')
-
-
-@register('policy_list', 'data prefix FQDN list', PolicyListDataPrefixFQDN, min_version='20.4')
-class PolicyListDataPrefixFQDNIndex(PolicyListIndex):
-    api_path = ApiPath('template/policy/list/dataprefixfqdn', None, None, None)
-    store_file = 'policy_lists_dataprefixfqdn.json'
 
 
 #
@@ -1354,7 +1332,7 @@ class SettingsVbond(ConfigItem):
 #
 class EdgeCertificate(IndexConfigItem):
     api_path = ApiPath('certificate/vedge/list', 'certificate/save/vedge/list', None, None)
-    store_path = ('certificates', )
+    store_path = ('certificates',)
     store_file = 'edge_certificates.json'
     iter_fields = ('uuid', 'validity')
 
@@ -1417,7 +1395,7 @@ class BfdSessions(RealtimeItem):
 @op_register('control', 'connections', 'Control connections')
 class DeviceControlConnections(RealtimeItem):
     api_path = ApiPath('device/control/connections', None, None, None)
-    fields_std = ('system_ip',  'site_id', 'peer_type', 'local_color', 'remote_color', 'state')
+    fields_std = ('system_ip', 'site_id', 'peer_type', 'local_color', 'remote_color', 'state')
     fields_ext = ('private_ip', 'private_port', 'public_ip', 'public_port', 'instance', 'protocol', 'domain_id')
 
 
@@ -1449,7 +1427,7 @@ class AppRouteStats(RealtimeItem):
 class AppRouteSlaClass(RealtimeItem):
     api_path = ApiPath('device/app-route/sla-class', None, None, None)
     fields_std = ('name', 'loss', 'latency', 'jitter')
-    fields_ext = ('index', )
+    fields_ext = ('index',)
 
 
 @op_register('omp', 'summary', 'OMP summary')
@@ -1485,7 +1463,7 @@ class DeviceTunnelStats(RealtimeItem):
 class DeviceSoftware(RealtimeItem):
     api_path = ApiPath('device/software', None, None, None)
     fields_std = ('version', 'active', 'default')
-    fields_ext = ('confirmed', )
+    fields_ext = ('confirmed',)
 
 
 @op_register('dpi', 'summary', 'DPI summary')
@@ -1555,7 +1533,7 @@ class BulkBfdSessions(BulkStateItem):
 @op_register('control', 'connections', 'Control connections')
 class BulkControlConnections(BulkStateItem):
     api_path = ApiPath('data/device/state/ControlConnection', None, None, None)
-    fields_std = ('system_ip',  'site_id', 'peer_type', 'local_color', 'remote_color', 'state')
+    fields_std = ('system_ip', 'site_id', 'peer_type', 'local_color', 'remote_color', 'state')
     fields_ext = ('private_ip', 'private_port', 'public_ip', 'public_port', 'instance', 'protocol', 'domain_id',
                   'uptime_date')
 
@@ -1588,4 +1566,4 @@ class BulkInterfaceCedge(BulkStateItem):
 class BulkOmpPeers(BulkStateItem):
     api_path = ApiPath('data/device/state/OMPPeer', None, None, None)
     fields_std = ('peer', 'type', 'site_id', 'state')
-    fields_ext = ('domain_id', )
+    fields_ext = ('domain_id',)
