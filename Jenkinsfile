@@ -30,17 +30,26 @@ pipeline {
                 echo "Quality test"
             }
         }
-        stage("Deploy to Staging") {
+        stage("Publish") {
+            options { skipDefaultCheckout true }
+            steps {
+                withDockerRegistry([ credentialsId: "$ECH_CREDENTIALS", url: "$REGISTRY_URL" ]) {
+                    sh """
+                        docker tag $ECH_PATH:$BRANCH_NAME $ECH_PATH:latest
+                        docker push $ECH_PATH:latest
+                    """
+                }
+            }
             when {
-                anyOf {
+                allOf {
                     buildingTag()
-                    branch 'master'
+                    expression {
+                        MASTER_COMMIT = sh(returnStdout: true, script: "git rev-parse origin/master").trim()
+                        LATEST_TAG = sh(returnStdout: true, script: "git rev-list -n 1 ${TAG_NAME}").trim()
+                        return MASTER_COMMIT == LATEST_TAG
+                    }
                 }
                 beforeAgent true
-            }
-            steps {
-                echo "Deploy to Staging"
-
             }
         }
     }
