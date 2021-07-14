@@ -41,7 +41,7 @@ pipeline {
                 }
             }
             when {
-                allOf {
+                anyOf {
                     buildingTag()
                     branch 'master'
                 }
