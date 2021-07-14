@@ -43,11 +43,7 @@ pipeline {
             when {
                 allOf {
                     buildingTag()
-                    expression {
-                        MASTER_COMMIT = sh(returnStdout: true, script: "git rev-parse origin/master").trim()
-                        LATEST_TAG = sh(returnStdout: true, script: "git rev-list -n 1 ${TAG_NAME}").trim()
-                        return MASTER_COMMIT == LATEST_TAG
-                    }
+                    branch 'master'
                 }
                 beforeAgent true
             }
