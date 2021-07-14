@@ -26,23 +26,8 @@ pipeline {
             }
         }
         stage("Code Quality Test") {
-            agent {
-                docker {
-                    image 'containers.cisco.com/aide/static-analysis-tools:v2'
-                    reuseNode true
-                }
-            }
             steps {
-                sh '''
-                    cd ${WORKSPACE}
-                    make tox
-                    make display-coverage-report
-                '''
-            }
-            post {
-                success {
-                    junit 'build/reports/**/*.xml'
-                }
+                echo "Quality test"
             }
         }
         stage("Deploy to Staging") {
