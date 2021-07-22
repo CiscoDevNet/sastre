@@ -244,7 +244,7 @@ class CliOrFeatureApiPath:
         return self.api_path_cli if is_cli_template else self.api_path_feature
 
 
-# Set of device types that use cedge template class. Updated as of vManage 20.4.1
+# Set of device types that use cedge template class. Updated as of vManage 20.5.1
 CEDGE_SET = {
     "vedge-CSR-1000v", "vedge-ISR-4331", "vedge-ISR-4431", "vedge-ISR-4461", "vedge-ISR-4451-X",
     "vedge-C8300-1N1S-4T2X", "vedge-IR-1101", "vedge-C8300-1N1S-6T", "vedge-ISRv", "vedge-ISR-4321", "vedge-ISR-4351",
@@ -267,7 +267,7 @@ CEDGE_SET = {
     "vedge-C1113-8PLTELA", "vedge-C1118-8P", "vedge-C1112-8P", "vedge-ISR1100-4G-XE", "vedge-IR-1833",
     "vedge-ISR1100X-4G-XE", "vedge-C1117-4PMWE", "vedge-IR-1821", "vedge-C1161-8PLTEP", "vedge-ISR1100-4GLTEGB-XE",
     "vedge-nfvis-C8200-UCPE", "vedge-C8000V", "vedge-C1117-4PW", "vedge-C8200-1N-4T", "vedge-C1112-8PLTEEA",
-    "vedge-C1113-8P", "vedge-IR-1831"
+    "vedge-C1113-8P", "vedge-IR-1831", "vedge-C8200L-1N-4T", "vedge-nfvis-C8200-UCPEVM"
 }
 
 
