@@ -12,7 +12,7 @@ import json
 import sys
 from pathlib import Path
 from requests.exceptions import ConnectionError
-from .base.rest_api import Rest, LoginFailedException
+from .base.rest_api import Rest, LoginFailedException, BadTenantException
 from .base.catalog import catalog_size, op_catalog_size
 from .base.models_base import ModelException, SASTRE_ROOT_DIR
 from .__version__ import __version__ as version
@@ -81,6 +81,8 @@ def main():
                             envvar='VMANAGE_PASSWORD', type=non_empty_type,
                             help='password, can also be defined via VMANAGE_PASSWORD environment variable. '
                                  ' If neither is provided user is prompted for password.')
+    cli_parser.add_argument('--tenant', metavar='<tenant>', type=non_empty_type,
+                            help='tenant name, when using provider accounts in multi-tenant deployments.')
     cli_parser.add_argument('--port', metavar='<port>', default=VMANAGE_PORT, action=EnvVar, envvar='VMANAGE_PORT',
                             help='vManage port number, can also be defined via VMANAGE_PORT environment variable '
                                  '(default: %(default)s)')
@@ -140,7 +142,7 @@ def main():
                 parsed_task_args = task.parser(cli_args.task_args, target_address=cli_args.address)
 
             base_url = BASE_URL.format(address=cli_args.address, port=cli_args.port)
-            with Rest(base_url, cli_args.user, cli_args.password, timeout=cli_args.timeout) as api:
+            with Rest(base_url, cli_args.user, cli_args.password, cli_args.tenant, timeout=cli_args.timeout) as api:
                 # Dispatch to the appropriate task handler
                 task.runner(parsed_task_args, api)
 
@@ -149,5 +151,5 @@ def main():
             task.runner(parsed_task_args)
 
         task.log_info('Task completed %s', task.outcome('successfully', 'with caveats: {tally}'))
-    except (LoginFailedException, ConnectionError, FileNotFoundError, ModelException) as ex:
+    except (LoginFailedException, BadTenantException, ConnectionError, FileNotFoundError, ModelException) as ex:
         logging.getLogger(__name__).critical(ex)
