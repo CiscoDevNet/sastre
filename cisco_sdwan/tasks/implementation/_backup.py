@@ -56,7 +56,11 @@ class TaskBackup(Task):
             elif edge_certs.save(parsed_args.workdir):
                 self.log_info('Saved WAN edge certificates')
 
-            for inventory, info in ((EdgeInventory.get(api), 'WAN edge'), (ControlInventory.get(api), 'controller')):
+            inventory_list = [(ControlInventory.get(api), 'controller')]
+            if not api.is_provider or api.is_tenant_scope:
+                inventory_list.append((EdgeInventory.get(api), 'WAN edge'))
+
+            for inventory, info in inventory_list:
                 if inventory is None:
                     self.log_error('Failed retrieving %s inventory', info)
                     continue

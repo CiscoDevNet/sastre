@@ -8,20 +8,23 @@ import requests
 import urllib3
 import json
 from time import time
+from typing import Optional
 
 
 class Rest:
-    def __init__(self, base_url, username, password, timeout=20, verify=False):
+    def __init__(self, base_url: str, username: str, password: str, tenant_name: Optional[str] = None,
+                 timeout: int = 20, verify: bool = False):
         self.base_url = base_url
         self.timeout = timeout
         self.verify = verify
         self.session = None
         self.server_facts = None
+        self.is_tenant_scope = False
 
         if not verify:
             urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-        if not self.login(username, password):
+        if not self.login(username, password, tenant_name):
             raise LoginFailedException(f'Login to {self.base_url} failed, check credentials')
 
     def __enter__(self):
@@ -36,7 +39,7 @@ class Rest:
 
         return False
 
-    def login(self, username, password):
+    def login(self, username: str, password: str, tenant_name: Optional[str]) -> bool:
         data = {
             'j_username': username,
             'j_password': password
@@ -63,6 +66,24 @@ class Rest:
 
         self.session.headers['Content-Type'] = 'application/json'
 
+        # Multi-tenant vManage with a provider account, insert vsessionid
+        if tenant_name is not None:
+            if not self.is_multi_tenant or not self.is_provider:
+                raise BadTenantException('Tenant is only applicable to provider accounts in multi-tenant deployments')
+
+            tenant_list = self.get('tenant').get('data')
+            if tenant_list is None:
+                raise RestAPIException('Could not retrieve vManage tenant list')
+
+            for tenant in tenant_list:
+                if tenant_name == tenant['name']:
+                    session_id = self.post({}, 'tenant', tenant['tenantId'], 'vsessionid').get('VSessionId')
+                    self.session.headers['VSessionId'] = session_id
+                    self.is_tenant_scope = True
+                    break
+            else:
+                raise BadTenantException(f'Invalid tenant: {tenant_name}')
+
         return True
 
     def logout(self):
@@ -72,6 +93,14 @@ class Rest:
     @property
     def server_version(self):
         return self.server_facts.get('platformVersion')
+
+    @property
+    def is_multi_tenant(self):
+        return self.server_facts.get('tenancyMode', '') == 'MultiTenant'
+
+    @property
+    def is_provider(self):
+        return self.server_facts.get('userMode', '') == 'provider'
 
     def get(self, *path_entries, **params):
         response = self.session.get(self._url(*path_entries),
@@ -111,15 +140,16 @@ class Rest:
         return f'{self.base_url}/dataservice/{path}'
 
 
-def raise_for_status(response_obj):
-    if response_obj.status_code != requests.codes.ok:
+def raise_for_status(response):
+    if response.status_code != requests.codes.ok:
         try:
-            reply_data = response_obj.json() if response_obj.text else {}
+            reply_data = response.json() if response.text else {}
         except json.decoder.JSONDecodeError:
-            reply_data = {'error': {'message': 'Check user permissions'}} if response_obj.status_code == 403 else {}
+            reply_data = {'error': {'message': 'Check user permissions'}} if response.status_code == 403 else {}
 
-        raise RestAPIException('{r.reason} ({r.status_code}): {error} [{r.request.method} {r.url}]'.format(
-                r=response_obj, error=reply_data.get('error', {}).get('message', 'Unspecified error message')))
+        raise RestAPIException(f'{response.reason} ({response.status_code}): '
+                               f'{reply_data.get("error", {}).get("message", "Unspecified error message")} '
+                               f'[{response.request.method} {response.url}]')
 
 
 def is_version_newer(version_1, version_2):
@@ -148,4 +178,9 @@ class RestAPIException(Exception):
 
 class LoginFailedException(RestAPIException):
     """ Login failure """
+    pass
+
+
+class BadTenantException(RestAPIException):
+    """ Provided tenant is invalid or not applicable """
     pass

@@ -1,3 +1,10 @@
+Sastre 1.14 [xx, 2021]
+============================
+
+#### Enhancements:
+- [#94] Support for multi-tenant vManage deployment.
+
+
 Sastre 1.14 [July 13, 2021]
 ============================
 
