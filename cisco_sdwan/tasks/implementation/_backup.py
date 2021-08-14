@@ -1,6 +1,7 @@
 import argparse
+from typing import Union, Optional
 from cisco_sdwan.__version__ import __doc__ as title
-from cisco_sdwan.base.rest_api import RestAPIException
+from cisco_sdwan.base.rest_api import Rest, RestAPIException
 from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL
 from cisco_sdwan.base.models_base import ServerInfo
 from cisco_sdwan.base.models_vmanage import (DeviceConfig, DeviceConfigRFS, DeviceTemplate, DeviceTemplateAttached,
@@ -36,7 +37,7 @@ class TaskBackup(Task):
                                       'device configurations.')
         return task_parser.parse_args(task_args)
 
-    def runner(self, parsed_args, api, task_output=None):
+    def runner(self, parsed_args, api: Optional[Rest] = None) -> Union[None, list]:
         self.log_info('Starting backup: vManage URL: "%s" -> Local workdir: "%s"', api.base_url, parsed_args.workdir)
 
         # Backup workdir must be empty for a new backup
@@ -120,3 +121,5 @@ class TaskBackup(Task):
                             self.log_info('Done %s %s values', info, item_name)
                     except RestAPIException as ex:
                         self.log_error('Failed backup %s %s values: %s', info, item_name, ex)
+
+        return

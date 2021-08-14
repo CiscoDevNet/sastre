@@ -1,6 +1,8 @@
 import argparse
+from typing import Union, Optional
 from uuid import uuid4
 from cisco_sdwan.__version__ import __doc__ as title
+from cisco_sdwan.base.rest_api import Rest
 from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL, ordered_tags
 from cisco_sdwan.base.models_base import update_ids, ServerInfo
 from cisco_sdwan.base.models_vmanage import DeviceTemplate, FeatureTemplate
@@ -8,7 +10,7 @@ from cisco_sdwan.base.processor import StopProcessorException, ProcessorExceptio
 from cisco_sdwan.migration import factory_cedge_aaa, factory_cedge_global
 from cisco_sdwan.migration.feature_migration import FeatureProcessor
 from cisco_sdwan.migration.device_migration import DeviceProcessor
-from cisco_sdwan.tasks.utils import TaskOptions, existing_file_type, filename_type, version_type, ext_template_type
+from cisco_sdwan.tasks.utils import TaskOptions, existing_workdir_type, filename_type, version_type, ext_template_type
 from cisco_sdwan.tasks.common import clean_dir, Task, TaskException
 
 
@@ -38,16 +40,16 @@ class TaskMigrate(Task):
                                  help='vManage version from source templates (default: %(default)s)')
         task_parser.add_argument('--to', metavar='<version>', type=version_type, dest='to_version', default='20.1',
                                  help='target vManage version for template migration (default: %(default)s)')
-        task_parser.add_argument('--workdir', metavar='<directory>', type=existing_file_type,
+        task_parser.add_argument('--workdir', metavar='<directory>', type=existing_workdir_type,
                                  help='migrate will read from the specified directory instead of target vManage')
 
         return task_parser.parse_args(task_args)
 
     @staticmethod
-    def is_api_required(parsed_args):
+    def is_api_required(parsed_args) -> bool:
         return parsed_args.workdir is None
 
-    def runner(self, parsed_args, api=None, task_output=None):
+    def runner(self, parsed_args, api: Optional[Rest] = None) -> Union[None, list]:
         source_info = f'Local workdir: "{parsed_args.workdir}"' if api is None else f'vManage URL: "{api.base_url}"'
         self.log_info('Starting migrate: %s %s -> %s Local output dir: "%s"', source_info, parsed_args.from_version,
                       parsed_args.to_version, parsed_args.output)
@@ -176,3 +178,5 @@ class TaskMigrate(Task):
 
         except (ProcessorException, TaskException) as ex:
             self.log_critical('Migration aborted: %s', ex)
+
+        return
