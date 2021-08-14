@@ -1,6 +1,7 @@
 import argparse
+from typing import Union, Optional
 from cisco_sdwan.__version__ import __doc__ as title
-from cisco_sdwan.base.rest_api import RestAPIException
+from cisco_sdwan.base.rest_api import Rest, RestAPIException
 from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL, ordered_tags
 from cisco_sdwan.base.models_vmanage import DeviceTemplateIndex
 from cisco_sdwan.tasks.utils import TaskOptions, TagOptions, regex_type
@@ -31,7 +32,7 @@ class TaskDelete(Task):
                                       f'{TagOptions.options()}. Special tag "{CATALOG_TAG_ALL}" selects all items.')
         return task_parser.parse_args(task_args)
 
-    def runner(self, parsed_args, api, task_output=None):
+    def runner(self, parsed_args, api: Optional[Rest] = None) -> Union[None, list]:
         self.log_info('Starting delete%s: vManage URL: "%s"',
                       ', DRY-RUN mode' if parsed_args.dryrun else '', api.base_url)
         log_prefix = 'DRY-RUN: ' if parsed_args.dryrun else ''
@@ -89,3 +90,5 @@ class TaskDelete(Task):
                     self.log_info('Done: Delete %s %s', info, item_name)
                 else:
                     self.log_warning('Failed deleting %s %s', info, item_name)
+
+        return

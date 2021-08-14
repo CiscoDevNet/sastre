@@ -127,11 +127,18 @@ def regex_type(regex_str):
     return regex_str
 
 
-def existing_file_type(workdir_str):
+def existing_workdir_type(workdir_str):
     if not Path(DATA_DIR, workdir_str).exists():
         raise argparse.ArgumentTypeError(f'Work directory "{workdir_str}" not found.')
 
     return workdir_str
+
+
+def existing_file_type(filename_str):
+    if not Path(filename_str).exists():
+        raise argparse.ArgumentTypeError(f'File "{filename_str}" not found.')
+
+    return filename_str
 
 
 def filename_type(name_str):

@@ -76,6 +76,85 @@ class TaskArgs:
         return cls(**kwargs)
 
 
+class Table:
+    DECIMAL_DIGITS = 1  # Number of decimal digits for float values
+
+    def __init__(self, *columns: str, name: Optional[str] = None, meta: Optional[str] = None) -> None:
+        self.header = tuple(columns)
+        self.name = name
+        self.meta = meta
+        self._row_class = namedtuple('Row', (f'column_{i}' for i in range(len(columns))))
+        self._rows = list()
+
+    @staticmethod
+    def process_value(value):
+        return round(value, Table.DECIMAL_DIGITS) if isinstance(value, float) else value
+
+    def add(self, *row_values):
+        self._rows.append(self._row_class(*map(self.process_value, row_values)))
+
+    def add_marker(self):
+        self._rows.append(None)
+
+    def extend(self, row_values_iter):
+        self._rows.extend(self._row_class(*map(self.process_value, row_values)) for row_values in row_values_iter)
+
+    def __iter__(self):
+        return iter(self._rows)
+
+    def __len__(self):
+        total_len = len(self._rows) - self._rows.count(None)
+        return total_len if total_len > 0 else 0
+
+    def __str__(self):
+        return '\n'.join(self.pretty_iter())
+
+    def _column_max_width(self, index):
+        def cell_length(cell_value):
+            return len(str(cell_value))
+
+        return max(
+            cell_length(self.header[index]),
+            max((cell_length(row[index]) for row in self._rows if row is not None)) if len(self) > 0 else 0
+        )
+
+    def pretty_iter(self):
+        def cell_format(width, value):
+            return ' {value:{width}} '.format(value=str(value), width=width-2)
+
+        def border(line_ch: str, int_edge_ch: str = '+', ext_edge_ch: str = '+') -> str:
+            return ext_edge_ch + int_edge_ch.join((line_ch*col_width for col_width in col_width_list)) + ext_edge_ch
+
+        col_width_list = [2+self._column_max_width(index) for index in range(len(self.header))]
+        border_line = border('-')
+        header_border_line = border('=', '=')
+
+        if self.name is not None:
+            yield f"*** {self.name} ***"
+
+        yield header_border_line
+        yield '|' + '|'.join(cell_format(width, value) for width, value in zip(col_width_list, self.header)) + '|'
+        yield header_border_line
+
+        done_content_row = False
+        for row in self._rows:
+            if row is not None:
+                done_content_row = True
+                yield '|' + '|'.join(cell_format(width, value) for width, value in zip(col_width_list, row)) + '|'
+            elif done_content_row:
+                done_content_row = False
+                yield border_line
+
+        if done_content_row:
+            yield border_line
+
+    def save(self, filename):
+        with open(filename, 'w', newline='') as csv_file:
+            writer = csv.writer(csv_file)
+            writer.writerow(self.header)
+            writer.writerows(row for row in self._rows if row is not None)
+
+
 class Task:
     # Configuration parameters for wait_actions
     ACTION_INTERVAL = 10    # seconds
@@ -129,10 +208,14 @@ class Task:
         raise NotImplementedError()
 
     @staticmethod
-    def is_api_required(parsed_args):
+    def is_api_required(parsed_args) -> bool:
         return True
 
-    def runner(self, parsed_args, api, task_output):
+    def runner(self, parsed_args, api: Optional[Rest] = None) -> Union[None, list]:
+        """
+        Execute the task. If the task has some output to the user, that is returned via a list of objects. Objects in
+        that list need to implement the __str__ method. If the task has no output to the user None is returned.
+        """
         raise NotImplementedError()
 
     def index_iter(self, backend, catalog_entry_iter):
@@ -505,82 +588,6 @@ def device_iter(api: Rest, match_name_regex: Optional[str] = None, match_reachab
             (match_system_ip is None or system_ip == match_system_ip)
         )
     )
-
-
-class Table:
-    DECIMAL_DIGITS = 1  # Number of decimal digits for float values
-
-    def __init__(self, *columns: str, name: Optional[str] = None, meta: Optional[str] = None) -> None:
-        self.header = tuple(columns)
-        self.name = name
-        self.meta = meta
-        self._row_class = namedtuple('Row', (f'column_{i}' for i in range(len(columns))))
-        self._rows = list()
-
-    @staticmethod
-    def process_value(value):
-        return round(value, Table.DECIMAL_DIGITS) if isinstance(value, float) else value
-
-    def add(self, *row_values):
-        self._rows.append(self._row_class(*map(self.process_value, row_values)))
-
-    def add_marker(self):
-        self._rows.append(None)
-
-    def extend(self, row_values_iter):
-        self._rows.extend(self._row_class(*map(self.process_value, row_values)) for row_values in row_values_iter)
-
-    def __iter__(self):
-        return iter(self._rows)
-
-    def __len__(self):
-        total_len = len(self._rows) - self._rows.count(None)
-        return total_len if total_len > 0 else 0
-
-    def _column_max_width(self, index):
-        def cell_length(cell_value):
-            return len(str(cell_value))
-
-        return max(
-            cell_length(self.header[index]),
-            max((cell_length(row[index]) for row in self._rows if row is not None)) if len(self) > 0 else 0
-        )
-
-    def pretty_iter(self):
-        def cell_format(width, value):
-            return ' {value:{width}} '.format(value=str(value), width=width-2)
-
-        def border(line_ch: str, int_edge_ch: str = '+', ext_edge_ch: str = '+') -> str:
-            return ext_edge_ch + int_edge_ch.join((line_ch*col_width for col_width in col_width_list)) + ext_edge_ch
-
-        col_width_list = [2+self._column_max_width(index) for index in range(len(self.header))]
-        border_line = border('-')
-        header_border_line = border('=', '=')
-
-        if self.name is not None:
-            yield f"*** {self.name} ***"
-
-        yield header_border_line
-        yield '|' + '|'.join(cell_format(width, value) for width, value in zip(col_width_list, self.header)) + '|'
-        yield header_border_line
-
-        done_content_row = False
-        for row in self._rows:
-            if row is not None:
-                done_content_row = True
-                yield '|' + '|'.join(cell_format(width, value) for width, value in zip(col_width_list, row)) + '|'
-            elif done_content_row:
-                done_content_row = False
-                yield border_line
-
-        if done_content_row:
-            yield border_line
-
-    def save(self, filename):
-        with open(filename, 'w', newline='') as csv_file:
-            writer = csv.writer(csv_file)
-            writer.writerow(self.header)
-            writer.writerows(row for row in self._rows if row is not None)
 
 
 def clean_dir(target_dir_name, max_saved=99):

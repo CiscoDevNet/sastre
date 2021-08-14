@@ -144,11 +144,15 @@ def main():
             base_url = BASE_URL.format(address=cli_args.address, port=cli_args.port)
             with Rest(base_url, cli_args.user, cli_args.password, cli_args.tenant, timeout=cli_args.timeout) as api:
                 # Dispatch to the appropriate task handler
-                task.runner(parsed_task_args, api)
+                task_output = task.runner(parsed_task_args, api)
 
         else:
             # Dispatch to the appropriate task handler without api connection
-            task.runner(parsed_task_args)
+            task_output = task.runner(parsed_task_args)
+
+        # Display task output
+        if task_output:
+            print('\n\n'.join(str(entry) for entry in task_output))
 
         task.log_info('Task completed %s', task.outcome('successfully', 'with caveats: {tally}'))
     except (LoginFailedException, BadTenantException, ConnectionError, FileNotFoundError, ModelException) as ex:

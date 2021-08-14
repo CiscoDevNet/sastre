@@ -1,11 +1,12 @@
 import argparse
+from typing import Union, Optional
 from cisco_sdwan.__version__ import __doc__ as title
-from cisco_sdwan.base.rest_api import RestAPIException, is_version_newer
+from cisco_sdwan.base.rest_api import Rest, RestAPIException, is_version_newer
 from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL, ordered_tags
 from cisco_sdwan.base.models_base import UpdateEval, ServerInfo
 from cisco_sdwan.base.models_vmanage import (DeviceTemplateIndex, PolicyVsmartIndex, EdgeInventory, ControlInventory,
                                              CheckVBond)
-from cisco_sdwan.tasks.utils import TaskOptions, TagOptions, existing_file_type, regex_type, default_workdir
+from cisco_sdwan.tasks.utils import TaskOptions, TagOptions, existing_workdir_type, regex_type, default_workdir
 from cisco_sdwan.tasks.common import regex_search, Task, WaitActionsException
 
 
@@ -17,7 +18,7 @@ class TaskRestore(Task):
         task_parser.prog = f'{task_parser.prog} restore'
         task_parser.formatter_class = argparse.RawDescriptionHelpFormatter
 
-        task_parser.add_argument('--workdir', metavar='<directory>', type=existing_file_type,
+        task_parser.add_argument('--workdir', metavar='<directory>', type=existing_workdir_type,
                                  default=default_workdir(target_address),
                                  help='restore source (default: %(default)s)')
         mutex = task_parser.add_mutually_exclusive_group()
@@ -39,7 +40,7 @@ class TaskRestore(Task):
                                       f'{TagOptions.options()}. Special tag "{CATALOG_TAG_ALL}" selects all items.')
         return task_parser.parse_args(task_args)
 
-    def runner(self, parsed_args, api, task_output=None):
+    def runner(self, parsed_args, api: Optional[Rest] = None) -> Union[None, list]:
         def load_items(index, item_cls):
             item_iter = (
                 (item_id, item_cls.load(parsed_args.workdir, index.need_extended_name, item_name, item_id))
@@ -251,3 +252,5 @@ class TaskRestore(Task):
                         self.wait_actions(api, action_list, 'activating vSmart policy', raise_on_failure=True)
             except (RestAPIException, FileNotFoundError, WaitActionsException) as ex:
                 self.log_critical('Attach failed: %s', ex)
+
+        return
