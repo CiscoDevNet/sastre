@@ -1,8 +1,10 @@
-Sastre 1.14 [xx, 2021]
+Sastre 1.15 [xx, 2021]
 ============================
 
 #### Enhancements:
 - [#94] Support for multi-tenant vManage deployment.
+- Report task has been expanded to include show state and show devices
+- Diff option added to report task, allowing comparison with a previous report.
 
 
 Sastre 1.14 [July 13, 2021]
