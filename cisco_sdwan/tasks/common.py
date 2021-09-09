@@ -8,10 +8,11 @@ import logging
 import time
 import csv
 import re
+import json
 from pathlib import Path
 from shutil import rmtree
 from collections import namedtuple
-from typing import List, Tuple, Iterator, Union, Optional
+from typing import List, Tuple, Iterator, Union, Optional, Any, Iterable
 from cisco_sdwan.base.rest_api import Rest, RestAPIException
 from cisco_sdwan.base.models_base import DATA_DIR
 from cisco_sdwan.base.models_vmanage import (DeviceTemplate, DeviceTemplateValues, DeviceTemplateAttached,
@@ -147,6 +148,19 @@ class Table:
 
         if done_content_row:
             yield border_line
+
+    def dict(self) -> dict:
+        table_dict = {
+            "header": {
+                "name": self.name or "",
+                "title": {column_id: title for column_id, title in zip(self._row_class._fields, self.header)}
+            },
+            "data": [row._asdict() for row in self._rows if row is not None]
+        }
+        return table_dict
+
+    def json(self, **dumps_kwargs: Any) -> str:
+        return json.dumps(self.dict(), **dumps_kwargs)
 
     def save(self, filename):
         with open(filename, 'w', newline='') as csv_file:
@@ -612,3 +626,14 @@ def clean_dir(target_dir_name, max_saved=99):
             rmtree(target_dir, ignore_errors=True)
 
     return False
+
+
+def export_json(table_iter: Iterable[Table], filename: str) -> None:
+    """
+    Export a group (Iterable) of Tables as a JSON encoded file
+    :param table_iter: Tables to export
+    :param filename: Name for the export file
+    """
+    with open(filename, 'w') as export_file:
+        data = [table.dict() for table in table_iter]
+        json.dump(data, export_file, indent=2)
