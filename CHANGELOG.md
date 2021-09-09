@@ -3,6 +3,8 @@ Sastre 1.15 [xx, 2021]
 
 #### Enhancements:
 - [#94] Support for multi-tenant vManage deployment.
+- [#45] All tasks that provide table output (e.g. show, list, etc) have been enhanced to allow exporting those tables as 
+  JSON encoded files. This is done via --json option added to each task.
 - Report task has been expanded to include show state and show devices
 - Diff option added to report task, allowing comparison with a previous report.
 
