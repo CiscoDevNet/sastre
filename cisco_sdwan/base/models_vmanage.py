@@ -1306,6 +1306,28 @@ class PolicyListProtocolIndex(PolicyListIndex):
     store_file = 'policy_lists_protocol.json'
 
 
+class PolicyListExpandedCommunity(PolicyList):
+    api_path = ApiPath('/template/policy/list/expandedcommunity')
+    store_path = ('policy_lists', 'ExpandedCommunity')
+
+
+@register('policy_list', 'expanded community list', PolicyListExpandedCommunity, min_version='20.5')
+class PolicyListExpandedCommunityIndex(PolicyListIndex):
+    api_path = ApiPath('/template/policy/list/expandedcommunity', None, None, None)
+    store_file = 'policy_lists_expanded_community.json'
+
+
+class PolicyListGeoLocation(PolicyList):
+    api_path = ApiPath('/template/policy/list/geolocation')
+    store_path = ('policy_lists', 'GeoLocation')
+
+
+@register('policy_list', 'geo location list', PolicyListGeoLocation, min_version='20.5')
+class PolicyListGeoLocationIndex(PolicyListIndex):
+    api_path = ApiPath('/template/policy/list/geolocation', None, None, None)
+    store_file = 'policy_lists_geo_location.json'
+
+
 #
 # Admin Settings
 #
