@@ -168,6 +168,15 @@ class RealtimeItem(OperationalItem):
         params = kwargs or dict(zip(cls.api_params, args))
         return cls(api.get(cls.api_path.get, **params))
 
+    @classmethod
+    def is_in_scope(cls, device_model: str) -> bool:
+        """
+        Indicates whether this RealtimeItem is applicable to a particular device model. Subclasses need to overwrite
+        this method when the realtime api endpoint that it represents is specific to certain device models. For instance
+        vEdge vs. cEdges.
+        """
+        return True
+
 
 class BulkStatsItem(OperationalItem):
     """
