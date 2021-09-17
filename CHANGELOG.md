@@ -2,13 +2,17 @@ Sastre 1.15 [xx, 2021]
 ============================
 
 #### Enhancements:
-- [#83] Support for vManage 20.5.x and included new API endpoints:
+- [#83] Initial support for the vManage 20.5.x, included the following API endpoints:
   - Policy lists: Expanded community, Geo location
 - [#94] Support for multi-tenant vManage deployment.
 - [#45] All tasks that provide table output (e.g. show, list, etc) have been enhanced to allow exporting those tables as 
   JSON encoded files. This is done via --json option added to each task.
 - Report task has been expanded to include show state and show devices
 - Diff option added to report task, allowing comparison with a previous report.
+- Show task was expanded with new realtime commands:
+  - orchestrator connections, orchestrator local-properties, orchestrator valid-vedges, orchestrator valid-vsmarts
+  - arp vedge, arp cedge
+  - hardware inventory
 
 #### Behavior changes:
 - Backup task on prior versions would include saving the running configuration from all nodes whenever tag 'all' was

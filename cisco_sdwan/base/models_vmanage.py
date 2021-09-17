@@ -1429,6 +1429,33 @@ class DeviceControlLocalProperties(RealtimeItem):
                   'certificate_not_valid_after')
 
 
+@op_register('orchestrator', 'connections', 'Orchestrator connections')
+class OrchestratorConnections(RealtimeItem):
+    api_path = ApiPath('device/orchestrator/connections', None, None, None)
+    fields_std = ('system_ip', 'site_id', 'peer_type', 'local_color', 'state')
+    fields_ext = ('private_ip', 'private_port', 'public_ip', 'public_port', 'domain_id')
+
+
+@op_register('orchestrator', 'local-properties', 'Orchestrator local-properties')
+class OrchestratorLocalProperties(RealtimeItem):
+    api_path = ApiPath('device/orchestrator/localproperties', None, None, None)
+    fields_std = ('system_ip', 'device_type', 'organization_name', 'uuid', 'board_serial')
+    fields_ext = ('protocol', 'certificate_status', 'root_ca_chain_status', 'certificate_validity',
+                  'certificate_not_valid_after')
+
+
+@op_register('orchestrator', 'valid-vedges', 'Orchestrator valid WAN edges')
+class OrchestratorValidEdges(RealtimeItem):
+    api_path = ApiPath('device/orchestrator/validvedges', None, None, None)
+    fields_std = ('chassis_number', 'serial_number', 'validity')
+
+
+@op_register('orchestrator', 'valid-vsmarts', 'Orchestrator valid vSmarts')
+class OrchestratorValidVsmarts(RealtimeItem):
+    api_path = ApiPath('device/orchestrator/validvsmarts', None, None, None)
+    fields_std = ('serial_number', )
+
+
 @op_register('interface', 'info', 'Interface info')
 class InterfaceIpv4(RealtimeItem):
     api_path = ApiPath('device/interface', None, None, None)
@@ -1493,6 +1520,40 @@ class DeviceDpiSummary(RealtimeItem):
     api_path = ApiPath('device/dpi/summary', None, None, None)
     fields_std = ('status', 'current_flows', 'peak_flows', 'current_rate', 'peak_rate')
     fields_ext = ('flows_created', 'flows_expired')
+
+
+@op_register('arp', 'vedge', 'vEdge ARP table')
+class ArpVedge(RealtimeItem):
+    api_path = ApiPath('device/arp', None, None, None)
+    fields_std = ('vpn_id', 'if_name', 'ip', 'mac', 'state')
+
+    @classmethod
+    def is_in_scope(cls, device_model: str) -> bool:
+        return device_model not in CEDGE_SET
+
+
+@op_register('arp', 'cedge', 'cEdge ARP table')
+class ArpCedge(RealtimeItem):
+    api_path = ApiPath('device/arp', None, None, None)
+    fields_std = ('vpn_id', 'interface', 'address', 'hardware', 'mode')
+
+    @classmethod
+    def is_in_scope(cls, device_model: str) -> bool:
+        return device_model in CEDGE_SET
+
+
+@op_register('hardware', 'inventory', 'hardware inventory')
+class HardwareInventory(RealtimeItem):
+    api_path = ApiPath('device/hardware/inventory', None, None, None)
+    fields_std = ('hw_type', 'hw_description')
+    fields_ext = ('version', 'part_number', 'serial_number')
+
+
+@op_register('hardware', 'environment', 'hardware environment')
+class HardwareEnvironment(RealtimeItem):
+    api_path = ApiPath('device/hardware/environment', None, None, None)
+    fields_std = ('name', 'sensor_name', 'state')
+    fields_ext = ('current_reading', 'sensor_units')
 
 
 #
