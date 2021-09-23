@@ -25,7 +25,9 @@ setuptools.setup(
     ],
     python_requires='>=3.8',
     install_requires=[
-       'requests',
+        'requests',
+        'PyYAML',
+        'pydantic'
     ],
     entry_points={
         'console_scripts': [

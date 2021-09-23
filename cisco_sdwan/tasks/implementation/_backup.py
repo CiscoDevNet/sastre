@@ -25,9 +25,9 @@ class TaskBackup(Task):
                                  help='by default, if workdir already exists (before a new backup is saved) the old '
                                       'workdir is renamed using a rolling naming scheme. This option disables this '
                                       'automatic rollover.')
-        task_parser.add_argument('--include-running', action='store_true',
+        task_parser.add_argument('--save-running', action='store_true',
                                  help='include the running config from each node to the backup. This is useful for '
-                                      'reference or documentation purposes. It is not used by the restore task.')
+                                      'reference or documentation purposes. It is not needed by the restore task.')
         mutex = task_parser.add_mutually_exclusive_group()
         mutex.add_argument('--regex', metavar='<regex>', type=regex_type,
                            help='regular expression matching item names to backup, within selected tags.')
@@ -52,29 +52,8 @@ class TaskBackup(Task):
         if target_info.save(parsed_args.workdir):
             self.log_info('Saved vManage server information')
 
-        # Backup node running configs
-        if parsed_args.include_running:
-            inventory_list = [(ControlInventory.get(api), 'controller')]
-            if not api.is_provider or api.is_tenant_scope:
-                inventory_list.append((EdgeInventory.get(api), 'WAN edge'))
-
-            for inventory, info in inventory_list:
-                if inventory is None:
-                    self.log_error('Failed retrieving %s inventory', info)
-                    continue
-
-                for uuid, _, hostname, _ in inventory.extended_iter():
-                    if hostname is None:
-                        self.log_debug('Skipping %s, no hostname', uuid)
-                        continue
-
-                    for item, config_type in ((DeviceConfig.get(api, DeviceConfig.api_params(uuid)), 'CFS'),
-                                              (DeviceConfigRFS.get(api, DeviceConfigRFS.api_params(uuid)), 'RFS')):
-                        if item is None:
-                            self.log_error('Failed backup %s device configuration %s', config_type, hostname)
-                            continue
-                        if item.save(parsed_args.workdir, item_name=hostname, item_id=uuid):
-                            self.log_info('Done %s device configuration %s', config_type, hostname)
+        if parsed_args.save_running:
+            self.save_running_configs(api, parsed_args.workdir)
 
         # Backup items not registered to the catalog, but to be included when tag is 'all'
         if CATALOG_TAG_ALL in parsed_args.tags:
@@ -128,3 +107,26 @@ class TaskBackup(Task):
                         self.log_error('Failed backup %s %s values: %s', info, item_name, ex)
 
         return
+
+    def save_running_configs(self, api: Optional[Rest], workdir: str) -> None:
+        inventory_list = [(ControlInventory.get(api), 'controller')]
+        if not api.is_provider or api.is_tenant_scope:
+            inventory_list.append((EdgeInventory.get(api), 'WAN edge'))
+
+        for inventory, info in inventory_list:
+            if inventory is None:
+                self.log_error('Failed retrieving %s inventory', info)
+                continue
+
+            for uuid, _, hostname, _ in inventory.extended_iter():
+                if hostname is None:
+                    self.log_debug('Skipping %s, no hostname', uuid)
+                    continue
+
+                for item, config_type in ((DeviceConfig.get(api, DeviceConfig.api_params(uuid)), 'CFS'),
+                                          (DeviceConfigRFS.get(api, DeviceConfigRFS.api_params(uuid)), 'RFS')):
+                    if item is None:
+                        self.log_error('Failed backup %s device configuration %s', config_type, hostname)
+                        continue
+                    if item.save(workdir, item_name=hostname, item_id=uuid):
+                        self.log_info('Done %s device configuration %s', config_type, hostname)
