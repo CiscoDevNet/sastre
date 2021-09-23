@@ -7,17 +7,20 @@ Sastre 1.15 [xx, 2021]
 - [#94] Support for multi-tenant vManage deployment.
 - [#45] All tasks that provide table output (e.g. show, list, etc) have been enhanced to allow exporting those tables as 
   JSON encoded files. This is done via --json option added to each task.
-- Report task has been expanded to include show state and show devices
-- Diff option added to report task, allowing comparison with a previous report.
 - Show task was expanded with new realtime commands:
   - orchestrator connections, orchestrator local-properties, orchestrator valid-vedges, orchestrator valid-vsmarts
   - arp vedge, arp cedge
   - hardware inventory
+- Report task has been expanded:
+  - Diff option added to report task, allowing comparison with a previous report.
+  - Option to customize which tasks/commands to include in the report. Via YAML file or JSON-formatted string.
+  - Default report now also include show state and show devices tasks.
+
 
 #### Behavior changes:
 - Backup task on prior versions would include saving the running configuration from all nodes whenever tag 'all' was
   used (i.e. backup all ...). Since this can be time-consuming in a large network and is not needed by the restore task,
-  it is now made an optional flag for the backup task: --include-running. By default, a 'backup all' will not include 
+  it is now made an optional flag for the backup task: --save-running. By default, a 'backup all' will not include 
   saving the running configs.
 
 Sastre 1.14 [July 13, 2021]
