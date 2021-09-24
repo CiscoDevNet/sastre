@@ -18,6 +18,7 @@ from .base.models_base import ModelException, SASTRE_ROOT_DIR
 from .__version__ import __version__ as version
 from .__version__ import __doc__ as title
 from .tasks.utils import TaskOptions, EnvVar, non_empty_type, PromptArg
+from .tasks.common import TaskException
 from .tasks.implementation import *
 
 # vManage REST API defaults
@@ -155,5 +156,6 @@ def main():
             print('\n\n'.join(str(entry) for entry in task_output))
 
         task.log_info('Task completed %s', task.outcome('successfully', 'with caveats: {tally}'))
-    except (LoginFailedException, BadTenantException, ConnectionError, FileNotFoundError, ModelException) as ex:
+    except (LoginFailedException, BadTenantException, ConnectionError, FileNotFoundError, ModelException,
+            TaskException) as ex:
         logging.getLogger(__name__).critical(ex)

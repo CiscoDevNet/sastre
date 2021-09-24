@@ -1,5 +1,5 @@
-Sastre 1.15 [xx, 2021]
-============================
+Sastre 1.15 [September 25, 2021]
+================================
 
 #### Enhancements:
 - [#83] Initial support for the vManage 20.5.x, included the following API endpoints:
@@ -11,8 +11,8 @@ Sastre 1.15 [xx, 2021]
   - orchestrator connections, orchestrator local-properties, orchestrator valid-vedges, orchestrator valid-vsmarts
   - arp vedge, arp cedge
   - hardware inventory
-- Report task has been expanded:
-  - Diff option added to report task, allowing comparison with a previous report.
+- Report task has been significantly expanded:
+  - Diff option added to report task, allowing comparison between reports. Diff can be exported as html or text.
   - Option to customize which tasks/commands to include in the report. Via YAML file or JSON-formatted string.
   - Default report now also include show state and show devices tasks.
 
