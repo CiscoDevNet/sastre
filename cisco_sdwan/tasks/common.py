@@ -47,6 +47,7 @@ class Tally:
         self._tally[counter] += 1
 
 
+# Note, deprecating the use of this TaskArgs in favor of models.TaskArgs, which uses pydantic
 class TaskArgs:
     """
     Used to store arguments for a task

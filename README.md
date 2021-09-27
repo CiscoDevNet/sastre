@@ -11,6 +11,11 @@ Some use-cases include:
 
 Please send your support questions to sastre-support@cisco.com.
 
+Note on vManage release support:
+- Sastre 1.15 has full support for vManage 20.4.x, and partial support for vManage 20.5.x. Please check CHANGELOG.md for details on specific 20.5 configuration elements that are supported.
+- Full 20.5 and 20.6 support is planned for Sastre 1.16.
+- Aside from supporting new configuration elements (associated with new features) added to the newer vManage releases, all other Sastre functionality has been validated to work with 20.6.x.
+
 ## Sastre and Sastre-Pro
 
 Sastre is available in two flavors:
@@ -22,7 +27,7 @@ Both flavors follow the same release numbering. For instance, if support for cer
 The command "sdwan --version" will indicate the flavor that is installed.
 
     % sdwan --version
-    Sastre-Pro Version 1.13. Catalog: 67 configuration items, 23 operational items.
+    Sastre-Pro Version 1.15. Catalog: 73 configuration items, 31 operational items.
 
 Tasks only available on Sastre-Pro are labeled as such in the [Introduction](#introduction) section below.
 
@@ -44,9 +49,9 @@ Task indicates the operation to be performed. The following tasks are currently 
 - Attach (Sastre-Pro): Attach WAN Edges/vSmarts to templates. Allows further customization on top of the functionality available via "restore --attach".
 - Detach (Sastre-Pro): Detach WAN Edges/vSmarts from templates. Allows further customization on top of the functionality available via "delete --detach".
 - Certificate (Sastre-Pro): Restore device certificate validity status from a backup or set to a desired value (i.e. valid, invalid or staging).
-- List (Sastre-Pro): List configuration items or device certificate information from vManage or a local backup. Display as table or export as csv file.
-- Show-template (Sastre-Pro): Show details about device templates on vManage or from a local backup. Display as table or export as csv file.
-- Report (Sastre-Pro): Generate a report file containing the output from all list and show-template commands.
+- List (Sastre-Pro): List configuration items or device certificate information from vManage or a local backup.
+- Show-template (Sastre-Pro): Show details about device templates on vManage or from a local backup.
+- Report (Sastre-Pro): Generate a customizable report file containing the output of multiple commands. Also provide option to generate a diff between reports.
 - Show (Sastre-Pro): Run vManage real-time, state or statistics commands; collecting data from one or more devices.
 
 Task-specific parameters are provided after the task argument, customizing the task behavior. For instance, whether to execute a restore task in dry-run mode or the destination directory for a backup task. 
@@ -59,12 +64,12 @@ Notes:
 ### Base parameters
 
     % sdwan -h
-    usage: sdwan [-h] [-a <vmanage-ip>] [-u <user>] [-p <password>] [--pid <pid>] [--port <port>] [--timeout <timeout>] [--verbose] [--version] <task> ...
+    usage: sdwan [-h] [-a <vmanage-ip>] [-u <user>] [-p <password>] [--tenant <tenant>] [--pid <pid>] [--port <port>] [--timeout <timeout>] [--verbose] [--version] <task> ...
     
     Sastre-Pro - Automation Tools for Cisco SD-WAN Powered by Viptela
     
     positional arguments:
-      <task>                task to be performed (backup, restore, delete, migrate, attach, detach, certificate, list, show-template, report, show)
+      <task>                task to be performed (backup, restore, delete, migrate, attach, detach, certificate, list, show-template, show, report)
       <arguments>           task parameters, if any
     
     optional arguments:
@@ -75,6 +80,7 @@ Notes:
                             username, can also be defined via VMANAGE_USER environment variable. If neither is provided user is prompted for username.
       -p <password>, --password <password>
                             password, can also be defined via VMANAGE_PASSWORD environment variable. If neither is provided user is prompted for password.
+      --tenant <tenant>     tenant name, when using provider accounts in multi-tenant deployments.
       --pid <pid>           CX project id, can also be defined via CX_PID environment variable. This is collected for AIDE reporting purposes only.
       --port <port>         vManage port number, can also be defined via VMANAGE_PORT environment variable (default: 8443)
       --timeout <timeout>   REST API timeout (default: 300)
@@ -102,25 +108,27 @@ CX project ID is only applicable to Sastre-Pro. CX_PID and --pid option are not 
 Task-specific parameters and options are defined after the task is provided. Each task has its own set of parameters.
 
     % sdwan backup -h
-    usage: sdwan backup [-h] [--workdir <directory>] [--no-rollover] [--regex <regex> | --not-regex <regex>] <tag> [<tag> ...]
+    usage: sdwan backup [-h] [--workdir <directory>] [--no-rollover] [--save-running] [--regex <regex> | --not-regex <regex>] <tag> [<tag> ...]
     
     Sastre-Pro - Automation Tools for Cisco SD-WAN Powered by Viptela
     
     Backup task:
     
     positional arguments:
-      <tag>                 one or more tags for selecting items to be backed up. Multiple tags should be separated by space. Available tags: all, policy_customapp, policy_definition,
-                            policy_list, policy_profile, policy_security, policy_vedge, policy_voice, policy_vsmart, template_device, template_feature. Special tag "all" selects all items,
-                            including WAN edge certificates and device configurations.
+      <tag>                 one or more tags for selecting items to be backed up. Multiple tags should be separated by space. Available tags: all, policy_customapp, policy_definition, policy_list, policy_profile, policy_security, policy_vedge, policy_voice, policy_vsmart,
+                            template_device, template_feature. Special tag "all" selects all items, including WAN edge certificates and device configurations.
     
     optional arguments:
       -h, --help            show this help message and exit
       --workdir <directory>
-                            backup destination (default: backup_198.18.1.10_20210608)
-      --no-rollover         by default, if workdir already exists (before a new backup is saved) the old workdir is renamed using a rolling naming scheme. This option disables this automatic
-                            rollover.
+                            backup destination (default: backup_198.18.1.10_20210927)
+      --no-rollover         by default, if workdir already exists (before a new backup is saved) the old workdir is renamed using a rolling naming scheme. This option disables this automatic rollover.
+      --save-running        include the running config from each node to the backup. This is useful for reference or documentation purposes. It is not needed by the restore task.
       --regex <regex>       regular expression matching item names to backup, within selected tags.
       --not-regex <regex>   regular expression matching item names NOT to backup, within selected tags.
+
+All tasks that provide a table-type output, such as show-template, list or show, have options to export those tables as CSV or JSON files via --save-csv and --save-json options. 
+
 
 #### Important concepts:
 - vManage URL: Constructed from the provided vManage IP address and TCP port (default 8443). All operations target this vManage.
@@ -167,23 +175,16 @@ Any of those vManage parameters can be provided via command line as well:
 Perform a backup:
 
     % sdwan --verbose backup all
-    INFO: Starting backup: vManage URL: "https://10.85.136.253:8443" -> Local workdir: "backup_10.85.136.253_20200617"
+    INFO: Starting backup: vManage URL: "https://198.18.1.10:8443" -> Local workdir: "backup_198.18.1.10_20210927"
     INFO: Saved vManage server information
     INFO: Saved WAN edge certificates
-    INFO: Done device configuration vedge-dc1
-    INFO: Done device configuration vedge-dc2
-    INFO: Done device configuration vedge-b1
-    INFO: Done device configuration vedge-b2
-    INFO: Done device configuration vmanage-1
-    INFO: Done device configuration vsmart-1
-    INFO: Done device configuration vbond-1
     INFO: Saved device template index
-    INFO: Done device template DC_ADVANCED
-    INFO: Done device template DC_BASIC
-    INFO: Done device template DC_BASIC attached devices
-    INFO: Done device template DC_BASIC values
     <snip>
-    INFO: Done SLA-class list Realtime_Full_Mesh
+    INFO: Saved prefix list index
+    INFO: Done prefix list DefaultRoute
+    INFO: Done prefix list InfrastructureRoutes
+    INFO: Saved local-domain list index
+    INFO: Done local-domain list DCLOUD
     INFO: Task completed successfully
     
 Note that '--verbose' was specified so that progress information is displayed. Without this option, only warning-level messages and above are displayed.
@@ -193,28 +194,23 @@ The backup is saved under data/backup_10.85.136.253_20191206:
     % ls
     data		logs		rc-example.sh
     % ls data
-    backup_10.85.136.253_20191206
+    backup_198.18.1.10_20210927
 
 ## Additional Examples
 
 ### Customizing backup destination:
 
-    % sdwan --verbose backup all --workdir "my_custom_directory"
-    INFO: Starting backup: vManage URL: "https://10.85.136.253:8443" -> Local workdir: "my_custom_directory"
+    % sdwan --verbose backup all --workdir my_custom_directory
+    INFO: Starting backup: vManage URL: "https://198.18.1.10:8443" -> Local workdir: "my_custom_directory"
     INFO: Saved vManage server information
     INFO: Saved WAN edge certificates
-    INFO: Done device configuration vedge-dc1
-    INFO: Done device configuration vedge-dc2
-    INFO: Done device configuration vedge-b1
-    INFO: Done device configuration vedge-b2
-    INFO: Done device configuration vmanage-1
-    INFO: Done device configuration vsmart-1
-    INFO: Done device configuration vbond-1
     INFO: Saved device template index
-    INFO: Done device template BRANCH_ADVANCED
     <snip>
-    INFO: Saved data-ipv6-prefix list index
-    INFO: Done data-ipv6-prefix list mgmt_prefixes_ipv6
+    INFO: Saved prefix list index
+    INFO: Done prefix list DefaultRoute
+    INFO: Done prefix list InfrastructureRoutes
+    INFO: Saved local-domain list index
+    INFO: Done local-domain list DCLOUD
     INFO: Task completed successfully
 
 ### Restoring from backup:
@@ -652,8 +648,6 @@ They all share the same set of options to filter devices to display:
   - --site <id> - Filter by site ID
   - --system-ip <ipv4> - Filter by system IP
 
-There is also a --csv option that allows exporting any of the show command tables as CSV files.
-
 Verifying inventory of devices that are reachable and name starting with "pEdge3" or "pEdge4":
 
     % sdwan show devices --reachable --regex "pEdge[3-4]"
@@ -825,25 +819,45 @@ Sastre requires Python 3.8 or newer. This can be verified by pasting the followi
 
 If 'ALL GOOD' is printed it means Python requirements are met. If not, download and install the latest 3.x version at Python.org (https://www.python.org/downloads/).
 
-The recommended way to install Sastre is via pip. For development purposes, Sastre can be installed from the github repository. Both methods are described in this section.
+The recommended way to install Sastre is via pip. For development purposes, Sastre can be installed from the GitHub repository. Both methods are described in this section.
 
-### PIP install (recommended)
+### PIP install in a virtual environment (recommended)
+
+Create a directory to store the virtual environment and runtime files:
+
+    % mkdir sastre
+    % cd sastre
+    
+Create virtual environment:
+
+    % python3 -m venv venv
+    
+Activate virtual environment:
+
+    % source venv/bin/activate
+    (venv) %
+    
+- Note that the prompt is updated with the virtual environment name (venv), indicating that the virtual environment is active.
+    
+Upgrade initial virtual environment packages:
+
+    (venv) % pip install --upgrade pip setuptools
 
 To install Sastre:
 
-    % python3 -m pip install --upgrade cisco-sdwan
+    (venv) % pip install --upgrade cisco-sdwan
     
 Verify that Sastre can run:
 
-    % sdwan --version
+    (venv) % sdwan --version
 
-### Github install
+Notes:
+- The virtual environment is deactivated by typing 'deactivate' at the command prompt.
+- Before running Sastre, make sure to activate the virtual environment back again (source venv/bin/activate).
 
-Install required Python packages:
+### GitHub install
 
-    % python3 -m pip install --upgrade requests
-
-Clone from the github repository:
+Clone from the GitHub repository:
 
     % git clone https://github.com/CiscoDevNet/sastre
     
@@ -851,17 +865,36 @@ Move to the clone directory:
     
     % cd sastre
 
+Create virtual environment:
+
+    % python3 -m venv venv
+    
+Activate virtual environment:
+
+    % source venv/bin/activate
+    (venv) %
+    
+- Note that the prompt is updated with the virtual environment name (venv), indicating that the virtual environment is active.
+    
+Upgrade initial virtual environment packages:
+
+    (venv) % pip install --upgrade pip setuptools
+
+Install required Python packages:
+
+    (venv) % pip install -r requirements.txt
+
 Verify that Sastre can run:
 
-    % python3 sdwan.py --version
+    (venv) % python3 sdwan.py --version
 
 ### Docker install
 
-First, proceed with the [GitHub install](#Github-install) outlined above.
+First, proceed with the [GitHub install](#GitHub-install) outlined above.
 
 Ensure you are within the directory cloned from GitHub:
 
-    % cd Sastre-Pro
+    % cd sastre
 
 Then proceed as follows to build the docker container:
 
@@ -884,12 +917,12 @@ Start the docker container:
      --mount type=bind,source="$(pwd)"/sastre-volume,target=/shared-data \
      sastre:latest
 
-    usage: sdwan [-h] [-a <vmanage-ip>] [-u <user>] [-p <password>] [--pid <pid>] [--port <port>] [--timeout <timeout>] [--verbose] [--version] <task> ...
+    usage: sdwan [-h] [-a <vmanage-ip>] [-u <user>] [-p <password>] [--tenant <tenant>] [--port <port>] [--timeout <timeout>] [--verbose] [--version] <task> ...
     
     Sastre - Automation Tools for Cisco SD-WAN Powered by Viptela
     
     positional arguments:
-      <task>                task to be performed (backup, restore, delete, certificate, list, show-template, migrate, report, show)
+      <task>                task to be performed (backup, restore, delete, migrate)
       <arguments>           task parameters, if any
     
     optional arguments:
@@ -900,6 +933,7 @@ Start the docker container:
                             username, can also be defined via VMANAGE_USER environment variable. If neither is provided user is prompted for username.
       -p <password>, --password <password>
                             password, can also be defined via VMANAGE_PASSWORD environment variable. If neither is provided user is prompted for password.
+      --tenant <tenant>     tenant name, when using provider accounts in multi-tenant deployments.
       --port <port>         vManage port number, can also be defined via VMANAGE_PORT environment variable (default: 8443)
       --timeout <timeout>   REST API timeout (default: 300)
       --verbose             increase output verbosity
