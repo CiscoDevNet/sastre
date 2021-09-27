@@ -127,7 +127,7 @@ Task-specific parameters and options are defined after the task is provided. Eac
       --regex <regex>       regular expression matching item names to backup, within selected tags.
       --not-regex <regex>   regular expression matching item names NOT to backup, within selected tags.
 
-All tasks that provide a table-type output, such as show-template, list or show, have options to export those tables as CSV or JSON files via --save-csv and --save-json options. 
+Tasks that provide table output, such as show-template, list or show; have options to export the generated tables as CSV or JSON files via --save-csv and --save-json options. 
 
 
 #### Important concepts:
