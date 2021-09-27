@@ -27,7 +27,7 @@ REST_TIMEOUT = 300
 BASE_URL = 'https://{address}:{port}'
 
 # Default logging configuration - JSON formatted
-# Reason for setting level at chardet.charsetprober is to prevent unwanted debug messages from requests module
+# Setting level at chardet.charsetprober to prevent unwanted debug messages from requests module
 LOGGING_CONFIG = '''
 {
     "version": 1,

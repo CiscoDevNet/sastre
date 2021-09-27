@@ -1,12 +1,12 @@
-Sastre 1.15 [September 25, 2021]
+Sastre 1.15 [September 27, 2021]
 ================================
 
 #### Enhancements:
 - [#83] Initial support for the vManage 20.5.x, included the following API endpoints:
   - Policy lists: Expanded community, Geo location
 - [#94] Support for multi-tenant vManage deployment.
-- [#45] All tasks that provide table output (e.g. show, list, etc) have been enhanced to allow exporting those tables as 
-  JSON encoded files. This is done via --json option added to each task.
+- [#45] All tasks that provide table output (i.e. show, list, show-template) have been enhanced to allow exporting those 
+  tables as JSON encoded files. This is done via --save-json option added to each task.
 - Show task was expanded with new realtime commands:
   - orchestrator connections, orchestrator local-properties, orchestrator valid-vedges, orchestrator valid-vsmarts
   - arp vedge, arp cedge
@@ -15,13 +15,13 @@ Sastre 1.15 [September 25, 2021]
   - Diff option added to report task, allowing comparison between reports. Diff can be exported as html or text.
   - Option to customize which tasks/commands to include in the report. Via YAML file or JSON-formatted string.
   - Default report now also include show state and show devices tasks.
-
-
+  
 #### Behavior changes:
 - Backup task on prior versions would include saving the running configuration from all nodes whenever tag 'all' was
   used (i.e. backup all ...). Since this can be time-consuming in a large network and is not needed by the restore task,
   it is now made an optional flag for the backup task: --save-running. By default, a 'backup all' will not include 
   saving the running configs.
+- CSV export option in show, list and show-template tasks is now --save-csv (previously --csv).
 
 Sastre 1.14 [July 13, 2021]
 ============================
