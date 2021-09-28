@@ -59,7 +59,7 @@ Task-specific parameters are provided after the task argument, customizing the t
 Notes:
 - Either 'sdwan' or 'sastre' can be used as the main command.
 - The command line described above, and in all examples that follow, assume Sastre was installed via PIP. 
-- If Sastre was cloned from the git repository, then 'sdwan.py' or 'sastre.py' should used instead. Please check the installation section for more details.
+- If Sastre was cloned from the git repository, then 'sdwan.py' or 'sastre.py' should be used instead. Please check the installation section for more details.
 
 ### Base parameters
 
@@ -88,7 +88,7 @@ Notes:
       --version             show program's version number and exit
 
 
-vManage address (-a/--address), user name (-u/--user), password (-p/--password) or port (--port) can also be provided via environment variables:
+vManage address (-a/--address), username (-u/--user), password (-p/--password) or port (--port) can also be provided via environment variables:
 - VMANAGE_IP
 - VMANAGE_USER
 - VMANAGE_PASSWORD
@@ -144,7 +144,7 @@ Create a directory to serve as root for backup files, log files and rc files:
     
 When Sastre is executed, data/ and logs/ directories are created as needed to store backup files and application logs. These are created under the directory where Sastre is run.
 
-Create an rc-example.sh file to include vManage details and source that file:
+Create a rc-example.sh file to include vManage details and source that file:
 
     % cat <<EOF > rc-example.sh
     export VMANAGE_IP='198.18.1.10'
@@ -281,7 +281,7 @@ The backup is saved under data/backup_10.85.136.253_20191206:
 - With the --force option, items with the same name are updated with the info found in the backup.
 - Sastre only updates the item when its contents differ from what is in vManage.
 - If the item is associated with attached templates or activated policies, all necessary re-attach/re-activate actions are automatically performed.
-- Currently, the --force option does not apply to changes in template values. 
+- Currently, the --force option does not inspect changes to template values. 
 
 Example:
 
@@ -344,7 +344,7 @@ Deleting items:
 
 #### Deleting with detach:
 When vSmart policies are activated and device templates are attached the associated items cannot be deleted. 
-The --detach option performs the necessary template detach and vSmart policy deactivate before proceeding with the delete.
+The --detach option performs the necessary template detach and vSmart policy deactivate before proceeding with delete.
 
     % sdwan --verbose delete all --detach
     INFO: Starting delete: vManage URL: "https://10.85.136.253:8443"
@@ -790,7 +790,7 @@ Example:
 
 ### Logs
 
-Sastre logs messages to the terminal and to log files (under the logs directory).
+Sastre logs messages to the terminal and to log files (under the logs/ directory).
 
 Debug-level and higher severity messages are always saved to the log files.
 
@@ -809,7 +809,7 @@ When an existing vManage item is modified, device templates may need to be reatt
 - On updates to a master template (e.g. device template) containing attached devices, Sastre will re-attach this device template using attachment values (variables) from the backup to feed the attach request.
 - On Updates to a child template (e.g. feature template) associated with a master template containing attached devices, Sastre will re-attach the affected master template(s). In this case, Sastre will use the existing values in vManage to feed the attach request.
 
-The implication is that if modified child templates (e.g. feature template) define new variables, re-attaching the master template will fail because not all variables will have values assigned. In this case, the recommended procedure is to detach the master template (i.e. change device to CLI mode in vManage), re-run “restore --force", then re-attach the device-template from vManage, where one would have a chance to supply any missing variable values.
+The implication is that if modified child templates (e.g. feature template) define new variables, re-attaching the master template will fail because not all variables will have values assigned. In this case, the recommended procedure is to detach the master template (i.e. change device to CLI mode in vManage), re-run "restore --force", then re-attach the device-template from vManage, where one would have a chance to supply any missing variable values.
 
 ## Installing
 
@@ -955,4 +955,4 @@ Notes:
     - /shared-data/logs - Where the logs are saved
     - /shared-data/rc - Used to store 'rc' files defining environment variables used by Sastre: VMANAGE_IP, VMANAGE_USER, etc.
 - The suggested docker run command above bind-mounts the /shared-data volume, i.e. it is mapped to a host system directory. This facilitates transferring of data to/from the container (e.g. vManage backups). The host directory is relative to the location where the docker run command is executed.
-- Docker run will spin-up the container and open an interactive session to it using the ash shell. Sdwan commands (e.g. sdwan backup all, etc) can be executed at this point. Typing 'exit' will leave the ash shell, stop and remove the container. Everything under data, rc and logs is persisted to the corresponding host system directories.
+- Docker run will spin-up the container and open an interactive session to it using the ash shell. Sdwan commands (e.g. sdwan backup all, etc.) can be executed at this point. Typing 'exit' will leave the ash shell, stop and remove the container. Everything under data, rc and logs is persisted to the corresponding host system directories.
