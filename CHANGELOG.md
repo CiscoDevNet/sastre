@@ -61,11 +61,11 @@ Sastre 1.12 [March 10, 2021]
 - [#63] Template detach requests used in delete task (--detach option) are improved to split detach requests in chunks of
   up to 10 devices. Dry-run mode is now supported with --detach option.
 - [#64] (Sastre-Pro) New attach task providing further customization on device template attach operations. Templates and 
-  devices can be filtered by regular expressions and device properties (reachability, system-ip, etc). Also, the maximum 
+  devices can be filtered by regular expressions and device properties (reachability, system-ip, etc.). Also, the maximum 
   number of devices per vManage template attach request can be customized. By default, Sastre will split attach 
   requests in chunks of up to 10 devices.
 - [#65] (Sastre-Pro) New detach task providing further customization on device template detach operations. Templates and 
-  devices can be filtered by regular expressions and device properties (reachability, system-ip, etc). Also, the maximum 
+  devices can be filtered by regular expressions and device properties (reachability, system-ip, etc.). Also, the maximum 
   number of devices per vManage template detach request can be customized. By default, Sastre will split detach 
   requests in chunks of up to 10 devices.
   
@@ -218,7 +218,7 @@ Sastre 0.33 [Dec 6, 2019]
 #### Enhancements:
 - Sastre is now published to PyPI as cisco-sdwan package. When installed via pip, sdwan or sastre can be used to
   run the application.
-- When installed via source on github, the application can now be called using sdwan.py or sastre.py.
+- When installed via source on GitHub, the application can now be called using sdwan.py or sastre.py.
 
 
 Sastre 0.31 [Nov 18, 2019]
@@ -240,7 +240,7 @@ Sastre 0.30 [Oct 25, 2019]
   can go up to 99. At this point Sastre starts deleting the previous backup.
 
 #### Non-backwards compatible enhancements:
-- Backup database is changed in release 0.30. Individual items (e.g. device templates, feature templates, etc) are
+- Backup database is changed in release 0.30. Individual items (e.g. device templates, feature templates, etc.) are
   now stored with a filename containing the actual item name, as opposed to the item uuid. The directories where
   items are saved were also changed.
   In order to guarantee a filesystem safe filename, item name characters other than a-z, A-Z, ' ', '-' or '_' are
