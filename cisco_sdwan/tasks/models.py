@@ -1,3 +1,4 @@
+import json
 import re
 from pathlib import Path
 from typing import Optional, List, Callable
@@ -32,6 +33,13 @@ def validate_filename(filename: str) -> str:
     return filename
 
 
+def validate_existing_file(filename: str) -> str:
+    if not Path(filename).exists():
+        raise ValueError(f'File "{filename}" not found.')
+
+    return filename
+
+
 def validate_ipv4(ipv4_str: str) -> str:
     if re.match(r'\d+(?:\.\d+){3}$', ipv4_str) is None:
         raise ValueError(f'"{ipv4_str}" is not a valid IPv4 address.')
@@ -62,6 +70,15 @@ def validate_op_cmd(op_type: OpType, cmd_list: List[str]) -> List[str]:
                          f'Group options: {OpCmdOptions.tags(op_type)}. '
                          f'Command options: {OpCmdOptions.commands(op_type)}.')
     return cmd_list
+
+
+def validate_json(json_str: str) -> str:
+    try:
+        json.loads(json_str)
+    except json.JSONDecodeError as ex:
+        raise ValueError(f'Invalid JSON data: {ex}') from None
+
+    return json_str
 
 
 catalog_tag_options = catalog_tags() | {CATALOG_TAG_ALL}
