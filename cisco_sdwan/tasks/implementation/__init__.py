@@ -8,11 +8,14 @@ from ._backup import TaskBackup
 from ._restore import TaskRestore
 from ._delete import TaskDelete
 from ._migrate import TaskMigrate
+from ._attach_detach import TaskAttach, TaskDetach
 
 
 __all__ = [
     'TaskBackup',
     'TaskRestore',
     'TaskDelete',
-    'TaskMigrate'
+    'TaskMigrate',
+    'TaskAttach',
+    'TaskDetach'
 ]

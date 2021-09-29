@@ -12,7 +12,7 @@ import json
 import sys
 from pathlib import Path
 from requests.exceptions import ConnectionError
-from .base.rest_api import Rest, LoginFailedException, BadTenantException
+from .base.rest_api import Rest, RestAPIException
 from .base.catalog import catalog_size, op_catalog_size
 from .base.models_base import ModelException, SASTRE_ROOT_DIR
 from .__version__ import __version__ as version
@@ -156,6 +156,5 @@ def main():
             print('\n\n'.join(str(entry) for entry in task_output))
 
         task.log_info('Task completed %s', task.outcome('successfully', 'with caveats: {tally}'))
-    except (LoginFailedException, BadTenantException, ConnectionError, FileNotFoundError, ModelException,
-            TaskException) as ex:
+    except (RestAPIException, ConnectionError, FileNotFoundError, ModelException, TaskException) as ex:
         logging.getLogger(__name__).critical(ex)

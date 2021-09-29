@@ -46,8 +46,8 @@ Task indicates the operation to be performed. The following tasks are currently 
 - Restore: Restore configuration items from a local backup to vManage.
 - Delete: Delete configuration items on vManage.
 - Migrate: Migrate configuration items from a vManage release to another. Currently, only 18.4, 19.2 or 19.3 to 20.1 is supported. Minor revision numbers (e.g. 20.1.1) are not relevant for the template migration.
-- Attach (Sastre-Pro): Attach WAN Edges/vSmarts to templates. Allows further customization on top of the functionality available via "restore --attach".
-- Detach (Sastre-Pro): Detach WAN Edges/vSmarts from templates. Allows further customization on top of the functionality available via "delete --detach".
+- Attach: Attach WAN Edges/vSmarts to templates. Allows further customization on top of the functionality available via "restore --attach".
+- Detach: Detach WAN Edges/vSmarts from templates. Allows further customization on top of the functionality available via "delete --detach".
 - Certificate (Sastre-Pro): Restore device certificate validity status from a backup or set to a desired value (i.e. valid, invalid or staging).
 - List (Sastre-Pro): List configuration items or device certificate information from vManage or a local backup.
 - Show-template (Sastre-Pro): Show details about device templates on vManage or from a local backup.

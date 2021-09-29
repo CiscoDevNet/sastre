@@ -1,3 +1,11 @@
+Sastre 1.16 [September 29, 2021]
+================================
+
+#### Enhancements
+- Attach/detach tasks now on both Sastre and Sastre-Pro.
+- Infra changes related to the report task, not user-facing.
+
+
 Sastre 1.15 [September 27, 2021]
 ================================
 
