@@ -25,10 +25,16 @@ def validate_workdir(workdir: str) -> str:
 
 
 def validate_filename(filename: str) -> str:
+    """ Validate file name. If filename is a path containing a directory, validate whether it exists.
+    """
+    file_path = Path(filename)
+    if not file_path.parent.exists():
+        raise ValueError(f'Directory for "{filename}" does not exist')
+
     # Also allow . on filename, on top of what's allowed by filename_safe
-    if re.sub(r'\.', '_', filename) != filename_safe(filename):
+    if re.sub(r'\.', '_', file_path.name) != filename_safe(file_path.name):
         raise ValueError(
-            f'Invalid name "{filename}". Only alphanumeric characters, "-", "_", and "." are allowed.'
+            f'Invalid name "{file_path.name}". Only alphanumeric characters, "-", "_", and "." are allowed.'
         )
     return filename
 
