@@ -1,9 +1,10 @@
-Sastre 1.16 [September 29, 2021]
+Sastre 1.16 [October 15, 2021]
 ================================
 
 #### Enhancements
 - Attach/detach tasks now on both Sastre and Sastre-Pro.
 - Infra changes related to the report task, not user-facing.
+- Report task diff option now allow specific sections to not be considered for diff comparison. Via skip_diff option in the report specification.
 
 
 Sastre 1.15 [September 27, 2021]
