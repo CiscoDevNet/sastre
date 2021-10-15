@@ -12,8 +12,8 @@ Some use-cases include:
 Please send your support questions to sastre-support@cisco.com.
 
 Note on vManage release support:
-- Sastre 1.15 has full support for vManage 20.4.x, and partial support for vManage 20.5.x. Please check CHANGELOG.md for details on specific 20.5 configuration elements that are supported.
-- Full 20.5 and 20.6 support is planned for Sastre 1.16.
+- Sastre 1.16 has full support for vManage 20.4.x, and partial support for vManage 20.5.x. Please check CHANGELOG.md for details on specific 20.5 configuration elements that are supported.
+- Full 20.5 and 20.6 support is planned for Sastre 1.17.
 - Aside from supporting new configuration elements (associated with new features) added to the newer vManage releases, all other Sastre functionality has been validated to work with 20.6.x.
 
 ## Sastre and Sastre-Pro
@@ -773,7 +773,7 @@ The regular expression syntax supported is described in https://docs.python.org/
 
 - The --name format specification can contain multiple occurrences of {name}. Each occurrence may contain a regular expression separated by a space: {name &lt;regex&gt;}. The regular expressions must contain one or more capturing groups, which define the segments of the original name to "copy". Segments matching each capturing group are concatenated and "pasted" to the {name} position.
 - If name regex does not match, {name &lt;regex&gt;} is replaced with an empty string.
-- A transform option under the list task allows one to verify of the effect of a name-regex (e.g. as used by the --name format specification in the migrate task).
+- The 'list transform' task can be used to verify the effect of a name-regex (e.g. as used by the --name format specification in the migrate task).
 
 Example:
 

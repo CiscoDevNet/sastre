@@ -745,12 +745,18 @@ class ExtendedTemplate:
         self.label_value_map = None
 
     def __call__(self, name):
+        """
+        Raise ValueError when issues are encountered while processing the name-regex
+        """
         def regex_replace(match_obj):
             regex = match_obj.group('regex')
             if regex is not None:
-                regex_p = re.compile(regex)
+                try:
+                    regex_p = re.compile(regex)
+                except re.error:
+                    raise ValueError('regular expression is invalid') from None
                 if not regex_p.groups:
-                    raise KeyError('regular expression must include at least one capturing group')
+                    raise ValueError('regular expression must include at least one capturing group')
 
                 value, regex_p_subs = regex_p.subn(''.join(f'\\{group+1}' for group in range(regex_p.groups)), name)
                 new_value = value if regex_p_subs else ''
@@ -765,9 +771,14 @@ class ExtendedTemplate:
         self.label_value_map = {}
         template, name_p_subs = self.template_pattern.subn(regex_replace, self.src_template)
         if not name_p_subs:
-            raise KeyError('template must include {name} variable')
+            raise ValueError('name-regex must include {name} variable')
 
-        return template.format(**self.label_value_map)
+        try:
+            result_name = template.format(**self.label_value_map)
+        except (KeyError, IndexError):
+            raise ValueError('invalid name-regex') from None
+
+        return result_name
 
 
 def default_getter(*fields, default=None):

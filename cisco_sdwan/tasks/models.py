@@ -1,10 +1,10 @@
 import json
 import re
 from pathlib import Path
-from typing import Optional, List, Callable
-from pydantic import BaseModel, validator, conint
+from typing import Optional, List, Callable, Any
+from pydantic import BaseModel, validator, Field, Extra
 from cisco_sdwan.base.catalog import OpType, CATALOG_TAG_ALL, op_catalog_tags, op_catalog_commands, catalog_tags
-from cisco_sdwan.base.models_base import filename_safe, DATA_DIR
+from cisco_sdwan.base.models_base import filename_safe, DATA_DIR, ExtendedTemplate
 from cisco_sdwan.tasks.utils import OpCmdOptions
 
 
@@ -98,8 +98,22 @@ def validate_catalog_tag(tag: str) -> str:
     return tag
 
 
+def validate_ext_template(template_str: str) -> str:
+    # ExtendedTemplate will raise ValueError on validation failures
+    ExtendedTemplate(template_str)('test')
+
+    return template_str
+
+
+def const(default_value: Any) -> Field:
+    """
+    Defines a model field as constant. That is, it cannot be set to any value other than the default value
+    """
+    return Field(default_value, const=True)
+
+
 # Models
-class TaskArgs(BaseModel):
+class TaskArgs(BaseModel, extra=Extra.forbid):
     def __init__(self, **kwargs):
         # Dummy init used so PyCharm type checker can recognize TaskArgs parameters
         super().__init__(**kwargs)
@@ -108,74 +122,11 @@ class TaskArgs(BaseModel):
 class SubTaskArgs(TaskArgs):
     subtask_info: str
     subtask_handler: Callable
-
     regex: Optional[str] = None
     not_regex: Optional[str] = None
     save_csv: Optional[str] = None
     save_json: Optional[str] = None
+
     # Validators
     _validate_regex = validator('regex', 'not_regex', allow_reuse=True)(validate_regex)
     _validate_filename = validator('save_csv', 'save_json', allow_reuse=True)(validate_filename)
-
-
-class ShowArgs(SubTaskArgs):
-    reachable: bool = False
-    site: Optional[int] = None
-    system_ip: Optional[str] = None
-    # Validators
-    _validate_site_id = validator('site', allow_reuse=True)(validate_site_id)
-    _validate_ipv4 = validator('system_ip', allow_reuse=True)(validate_ipv4)
-
-
-class ShowRealtimeArgs(ShowArgs):
-    cmd: List[str]
-    detail: bool = False
-
-    # Validators
-    @validator('cmd')
-    def validate_cmd(cls, cmd_list: List[str]) -> List[str]:
-        return validate_op_cmd(OpType.RT, cmd_list)
-
-
-class ShowStateArgs(ShowArgs):
-    cmd: List[str]
-    detail: bool = False
-
-    # Validators
-    @validator('cmd')
-    def validate_cmd(cls, cmd_list: List[str]) -> List[str]:
-        return validate_op_cmd(OpType.STATE, cmd_list)
-
-
-class ShowStatisticsArgs(ShowArgs):
-    cmd: List[str]
-    detail: bool = False
-    days: conint(ge=0, lt=10000) = 0
-    hours: conint(ge=0, lt=10000) = 0
-
-    # Validators
-    @validator('cmd')
-    def validate_cmd(cls, cmd_list: List[str]) -> List[str]:
-        return validate_op_cmd(OpType.STATS, cmd_list)
-
-
-class ListArgs(SubTaskArgs):
-    workdir: Optional[str] = None
-    # Validators
-    _validate_workdir = validator('workdir', allow_reuse=True)(validate_workdir)
-
-
-class ListConfigArgs(ListArgs):
-    tags: List[str]
-    # Validators
-    _validate_tags = validator('tags', each_item=True, allow_reuse=True)(validate_catalog_tag)
-
-
-class ShowTemplateArgs(SubTaskArgs):
-    workdir: Optional[str] = None
-    # Validators
-    _validate_workdir = validator('workdir', allow_reuse=True)(validate_workdir)
-
-
-class ShowTemplateRefArgs(ShowTemplateArgs):
-    with_refs: bool = False

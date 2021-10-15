@@ -238,9 +238,7 @@ class PromptArg:
 def ext_template_type(template_str):
     try:
         ExtendedTemplate(template_str)('test')
-    except re.error:
-        raise argparse.ArgumentTypeError('regular expression is invalid') from None
-    except (KeyError, ValueError) as ex:
+    except ValueError as ex:
         raise argparse.ArgumentTypeError(ex) from None
 
     return template_str
