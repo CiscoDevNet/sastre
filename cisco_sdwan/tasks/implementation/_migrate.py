@@ -1,6 +1,7 @@
 import argparse
 from typing import Union, Optional
 from uuid import uuid4
+from pydantic import validator
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest
 from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL, ordered_tags
@@ -12,6 +13,8 @@ from cisco_sdwan.migration.feature_migration import FeatureProcessor
 from cisco_sdwan.migration.device_migration import DeviceProcessor
 from cisco_sdwan.tasks.utils import TaskOptions, existing_workdir_type, filename_type, version_type, ext_template_type
 from cisco_sdwan.tasks.common import clean_dir, Task, TaskException
+from cisco_sdwan.tasks.models import (TaskArgs, validate_workdir, validate_ext_template, validate_version,
+                                      validate_filename)
 
 
 @TaskOptions.register('migrate')
@@ -180,3 +183,26 @@ class TaskMigrate(Task):
             self.log_critical('Migration aborted: %s', ex)
 
         return
+
+
+class MigrateArgs(TaskArgs):
+    scope: str
+    output: str
+    no_rollover: bool = False
+    name: str = 'migrated_{name}'
+    from_version: str = '18.4'
+    to_version: str = '20.1'
+    workdir: Optional[str] = None
+
+    # Validators
+    _validate_filename = validator('output', allow_reuse=True)(validate_filename)
+    _validate_name_regex = validator('name_regex', allow_reuse=True)(validate_ext_template)
+    _validate_version = validator('from_version', 'to_version', allow_reuse=True)(validate_version)
+    _validate_workdir = validator('workdir', allow_reuse=True)(validate_workdir)
+
+    @validator('scope')
+    def validate_scope(cls, v):
+        scope_options = ('all', 'attached')
+        if v not in scope_options:
+            raise ValueError(f'"{v}" is not a valid scope. Options are: {", ".join(scope_options)}.')
+        return v

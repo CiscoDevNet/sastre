@@ -47,37 +47,6 @@ class Tally:
         self._tally[counter] += 1
 
 
-# Note, deprecating the use of this TaskArgs in favor of models.TaskArgs, which uses pydantic
-class TaskArgs:
-    """
-    Used to store arguments for a task
-    """
-    def __init__(self, **kwargs):
-        self.data = kwargs
-
-    def __getattr__(self, field):
-        if field not in self.data:
-            raise AttributeError("'{cls_name}' object has no attribute '{attr}'".format(cls_name=type(self).__name__,
-                                                                                        attr=field))
-        return self.data[field]
-
-    @classmethod
-    def from_json(cls, json_obj, mapper=None):
-        """
-        Returns a TaskArgs instance off the provided json_obj
-        :param json_obj: A json object parsed from a json encoded string
-        :param mapper: An optional dictionary mapping arg_name strings to a conversion function. This conversion
-                       function is called with the arg_value from json_object and should return the converted (python
-                       native) value associated with arg_value.
-        :return: TaskArgs instance
-        """
-        mapper_dict = mapper or {}
-        kwargs = {arg_name: mapper_dict.get(arg_name, lambda x: x)(arg_value)
-                  for arg_name, arg_value in json_obj.items()}
-
-        return cls(**kwargs)
-
-
 class Table:
     DECIMAL_DIGITS = 1  # Number of decimal digits for float values
 
