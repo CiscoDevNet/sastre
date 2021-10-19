@@ -33,10 +33,10 @@ class TaskMigrate(Task):
         task_parser.add_argument('--no-rollover', action='store_true',
                                  help='by default, if the output directory already exists it is renamed using a '
                                       'rolling naming scheme. This option disables this automatic rollover.')
-        task_parser.add_argument('--name', metavar='<format>', type=ext_template_type, default='migrated_{name}',
-                                 help='format used to name the migrated templates (default: %(default)s). '
+        task_parser.add_argument('--name', metavar='<name-regex>', type=ext_template_type, default='migrated_{name}',
+                                 help='name-regex used to name the migrated templates (default: %(default)s). '
                                       'Variable {name} is replaced with the original template name. Sections of the '
-                                      'original template name can be selected using the {name <regex>} format. Where '
+                                      'original template name can be selected using the {name <regex>} syntax. Where '
                                       '<regex> is a regular expression that must contain at least one capturing group. '
                                       'Capturing groups identify sections of the original name to keep.')
         task_parser.add_argument('--from', metavar='<version>', type=version_type, dest='from_version', default='18.4',
@@ -196,7 +196,7 @@ class MigrateArgs(TaskArgs):
 
     # Validators
     _validate_filename = validator('output', allow_reuse=True)(validate_filename)
-    _validate_name_regex = validator('name_regex', allow_reuse=True)(validate_ext_template)
+    _validate_name = validator('name', allow_reuse=True)(validate_ext_template)
     _validate_version = validator('from_version', 'to_version', allow_reuse=True)(validate_version)
     _validate_workdir = validator('workdir', allow_reuse=True)(validate_workdir)
 
