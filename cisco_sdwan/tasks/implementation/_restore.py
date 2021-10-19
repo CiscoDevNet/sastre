@@ -1,5 +1,6 @@
 import argparse
 from typing import Union, Optional
+from pydantic import validator
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest, RestAPIException, is_version_newer
 from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL, ordered_tags
@@ -8,6 +9,7 @@ from cisco_sdwan.base.models_vmanage import (DeviceTemplateIndex, PolicyVsmartIn
                                              CheckVBond)
 from cisco_sdwan.tasks.utils import TaskOptions, TagOptions, existing_workdir_type, regex_type, default_workdir
 from cisco_sdwan.tasks.common import regex_search, Task, WaitActionsException
+from cisco_sdwan.tasks.models import TaskArgs, validate_workdir, validate_regex, validate_catalog_tag
 
 
 @TaskOptions.register('restore')
@@ -254,3 +256,18 @@ class TaskRestore(Task):
                 self.log_critical('Attach failed: %s', ex)
 
         return
+
+
+class RestoreArgs(TaskArgs):
+    workdir: str
+    regex: Optional[str] = None
+    not_regex: Optional[str] = None
+    dryrun: bool = False
+    attach: bool = False
+    force: bool = False
+    tag: str
+
+    # Validators
+    _validate_workdir = validator('workdir', allow_reuse=True)(validate_workdir)
+    _validate_regex = validator('regex', 'not_regex', allow_reuse=True)(validate_regex)
+    _validate_tag = validator('tag', allow_reuse=True)(validate_catalog_tag)

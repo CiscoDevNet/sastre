@@ -105,6 +105,14 @@ def validate_ext_template(template_str: str) -> str:
     return template_str
 
 
+def validate_version(version_str: str) -> str:
+    # Development versions may follow this format: '20.1.999-98'
+    if re.match(r'\d+([.-]\d+){1,3}$', version_str) is None:
+        raise ValueError(f'"{version_str}" is not a valid version identifier.')
+
+    return '.'.join(([str(int(v)) for v in version_str.replace('-', '.').split('.')] + ['0', ])[:2])
+
+
 def const(default_value: Any) -> Field:
     """
     Defines a model field as constant. That is, it cannot be set to any value other than the default value
