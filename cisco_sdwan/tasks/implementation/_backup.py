@@ -1,5 +1,6 @@
 import argparse
-from typing import Union, Optional
+from typing import Union, Optional, List
+from pydantic import validator
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest, RestAPIException
 from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL
@@ -8,6 +9,7 @@ from cisco_sdwan.base.models_vmanage import (DeviceConfig, DeviceConfigRFS, Devi
                                              DeviceTemplateValues, EdgeInventory, ControlInventory, EdgeCertificate)
 from cisco_sdwan.tasks.utils import TaskOptions, TagOptions, filename_type, regex_type, default_workdir
 from cisco_sdwan.tasks.common import regex_search, clean_dir, Task
+from cisco_sdwan.tasks.models import TaskArgs, validate_regex, validate_filename, validate_catalog_tag
 
 
 @TaskOptions.register('backup')
@@ -130,3 +132,17 @@ class TaskBackup(Task):
                         continue
                     if item.save(workdir, item_name=hostname, item_id=uuid):
                         self.log_info('Done %s device configuration %s', config_type, hostname)
+
+
+class BackupArgs(TaskArgs):
+    regex: Optional[str] = None
+    not_regex: Optional[str] = None
+    no_rollover: bool = False
+    save_running: bool = False
+    workdir: str
+    tags: List[str]
+
+    # Validators
+    _validate_regex = validator('regex', 'not_regex', allow_reuse=True)(validate_regex)
+    _validate_workdir = validator('workdir', allow_reuse=True)(validate_filename)
+    _validate_tags = validator('tags', each_item=True, allow_reuse=True)(validate_catalog_tag)

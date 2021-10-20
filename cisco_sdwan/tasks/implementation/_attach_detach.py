@@ -1,12 +1,14 @@
 import argparse
 from functools import partial
-from typing import Union, Optional
+from typing import Union, Optional, Callable
+from pydantic import validator, conint
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest, RestAPIException
 from cisco_sdwan.base.models_vmanage import DeviceTemplateIndex, EdgeInventory, ControlInventory
 from cisco_sdwan.tasks.utils import (TaskOptions, existing_workdir_type, regex_type, default_workdir, ipv4_type,
                                      site_id_type, int_type)
 from cisco_sdwan.tasks.common import regex_search, Task, WaitActionsException, device_iter
+from cisco_sdwan.tasks.models import TaskArgs, const, validate_regex, validate_workdir, validate_site_id, validate_ipv4
 
 # Default number of devices to include per attach/detach request. The value of 200 was adopted because it is what was
 # validated in the lab
@@ -95,6 +97,31 @@ class TaskAttach(Task):
 
         return
 
+class AttachArgs(TaskArgs):
+    templates: Optional[str] = None
+    devices: Optional[str] = None
+    site: Optional[str] = None
+    system_ip: Optional[str] = None
+    reachable: bool = False
+    dryrun: bool = False
+    batch: conint(ge=1, lt=9999) = DEFAULT_BATCH_SIZE
+    workdir: str
+
+    # Validators
+    _validate_regex = validator('templates', 'devices', allow_reuse=True)(validate_regex)
+    _validate_site_id = validator('site', allow_reuse=True)(validate_site_id)
+    _validate_ipv4 = validator('system_ip', allow_reuse=True)(validate_ipv4)
+    _validate_workdir = validator('workdir', allow_reuse=True)(validate_workdir)
+
+class AttachVsmartArgs(AttachArgs):
+    template_filter: Callable = const(DeviceTemplateIndex.is_vsmart)
+    device_set: Callable = const(TaskAttach.vsmart_set)
+    set_title: str = const('vSmarts')
+
+class AttachEdgeArgs(AttachArgs):
+    template_filter: Callable = const(DeviceTemplateIndex.is_not_vsmart)
+    device_set: Callable = const(TaskAttach.edge_set)
+    set_title: str = const('WAN Edges')
 
 @TaskOptions.register('detach')
 class TaskDetach(Task):
@@ -158,3 +185,25 @@ class TaskDetach(Task):
             self.log_critical('Detach failed: %s', ex)
 
         return
+
+class DetachArgs(TaskArgs):
+    templates: Optional[str] = None
+    devices: Optional[str] = None
+    site: Optional[str] = None
+    system_ip: Optional[str] = None
+    reachable: bool = False
+    dryrun: bool = False
+    batch: conint(ge=1, lt=9999) = DEFAULT_BATCH_SIZE
+
+    # Validators
+    _validate_regex = validator('templates', 'devices', allow_reuse=True)(validate_regex)
+    _validate_site_id = validator('site', allow_reuse=True)(validate_site_id)
+    _validate_ipv4 = validator('system_ip', allow_reuse=True)(validate_ipv4)
+
+class DetachVsmartArgs(DetachArgs):
+    template_filter: Callable = const(DeviceTemplateIndex.is_vsmart)
+    set_title: str = const('vSmarts')
+
+class DetachEdgeArgs(DetachArgs):
+    template_filter: Callable = const(DeviceTemplateIndex.is_not_vsmart)
+    set_title: str = const('WAN Edges')
