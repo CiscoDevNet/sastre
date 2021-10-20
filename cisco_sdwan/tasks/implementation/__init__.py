@@ -5,9 +5,9 @@
  This module contains the implementation of user-facing tasks
 """
 from ._backup import TaskBackup
-from ._restore import TaskRestore
+from ._restore import TaskRestore, RestoreArgs
 from ._delete import TaskDelete
-from ._migrate import TaskMigrate
+from ._migrate import TaskMigrate, MigrateArgs
 from ._attach_detach import TaskAttach, TaskDetach
 
 
@@ -17,5 +17,7 @@ __all__ = [
     'TaskDelete',
     'TaskMigrate',
     'TaskAttach',
-    'TaskDetach'
+    'TaskDetach',
+    'RestoreArgs',
+    'MigrateArgs'
 ]
