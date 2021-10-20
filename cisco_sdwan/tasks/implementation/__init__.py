@@ -4,11 +4,11 @@
  cisco_sdwan.tasks.implementation
  This module contains the implementation of user-facing tasks
 """
-from ._backup import TaskBackup
+from ._backup import TaskBackup, BackupArgs
 from ._restore import TaskRestore, RestoreArgs
-from ._delete import TaskDelete
+from ._delete import TaskDelete, DeleteArgs
 from ._migrate import TaskMigrate, MigrateArgs
-from ._attach_detach import TaskAttach, TaskDetach
+from ._attach_detach import TaskAttach, TaskDetach, AttachVsmartArgs, AttachEdgeArgs, DetachVsmartArgs, DetachEdgeArgs
 
 
 __all__ = [
@@ -18,6 +18,12 @@ __all__ = [
     'TaskMigrate',
     'TaskAttach',
     'TaskDetach',
+    'BackupArgs',
     'RestoreArgs',
-    'MigrateArgs'
+    'DeleteArgs',
+    'MigrateArgs',
+    'AttachVsmartArgs',
+    'AttachEdgeArgs',
+    'DetachVsmartArgs',
+    'DetachEdgeArgs'
 ]

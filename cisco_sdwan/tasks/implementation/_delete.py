@@ -1,11 +1,13 @@
 import argparse
 from typing import Union, Optional
+from pydantic import validator
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest, RestAPIException
 from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL, ordered_tags
 from cisco_sdwan.base.models_vmanage import DeviceTemplateIndex
 from cisco_sdwan.tasks.utils import TaskOptions, TagOptions, regex_type
 from cisco_sdwan.tasks.common import regex_search, Task, WaitActionsException
+from cisco_sdwan.tasks.models import TaskArgs, validate_regex, validate_catalog_tag
 
 
 @TaskOptions.register('delete')
@@ -92,3 +94,14 @@ class TaskDelete(Task):
                     self.log_warning('Failed deleting %s %s', info, item_name)
 
         return
+
+class DeleteArgs(TaskArgs):
+    regex: Optional[str] = None
+    not_regex: Optional[str] = None
+    dryrun: bool = False
+    detach: bool = False
+    tag: str
+
+    # Validators
+    _validate_regex = validator('regex', 'not_regex', allow_reuse=True)(validate_regex)
+    _validate_tag = validator('tag', allow_reuse=True)(validate_catalog_tag)
