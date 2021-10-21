@@ -97,6 +97,7 @@ class TaskAttach(Task):
 
         return
 
+
 class AttachArgs(TaskArgs):
     templates: Optional[str] = None
     devices: Optional[str] = None
@@ -113,15 +114,18 @@ class AttachArgs(TaskArgs):
     _validate_ipv4 = validator('system_ip', allow_reuse=True)(validate_ipv4)
     _validate_workdir = validator('workdir', allow_reuse=True)(validate_workdir)
 
+
 class AttachVsmartArgs(AttachArgs):
     template_filter: Callable = const(DeviceTemplateIndex.is_vsmart)
     device_set: Callable = const(TaskAttach.vsmart_set)
     set_title: str = const('vSmarts')
 
+
 class AttachEdgeArgs(AttachArgs):
     template_filter: Callable = const(DeviceTemplateIndex.is_not_vsmart)
     device_set: Callable = const(TaskAttach.edge_set)
     set_title: str = const('WAN Edges')
+
 
 @TaskOptions.register('detach')
 class TaskDetach(Task):
@@ -186,6 +190,7 @@ class TaskDetach(Task):
 
         return
 
+
 class DetachArgs(TaskArgs):
     templates: Optional[str] = None
     devices: Optional[str] = None
@@ -200,9 +205,11 @@ class DetachArgs(TaskArgs):
     _validate_site_id = validator('site', allow_reuse=True)(validate_site_id)
     _validate_ipv4 = validator('system_ip', allow_reuse=True)(validate_ipv4)
 
+
 class DetachVsmartArgs(DetachArgs):
     template_filter: Callable = const(DeviceTemplateIndex.is_vsmart)
     set_title: str = const('vSmarts')
+
 
 class DetachEdgeArgs(DetachArgs):
     template_filter: Callable = const(DeviceTemplateIndex.is_not_vsmart)

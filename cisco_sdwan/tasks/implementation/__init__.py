@@ -10,7 +10,6 @@ from ._delete import TaskDelete, DeleteArgs
 from ._migrate import TaskMigrate, MigrateArgs
 from ._attach_detach import TaskAttach, TaskDetach, AttachVsmartArgs, AttachEdgeArgs, DetachVsmartArgs, DetachEdgeArgs
 
-
 __all__ = [
     'TaskBackup',
     'TaskRestore',
