@@ -95,6 +95,7 @@ class TaskDelete(Task):
 
         return
 
+
 class DeleteArgs(TaskArgs):
     regex: Optional[str] = None
     not_regex: Optional[str] = None
