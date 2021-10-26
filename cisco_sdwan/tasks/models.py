@@ -53,10 +53,9 @@ def validate_ipv4(ipv4_str: str) -> str:
     return ipv4_str
 
 
-def validate_site_id(site_id: str) -> int:
+def validate_site_id(site_id: str) -> str:
     try:
-        site_id = int(site_id)
-        if not 0 <= site_id <= 4294967295:
+        if not 0 <= int(site_id) <= 4294967295:
             raise ValueError()
     except ValueError:
         raise ValueError(f'"{site_id}" is not a valid site-id.') from None
