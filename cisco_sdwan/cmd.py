@@ -154,6 +154,9 @@ def main():
         # Display task output
         if task_output:
             print('\n\n'.join(str(entry) for entry in task_output))
+        # Display dryrun report if console logging is disabled (i.e. not in verbose mode)
+        if not cli_args.verbose and task.is_dryrun:
+            print(str(task.dryrun_report))
 
         task.log_info('Task completed %s', task.outcome('successfully', 'with caveats: {tally}'))
     except (RestAPIException, ConnectionError, FileNotFoundError, ModelException, TaskException) as ex:

@@ -50,15 +50,14 @@ class TaskRestore(Task):
             )
             return ((item_id, item_obj) for item_id, item_obj in item_iter if item_obj is not None)
 
-        self.log_info('Starting restore%s: Local workdir: "%s" -> vManage URL: "%s"',
-                      ', DRY-RUN mode' if parsed_args.dryrun else '', parsed_args.workdir, api.base_url)
+        self.is_dryrun = parsed_args.dryrun
+        self.log_info(f'Restore task: Local workdir: "{parsed_args.workdir}" -> vManage URL: "{api.base_url}"')
 
         local_info = ServerInfo.load(parsed_args.workdir)
         # Server info file may not be present (e.g. backup from older Sastre releases)
         if local_info is not None and is_version_newer(api.server_version, local_info.server_version):
-            self.log_warning('Target vManage release (%s) is older than the release used in backup (%s). '
-                             'Items may fail to be restored due to incompatibilities across releases.',
-                             api.server_version, local_info.server_version)
+            self.log_warning(f'Target vManage release ({api.server_version}) is older than the release used in backup '
+                             f'({local_info.server_version}). Items may fail to restore due to incompatibilities.')
         check_vbond = CheckVBond.get(api)
         if check_vbond is None:
             self.log_warning('Failed retrieving vBond configuration status.')
@@ -66,24 +65,24 @@ class TaskRestore(Task):
         else:
             is_vbond_set = check_vbond.is_configured
 
-        self.log_info('Loading existing items from target vManage')
+        self.log_info('Loading existing items from target vManage', dryrun=False)
         target_all_items_map = {
             hash(type(index)): {item_name: item_id for item_id, item_name in index}
             for _, _, index, item_cls in self.index_iter(api, catalog_iter(CATALOG_TAG_ALL, version=api.server_version))
         }
 
-        self.log_info('Identifying items to be pushed')
+        self.log_info('Identifying items to be pushed', dryrun=False)
         id_mapping = {}         # {<old_id>: <new_id>}, used to replace old (saved) item ids with new (target) ids
         restore_list = []       # [ (<info>, <index_cls>, [(<item_id>, <item>, <id_on_target>), ...]), ...]
         dependency_set = set()  # {<item_id>, ...}
         match_set = set()       # {<item_id>, ...}
         for tag in ordered_tags(parsed_args.tag):
             if tag == 'template_device' and not is_vbond_set:
-                self.log_warning('Will skip %s items because vBond is not configured. '
-                                 'On vManage, Administration > Settings > vBond.', tag)
+                self.log_warning(f'Will skip {tag} items because vBond is not configured. '
+                                 'On vManage, Administration > Settings > vBond.')
                 continue
 
-            self.log_info('Inspecting %s items', tag)
+            self.log_info(f'Inspecting {tag} items', dryrun=False)
             tag_iter = (
                 (info, index, load_items(index, item_cls))
                 for _, info, index, item_cls in self.index_iter(parsed_args.workdir,
@@ -93,7 +92,7 @@ class TaskRestore(Task):
                 target_item_map = target_all_items_map.get(hash(type(index)))
                 if target_item_map is None:
                     # Logging at warning level because the backup files did have this item
-                    self.log_warning('Will skip %s, item not supported by target vManage', info)
+                    self.log_warning(f'Will skip {info}, item not supported by target vManage')
                     continue
 
                 restore_item_list = []
@@ -106,11 +105,11 @@ class TaskRestore(Task):
 
                         if not parsed_args.force:
                             # Existing item on target vManage will be used, i.e. will not overwrite it
-                            self.log_debug('Will skip %s %s, item already on target vManage', info, item.name)
+                            self.log_debug(f'Will skip {info} {item.name}, item already on target vManage')
                             continue
 
                     if item.is_readonly:
-                        self.log_debug('Will skip read-only %s %s', info, item.name)
+                        self.log_debug(f'Will skip read-only {info} {item.name}')
                         continue
 
                     regex = parsed_args.regex or parsed_args.not_regex
@@ -129,9 +128,8 @@ class TaskRestore(Task):
                 if len(restore_item_list) > 0:
                     restore_list.append((info, index, restore_item_list))
 
-        log_prefix = 'DRY-RUN: ' if parsed_args.dryrun else ''
         if len(restore_list) > 0:
-            self.log_info('%sPushing items to vManage', log_prefix)
+            self.log_info('Pushing items to vManage', dryrun=False)
             # Items were added to restore_list following ordered_tags() order (i.e. higher level items before lower
             # level items). The reverse order needs to be followed on restore.
             for info, index, restore_item_list in reversed(restore_list):
@@ -143,8 +141,8 @@ class TaskRestore(Task):
                     try:
                         if target_id is None:
                             # Create new item
-                            if parsed_args.dryrun:
-                                self.log_info('%s%s %s %s%s', log_prefix, op_info, info, item.name, reason)
+                            if self.is_dryrun:
+                                self.log_info(f'{op_info} {info} {item.name}{reason}')
                                 continue
                             # Not using item id returned from post because post can return empty (e.g. local policies)
                             api.post(item.post_data(id_mapping), item.api_path.post)
@@ -153,24 +151,25 @@ class TaskRestore(Task):
                             # Update existing item
                             update_data = item.put_data(id_mapping)
                             if item.get_raise(api, target_id).is_equal(update_data):
-                                self.log_debug('%s%s skipped (no diffs) %s %s', log_prefix, op_info, info, item.name)
+                                self.log_debug(f'{op_info} skipped (no diffs) {info} {item.name}')
                                 continue
 
-                            if parsed_args.dryrun:
-                                self.log_info('%s%s %s %s%s', log_prefix, op_info, info, item.name, reason)
+                            if self.is_dryrun:
+                                self.log_info(f'{op_info} {info} {item.name}{reason}')
                                 continue
 
                             put_eval = UpdateEval(api.put(update_data, item.api_path.put, target_id))
                             if put_eval.need_reattach:
                                 if put_eval.is_master:
-                                    self.log_info('Updating %s %s requires reattach', info, item.name)
+                                    self.log_info(f'Updating {info} {item.name} requires reattach')
                                     attach_data = self.attach_template_data(
                                         api, parsed_args.workdir, index.need_extended_name,
                                         [(item.name, item_id, target_id)]
                                     )
                                 else:
-                                    self.log_info('Updating %s %s requires reattach of affected templates',
-                                                  info, item.name)
+                                    self.log_info(
+                                        f'Updating {info} {item.name} requires reattach of affected templates'
+                                    )
                                     target_templates = {item_id: item_name
                                                         for item_id, item_name in DeviceTemplateIndex.get_raise(api)}
                                     templates_iter = (
@@ -180,20 +179,19 @@ class TaskRestore(Task):
                                     attach_data = self.reattach_template_data(api, templates_iter)
 
                                 # All re-attachments need to be done in a single request, thus 9999 for chunk_size
-                                num_attach = self.attach(
-                                    api, *attach_data, log_context='reattaching templates', chunk_size=9999
-                                )
-                                self.log_debug('Attach requests processed: %s', num_attach)
+                                reqs = self.attach(api, *attach_data, chunk_size=9999,
+                                                   log_context='reattaching templates')
+                                self.log_debug(f'Attach requests processed: {reqs}')
                             elif put_eval.need_reactivate:
-                                self.log_info('Updating %s %s requires vSmart policy reactivate', info, item.name)
+                                self.log_info(f'Updating {info} {item.name} requires vSmart policy reactivate')
                                 action_list = self.activate_policy(
                                     api, *PolicyVsmartIndex.get_raise(api).active_policy, is_edited=True
                                 )
                                 self.wait_actions(api, action_list, 'reactivating vSmart policy', raise_on_failure=True)
                     except (RestAPIException, WaitActionsException) as ex:
-                        self.log_error('Failed %s %s %s%s: %s', op_info, info, item.name, reason, ex)
+                        self.log_error(f'Failed {op_info} {info} {item.name}{reason}: {ex}')
                     else:
-                        self.log_info('Done: %s %s %s%s', op_info, info, item.name, reason)
+                        self.log_info(f'Done: {op_info} {info} {item.name}{reason}')
 
                 # Read new ids from target and update id_mapping
                 try:
@@ -201,10 +199,10 @@ class TaskRestore(Task):
                     for item_name, old_item_id in pushed_item_dict.items():
                         id_mapping[old_item_id] = new_target_item_map[item_name]
                 except RestAPIException as ex:
-                    self.log_critical('Failed retrieving %s: %s', info, ex)
+                    self.log_critical(f'Failed retrieving {info}: {ex}')
                     break
         else:
-            self.log_info('%sNo items to push', log_prefix)
+            self.log_info('No items to push')
 
         if parsed_args.attach:
             try:
@@ -221,9 +219,9 @@ class TaskRestore(Task):
                     api, parsed_args.workdir, saved_template_index.need_extended_name, edge_templates_iter,
                     target_uuid_set={uuid for uuid, _ in EdgeInventory.get_raise(api)}
                 )
-                reqs = self.attach(api, *attach_data, dryrun=parsed_args.dryrun, log_context='attaching WAN Edges')
+                reqs = self.attach(api, *attach_data, log_context='attaching WAN Edges')
                 if reqs:
-                    self.log_debug('%sAttach requests processed: %s', log_prefix, reqs)
+                    self.log_debug(f'Attach requests processed: {reqs}')
                 else:
                     self.log_info('No WAN Edge attachments needed')
 
@@ -238,14 +236,14 @@ class TaskRestore(Task):
                 attach_data = self.attach_template_data(api, parsed_args.workdir,
                                                         saved_template_index.need_extended_name, vsmart_templates_iter,
                                                         target_uuid_set=vsmart_set)
-                reqs = self.attach(api, *attach_data, dryrun=parsed_args.dryrun, log_context="attaching vSmarts")
+                reqs = self.attach(api, *attach_data, log_context="attaching vSmarts")
                 if reqs:
-                    self.log_debug('%sAttach requests processed: %s', log_prefix, reqs)
+                    self.log_debug(f'Attach requests processed: {reqs}')
                 else:
                     self.log_info('No vSmart attachments needed')
 
                 # Activate vSmart policy
-                if not parsed_args.dryrun:
+                if not self.is_dryrun:
                     _, policy_name = PolicyVsmartIndex.load(parsed_args.workdir, raise_not_found=True).active_policy
                     action_list = self.activate_policy(api, target_policies.get(policy_name), policy_name)
                     if len(action_list) == 0:
@@ -253,7 +251,7 @@ class TaskRestore(Task):
                     else:
                         self.wait_actions(api, action_list, 'activating vSmart policy', raise_on_failure=True)
             except (RestAPIException, FileNotFoundError, WaitActionsException) as ex:
-                self.log_critical('Attach failed: %s', ex)
+                self.log_critical(f'Attach failed: {ex}')
 
         return
 

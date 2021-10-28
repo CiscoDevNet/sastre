@@ -54,7 +54,7 @@ class TaskMigrate(Task):
 
     def runner(self, parsed_args, api: Optional[Rest] = None) -> Union[None, list]:
         source_info = f'Local workdir: "{parsed_args.workdir}"' if api is None else f'vManage URL: "{api.base_url}"'
-        self.log_info('Starting migrate: %s %s -> %s Local output dir: "%s"', source_info, parsed_args.from_version,
+        self.log_info('Migrate task: %s %s -> %s Local output dir: "%s"', source_info, parsed_args.from_version,
                       parsed_args.to_version, parsed_args.output)
 
         # Output directory must be empty for a new migration

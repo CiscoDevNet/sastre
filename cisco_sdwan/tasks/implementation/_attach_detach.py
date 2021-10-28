@@ -65,9 +65,8 @@ class TaskAttach(Task):
         return {uuid for uuid, _ in ControlInventory.get_raise(api).filtered_iter(ControlInventory.is_vsmart)}
 
     def runner(self, parsed_args, api: Optional[Rest] = None) -> Union[None, list]:
-        self.log_info('Starting attach templates%s: Local workdir: "%s" -> vManage URL: "%s"',
-                      ', DRY-RUN mode' if parsed_args.dryrun else '', parsed_args.workdir, api.base_url)
-        log_prefix = 'DRY-RUN: ' if parsed_args.dryrun else ''
+        self.is_dryrun = parsed_args.dryrun
+        self.log_info(f'Attach templates task: Local workdir: "{parsed_args.workdir}" -> vManage URL: "{api.base_url}"')
 
         try:
             uuid_set = (
@@ -85,15 +84,15 @@ class TaskAttach(Task):
 
             attach_data = self.attach_template_data(api, parsed_args.workdir, saved_template_index.need_extended_name,
                                                     matched_templates, target_uuid_set=uuid_set)
-            reqs = self.attach(api, *attach_data, chunk_size=parsed_args.batch, dryrun=parsed_args.dryrun,
+            reqs = self.attach(api, *attach_data, chunk_size=parsed_args.batch,
                                log_context=f"attaching {parsed_args.set_title}")
             if reqs:
-                self.log_debug('%sAttach requests processed: %s', log_prefix, reqs)
+                self.log_debug(f'Attach requests processed: {reqs}')
             else:
-                self.log_info('%sNo %s attachments to process', log_prefix, parsed_args.set_title)
+                self.log_info(f'No {parsed_args.set_title} attachments to process')
 
         except (RestAPIException, FileNotFoundError, WaitActionsException) as ex:
-            self.log_critical('%sAttach failed: %s', log_prefix, ex)
+            self.log_critical(f'Attach failed: {ex}')
 
         return
 
@@ -165,9 +164,8 @@ class TaskDetach(Task):
         return task_parser.parse_args(task_args)
 
     def runner(self, parsed_args, api: Optional[Rest] = None) -> Union[None, list]:
-        self.log_info('Starting detach templates%s: vManage URL: "%s"',
-                      ', DRY-RUN mode' if parsed_args.dryrun else '', api.base_url)
-        log_prefix = 'DRY-RUN: ' if parsed_args.dryrun else ''
+        self.is_dryrun = parsed_args.dryrun
+        self.log_info(f'Detach templates task: vManage URL: "{api.base_url}"')
 
         try:
             matched_devices = dict(
@@ -179,14 +177,14 @@ class TaskDetach(Task):
                 if parsed_args.templates is None or regex_search(parsed_args.templates, t_name)
             )
             reqs = self.detach(api, matched_templates, matched_devices, chunk_size=parsed_args.batch,
-                               dryrun=parsed_args.dryrun, log_context=f"detaching {parsed_args.set_title}")
+                               log_context=f"detaching {parsed_args.set_title}")
             if reqs:
-                self.log_debug('%sDetach requests processed: %s', log_prefix, reqs)
+                self.log_debug(f'Detach requests processed: {reqs}')
             else:
-                self.log_info('%sNo %s detachments to process', log_prefix, parsed_args.set_title)
+                self.log_info(f'No {parsed_args.set_title} detachments to process')
 
         except (RestAPIException, WaitActionsException) as ex:
-            self.log_critical('Detach failed: %s', ex)
+            self.log_critical(f'Detach failed: {ex}')
 
         return
 

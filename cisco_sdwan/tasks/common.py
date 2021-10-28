@@ -91,7 +91,7 @@ class Table:
 
     def pretty_iter(self):
         def cell_format(width, value):
-            return ' {value:{width}} '.format(value=str(value), width=width-2)
+            return f' {str(value):{width-2}} '
 
         def border(line_ch: str, int_edge_ch: str = '+', ext_edge_ch: str = '+') -> str:
             return ext_edge_ch + int_edge_ch.join((line_ch*col_width for col_width in col_width_list)) + ext_edge_ch
@@ -139,34 +139,63 @@ class Table:
             writer.writerows(row for row in self._rows if row is not None)
 
 
+class DryRunReport:
+    def __init__(self):
+        self._entries: List[str] = []
+
+    def add(self, entry: str) -> None:
+        self._entries.append(entry)
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self._entries)
+
+    def render(self) -> Iterator[str]:
+        yield ""
+        yield "### Dry-run action preview ###"
+        yield ""
+        yield from (f"  - {entry}" for entry in self)
+        yield ""
+
+    def __str__(self) -> str:
+        return '\n'.join(self.render())
+
+
 class Task:
     # Configuration parameters for wait_actions
     ACTION_INTERVAL = 10    # seconds
     ACTION_TIMEOUT = 1800   # 30 minutes
 
     SAVINGS_FACTOR = 1
+    DRYRUN_LEVELS = {'info', 'warning', 'error', 'critical'}
 
     def __init__(self):
         self.log_count = Tally('debug', 'info', 'warning', 'error', 'critical')
+        self.is_dryrun = False
+        self.dryrun_report = DryRunReport()
 
-    def log_debug(self, *args):
-        self._log('debug', *args)
+    def log_debug(self, msg: str, *args, dryrun: bool = True) -> None:
+        self._log('debug', msg, *args, dryrun=dryrun)
 
-    def log_info(self, *args):
-        self._log('info', *args)
+    def log_info(self, msg: str, *args, dryrun: bool = True) -> None:
+        self._log('info', msg, *args, dryrun=dryrun)
 
-    def log_warning(self, *args):
-        self._log('warning', *args)
+    def log_warning(self, msg: str, *args, dryrun: bool = True) -> None:
+        self._log('warning', msg, *args, dryrun=dryrun)
 
-    def log_error(self, *args):
-        self._log('error', *args)
+    def log_error(self, msg: str, *args, dryrun: bool = True) -> None:
+        self._log('error', msg, *args, dryrun=dryrun)
 
-    def log_critical(self, *args):
-        self._log('critical', *args)
+    def log_critical(self, msg: str, *args, dryrun: bool = True) -> None:
+        self._log('critical', msg, *args, dryrun=dryrun)
 
-    def _log(self, level, *args):
-        getattr(logging.getLogger(type(self).__name__), level)(*args)
+    def _log(self, level: str, msg: str, *args, dryrun: bool) -> None:
+        log_msg = f"DRY-RUN: {msg}" if self.is_dryrun else msg
+        getattr(logging.getLogger(type(self).__name__), level)(log_msg, *args)
+
         self.log_count.incr(level)
+
+        if self.is_dryrun and dryrun and level in Task.DRYRUN_LEVELS:
+            self.dryrun_report.add(msg % args if args else msg)
 
     def outcome(self, success_msg, failure_msg):
         msg_list = list()
@@ -214,9 +243,7 @@ class Task:
 
         def load_index(index_cls, info):
             index = index_cls.get(backend) if is_api else index_cls.load(backend)
-            self.log_debug('%s %s %s index',
-                           'No' if index is None else 'Loaded',
-                           'remote' if is_api else 'local', info)
+            self.log_debug(f'{"No" if index is None else "Loaded"} {"remote" if is_api else "local"} {info} index')
             return index
 
         all_index_iter = (
@@ -252,15 +279,15 @@ class Task:
         """
         def load_template_input(template_name: str, saved_id: str, target_id: str) -> Union[list, None]:
             if target_id is None:
-                self.log_debug('Skip %s, saved template is not on target node', template_name)
+                self.log_debug(f'Skip {template_name}, saved template is not on target node')
                 return None
 
             saved_values = DeviceTemplateValues.load(workdir, ext_name, template_name, saved_id)
             if saved_values is None:
-                self.log_error('DeviceTemplateValues file not found: %s, %s', template_name, saved_id)
+                self.log_error(f'DeviceTemplateValues file not found: {template_name}, {saved_id}')
                 return None
             if saved_values.is_empty:
-                self.log_debug('Skip %s, saved template has no attachments', template_name)
+                self.log_debug(f'Skip {template_name}, saved template has no attachments')
                 return None
 
             target_attached_uuid_set = {uuid for uuid, _ in DeviceTemplateAttached.get_raise(api, target_id)}
@@ -269,14 +296,14 @@ class Task:
             else:
                 saved_attached = DeviceTemplateAttached.load(workdir, ext_name, template_name, saved_id)
                 if saved_attached is None:
-                    self.log_error('DeviceTemplateAttached file not found: %s, %s', template_name, saved_id)
+                    self.log_error(f'DeviceTemplateAttached file not found: {template_name}, {saved_id}')
                     return None
                 saved_attached_uuid_set = {uuid for uuid, _ in saved_attached}
                 allowed_uuid_set = target_uuid_set & saved_attached_uuid_set - target_attached_uuid_set
 
             input_list = saved_values.input_list(allowed_uuid_set)
             if len(input_list) == 0:
-                self.log_debug('Skip %s, no devices to attach', template_name)
+                self.log_debug(f'Skip {template_name}, no devices to attach')
                 return None
 
             return input_list
@@ -314,14 +341,13 @@ class Task:
         return template_input_list, True
 
     def attach(self, api: Rest, template_input_list: List[tuple], is_edited: bool, *, chunk_size: int = 200,
-               dryrun: bool = False, log_context: str, raise_on_failure: bool = True) -> int:
+               log_context: str, raise_on_failure: bool = True) -> int:
         """
         Attach device templates to devices
         :param api: Instance of Rest API
         :param template_input_list: List containing payload for template attachment
         :param is_edited: Boolean corresponding to the isEdited tag in the template attach payload
         :param chunk_size: Maximum number of device attachments per request
-        :param dryrun: Indicates dryrun mode
         :param raise_on_failure: If True, raise exception on action failures
         :param log_context: Message to log during wait actions
         :return: Number of attachment requests processed
@@ -336,9 +362,9 @@ class Task:
                     f"{template_name} ({', '.join(DeviceTemplateValues.input_list_devices(input_list))})"
                     for template_name, key_dict in section_dict.items() for _, input_list in key_dict.items()
                 )
-                self.log_info('%sTemplate attach: %s', 'DRY-RUN: ' if dryrun else '', ', '.join(request_details))
+                self.log_info(f'Template attach: {", ".join(request_details)}')
 
-                if not dryrun:
+                if not self.is_dryrun:
                     template_input_iter = (
                         (template_id, input_list)
                         for key_dict in section_dict.values() for template_id, input_list in key_dict.items()
@@ -346,7 +372,7 @@ class Task:
                     action_worker = attach_cls(
                         api.post(attach_cls.api_params(template_input_iter, is_edited), attach_cls.api_path.post)
                     )
-                    self.log_debug('Device template attach requested: %s', action_worker.uuid)
+                    self.log_debug(f'Device template attach requested: {action_worker.uuid}')
                     self.wait_actions(api, [(action_worker, ', '.join(section_dict))], log_context, raise_on_failure)
 
                 request_list.append(...)
@@ -377,7 +403,7 @@ class Task:
         return len(feature_based_reqs + cli_based_reqs)
 
     def detach(self, api: Rest, template_iter: Iterator[tuple], device_map: Optional[dict] = None, *,
-               chunk_size: int = 200, dryrun: bool = False, log_context: str, raise_on_failure: bool = True) -> int:
+               chunk_size: int = 200, log_context: str, raise_on_failure: bool = True) -> int:
         """
         Detach devices from device templates
         :param api: Instance of Rest API
@@ -385,7 +411,6 @@ class Task:
         :param device_map: {<uuid>: <name>, ...} dict containing allowed devices for the detach. If None, all attached
                            devices are detached.
         :param chunk_size: Maximum number of device detachments per request
-        :param dryrun: Indicates dryrun mode
         :param raise_on_failure: If True, raise exception on action failures
         :param log_context: Message to log during wait actions
         :return: Number of detach requests processed
@@ -402,15 +427,15 @@ class Task:
                         f"{t_name} ({', '.join(device_map.get(device_id, '-') for device_id in device_id_list)})"
                         for t_name, device_id_list in key_dict.items()
                     )
-                    self.log_info('%sTemplate detach: %s', 'DRY-RUN: ' if dryrun else '', ', '.join(request_details))
+                    self.log_info(f'Template detach: {", ".join(request_details)}')
 
-                    if not dryrun:
+                    if not self.is_dryrun:
                         id_list = (device_id for device_id_list in key_dict.values() for device_id in device_id_list)
                         action_worker = DeviceModeCli(
                             api.post(DeviceModeCli.api_params(device_type, *id_list), DeviceModeCli.api_path.post)
                         )
                         wait_list.append((action_worker, ', '.join(key_dict)))
-                        self.log_debug('Device template attach requested: %s', action_worker.uuid)
+                        self.log_debug(f'Device template attach requested: {action_worker.uuid}')
 
                     request_list.append(...)
 
@@ -427,7 +452,7 @@ class Task:
         for template_id, template_name in template_iter:
             devices_attached = DeviceTemplateAttached.get(api, template_id)
             if devices_attached is None:
-                self.log_warning('Failed to retrieve %s attached devices from vManage', template_name)
+                self.log_warning(f'Failed to retrieve {template_name} attached devices from vManage')
                 continue
             for uuid, personality in devices_attached:
                 if uuid in device_map:
@@ -459,7 +484,7 @@ class Task:
             action_worker = PolicyVsmartActivate(
                 api.post(PolicyVsmartActivate.api_params(is_edited), PolicyVsmartActivate.api_path.post, policy_id)
             )
-            self.log_debug('Policy activate requested: %s', action_worker.uuid)
+            self.log_debug(f'Policy activate requested: {action_worker.uuid}')
             action_list.append((action_worker, policy_name))
 
         return action_list
@@ -469,7 +494,7 @@ class Task:
         item_id, item_name = PolicyVsmartIndex.get_raise(api).active_policy
         if item_id is not None and item_name is not None:
             action_worker = PolicyVsmartDeactivate(api.post({}, PolicyVsmartDeactivate.api_path.post, item_id))
-            self.log_debug('Policy deactivate requested: %s', action_worker.uuid)
+            self.log_debug(f'Policy deactivate requested: {action_worker.uuid}')
             action_list.append((action_worker, item_name))
 
         return action_list
@@ -504,9 +529,9 @@ class Task:
                     result_list.append(action.is_successful)
                     if action_info is not None:
                         if action.is_successful:
-                            self.log_info('Completed %s', action_info)
+                            self.log_info(f'Completed {action_info}')
                         else:
-                            self.log_warning('Failed %s: %s', action_info, action.activity_details)
+                            self.log_warning(f'Failed {action_info}: {action.activity_details}')
 
                     break
 
@@ -521,11 +546,11 @@ class Task:
 
         result = all(result_list)
         if result:
-            self.log_info('Completed %s', log_context)
+            self.log_info(f'Completed {log_context}')
         elif raise_on_failure:
-            raise WaitActionsException('Failed {context}'.format(context=log_context))
+            raise WaitActionsException(f'Failed {log_context}')
         else:
-            self.log_warning('Failed %s', log_context)
+            self.log_warning(f'Failed {log_context}')
 
         return result
 
@@ -574,7 +599,7 @@ def device_iter(api: Rest, match_name_regex: Optional[str] = None, match_reachab
     )
 
 
-def clean_dir(target_dir_name, max_saved=99):
+def clean_dir(target_dir_name: str, max_saved: int = 99) -> Union[str, bool]:
     """
     Clean target_dir_name directory if it exists. If max_saved is non-zero and target_dir_name exists, move it to a new
     directory name in sequence.
@@ -586,7 +611,7 @@ def clean_dir(target_dir_name, max_saved=99):
         if max_saved > 0:
             save_seq = range(max_saved)
             for elem in save_seq:
-                save_path = Path(DATA_DIR, '{workdir}_{count}'.format(workdir=target_dir_name, count=elem+1))
+                save_path = Path(DATA_DIR, f'{target_dir_name}_{elem+1}')
                 if elem == save_seq[-1]:
                     rmtree(save_path, ignore_errors=True)
                 if not save_path.exists():
