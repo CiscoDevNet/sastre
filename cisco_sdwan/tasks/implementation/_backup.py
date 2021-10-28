@@ -43,7 +43,7 @@ class TaskBackup(Task):
         return task_parser.parse_args(task_args)
 
     def runner(self, parsed_args, api: Optional[Rest] = None) -> Union[None, list]:
-        self.log_info('Starting backup: vManage URL: "%s" -> Local workdir: "%s"', api.base_url, parsed_args.workdir)
+        self.log_info('Backup task: vManage URL: "%s" -> Local workdir: "%s"', api.base_url, parsed_args.workdir)
 
         # Backup workdir must be empty for a new backup
         saved_workdir = clean_dir(parsed_args.workdir, max_saved=0 if parsed_args.no_rollover else 99)

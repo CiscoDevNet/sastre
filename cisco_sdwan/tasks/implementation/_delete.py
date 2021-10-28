@@ -35,22 +35,21 @@ class TaskDelete(Task):
         return task_parser.parse_args(task_args)
 
     def runner(self, parsed_args, api: Optional[Rest] = None) -> Union[None, list]:
-        self.log_info('Starting delete%s: vManage URL: "%s"',
-                      ', DRY-RUN mode' if parsed_args.dryrun else '', api.base_url)
-        log_prefix = 'DRY-RUN: ' if parsed_args.dryrun else ''
+        self.is_dryrun = parsed_args.dryrun
+        self.log_info(f'Delete task: vManage URL: "{api.base_url}"')
 
         if parsed_args.detach:
             try:
                 template_index = DeviceTemplateIndex.get_raise(api)
                 # Detach WAN Edge templates
                 reqs = self.detach(api, template_index.filtered_iter(DeviceTemplateIndex.is_not_vsmart),
-                                   dryrun=parsed_args.dryrun, log_context='detaching WAN Edges')
+                                   log_context='detaching WAN Edges')
                 if reqs:
-                    self.log_debug('%sDetach requests processed: %s', log_prefix, reqs)
+                    self.log_debug(f'Detach requests processed: {reqs}')
                 else:
                     self.log_info('No WAN Edge attached')
                 # Deactivate vSmart policy
-                if not parsed_args.dryrun:
+                if not self.is_dryrun:
                     action_list = self.deactivate_policy(api)
                     if len(action_list) == 0:
                         self.log_info('No vSmart policy activated')
@@ -58,17 +57,17 @@ class TaskDelete(Task):
                         self.wait_actions(api, action_list, 'deactivating vSmart policy', raise_on_failure=True)
                 # Detach vSmart template
                 reqs = self.detach(api, template_index.filtered_iter(DeviceTemplateIndex.is_vsmart),
-                                   dryrun=parsed_args.dryrun, log_context='detaching vSmarts')
+                                   log_context='detaching vSmarts')
                 if reqs:
-                    self.log_debug('%sDetach requests processed: %s', log_prefix, reqs)
+                    self.log_debug(f'Detach requests processed: {reqs}')
                 else:
                     self.log_info('No vSmart attached')
             except (RestAPIException, WaitActionsException) as ex:
-                self.log_critical('Detach failed: %s', ex)
+                self.log_critical(f'Detach failed: {ex}')
                 return
 
         for tag in ordered_tags(parsed_args.tag, parsed_args.tag != CATALOG_TAG_ALL):
-            self.log_info('Inspecting %s items', tag)
+            self.log_info(f'Inspecting {tag} items', dryrun=False)
             regex = parsed_args.regex or parsed_args.not_regex
             matched_item_iter = (
                 (item_name, item_id, item_cls, info)
@@ -79,19 +78,19 @@ class TaskDelete(Task):
             for item_name, item_id, item_cls, info in matched_item_iter:
                 item = item_cls.get(api, item_id)
                 if item is None:
-                    self.log_warning('Failed retrieving %s %s', info, item_name)
+                    self.log_warning(f'Failed retrieving {info} {item_name}')
                     continue
                 if item.is_readonly or item.is_system:
-                    self.log_debug('Skipped %s %s %s', 'read-only' if item.is_readonly else 'system', info, item_name)
+                    self.log_debug(f'Skipped {"read-only" if item.is_readonly else "system"} {info} {item_name}')
                     continue
-                if parsed_args.dryrun:
-                    self.log_info('DRY-RUN: Delete %s %s', info, item_name)
+                if self.is_dryrun:
+                    self.log_info(f'Delete {info} {item_name}')
                     continue
 
                 if api.delete(item_cls.api_path.delete, item_id):
-                    self.log_info('Done: Delete %s %s', info, item_name)
+                    self.log_info(f'Done: Delete {info} {item_name}')
                 else:
-                    self.log_warning('Failed deleting %s %s', info, item_name)
+                    self.log_warning(f'Failed deleting {info} {item_name}')
 
         return
 
