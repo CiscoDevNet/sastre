@@ -151,9 +151,9 @@ class DryRunReport:
 
     def render(self) -> Iterator[str]:
         yield ""
-        yield "### Dry-run action preview ###"
+        yield "### Dry-run actions preview ###"
         yield ""
-        yield from (f"  - {entry}" for entry in self)
+        yield from (f"    {entry}" for entry in self)
         yield ""
 
     def __str__(self) -> str:
@@ -189,9 +189,15 @@ class Task:
         self._log('critical', msg, *args, dryrun=dryrun)
 
     def _log(self, level: str, msg: str, *args, dryrun: bool) -> None:
-        log_msg = f"DRY-RUN: {msg}" if self.is_dryrun else msg
-        getattr(logging.getLogger(type(self).__name__), level)(log_msg, *args)
-
+        """
+        Logs a message
+        :param level: Logging level
+        :param msg: Log message
+        :param args: Optional args to replace in msg via % operator
+        :param dryrun: Whether to include this message to the dryrun report. Messages are added to the dryrun report if
+                       this flag is True, the task is in dryrun mode and the level is in DRYRUN_LEVELS.
+        """
+        getattr(logging.getLogger(type(self).__name__), level)(f"DRY-RUN: {msg}" if self.is_dryrun else msg, *args)
         self.log_count.incr(level)
 
         if self.is_dryrun and dryrun and level in Task.DRYRUN_LEVELS:

@@ -275,17 +275,17 @@ The backup is saved under data/backup_10.85.136.253_20191206:
     INFO: Completed activating vSmart policy
     INFO: Task completed successfully
 
-#### Overwriting items with the --force option:
-- By default, when an item from backup has the same name as an existing item in vManage, it will be skipped by restore. Leaving the existing one intact.
-- When an item, say a device template, is modified in vManage. Performing a restore from a backup taken before the modification will skip that item.
-- With the --force option, items with the same name are updated with the info found in the backup.
-- Sastre only updates the item when its contents differ from what is in vManage.
+#### Overwriting items with the --update option:
+- By default, when an item from the backup has the same name as an existing item on vManage it will be skipped by restore.
+- For instance, if a device template is modified on vManage, restoring from a backup taken before the modification will skip that item.
+- With the --update option, items with the same name are updated with the info found in the backup.
+- Sastre only update items when there are differences between the backup and vManage content.
 - If the item is associated with attached templates or activated policies, all necessary re-attach/re-activate actions are automatically performed.
-- Currently, the --force option does not inspect changes to template values. 
+- Currently, the --update option does not inspect changes to template values. 
 
 Example:
 
-    % sdwan --verbose restore all --workdir state_b --force
+    % sdwan --verbose restore all --workdir state_b --update
     INFO: Starting restore: Local workdir: "state_b" -> vManage URL: "https://10.85.136.253:8443"
     INFO: Loading existing items from target vManage
     INFO: Identifying items to be pushed
@@ -798,18 +798,19 @@ The --verbose flag controls the severity of messages printed to the terminal. If
 
 ### Restore behavior
 
-By default, restore will skip items with the same name. If an existing item in vManage has the same name as an item in the backup this item is skipped from restore.
+By default, restore will skip items with the same name. If an existing item on vManage has the same name as an item in the backup this item is skipped from restore.
 
-Any references/dependencies on that item are properly updated. For instance, if a feature template is not pushed to vManage because an item with the same name is already present, device templates being pushed will now point to the feature template which was already in vManage.
+Any references/dependencies on that item are properly updated. For instance, if a feature template is not pushed to vManage because an item with the same name is already present, device templates being pushed will now point to the feature template which is already on vManage.
 
-Adding the --force option to restore modifies this behavior. In this case Sastre will update existing items containing the same name as in the backup, but only if their content is different.
+Adding the --update option to restore modifies this behavior. In this case, Sastre will update existing items containing the same name as in the backup, but only if their content is different.
 
-When an existing vManage item is modified, device templates may need to be reattached or vSmart policies may need to be re-activated. This is handled by Sastre as follows:
+When an existing vManage item is modified, device templates may need to be reattached or vSmart policies may need to be re-activated. This is handled as follows:
 - Updating items associated with an active vSmart policy may require this policy to be re-activated. In this case, Sastre will request the policy reactivate automatically.
-- On updates to a master template (e.g. device template) containing attached devices, Sastre will re-attach this device template using attachment values (variables) from the backup to feed the attach request.
-- On Updates to a child template (e.g. feature template) associated with a master template containing attached devices, Sastre will re-attach the affected master template(s). In this case, Sastre will use the existing values in vManage to feed the attach request.
+- On updates to master templates (e.g. device template) containing attached devices, Sastre will re-attach the device templates.
+- On Updates to child templates (e.g. feature template) associated with master templates containing attached devices, Sastre will re-attach the affected master template(s).
+- In all re-attach cases, Sastre will use the existing attachment values on vManage to feed the attach request.
 
-The implication is that if modified child templates (e.g. feature template) define new variables, re-attaching the master template will fail because not all variables will have values assigned. In this case, the recommended procedure is to detach the master template (i.e. change device to CLI mode in vManage), re-run "restore --force", then re-attach the device-template from vManage, where one would have a chance to supply any missing variable values.
+The implication is that if modified templates define new variables re-attach will fail, because not all variables would have values assigned. In this case, the recommended procedure is to detach the master template (e.g. using detach task), re-run "restore --update", then re-attach the device-template from vManage, where one would be able to supply any missing variable values.
 
 ## Installing
 

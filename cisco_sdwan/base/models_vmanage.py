@@ -283,8 +283,11 @@ class DeviceTemplate(ConfigItem):
     store_file = '{item_name}.json'
     name_tag = 'templateName'
     post_filtered_tags = ('feature',)
+    # templateClass, deviceRole, draftMode, templateId and copyEdited are new tags in 20.x+, adding to skip diff to not
+    # trigger updates when restore --update is done between pre 20.x workdir and post 20.x vManage.
     skip_cmp_tag_set = {'createdOn', 'createdBy', 'lastUpdatedBy', 'lastUpdatedOn', '@rid', 'owner', 'infoTag',
-                        'templateAttached', 'templateConfigurationEdited'}
+                        'templateAttached', 'templateConfigurationEdited', 'templateClass', 'deviceRole', 'draftMode',
+                        'templateId', 'copyEdited'}
 
     @property
     def is_type_cli(self) -> bool:
@@ -389,8 +392,10 @@ class FeatureTemplate(ConfigItem):
     id_tag = 'templateId'
     name_tag = 'templateName'
     type_tag = 'templateType'
+    # gTemplateClass is new in 20.x, adding skip diff to not trigger updates when restore --update is done between
+    # pre 20.x workdir and post 20.x vManage.
     skip_cmp_tag_set = {'createdOn', 'createdBy', 'lastUpdatedBy', 'lastUpdatedOn', '@rid', 'owner', 'infoTag',
-                        'devicesAttached', 'attachedMastersCount'}
+                        'devicesAttached', 'attachedMastersCount', 'gTemplateClass'}
 
     @property
     def device_types(self) -> Set[str]:
@@ -504,6 +509,9 @@ class PolicySecurity(ConfigItem):
     store_file = '{item_name}.json'
     name_tag = 'policyName'
     type_tag = 'policyType'
+    # policyUseCase, policyMode are new tags in 20.x+, adding to skip diff to not trigger updates when restore --update
+    # is done between pre 20.x workdir and post 20.x vManage.
+    skip_cmp_tag_set = {'policyUseCase', 'policyMode'}
 
 
 @register('policy_security', 'security policy', PolicySecurity)
@@ -571,8 +579,10 @@ class PolicyDef(ConfigItem):
     id_tag = 'definitionId'
     name_tag = 'name'
     type_tag = 'type'
+    # mode is new tag in 20.x+, adding to skip diff to not trigger updates when restore --update is done between pre
+    # 20.x workdir and post 20.x vManage.
     skip_cmp_tag_set = {'lastUpdated', 'referenceCount', 'references', 'activatedId', 'isActivatedByVsmart',
-                        'owner', 'infoTag'}
+                        'owner', 'infoTag', 'mode'}
 
 
 # Policy definition index base class

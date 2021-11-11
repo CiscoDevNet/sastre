@@ -32,10 +32,10 @@ class TaskRestore(Task):
                                  help='dry-run mode. Items to be restored are listed but not pushed to vManage.')
         task_parser.add_argument('--attach', action='store_true',
                                  help='attach devices to templates and activate vSmart policy after restoring items')
-        task_parser.add_argument('--force', action='store_true',
-                                 help='target vManage items with the same name as the corresponding item in workdir '
-                                      'are updated with the contents from workdir. Without this option, those items '
-                                      'are skipped and not overwritten.')
+        task_parser.add_argument('--update', action='store_true',
+                                 help='update vManage items that have the same name but different content as the '
+                                      'corresponding item in workdir. Without this option, such items are skipped '
+                                      'from restore.')
         task_parser.add_argument('tag', metavar='<tag>', type=TagOptions.tag,
                                  help='tag for selecting items to be restored. Items that are dependencies of the '
                                       'specified tag are automatically included. Available tags: '
@@ -103,8 +103,8 @@ class TaskRestore(Task):
                         if item_id != target_id:
                             id_mapping[item_id] = target_id
 
-                        if not parsed_args.force:
-                            # Existing item on target vManage will be used, i.e. will not overwrite it
+                        if not parsed_args.update:
+                            # Existing item on target vManage will be used, i.e. will not update it
                             self.log_debug(f'Will skip {info} {item.name}, item already on target vManage')
                             continue
 
@@ -121,7 +121,7 @@ class TaskRestore(Task):
                         match_set.add(item_id)
                     if item_matches or item_id in dependency_set:
                         # A target_id that is not None signals a put operation, as opposed to post.
-                        # target_id will be None unless --force is specified and item name is on target
+                        # target_id will be None unless --update is specified and item name is on target
                         restore_item_list.append((item_id, item, target_id))
                         dependency_set.update(item.id_references_set)
 
@@ -162,10 +162,7 @@ class TaskRestore(Task):
                             if put_eval.need_reattach:
                                 if put_eval.is_master:
                                     self.log_info(f'Updating {info} {item.name} requires reattach')
-                                    attach_data = self.attach_template_data(
-                                        api, parsed_args.workdir, index.need_extended_name,
-                                        [(item.name, item_id, target_id)]
-                                    )
+                                    attach_data = self.reattach_template_data(api, [(item.name, target_id)])
                                 else:
                                     self.log_info(
                                         f'Updating {info} {item.name} requires reattach of affected templates'
@@ -262,7 +259,7 @@ class RestoreArgs(TaskArgs):
     not_regex: Optional[str] = None
     dryrun: bool = False
     attach: bool = False
-    force: bool = False
+    update: bool = False
     tag: str
 
     # Validators

@@ -147,9 +147,10 @@ def raise_for_status(response):
         except json.decoder.JSONDecodeError:
             reply_data = {'error': {'message': 'Check user permissions'}} if response.status_code == 403 else {}
 
+        details = reply_data.get("error", {}).get("details", "")
         raise RestAPIException(f'{response.reason} ({response.status_code}): '
-                               f'{reply_data.get("error", {}).get("message", "Unspecified error message")} '
-                               f'[{response.request.method} {response.url}]')
+                               f'{reply_data.get("error", {}).get("message", "Unspecified error message")}'
+                               f'{ ": " if details else ""}{details} [{response.request.method} {response.url}]')
 
 
 def is_version_newer(version_1, version_2):
