@@ -1,4 +1,4 @@
-Sastre 1.16 [October 15, 2021]
+Sastre 1.16 [November 12, 2021]
 ================================
 
 #### Enhancements
@@ -6,6 +6,14 @@ Sastre 1.16 [October 15, 2021]
 - Infra changes related to the report task, not user-facing.
 - Report task diff option now allow specific sections to not be considered for diff comparison. Via skip_diff option in the report specification.
 - [#105] Tasks with --dryrun option, when executed without --verbose, now display a dryrun action preview at the end.
+- Task 'restore --force' payload diff comparison improved to allow pre-20.x backups to be restored on post-20.x vManage 
+  with minimal updates when --force is used.
+
+#### Behavior changes:
+- Restore task --force option has been renamed as --update. Additionally, if template re-attach is required, template 
+  values are now always obtained from the existing attachment on vManage. Previously, re-attach template values would be 
+  sourced differently depending on whether the re-attach was triggered by device template changes (values from backup) or 
+  feature template changes (values from vManage).
 
 
 Sastre 1.15 [September 27, 2021]
