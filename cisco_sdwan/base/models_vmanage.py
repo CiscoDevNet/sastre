@@ -4,13 +4,13 @@
  cisco_sdwan.base.models_vmanage
  This module implements vManage API models
 """
-from typing import Iterable, Set
+from typing import Iterable, Set, Callable
 from pathlib import Path
 from collections import namedtuple
 from urllib.parse import quote_plus
 from .catalog import register, op_register
 from .models_base import (ApiItem, IndexApiItem, ConfigItem, IndexConfigItem, RealtimeItem, BulkStatsItem,
-                          BulkStateItem, ApiPath, IdName)
+                          BulkStateItem, ApiPath, IdName, default_getter)
 
 
 #
@@ -1381,6 +1381,12 @@ class EdgeCertificate(IndexConfigItem):
         'certinstallfailed': 'certificate install failed',
         'certinstalled': 'certificate installed',
     }
+
+    @staticmethod
+    def key_fn() -> Callable:
+        # Sort by hostname then chassis number. Using '|' as default in order to have entries without hostname listed
+        # last (i.e. '|' code point is bigger than alphanumerics)
+        return default_getter('host-name', 'chasisNumber', default='|')
 
     @classmethod
     def state_str(cls, state):
