@@ -73,8 +73,9 @@ class OperationalItem:
     """
     api_path = None
     api_params = None
-    fields_std = None
-    fields_ext = None
+    fields_std = None   # Tuple with standard fields to include (by default) as entries are iterated
+    fields_ext = None   # Tuple with extended fields to add, on top of fields_std
+    fields_sub = None   # Tuple containing fields to subtract from fields_std as entries are iterated
     field_conversion_fns = {}
 
     def __init__(self, payload: Mapping[str, Any]) -> None:

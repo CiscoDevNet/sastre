@@ -1438,6 +1438,7 @@ class DeviceControlConnections(RealtimeItem):
     api_path = ApiPath('device/control/connections', None, None, None)
     fields_std = ('system_ip', 'site_id', 'peer_type', 'local_color', 'remote_color', 'state')
     fields_ext = ('private_ip', 'private_port', 'public_ip', 'public_port', 'instance', 'protocol', 'domain_id')
+    fields_sub = ('local_color', 'remote_color')
 
 
 @op_register('control', 'local-properties', 'Control local-properties')
@@ -1481,6 +1482,7 @@ class InterfaceIpv4(RealtimeItem):
     fields_std = ('vpn_id', 'ifname', 'af_type', 'ip_address', 'ipv6_address', 'if_admin_status', 'if_oper_status',
                   'desc')
     fields_ext = ('tx_drops', 'rx_drops', 'tx_kbps', 'rx_kbps')
+    fields_sub = ('ifname',)
 
 
 @op_register('app-route', 'stats', 'Application-aware route statistics')
@@ -1642,6 +1644,7 @@ class BulkControlConnections(BulkStateItem):
     fields_std = ('system_ip', 'site_id', 'peer_type', 'local_color', 'remote_color', 'state')
     fields_ext = ('private_ip', 'private_port', 'public_ip', 'public_port', 'instance', 'protocol', 'domain_id',
                   'uptime_date')
+    fields_sub = ('local_color', 'remote_color')
 
 
 @op_register('control', 'local-properties', 'Control local-properties')
@@ -1658,6 +1661,7 @@ class BulkInterfaceVedge(BulkStateItem):
     fields_std = ('vpn_id', 'ifname', 'af_type', 'ip_address', 'ipv6_address', 'if_admin_status',
                   'if_oper_status', 'desc')
     fields_ext = ('mtu', 'hwaddr', 'speed_mbps', 'port_type')
+    fields_sub = ('ifname',)
 
 
 @op_register('interface', 'cedge', 'cEdge interfaces')
@@ -1666,6 +1670,7 @@ class BulkInterfaceCedge(BulkStateItem):
     fields_std = ('vpn_id', 'ifname', 'ip_address', 'ipv4_subnet_mask', 'ipv6_addrs', 'if_admin_status',
                   'if_oper_status', 'description')
     fields_ext = ('mtu', 'hwaddr', 'speed_mbps')
+    fields_sub = ('ifname',)
 
 
 @op_register('omp', 'peers', 'OMP peers')
