@@ -8,6 +8,7 @@ Sastre 1.16 [November 12, 2021]
 - [#105] Tasks with --dryrun option, when executed without --verbose, now display a dryrun action preview at the end.
 - Task 'restore --force' payload diff comparison improved to allow pre-20.x backups to be restored on post-20.x vManage 
   with minimal updates when --force is used.
+- New --simple option added to show tasks. In contrast with --detail, this option generates shorter versions of the output tables.
 
 #### Behavior changes:
 - Restore task --force option has been renamed as --update. Additionally, if template re-attach is required, template 
