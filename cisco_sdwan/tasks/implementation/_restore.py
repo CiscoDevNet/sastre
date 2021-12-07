@@ -58,12 +58,8 @@ class TaskRestore(Task):
         if local_info is not None and is_version_newer(api.server_version, local_info.server_version):
             self.log_warning(f'Target vManage release ({api.server_version}) is older than the release used in backup '
                              f'({local_info.server_version}). Items may fail to restore due to incompatibilities.')
-        check_vbond = CheckVBond.get(api)
-        if check_vbond is None:
-            self.log_warning('Failed retrieving vBond configuration status.')
-            is_vbond_set = False
-        else:
-            is_vbond_set = check_vbond.is_configured
+
+        is_vbond_set = self.is_vbond_configured(api)
 
         self.log_info('Loading existing items from target vManage', dryrun=False)
         target_all_items_map = {
@@ -251,6 +247,18 @@ class TaskRestore(Task):
                 self.log_critical(f'Attach failed: {ex}')
 
         return
+
+    def is_vbond_configured(self, api: Rest) -> bool:
+        if api.is_multi_tenant and not api.is_provider:
+            # Cannot explicitly check vBond configuration with tenant account, assume it is configured
+            return True
+
+        check_vbond = CheckVBond.get(api)
+        if check_vbond is None:
+            self.log_warning('Failed retrieving vBond configuration status.')
+            return False
+
+        return check_vbond.is_configured
 
 
 class RestoreArgs(TaskArgs):
