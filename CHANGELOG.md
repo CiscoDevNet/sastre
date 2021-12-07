@@ -1,3 +1,10 @@
+Sastre 1.16.7 [December 7, 2021]
+================================
+
+#### Fixes:
+- Restore task, vBond configuration validation failed with multi-tenant vManage and tenant accounts. This has been fixed.
+
+
 Sastre 1.16 [November 12, 2021]
 ================================
 
