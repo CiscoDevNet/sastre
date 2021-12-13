@@ -3,7 +3,6 @@ from collections.abc import Hashable
 from cisco_sdwan.base.processor import Operation, Processor, ProcessorException
 from . import module_dir, factory_cedge_aaa, factory_cedge_global
 
-
 _operations = {}  # {<operation_key>: Operation ...}
 
 
@@ -14,6 +13,7 @@ def register(operation_key, *param_keys):
     @param param_keys: Parameter keys from recipe file to be supplied to operation handler call.
     @return: decorator
     """
+
     def decorator(operation_fn):
         _operations[operation_key] = Operation(operation_fn, param_keys)
         return operation_fn
@@ -48,7 +48,7 @@ def op_replace(template_data, field_hierarchy_list, mappings):
                             json_obj[key] = new_val
                 else:
                     replace(value, search_list)
-            
+
         elif isinstance(json_obj, list):
             for elem in json_obj:
                 replace(elem, search_list)

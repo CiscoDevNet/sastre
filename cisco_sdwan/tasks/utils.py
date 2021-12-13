@@ -44,6 +44,7 @@ class TaskOptions:
         @param task_name: String presented to the user in order to select a task
         @return: decorator
         """
+
         def decorator(task_cls):
             if not isinstance(task_cls, type) or not issubclass(task_cls, Task):
                 raise SastreException(f'Invalid task registration attempt: {task_cls.__name__}')

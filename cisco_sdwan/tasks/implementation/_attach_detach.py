@@ -70,9 +70,10 @@ class TaskAttach(Task):
 
         try:
             uuid_set = (
-                parsed_args.device_set(api) &
-                set(uuid for uuid, _ in device_iter(api, parsed_args.devices, parsed_args.reachable, parsed_args.site,
-                                                    parsed_args.system_ip))
+                    parsed_args.device_set(api) &
+                    set(uuid for uuid, _ in
+                        device_iter(api, parsed_args.devices, parsed_args.reachable, parsed_args.site,
+                                    parsed_args.system_ip))
             )
             target_templates = {item_name: item_id for item_id, item_name in DeviceTemplateIndex.get_raise(api)}
             saved_template_index = DeviceTemplateIndex.load(parsed_args.workdir, raise_not_found=True)

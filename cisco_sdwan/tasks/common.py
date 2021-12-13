@@ -32,7 +32,7 @@ def regex_search(regex: str, *fields: str, inverse: bool = False) -> bool:
     @param inverse: False (default), or True to invert the match behavior.
     @return: True if a match is found on any field, False otherwise.
     """
-    op_fn = all if inverse else any    # Logical AND across all fields, else logical OR
+    op_fn = all if inverse else any  # Logical AND across all fields, else logical OR
     return op_fn(inverse ^ bool(re.search(regex, match_field)) for match_field in fields)
 
 
@@ -91,12 +91,12 @@ class Table:
 
     def pretty_iter(self):
         def cell_format(width, value):
-            return f' {str(value):{width-2}} '
+            return f' {str(value):{width - 2}} '
 
         def border(line_ch: str, int_edge_ch: str = '+', ext_edge_ch: str = '+') -> str:
-            return ext_edge_ch + int_edge_ch.join((line_ch*col_width for col_width in col_width_list)) + ext_edge_ch
+            return ext_edge_ch + int_edge_ch.join((line_ch * col_width for col_width in col_width_list)) + ext_edge_ch
 
-        col_width_list = [2+self._column_max_width(index) for index in range(len(self.header))]
+        col_width_list = [2 + self._column_max_width(index) for index in range(len(self.header))]
         border_line = border('-')
         header_border_line = border('=', '=')
 
@@ -162,8 +162,8 @@ class DryRunReport:
 
 class Task:
     # Configuration parameters for wait_actions
-    ACTION_INTERVAL = 10    # seconds
-    ACTION_TIMEOUT = 1800   # 30 minutes
+    ACTION_INTERVAL = 10  # seconds
+    ACTION_TIMEOUT = 1800  # 30 minutes
 
     SAVINGS_FACTOR = 1
     DRYRUN_LEVELS = {'info', 'warning', 'error', 'critical'}
@@ -283,6 +283,7 @@ class Task:
                                 When absent, re-attach all currently attached devices on target.
         @return: Tuple containing attach data (<template input list>, <isEdited>)
         """
+
         def load_template_input(template_name: str, saved_id: str, target_id: str) -> Union[list, None]:
             if target_id is None:
                 self.log_debug(f'Skip {template_name}, saved template is not on target node')
@@ -331,6 +332,7 @@ class Task:
         @param templates_iter: Iterator of (<template_name>, <target_template_id>)
         @return: Tuple containing attach data (<template input list>, <isEdited>)
         """
+
         def get_template_input(template_id):
             uuid_list = [uuid for uuid, _ in DeviceTemplateAttached.get_raise(api, template_id)]
             values = DeviceTemplateValues(api.post(DeviceTemplateValues.api_params(template_id, uuid_list),
@@ -358,6 +360,7 @@ class Task:
         @param log_context: Message to log during wait actions
         @return: Number of attachment requests processed
         """
+
         def grouper(attach_cls, request_list):
             while True:
                 section_dict = yield from chopper(chunk_size)
@@ -421,6 +424,7 @@ class Task:
         @param log_context: Message to log during wait actions
         @return: Number of detach requests processed
         """
+
         def grouper(request_list):
             while True:
                 section_dict = yield from chopper(chunk_size)
@@ -617,7 +621,7 @@ def clean_dir(target_dir_name: str, max_saved: int = 99) -> Union[str, bool]:
         if max_saved > 0:
             save_seq = range(max_saved)
             for elem in save_seq:
-                save_path = Path(DATA_DIR, f'{target_dir_name}_{elem+1}')
+                save_path = Path(DATA_DIR, f'{target_dir_name}_{elem + 1}')
                 if elem == save_seq[-1]:
                     rmtree(save_path, ignore_errors=True)
                 if not save_path.exists():

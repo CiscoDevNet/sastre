@@ -4,11 +4,9 @@ from cisco_sdwan.base.processor import Operation, Processor, ProcessorException
 from cisco_sdwan.base.models_vmanage import CEDGE_SET
 from . import module_dir
 
-
 DEVICE_TYPES_TO_FILTER = {"vedge-ISR1100-6G", "vedge-ISR1100-4G", "vedge-ISR1100-4GLTE", "vedge-cloud", "vedge-1000",
                           "vedge-2000", "vedge-5000", "vedge-100", "vedge-100-B", "vedge-100-M", "vedge-100-WM",
                           "vsmart", "vbond", "vmanage"}
-
 
 _operations = {}  # {<operation_key>: Operation ...}
 
@@ -20,6 +18,7 @@ def register(operation_key, *param_keys):
     @param param_keys: Parameter keys from recipe file to be supplied to operation handler call.
     @return: decorator
     """
+
     def decorator(operation_fn):
         _operations[operation_key] = Operation(operation_fn, param_keys)
         return operation_fn
@@ -33,7 +32,7 @@ def op_remove(template_data, field_hierarchy_list):
     Removes the JSONValue for the leaf key specified in fieldHierarchyList.
 
     For example, assume fieldHierarchyList is ['view', 'name'], then
-    operRemove will first lookup the JSONValue of key 'view'. Next,
+    operRemove will first look up the JSONValue of key 'view'. Next,
     it will look up JSONValue of key 'name' if it exists, and then deletes
     the JSONValue.
     """
@@ -84,7 +83,7 @@ def op_range(template_data, field_hierarchy_list, range_min, range_max):
 @register('default', 'fieldHierarchyList', 'default')
 def op_default(template_data, field_hierarchy_list, default):
     """
-    Check if vipType is ignore and vipValue of the leaf field is different than the default provided. If True
+    Check if vipType is 'ignore' and vipValue of the leaf field is different from the default provided. If True
     then change vipType to constant and vipValue to the default provided.
     """
     op_trace = []
