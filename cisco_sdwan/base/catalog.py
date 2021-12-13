@@ -72,10 +72,10 @@ def ordered_tags(tag: str, single: bool = False, reverse: bool = False) -> Itera
     items need to be removed based on their dependencies (e.g. template_device before template_feature). The overall
     order is defined by _tag_dependency_list.
     If special tag 'all' is used, all items from _tag_dependency_list are yielded.
-    :param tag: tag string or 'all'
-    :param single: Optional, when True only a the one (first) tag is yielded. Used mainly for convenience of the caller.
-    :param reverse: If true, yield tags in reverse order
-    :return: Selected tags in order, as per _tag_dependency_list
+    @param tag: tag string or 'all'
+    @param single: Optional, when True only one (first) tag is yielded. Used mainly for convenience of the caller.
+    @param reverse: If true, yield tags in reverse order
+    @return: Selected tags in order, as per _tag_dependency_list
     """
     find_tag = (tag == CATALOG_TAG_ALL)
     for item in _tag_dependency_list if not reverse else reversed(_tag_dependency_list):
@@ -94,11 +94,11 @@ def register(tag: str, info: str, item_cls: type, min_version: Optional[str] = N
     """
     Decorator used for registering config item index/handler classes with the catalog.
     The class being decorated needs to be a subclass of IndexConfigItem.
-    :param tag: Tag string associated with this item. String 'all' is reserved and cannot be used.
-    :param info: Item information used for logging purposes
-    :param item_cls: The config item handler class, needs to be a subclass of ConfigItem
-    :param min_version: (optional) Minimum vManage version that supports this catalog item.
-    :return: decorator
+    @param tag: Tag string associated with this item. String 'all' is reserved and cannot be used.
+    @param info: Item information used for logging purposes
+    @param item_cls: The config item handler class, needs to be a subclass of ConfigItem
+    @param min_version: (optional) Minimum vManage version that supports this catalog item.
+    @return: decorator
     """
     def decorator(index_cls):
         if not isinstance(index_cls, type) or not issubclass(index_cls, IndexConfigItem):
@@ -122,7 +122,7 @@ def register(tag: str, info: str, item_cls: type, min_version: Optional[str] = N
 def catalog_size() -> int:
     """
     Return number of entries in the catalog
-    :return: integer
+    @return: integer
     """
     return len(_catalog)
 
@@ -131,10 +131,10 @@ def catalog_iter(*tags: str, version: Optional[str] = None) -> Iterator[tuple]:
     """
     Return an iterator of (<tag>, <info>, <index_cls>, <item_cls>) tuples matching the specified tag(s) and supported
     by vManage version.
-    :param tags: tags indicating catalog entries to return
-    :param version: Target vManage version. Only returns catalog items supported by the target vManage.
+    @param tags: tags indicating catalog entries to return
+    @param version: Target vManage version. Only returns catalog items supported by the target vManage.
                     If not specified or None, version is not verified.
-    :return: iterator of (<tag>, <info>, <index_cls>, <item_cls>) tuples from the catalog
+    @return: iterator of (<tag>, <info>, <index_cls>, <item_cls>) tuples from the catalog
     """
     def match_tags(clog_item):
         return CATALOG_TAG_ALL in tags or clog_item.tag in tags
@@ -151,7 +151,7 @@ def catalog_iter(*tags: str, version: Optional[str] = None) -> Iterator[tuple]:
 def catalog_tags() -> set:
     """
     Return unique tags used by items registered with the catalog
-    :return: Set of unique tags
+    @return: Set of unique tags
     """
     return {entry.tag for entry in _catalog}
 
@@ -163,11 +163,11 @@ def op_register(tag: str, selector: str, info: str, min_version: Optional[str] =
     """
     Decorator used for registering operational-data items with the op catalog.
     The class being decorated needs to be a subclass of OperationalItem.
-    :param tag: Tag string associated with this item. String 'all' is reserved and cannot be used.
-    :param selector: String used to further filter entries that match the tags.
-    :param info: Item information used for logging purposes
-    :param min_version: (optional) Minimum vManage version that supports this catalog item.
-    :return: decorator
+    @param tag: Tag string associated with this item. String 'all' is reserved and cannot be used.
+    @param selector: String used to further filter entries that match the tags.
+    @param info: Item information used for logging purposes
+    @param min_version: (optional) Minimum vManage version that supports this catalog item.
+    @return: decorator
     """
     def decorator(op_cls):
         try:
@@ -190,7 +190,7 @@ def op_register(tag: str, selector: str, info: str, min_version: Optional[str] =
 def op_catalog_size() -> int:
     """
     Return number of entries in the operational-data catalog
-    :return: integer
+    @return: integer
     """
     return sum(len(entries) for entries in _op_catalog.values())
 
@@ -199,12 +199,12 @@ def op_catalog_iter(op_type: OpType, *tags: str, version: Optional[str] = None) 
     """
     Return an iterator of (<info>, <op_cls>) tuples matching the specified tag(s), selector and supported
     by vManage version.
-    :param op_type: OpType enum indicating type of operational-data
-    :param tags: Tags to filter catalog entries to return. If 2 or more tags are provided, the last one is considered
+    @param op_type: OpType enum indicating type of operational-data
+    @param tags: Tags to filter catalog entries to return. If 2 or more tags are provided, the last one is considered
                  a selector.
-    :param version: Target vManage version. Only returns catalog items supported by the target vManage.
+    @param version: Target vManage version. Only returns catalog items supported by the target vManage.
                     If not specified or None, version is not verified.
-    :return: iterator of (<info>, <op_cls>) tuples from the operational-data catalog
+    @return: iterator of (<info>, <op_cls>) tuples from the operational-data catalog
     """
     if len(tags) > 1:
         group_list = tags[:-1]
@@ -231,8 +231,8 @@ def op_catalog_iter(op_type: OpType, *tags: str, version: Optional[str] = None) 
 def op_catalog_tags(op_type: OpType) -> set:
     """
     Return unique tags used by items registered with the operational-data catalog group
-    :param op_type: OpType enum indicating type of operational-data
-    :return: Set of unique tags
+    @param op_type: OpType enum indicating type of operational-data
+    @return: Set of unique tags
     """
     return {entry.tag for entry in _op_catalog.get(op_type, [])}
 
@@ -241,8 +241,8 @@ def op_catalog_commands(op_type: OpType) -> set:
     """
     Return set of commands registered with the operational-data catalog group. These are the combination of tags and
     selectors
-    :param op_type: OpType enum indicating type of operational-data
-    :return: Set of commands
+    @param op_type: OpType enum indicating type of operational-data
+    @return: Set of commands
     """
     return {f'{entry.tag} {entry.selector}' for entry in _op_catalog.get(op_type, [])}
 

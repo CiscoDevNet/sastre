@@ -16,9 +16,9 @@ _operations = {}  # {<operation_key>: Operation ...}
 def register(operation_key, *param_keys):
     """
     Decorator used for registering operation handlers.
-    :param operation_key: Operation key as used in the recipe file
-    :param param_keys: Parameter keys from recipe file to be supplied to operation handler call.
-    :return: decorator
+    @param operation_key: Operation key as used in the recipe file
+    @param param_keys: Parameter keys from recipe file to be supplied to operation handler call.
+    @return: decorator
     """
     def decorator(operation_fn):
         _operations[operation_key] = Operation(operation_fn, param_keys)
@@ -104,8 +104,8 @@ def leaf_iter(template_definition, field_hierarchy_list):
     """
     Yields leaf level objects from template_definition having data path matching field_hierarchy_list
     If leaf level object does not exist, nothing is yield.
-    :param template_definition: json object corresponding to the template definition
-    :param field_hierarchy_list: List of keys representing the field hierarchy in template_definition
+    @param template_definition: json object corresponding to the template definition
+    @param field_hierarchy_list: List of keys representing the field hierarchy in template_definition
     :yield: leaf level objects from template_definition
     """
     current_obj = template_definition

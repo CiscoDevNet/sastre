@@ -15,7 +15,6 @@ from operator import attrgetter
 from requests.exceptions import Timeout
 from .rest_api import RestAPIException, Rest
 
-
 # Top-level directory for local data store
 SASTRE_ROOT_DIR = Path(environ.get('SASTRE_ROOT_DIR', Path.cwd()))
 DATA_DIR = str(Path(SASTRE_ROOT_DIR, 'data'))
@@ -57,8 +56,8 @@ class ApiPath:
 
     def __init__(self, get, *other_ops):
         """
-        :param get: URL path for get operations
-        :param other_ops: URL path for post, put and delete operations, in this order. If an item is not specified
+        @param get: URL path for get operations
+        @param other_ops: URL path for post, put and delete operations, in this order. If an item is not specified
                           the same URL as the last operation provided is used.
         """
         self.get = get
@@ -97,10 +96,10 @@ class OperationalItem:
     def field_info(self, *field_names: str, info: str = 'title', default: Union[None, str] = 'N/A') -> tuple:
         """
         Retrieve metadata about one or more fields.
-        :param field_names: One or more field name to retrieve metadata from.
-        :param info: Indicate which metadata to retrieve. By default, field title is returned.
-        :param default: Value to be returned when a field_name does not exist.
-        :return: tuple with one or more elements representing the desired metadata for each field requested.
+        @param field_names: One or more field name to retrieve metadata from.
+        @param info: Indicate which metadata to retrieve. By default, field title is returned.
+        @param default: Value to be returned when a field_name does not exist.
+        @return: tuple with one or more elements representing the desired metadata for each field requested.
         """
         if len(field_names) == 1:
             return self._meta.get(field_names[0], {}).get(info, default),
@@ -109,13 +108,13 @@ class OperationalItem:
 
     def field_value_iter(self, *field_names: str, **conv_fn_map: Mapping[str, Callable]) -> Iterator[namedtuple]:
         """
-        Iterate over entries of a realtime instance. Only fields/columns defined by field_names are yield. Type
-        conversion of one or more fields is supported by passing a callable that takes one argument (i.e. the field
+        Iterate over entries of an operational item instance. Only fields/columns defined by field_names are yield.
+        Type conversion of one or more fields is supported by passing a callable that takes one argument (i.e. the field
         value) and returns the converted value. E.g. passing average_latency=int will convert a string average_latency
         field to an integer.
-        :param field_names: Specify one or more field names to retrieve.
-        :param conv_fn_map: Keyword arguments passed allow type conversions on fields.
-        :return: A FieldValue object (named tuple) with attributes for each field_name.
+        @param field_names: Specify one or more field names to retrieve.
+        @param conv_fn_map: Keyword arguments passed allow type conversions on fields.
+        @return: A FieldValue object (named tuple) with attributes for each field_name.
         """
         FieldValue = namedtuple('FieldValue', field_names)
 
@@ -252,7 +251,7 @@ class BulkStatsItem(OperationalItem):
         for sample in self.field_value_iter(self.field_entry_time, *field_names, **conv_fn_map):
             time_series_dict.setdefault(self.time_series_key(sample), []).append(sample)
 
-        # Sort each time series by entry_time with newest samples first
+        # Sort each time series by entry_time with the newest samples first
         sort_key = attrgetter(self.field_entry_time)
         for time_series in time_series_dict.values():
             time_series.sort(key=sort_key, reverse=True)
@@ -280,7 +279,7 @@ class BulkStateItem(OperationalItem):
     vManage pagination protocol internally, abstracting it from the user.
     An instance of this class can be created to retrieve and parse bulk state endpoints.
     """
-    api_params = ('count', )
+    api_params = ('count',)
     field_node_id = 'vdevice_name'
 
     def __init__(self, payload: Mapping[str, Any]) -> None:
@@ -322,13 +321,13 @@ class ApiItem:
     ApiItem represents a vManage API element defined by an ApiPath with GET, POST, PUT and DELETE paths. An instance
     of this class can be created to store the contents of that vManage API element (self.data field).
     """
-    api_path = None     # An ApiPath instance
+    api_path = None  # An ApiPath instance
     id_tag = None
     name_tag = None
 
     def __init__(self, data):
         """
-        :param data: dict containing the information to be associated with this api item
+        @param data: dict containing the information to be associated with this api item
         """
         self.data = data
 
@@ -366,9 +365,10 @@ class IndexApiItem(ApiItem):
     """
     IndexApiItem is an index-type ApiItem that can be iterated over, returning iter_fields
     """
+
     def __init__(self, data):
         """
-        :param data: dict containing the information to be associated with this API item.
+        @param data: dict containing the information to be associated with this API item.
         """
         super().__init__(data.get('data') if isinstance(data, dict) else data)
 
@@ -380,9 +380,9 @@ class IndexApiItem(ApiItem):
     def iter(self, *iter_fields: str, default: Any = None, sort_key: Optional[Callable] = None) -> Iterator:
         """
         Returns an iterator where each entry is the value of the respective field in iter_fields.
-        :param default: Value to return for any field missing in an entry. Default is None.
-        :param sort_key: If specified, iterate in the order specified by this key.
-        :return: Iterator of entries in the index object
+        @param default: Value to return for any field missing in an entry. Default is None.
+        @param sort_key: If specified, iterate in the order specified by this key.
+        @return: Iterator of entries in the index object
         """
         data = sorted(self.data, key=sort_key) if sort_key is not None else self.data
 
@@ -395,9 +395,9 @@ class IndexApiItem(ApiItem):
         """
         Returns an iterator where each entry is composed of the combined fields of iter_fields and extended_iter_fields.
         None is returned on any fields that are missing in an entry
-        :param default: Value to return for any field missing in an entry. Default is None.
-        :param sort_key: If specified, iterate in the order specified by this key.
-        :return: Iterator of entries in the index object
+        @param default: Value to return for any field missing in an entry. Default is None.
+        @param sort_key: If specified, iterate in the order specified by this key.
+        @return: Iterator of entries in the index object
         """
         return self.iter(*self.iter_fields, *self.extended_iter_fields, default=default, sort_key=sort_key)
 
@@ -420,7 +420,7 @@ class ConfigItem(ApiItem):
 
     def __init__(self, data):
         """
-        :param data: dict containing the information to be associated with this configuration item
+        @param data: dict containing the information to be associated with this configuration item
         """
         super().__init__(data)
 
@@ -457,15 +457,15 @@ class ConfigItem(ApiItem):
         """
         Factory method that loads data from a json file and returns a ConfigItem instance with that data
 
-        :param node_dir: String indicating directory under root_dir used for all files from a given vManage node.
-        :param ext_name: True indicates that item_names need to be extended (with item_id) in order to make their
+        @param node_dir: String indicating directory under root_dir used for all files from a given vManage node.
+        @param ext_name: True indicates that item_names need to be extended (with item_id) in order to make their
                          filename safe version unique. False otherwise.
-        :param item_name: (Optional) Name of the item being loaded. Variable used to build the filename.
-        :param item_id: (Optional) UUID for the item being loaded. Variable used to build the filename.
-        :param raise_not_found: (Optional) If set to True, raise FileNotFoundError if file is not found.
-        :param use_root_dir: True indicates that node_dir is under the root_dir. When false, item should be located
+        @param item_name: (Optional) Name of the item being loaded. Variable used to build the filename.
+        @param item_id: (Optional) UUID for the item being loaded. Variable used to build the filename.
+        @param raise_not_found: (Optional) If set to True, raise FileNotFoundError if file is not found.
+        @param use_root_dir: True indicates that node_dir is under the root_dir. When false, item should be located
                              directly under node_dir/store_path
-        :return: ConfigItem object, or None if file does not exist and raise_not_found=False
+        @return: ConfigItem object, or None if file does not exist and raise_not_found=False
         """
         dir_path = Path(cls.root_dir, node_dir, *cls.store_path) if use_root_dir else Path(node_dir, *cls.store_path)
         file_path = dir_path.joinpath(cls.get_filename(ext_name, item_name, item_id))
@@ -487,12 +487,12 @@ class ConfigItem(ApiItem):
         """
         Save data (i.e. self.data) to a json file
 
-        :param node_dir: String indicating directory under root_dir used for all files from a given vManage node.
-        :param ext_name: True indicates that item_names need to be extended (with item_id) in order to make their
+        @param node_dir: String indicating directory under root_dir used for all files from a given vManage node.
+        @param ext_name: True indicates that item_names need to be extended (with item_id) in order to make their
                          filename safe version unique. False otherwise.
-        :param item_name: (Optional) Name of the item being saved. Variable used to build the filename.
-        :param item_id: (Optional) UUID for the item being saved. Variable used to build the filename.
-        :return: True indicates data has been saved. False indicates no data to save (and no file has been created).
+        @param item_name: (Optional) Name of the item being saved. Variable used to build the filename.
+        @param item_id: (Optional) UUID for the item being saved. Variable used to build the filename.
+        @return: True indicates data has been saved. False indicates no data to save (and no file has been created).
         """
         if self.is_empty:
             return False
@@ -507,12 +507,12 @@ class ConfigItem(ApiItem):
 
     def post_data(self, id_mapping_dict, new_name=None):
         """
-        Build payload to be used for POST requests against this config item. From self.data, perform item id
+        Build payload to be used for POST requests against this config item. From "self.data", perform item id
         replacements defined in id_mapping_dict, also remove item id and rename item with new_name (if provided).
-        :param id_mapping_dict: {<old item id>: <new item id>} dict. Matches of <old item id> are replaced with
-        <new item id>
-        :param new_name: String containing new name
-        :return: Dict containing payload for POST requests
+        @param id_mapping_dict: {<old item id>: <new item id>} dict. Matches of <old item id> are replaced with
+                                <new item id>
+        @param new_name: String containing new name
+        @return: Dict containing payload for POST requests
         """
         # Delete keys that shouldn't be on post requests
         filtered_keys = {
@@ -533,11 +533,11 @@ class ConfigItem(ApiItem):
 
     def put_data(self, id_mapping_dict):
         """
-        Build payload to be used for PUT requests against this config item. From self.data, perform item id
+        Build payload to be used for PUT requests against this config item. From "self.data", perform item id
         replacements defined in id_mapping_dict.
-        :param id_mapping_dict: {<old item id>: <new item id>} dict. Matches of <old item id> are replaced with
-        <new item id>
-        :return: Dict containing payload for PUT requests
+        @param id_mapping_dict: {<old item id>: <new item id>} dict. Matches of <old item id> are replaced with
+                                <new item id>
+        @return: Dict containing payload for PUT requests
         """
         filtered_keys = {
             '@rid',
@@ -552,7 +552,7 @@ class ConfigItem(ApiItem):
     def id_references_set(self):
         """
         Return all references to other item ids by this item
-        :return: Set containing id-based references
+        @return: Set containing id-based references
         """
         filtered_keys = {
             self.id_tag,
@@ -566,9 +566,9 @@ class ConfigItem(ApiItem):
         """
         Return a new valid name for this item based on the format string template provided. Variable {name} is replaced
         with the existing item name. Other variables are provided via kwargs.
-        :param name_template: str containing the name template to construct the new name.
+        @param name_template: str containing the name template to construct the new name.
                               For example: migrated_{name&G_Branch_184_(.*)}
-        :return: Tuple containing new name and an indication whether it is valid
+        @return: Tuple containing new name and an indication whether it is valid
         """
         is_valid = False
 
@@ -586,9 +586,9 @@ class ConfigItem(ApiItem):
         """
         Returns a list containing the values of all occurrences of key inside data. Matched values that are dict or list
         are not included.
-        :param key: Key to search
-        :param from_key: Top-level key under which to start the search
-        :return: List
+        @param key: Key to search
+        @param from_key: Top-level key under which to start the search
+        @return: List
         """
         match_list = []
 
@@ -617,9 +617,10 @@ class IndexConfigItem(ConfigItem):
     """
     IndexConfigItem is an index-type ConfigItem that can be iterated over, returning iter_fields
     """
+
     def __init__(self, data):
         """
-        :param data: dict containing the information to be associated with this configuration item.
+        @param data: dict containing the information to be associated with this configuration item.
         """
         super().__init__(data.get('data') if isinstance(data, dict) else data)
 
@@ -639,7 +640,7 @@ class IndexConfigItem(ConfigItem):
     # Extended_iter_fields should be defined in subclasses that use extended_iter, needs to be a tuple subclass.
     extended_iter_fields = None
 
-    store_path = ('inventory', )
+    store_path = ('inventory',)
 
     @classmethod
     def create(cls, item_list: Sequence[ConfigItem], id_hint_dict: Dict[str, str]):
@@ -656,9 +657,9 @@ class IndexConfigItem(ConfigItem):
     def iter(self, *iter_fields: str, default: Any = None, sort_key: Optional[Callable] = None) -> Iterator:
         """
         Returns an iterator where each entry is the value of the respective field in iter_fields.
-        :param default: Value to return for any field missing in an entry. Default is None.
-        :param sort_key: If specified, iterate in the order specified by this key.
-        :return: Iterator of entries in the index object
+        @param default: Value to return for any field missing in an entry. Default is None.
+        @param sort_key: If specified, iterate in the order specified by this key.
+        @return: Iterator of entries in the index object
         """
         data = sorted(self.data, key=sort_key) if sort_key is not None else self.data
 
@@ -671,9 +672,9 @@ class IndexConfigItem(ConfigItem):
         """
         Returns an iterator where each entry is composed of the combined fields of iter_fields and extended_iter_fields.
         None is returned on any fields that are missing in an entry
-        :param default: Value to return for any field missing in an entry. Default is None.
-        :param sort_key: If specified, iterate in the order specified by this key.
-        :return: Iterator of entries in the index object
+        @param default: Value to return for any field missing in an entry. Default is None.
+        @param sort_key: If specified, iterate in the order specified by this key.
+        @return: Iterator of entries in the index object
         """
         return self.iter(*self.iter_fields, *self.extended_iter_fields, default=default, sort_key=sort_key)
 
@@ -684,7 +685,7 @@ class ServerInfo:
 
     def __init__(self, **kwargs):
         """
-        :param kwargs: key-value pairs of information about the vManage server
+        @param kwargs: key-value pairs of information about the vManage server
         """
         self.data = kwargs
 
@@ -699,8 +700,8 @@ class ServerInfo:
         """
         Factory method that loads data from a json file and returns a ServerInfo instance with that data
 
-        :param node_dir: String indicating directory under root_dir used for all files from a given vManage node.
-        :return: ServerInfo object, or None if file does not exist
+        @param node_dir: String indicating directory under root_dir used for all files from a given vManage node.
+        @return: ServerInfo object, or None if file does not exist
         """
         dir_path = Path(cls.root_dir, node_dir)
         file_path = dir_path.joinpath(cls.store_file)
@@ -718,8 +719,8 @@ class ServerInfo:
         """
         Save data (i.e. self.data) to a json file
 
-        :param node_dir: String indicating directory under root_dir used for all files from a given vManage node.
-        :return: True indicates data has been saved. False indicates no data to save (and no file has been created).
+        @param node_dir: String indicating directory under root_dir used for all files from a given vManage node.
+        @return: True indicates data has been saved. False indicates no data to save (and no file has been created).
         """
         dir_path = Path(self.root_dir, node_dir)
         dir_path.mkdir(parents=True, exist_ok=True)
@@ -734,9 +735,9 @@ def filename_safe(name: str, lower: bool = False) -> str:
     """
     Perform the necessary replacements in <name> to make it filename safe.
     Any char that is not a-z, A-Z, 0-9, '_', ' ', or '-' is replaced with '_'. Convert to lowercase, if lower=True.
-    :param lower: If True, apply str.lower() to result.
-    :param name: name string to be converted
-    :return: string containing the filename-save version of item_name
+    @param lower: If True, apply str.lower() to result.
+    @param name: name string to be converted
+    @return: string containing the filename-save version of item_name
     """
     # Inspired by Django's slugify function
     cleaned = re.sub(r'[^\w\s-]', '_', name)
@@ -765,6 +766,7 @@ class ExtendedTemplate:
         """
         Raise ValueError when issues are encountered while processing the name-regex
         """
+
         def regex_replace(match_obj):
             regex = match_obj.group('regex')
             if regex is not None:
@@ -775,7 +777,7 @@ class ExtendedTemplate:
                 if not regex_p.groups:
                     raise ValueError('regular expression must include at least one capturing group')
 
-                value, regex_p_subs = regex_p.subn(''.join(f'\\{group+1}' for group in range(regex_p.groups)), name)
+                value, regex_p_subs = regex_p.subn(''.join(f'\\{group + 1}' for group in range(regex_p.groups)), name)
                 new_value = value if regex_p_subs else ''
             else:
                 new_value = name
