@@ -36,11 +36,11 @@ class DeviceTemplateAttach(ApiItem):
     def api_params(template_input_iter, is_edited):
         """
         Build dictionary used to provide input parameters for api POST call
-        :param template_input_iter: An iterable of (<template_id>, <input_list>) tuples. Input_list is a list where
+        @param template_input_iter: An iterable of (<template_id>, <input_list>) tuples. Input_list is a list where
                                     each entry represents one attached device and is a dictionary of input
                                     variable names and values.
-        :param is_edited: True if this is an in-place re-attach, False if this is a template attach.
-        :return: Dictionary used to provide POST input parameters
+        @param is_edited: True if this is an in-place re-attach, False if this is a template attach.
+        @return: Dictionary used to provide POST input parameters
         """
         def template_entry(template_id, template_input_list):
             return {
@@ -196,12 +196,12 @@ class DeviceConfig(ConfigItem):
         """
         Save data (i.e. self.data) to a json file
 
-        :param node_dir: String indicating directory under root_dir used for all files from a given vManage node.
-        :param ext_name: True indicates that item_names need to be extended (with item_id) in order to make their
+        @param node_dir: String indicating directory under root_dir used for all files from a given vManage node.
+        @param ext_name: True indicates that item_names need to be extended (with item_id) in order to make their
                          filename safe version unique. False otherwise.
-        :param item_name: (Optional) Name of the item being saved. Variable used to build the filename.
-        :param item_id: (Optional) UUID for the item being saved. Variable used to build the filename.
-        :return: True indicates data has been saved. False indicates no data to save (and no file has been created).
+        @param item_name: (Optional) Name of the item being saved. Variable used to build the filename.
+        @param item_id: (Optional) UUID for the item being saved. Variable used to build the filename.
+        @return: True indicates data has been saved. False indicates no data to save (and no file has been created).
         """
         if self.is_empty:
             return False
@@ -348,9 +348,9 @@ class DeviceTemplateValues(ConfigItem):
     def api_params(template_id, device_uuid_list):
         """
         Build dictionary used to provide input parameters for api POST call
-        :param template_id: String containing the template ID
-        :param device_uuid_list: List of device UUIDs
-        :return: Dictionary used to provide POST input parameters
+        @param template_id: String containing the template ID
+        @param device_uuid_list: List of device UUIDs
+        @return: Dictionary used to provide POST input parameters
         """
         return {
             "deviceIds": device_uuid_list,
@@ -363,8 +363,8 @@ class DeviceTemplateValues(ConfigItem):
         """
         Return list of device input entries. Each entry represents one attached device and is a dictionary of input
         variable names and values.
-        :param allowed_uuid_set: Optional, set of uuids. If provided, only input entries for those uuids are returned
-        :return: [{<input_var_name>: <input_var_value>, ...}, ...]
+        @param allowed_uuid_set: Optional, set of uuids. If provided, only input entries for those uuids are returned
+        @return: [{<input_var_name>: <input_var_value>, ...}, ...]
         """
         return [entry for entry in self.data.get('data', [])
                 if allowed_uuid_set is None or entry.get('csv-deviceId') in allowed_uuid_set]
@@ -431,11 +431,11 @@ class FeatureTemplateIndex(IndexConfigItem):
         """
         Intended to be used along with partial to create a filter_fn that matches on desired_type and
         desired_is_default values. Partial locks the desired_type and desired_is_default parameters.
-        :param desired_type: Desired feature templateType
-        :param desired_is_default: Whether to match only factoryDefault templates
-        :param item_type: templateType from feature template being matched
-        :param item_is_default: factoryDefault from feature template being matched
-        :returns: True if conditions matched, false otherwise
+        @param desired_type: Desired feature templateType
+        @param desired_is_default: Whether to match only factoryDefault templates
+        @param item_type: templateType from feature template being matched
+        @param item_is_default: factoryDefault from feature template being matched
+        @return: True if conditions matched, false otherwise
         """
         if desired_is_default and not item_is_default:
             return False
@@ -472,7 +472,7 @@ class PolicyVsmartIndex(IndexConfigItem):
     def active_policy(self):
         """
         Return ID and name from active policy or (None, None) if no policy is active
-        :return: (<id>, <name>) or (None, None)
+        @return: (<id>, <name>) or (None, None)
         """
         for is_active, item_id, item_name in self.iter('isPolicyActivated', *self.iter_fields):
             if is_active:
@@ -554,7 +554,7 @@ class PolicyCustomApp(ConfigItem):
 
     def __init__(self, data):
         """
-        :param data: dict containing the information to be associated with this API item.
+        @param data: dict containing the information to be associated with this API item.
         """
         # In 20.3.1 the payload returned by vManage contains a 'data' key with the policy definition in it. This is
         # different than on previous versions or other ConfigItems. Overwriting the default __init__ in order to
@@ -1351,7 +1351,7 @@ class SettingsVbond(ConfigItem):
 
     def __init__(self, data):
         """
-        :param data: dict containing the information to be associated with this API item.
+        @param data: dict containing the information to be associated with this API item.
         """
         # Get requests return a dict as {'data': [{'domainIp': 'vbond.cisco.com', 'port': '12346'}]}
         super().__init__(data.get('data', [''])[0])
@@ -1393,16 +1393,16 @@ class EdgeCertificate(IndexConfigItem):
         """
         Convert the state field from WAN edge certificate into user-friendly string. If not known, return the original
         state field
-        :param state: string containing the WAN edge certificate state field.
-        :return: string
+        @param state: string containing the WAN edge certificate state field.
+        @return: string
         """
         return cls._state_lookup.get(state, state)
 
     def status_post_data(self, *new_status):
         """
         Build payload to be used for POST requests that update WAN edge certificate validity status
-        :param new_status: One or more (<uuid>, <new status>) tuples
-        :return: List containing payload for POST requests
+        @param new_status: One or more (<uuid>, <new status>) tuples
+        @return: List containing payload for POST requests
         """
         new_status_dict = dict(new_status)
 

@@ -41,8 +41,8 @@ class TaskOptions:
         """
         Decorator used for registering tasks.
         The class being decorated needs to be a subclass of Task.
-        :param task_name: String presented to the user in order to select a task
-        :return: decorator
+        @param task_name: String presented to the user in order to select a task
+        @return: decorator
         """
         def decorator(task_cls):
             if not isinstance(task_cls, type) or not issubclass(task_cls, Task):

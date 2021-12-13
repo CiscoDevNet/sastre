@@ -10,9 +10,9 @@ _operations = {}  # {<operation_key>: Operation ...}
 def register(operation_key, *param_keys):
     """
     Decorator used for registering operation handlers.
-    :param operation_key: Operation key as used in the recipe file
-    :param param_keys: Parameter keys from recipe file to be supplied to operation handler call.
-    :return: decorator
+    @param operation_key: Operation key as used in the recipe file
+    @param param_keys: Parameter keys from recipe file to be supplied to operation handler call.
+    @return: decorator
     """
     def decorator(operation_fn):
         _operations[operation_key] = Operation(operation_fn, param_keys)

@@ -161,9 +161,9 @@ def is_version_newer(version_1, version_2):
 
     Versions should be strings with fields separated by dots in format: <main>.<minor>.<maintenance>
 
-    :param version_1: String containing first version
-    :param version_2: String containing second version
-    :return: True if version_2 is newer than version_1.
+    @param version_1: String containing first version
+    @param version_2: String containing second version
+    @return: True if version_2 is newer than version_1.
     """
     def parse(version_string):
         # Development versions may follow this format: '20.1.999-98'

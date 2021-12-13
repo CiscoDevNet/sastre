@@ -27,10 +27,10 @@ def regex_search(regex: str, *fields: str, inverse: bool = False) -> bool:
     Execute regular expression search on provided fields. Match fields in the order provided. Behavior is determined
     by the inverse field. With inverse False (default), returns True (i.e. match) if pattern matches any field. When
     inverse is True, returns True if pattern does not match all fields
-    :param regex: Pattern to match
-    :param fields: One or more strings to match
-    :param inverse: False (default), or True to invert the match behavior.
-    :return: True if a match is found on any field, False otherwise.
+    @param regex: Pattern to match
+    @param fields: One or more strings to match
+    @param inverse: False (default), or True to invert the match behavior.
+    @return: True if a match is found on any field, False otherwise.
     """
     op_fn = all if inverse else any    # Logical AND across all fields, else logical OR
     return op_fn(inverse ^ bool(re.search(regex, match_field)) for match_field in fields)
@@ -191,10 +191,10 @@ class Task:
     def _log(self, level: str, msg: str, *args, dryrun: bool) -> None:
         """
         Logs a message
-        :param level: Logging level
-        :param msg: Log message
-        :param args: Optional args to replace in msg via % operator
-        :param dryrun: Whether to include this message to the dryrun report. Messages are added to the dryrun report if
+        @param level: Logging level
+        @param msg: Log message
+        @param args: Optional args to replace in msg via % operator
+        @param dryrun: Whether to include this message to the dryrun report. Messages are added to the dryrun report if
                        this flag is True, the task is in dryrun mode and the level is in DRYRUN_LEVELS.
         """
         getattr(logging.getLogger(type(self).__name__), level)(f"DRY-RUN: {msg}" if self.is_dryrun else msg, *args)
@@ -233,17 +233,17 @@ class Task:
     def runner(self, parsed_args, api: Optional[Rest] = None) -> Union[None, list]:
         """
         Execute the task. If the task has some output to the user, that is returned via a list of objects. Objects in
-        that list need to implement the __str__ method. If the task has no output to the user None is returned.
+        that list need to implement the __str__ method. If the task generates no output to the user None is returned.
         """
         raise NotImplementedError()
 
     def index_iter(self, backend, catalog_entry_iter):
         """
         Return an iterator of indexes loaded from backend. If backend is a Rest API instance, indexes are loaded
-        from remote vManage via API. Otherwise items are loaded from local backup under the backend directory.
-        :param backend: Rest api instance or directory name
-        :param catalog_entry_iter: An iterator of CatalogEntry
-        :return: Iterator of (<tag>, <info>, <index>, <item_cls>)
+        from remote vManage via API. Otherwise, items are loaded from local backup under the backend directory.
+        @param backend: Rest api instance or directory name
+        @param catalog_entry_iter: An iterator of CatalogEntry
+        @return: Iterator of (<tag>, <info>, <index>, <item_cls>)
         """
         is_api = isinstance(backend, Rest)
 
@@ -273,15 +273,15 @@ class Task:
                              target_uuid_set: Optional[set] = None) -> Tuple[list, bool]:
         """
         Prepare data for template attach considering local backup as the source of truth (i.e. where input values are)
-        :param api: Instance of Rest API
-        :param workdir: Directory containing saved items
-        :param ext_name: Boolean passed to .load methods indicating whether extended item names should be used.
-        :param templates_iter: Iterator of (<template_name>, <saved_template_id>, <target_template_id>)
-        :param target_uuid_set: (optional) Set of existing device uuids on target node.
+        @param api: Instance of Rest API
+        @param workdir: Directory containing saved items
+        @param ext_name: Boolean passed to .load methods indicating whether extended item names should be used.
+        @param templates_iter: Iterator of (<template_name>, <saved_template_id>, <target_template_id>)
+        @param target_uuid_set: (optional) Set of existing device uuids on target node.
                                 When provided, attach only devices that were previously attached (on saved) and are on
                                 target node but are not yet attached.
                                 When absent, re-attach all currently attached devices on target.
-        :return: Tuple containing attach data (<template input list>, <isEdited>)
+        @return: Tuple containing attach data (<template input list>, <isEdited>)
         """
         def load_template_input(template_name: str, saved_id: str, target_id: str) -> Union[list, None]:
             if target_id is None:
@@ -327,9 +327,9 @@ class Task:
     def reattach_template_data(api: Rest, templates_iter: Iterator[tuple]) -> Tuple[list, bool]:
         """
         Prepare data for template reattach considering vManage as the source of truth (i.e. where input values are)
-        :param api: Instance of Rest API
-        :param templates_iter: Iterator of (<template_name>, <target_template_id>)
-        :return: Tuple containing attach data (<template input list>, <isEdited>)
+        @param api: Instance of Rest API
+        @param templates_iter: Iterator of (<template_name>, <target_template_id>)
+        @return: Tuple containing attach data (<template input list>, <isEdited>)
         """
         def get_template_input(template_id):
             uuid_list = [uuid for uuid, _ in DeviceTemplateAttached.get_raise(api, template_id)]
@@ -350,13 +350,13 @@ class Task:
                log_context: str, raise_on_failure: bool = True) -> int:
         """
         Attach device templates to devices
-        :param api: Instance of Rest API
-        :param template_input_list: List containing payload for template attachment
-        :param is_edited: Boolean corresponding to the isEdited tag in the template attach payload
-        :param chunk_size: Maximum number of device attachments per request
-        :param raise_on_failure: If True, raise exception on action failures
-        :param log_context: Message to log during wait actions
-        :return: Number of attachment requests processed
+        @param api: Instance of Rest API
+        @param template_input_list: List containing payload for template attachment
+        @param is_edited: Boolean corresponding to the isEdited tag in the template attach payload
+        @param chunk_size: Maximum number of device attachments per request
+        @param raise_on_failure: If True, raise exception on action failures
+        @param log_context: Message to log during wait actions
+        @return: Number of attachment requests processed
         """
         def grouper(attach_cls, request_list):
             while True:
@@ -412,14 +412,14 @@ class Task:
                chunk_size: int = 200, log_context: str, raise_on_failure: bool = True) -> int:
         """
         Detach devices from device templates
-        :param api: Instance of Rest API
-        :param template_iter: An iterator of (<template id>, <template name>) tuples containing templates to detach
-        :param device_map: {<uuid>: <name>, ...} dict containing allowed devices for the detach. If None, all attached
+        @param api: Instance of Rest API
+        @param template_iter: An iterator of (<template id>, <template name>) tuples containing templates to detach
+        @param device_map: {<uuid>: <name>, ...} dict containing allowed devices for detach. If None, all attached
                            devices are detached.
-        :param chunk_size: Maximum number of device detachments per request
-        :param raise_on_failure: If True, raise exception on action failures
-        :param log_context: Message to log during wait actions
-        :return: Number of detach requests processed
+        @param chunk_size: Maximum number of device detachments per request
+        @param raise_on_failure: If True, raise exception on action failures
+        @param log_context: Message to log during wait actions
+        @return: Number of detach requests processed
         """
         def grouper(request_list):
             while True:
@@ -470,12 +470,12 @@ class Task:
     def activate_policy(self, api: Rest, policy_id: Optional[str], policy_name: Optional[str],
                         is_edited: bool = False) -> List[tuple]:
         """
-        :param api: Instance of Rest API
-        :param policy_id: ID of policy to activate
-        :param policy_name: Name of policy to activate
-        :param is_edited: (optional) When true it indicates reactivation of an already active policy (e.x. due to
+        @param api: Instance of Rest API
+        @param policy_id: ID of policy to activate
+        @param policy_name: Name of policy to activate
+        @param is_edited: (optional) When true it indicates reactivation of an already active policy (e.x. due to
                                      in-place modifications)
-        :return: List of worker actions to monitor [(<action_worker>, <template_name>), ...]
+        @return: List of worker actions to monitor [(<action_worker>, <template_name>), ...]
         """
         action_list = []
         if policy_id is None or policy_name is None:
@@ -508,13 +508,13 @@ class Task:
     def wait_actions(self, api: Rest, action_list: List[tuple], log_context: str, raise_on_failure: bool) -> bool:
         """
         Wait for actions in action_list to complete
-        :param api: Instance of Rest API
-        :param action_list: [(<action_worker>, <action_info>), ...]. Where <action_worker> is an instance of ApiItem and
+        @param api: Instance of Rest API
+        @param action_list: [(<action_worker>, <action_info>), ...]. Where <action_worker> is an instance of ApiItem and
                             <action_info> is a str with information about the action. Action_info can be None, in which
                             case no messages are logged for individual actions.
-        :param log_context: String providing context to log messages
-        :param raise_on_failure: If True, raise exception on action failures
-        :return: True if all actions completed with success. False otherwise.
+        @param log_context: String providing context to log messages
+        @param raise_on_failure: If True, raise exception on action failures
+        @return: True if all actions completed with success. False otherwise.
         """
 
         def upper_first(input_string):
@@ -586,12 +586,12 @@ def device_iter(api: Rest, match_name_regex: Optional[str] = None, match_reachab
                 match_site_id: Optional[str] = None, match_system_ip: Optional[str] = None) -> Iterator[tuple]:
     """
     Return an iterator over device inventory, filtered by optional conditions.
-    :param api: Instance of Rest API
-    :param match_name_regex: Regular expression matching device host-name
-    :param match_reachable: Boolean indicating whether to include reachable devices only
-    :param match_site_id: When present, only include devices with provided site-id
-    :param match_system_ip: If present, only include device with provided system-ip
-    :return: Iterator of (<device-uuid>, <device-name>) tuples.
+    @param api: Instance of Rest API
+    @param match_name_regex: Regular expression matching device host-name
+    @param match_reachable: Boolean indicating whether to include reachable devices only
+    @param match_site_id: When present, only include devices with provided site-id
+    @param match_system_ip: If present, only include device with provided system-ip
+    @return: Iterator of (<device-uuid>, <device-name>) tuples.
     """
     return (
         (uuid, name)
@@ -609,8 +609,8 @@ def clean_dir(target_dir_name: str, max_saved: int = 99) -> Union[str, bool]:
     """
     Clean target_dir_name directory if it exists. If max_saved is non-zero and target_dir_name exists, move it to a new
     directory name in sequence.
-    :param target_dir_name: str with the directory to be cleaned
-    :param max_saved: int indicating the maximum instances to keep. If 0, target_dir_name is just deleted.
+    @param target_dir_name: str with the directory to be cleaned
+    @param max_saved: int indicating the maximum instances to keep. If 0, target_dir_name is just deleted.
     """
     target_dir = Path(DATA_DIR, target_dir_name)
     if target_dir.exists():
@@ -632,8 +632,8 @@ def clean_dir(target_dir_name: str, max_saved: int = 99) -> Union[str, bool]:
 def export_json(table_iter: Iterable[Table], filename: str) -> None:
     """
     Export a group (Iterable) of Tables as a JSON encoded file
-    :param table_iter: Tables to export
-    :param filename: Name for the export file
+    @param table_iter: Tables to export
+    @param filename: Name for the export file
     """
     with open(filename, 'w') as export_file:
         data = [table.dict() for table in table_iter]
