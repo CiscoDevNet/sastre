@@ -68,10 +68,10 @@ class TaskRestore(Task):
         }
 
         self.log_info('Identifying items to be pushed', dryrun=False)
-        id_mapping = {}         # {<old_id>: <new_id>}, used to replace old (saved) item ids with new (target) ids
-        restore_list = []       # [ (<info>, <index_cls>, [(<item_id>, <item>, <id_on_target>), ...]), ...]
+        id_mapping = {}  # {<old_id>: <new_id>}, used to replace old (saved) item ids with new (target) ids
+        restore_list = []  # [ (<info>, <index_cls>, [(<item_id>, <item>, <id_on_target>), ...]), ...]
         dependency_set = set()  # {<item_id>, ...}
-        match_set = set()       # {<item_id>, ...}
+        match_set = set()  # {<item_id>, ...}
         for tag in ordered_tags(parsed_args.tag):
             if tag == 'template_device' and not is_vbond_set:
                 self.log_warning(f'Will skip {tag} items because vBond is not configured. '
@@ -110,8 +110,8 @@ class TaskRestore(Task):
 
                     regex = parsed_args.regex or parsed_args.not_regex
                     item_matches = (
-                        (parsed_args.tag == CATALOG_TAG_ALL or parsed_args.tag == tag) and
-                        (regex is None or regex_search(regex, item.name, inverse=parsed_args.regex is None))
+                            (parsed_args.tag == CATALOG_TAG_ALL or parsed_args.tag == tag) and
+                            (regex is None or regex_search(regex, item.name, inverse=parsed_args.regex is None))
                     )
                     if item_matches:
                         match_set.add(item_id)

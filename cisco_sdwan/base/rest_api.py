@@ -150,7 +150,7 @@ def raise_for_status(response):
         details = reply_data.get("error", {}).get("details", "")
         raise RestAPIException(f'{response.reason} ({response.status_code}): '
                                f'{reply_data.get("error", {}).get("message", "Unspecified error message")}'
-                               f'{ ": " if details else ""}{details} [{response.request.method} {response.url}]')
+                               f'{": " if details else ""}{details} [{response.request.method} {response.url}]')
 
 
 def is_version_newer(version_1, version_2):
@@ -165,6 +165,7 @@ def is_version_newer(version_1, version_2):
     @param version_2: String containing second version
     @return: True if version_2 is newer than version_1.
     """
+
     def parse(version_string):
         # Development versions may follow this format: '20.1.999-98'
         return ([int(v) for v in version_string.replace('-', '.').split('.')] + [0, ])[:2]

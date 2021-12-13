@@ -9,7 +9,6 @@ from enum import Enum
 from .models_base import IndexConfigItem, ConfigItem, RealtimeItem, BulkStateItem, BulkStatsItem
 from .rest_api import is_version_newer
 
-
 CATALOG_TAG_ALL = 'all'
 
 
@@ -22,7 +21,7 @@ class CatalogItem(NamedTuple):
     min_version: Union[str, None]
 
 
-_catalog = list()   # [(<tag>, <info>, <index_cls>, <item_cls>, <min_version>), ...]
+_catalog = list()  # [(<tag>, <info>, <index_cls>, <item_cls>, <min_version>), ...]
 
 
 # Catalog for operational data items
@@ -45,7 +44,6 @@ class OpCatalogItem(NamedTuple):
 
 
 _op_catalog = dict()  # {<OpType>: [(<tag>, <selector>, <info>, <op_cls>, <min_version>), ...]}
-
 
 #
 # Configuration catalog functions
@@ -100,6 +98,7 @@ def register(tag: str, info: str, item_cls: type, min_version: Optional[str] = N
     @param min_version: (optional) Minimum vManage version that supports this catalog item.
     @return: decorator
     """
+
     def decorator(index_cls):
         if not isinstance(index_cls, type) or not issubclass(index_cls, IndexConfigItem):
             raise CatalogException(f'Invalid config item index class register attempt: {index_cls.__name__}')
@@ -136,6 +135,7 @@ def catalog_iter(*tags: str, version: Optional[str] = None) -> Iterator[tuple]:
                     If not specified or None, version is not verified.
     @return: iterator of (<tag>, <info>, <index_cls>, <item_cls>) tuples from the catalog
     """
+
     def match_tags(clog_item):
         return CATALOG_TAG_ALL in tags or clog_item.tag in tags
 
@@ -169,6 +169,7 @@ def op_register(tag: str, selector: str, info: str, min_version: Optional[str] =
     @param min_version: (optional) Minimum vManage version that supports this catalog item.
     @return: decorator
     """
+
     def decorator(op_cls):
         try:
             op_type = OpType.from_subclass(op_cls)

@@ -42,6 +42,7 @@ class DeviceTemplateAttach(ApiItem):
         @param is_edited: True if this is an in-place re-attach, False if this is a template attach.
         @return: Dictionary used to provide POST input parameters
         """
+
         def template_entry(template_id, template_input_list):
             return {
                 "templateId": template_id,
@@ -238,7 +239,7 @@ class CliOrFeatureApiPath:
         self.api_path_cli = api_path_cli
 
     def __get__(self, instance, owner):
-        # If called from class, assume its a feature template
+        # If called from class, assume it is a feature template
         is_cli_template = instance is not None and instance.is_type_cli
 
         return self.api_path_cli if is_cli_template else self.api_path_feature
@@ -557,7 +558,7 @@ class PolicyCustomApp(ConfigItem):
         @param data: dict containing the information to be associated with this API item.
         """
         # In 20.3.1 the payload returned by vManage contains a 'data' key with the policy definition in it. This is
-        # different than on previous versions or other ConfigItems. Overwriting the default __init__ in order to
+        # different from previous versions or other ConfigItems. Overwriting the default __init__ in order to
         # handle both options.
         super().__init__(data.get('data', data))
 
@@ -1473,7 +1474,7 @@ class OrchestratorValidEdges(RealtimeItem):
 @op_register('orchestrator', 'valid-vsmarts', 'Orchestrator valid vSmarts')
 class OrchestratorValidVsmarts(RealtimeItem):
     api_path = ApiPath('device/orchestrator/validvsmarts', None, None, None)
-    fields_std = ('serial_number', )
+    fields_std = ('serial_number',)
 
 
 @op_register('interface', 'info', 'Interface info')
