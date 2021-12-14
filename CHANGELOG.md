@@ -1,3 +1,10 @@
+Sastre 1.16.8 [December 13, 2021]
+================================
+
+#### Enhancements:
+- On all tasks providing table output, the tables are now sorted to ensure consistency across multiple executions of the command.
+
+
 Sastre 1.16.7 [December 7, 2021]
 ================================
 
