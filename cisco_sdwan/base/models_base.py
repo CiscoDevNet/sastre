@@ -10,7 +10,7 @@ from os import environ
 from pathlib import Path
 from itertools import zip_longest
 from collections import namedtuple
-from typing import Sequence, Dict, Tuple, Union, Iterator, Callable, Mapping, Any, Optional
+from typing import Sequence, Dict, Tuple, Union, Iterator, Callable, Mapping, Any
 from operator import attrgetter
 from requests.exceptions import Timeout
 from .rest_api import RestAPIException, Rest
@@ -377,29 +377,25 @@ class IndexApiItem(ApiItem):
     # Extended_iter_fields should be defined in subclasses that use extended_iter, needs to be a tuple subclass.
     extended_iter_fields = None
 
-    def iter(self, *iter_fields: str, default: Any = None, sort_key: Optional[Callable] = None) -> Iterator:
+    def iter(self, *iter_fields: str, default: Any = None) -> Iterator:
         """
         Returns an iterator where each entry is the value of the respective field in iter_fields.
         @param default: Value to return for any field missing in an entry. Default is None.
-        @param sort_key: If specified, iterate in the order specified by this key.
         @return: Iterator of entries in the index object
         """
-        data = sorted(self.data, key=sort_key) if sort_key is not None else self.data
-
-        return (default_getter(*iter_fields, default=default)(entry) for entry in data)
+        return (default_getter(*iter_fields, default=default)(entry) for entry in self.data)
 
     def __iter__(self):
         return self.iter(*self.iter_fields)
 
-    def extended_iter(self, default=None, sort_key: Optional[Callable] = None) -> Iterator:
+    def extended_iter(self, default=None) -> Iterator:
         """
         Returns an iterator where each entry is composed of the combined fields of iter_fields and extended_iter_fields.
         None is returned on any fields that are missing in an entry
         @param default: Value to return for any field missing in an entry. Default is None.
-        @param sort_key: If specified, iterate in the order specified by this key.
         @return: Iterator of entries in the index object
         """
-        return self.iter(*self.iter_fields, *self.extended_iter_fields, default=default, sort_key=sort_key)
+        return self.iter(*self.iter_fields, *self.extended_iter_fields, default=default)
 
 
 class ConfigItem(ApiItem):
@@ -654,29 +650,25 @@ class IndexConfigItem(ConfigItem):
         }
         return cls(index_dict)
 
-    def iter(self, *iter_fields: str, default: Any = None, sort_key: Optional[Callable] = None) -> Iterator:
+    def iter(self, *iter_fields: str, default: Any = None) -> Iterator:
         """
         Returns an iterator where each entry is the value of the respective field in iter_fields.
         @param default: Value to return for any field missing in an entry. Default is None.
-        @param sort_key: If specified, iterate in the order specified by this key.
         @return: Iterator of entries in the index object
         """
-        data = sorted(self.data, key=sort_key) if sort_key is not None else self.data
-
-        return (default_getter(*iter_fields, default=default)(entry) for entry in data)
+        return (default_getter(*iter_fields, default=default)(entry) for entry in self.data)
 
     def __iter__(self):
         return self.iter(*self.iter_fields)
 
-    def extended_iter(self, default=None, sort_key: Optional[Callable] = None) -> Iterator:
+    def extended_iter(self, default=None) -> Iterator:
         """
         Returns an iterator where each entry is composed of the combined fields of iter_fields and extended_iter_fields.
         None is returned on any fields that are missing in an entry
         @param default: Value to return for any field missing in an entry. Default is None.
-        @param sort_key: If specified, iterate in the order specified by this key.
         @return: Iterator of entries in the index object
         """
-        return self.iter(*self.iter_fields, *self.extended_iter_fields, default=default, sort_key=sort_key)
+        return self.iter(*self.iter_fields, *self.extended_iter_fields, default=default)
 
 
 class ServerInfo:
