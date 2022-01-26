@@ -900,6 +900,39 @@ class PolicyDefRuleSetIndex(PolicyDefIndex):
     store_file = 'policy_definitions_ruleset.json'
 
 
+class AdvancedInspectionProfile(PolicyDef):
+    api_path = ApiPath('/template/policy/definition/advancedinspectionprofile')
+    store_path = ('policy_definitions', 'AdvancedInspectionProfile')
+
+
+@register('policy_definition', 'advanced inspection profile policy definition', AdvancedInspectionProfile, min_version='20.6')
+class AdvancedInspectionProfileIndex(PolicyDefIndex):
+    api_path = ApiPath('/template/policy/definition/advancedinspectionprofile', None, None, None)
+    store_file = 'policy_definitions_advancedinspectionprofile.json'
+
+
+class VpnQosMap(PolicyDef):
+    api_path = ApiPath('/template/policy/definition/vpnqosmap')
+    store_path = ('policy_definitions', 'VpnQosMap')
+
+
+@register('policy_definition', 'vpn qos map policy definition', VpnQosMap, min_version='20.6')
+class VpnQosMapIndex(PolicyDefIndex):
+    api_path = ApiPath('/template/policy/definition/vpnqosmap', None, None, None)
+    store_file = 'policy_definitions_vpnqosmap.json'
+
+
+class SecurityGroup(PolicyDef):
+    api_path = ApiPath('/template/policy/definition/securitygroup')
+    store_path = ('policy_definitions', 'SecurityGroup')
+
+
+@register('policy_definition', 'security group policy definition', SecurityGroup, min_version='20.6')
+class SecurityGroupIndex(PolicyDefIndex):
+    api_path = ApiPath('/template/policy/definition/securitygroup', None, None, None)
+    store_file = 'policy_definitions_securitygroup.json'
+
+
 #
 # Policy lists
 #
