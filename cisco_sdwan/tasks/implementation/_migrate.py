@@ -1,11 +1,12 @@
 import argparse
 from typing import Union, Optional
 from uuid import uuid4
+from contextlib import suppress
 from pydantic import validator
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest
 from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL, ordered_tags
-from cisco_sdwan.base.models_base import update_ids, ServerInfo
+from cisco_sdwan.base.models_base import update_ids, ServerInfo, ExtendedTemplate
 from cisco_sdwan.base.models_vmanage import DeviceTemplate, FeatureTemplate
 from cisco_sdwan.base.processor import StopProcessorException, ProcessorException
 from cisco_sdwan.migration import factory_cedge_aaa, factory_cedge_global
@@ -105,7 +106,7 @@ class TaskMigrate(Task):
                             self.log_error('Failed loading %s %s', info, item_name)
                             continue
 
-                        try:
+                        with suppress(StopProcessorException):
                             item_processor = loaded_processors.get(item_cls)
                             if item_processor is None:
                                 raise StopProcessorException()
@@ -115,8 +116,8 @@ class TaskMigrate(Task):
                                 self.log_debug('Skipping %s, migration not necessary', item_name)
                                 raise StopProcessorException()
 
-                            new_name, is_valid = item.get_new_name(parsed_args.name)
-                            if not is_valid:
+                            new_name = ExtendedTemplate(parsed_args.name)(item_name)
+                            if not item_cls.is_name_valid(new_name):
                                 self.log_error('New %s name is not valid: %s', info, new_name)
                                 is_bad_name = True
                                 raise StopProcessorException()
@@ -146,9 +147,6 @@ class TaskMigrate(Task):
                             else:
                                 self.log_debug('Migrated adds to original: %s + %s', item_name, new_name)
                                 export_list.append(new_item)
-
-                        except StopProcessorException:
-                            pass
 
                         export_list.append(item)
 

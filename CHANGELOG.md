@@ -1,3 +1,10 @@
+Sastre 1.17 [February 18, 2022]
+================================
+
+#### Enhancements:
+- New transform task, allowing renaming and copying of configuration items.
+
+
 Sastre 1.16.8 [December 13, 2021]
 ================================
 

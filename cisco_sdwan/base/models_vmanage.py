@@ -4,10 +4,11 @@
  cisco_sdwan.base.models_vmanage
  This module implements vManage API models
 """
-from typing import Iterable, Set
+from typing import Iterable, Set, Optional, Sequence, Mapping
 from pathlib import Path
 from collections import namedtuple
 from urllib.parse import quote_plus
+from .rest_api import Rest, RestAPIException
 from .catalog import register, op_register
 from .models_base import (ApiItem, IndexApiItem, ConfigItem, IndexConfigItem, RealtimeItem, BulkStatsItem,
                           BulkStateItem, ApiPath, IdName)
@@ -275,6 +276,69 @@ CEDGE_SET = {
 SOFT_EDGE_SET = {"vedge-CSR-1000v", "vedge-C8000V", "vedge-cloud", "vmanage", "vsmart"}
 
 
+# This is a special case handled under DeviceTemplate
+class DeviceTemplateAttached(IndexConfigItem):
+    api_path = ApiPath('template/device/config/attached', None, None, None)
+    store_path = ('device_templates', 'attached')
+    store_file = '{item_name}.json'
+    iter_fields = ('uuid', 'personality')
+
+
+# This is a special case handled under DeviceTemplate
+class DeviceTemplateValues(ConfigItem):
+    api_path = ApiPath(None, 'template/device/config/input', None, None)
+    store_path = ('device_templates', 'values')
+    store_file = '{item_name}.json'
+
+    @staticmethod
+    def api_params(template_id: str, device_uuids: Iterable[str]) -> dict:
+        """
+        Build dictionary used to provide input parameters for api POST call
+        @param template_id: Template ID string
+        @param device_uuids: Iterable of device UUIDs
+        @return: Dictionary used to provide POST input parameters
+        """
+        return {
+            "deviceIds": list(device_uuids),
+            "isEdited": False,
+            "isMasterEdited": False,
+            "templateId": template_id
+        }
+
+    def input_list(self, allowed_uuid_set=None):
+        """
+        Return list of device input entries. Each entry represents one attached device and is a dictionary of input
+        variable names and values.
+        @param allowed_uuid_set: Optional, set of uuids. If provided, only input entries for those uuids are returned
+        @return: [{<input_var_name>: <input_var_value>, ...}, ...]
+        """
+        return [entry for entry in self.data.get('data', [])
+                if allowed_uuid_set is None or entry.get('csv-deviceId') in allowed_uuid_set]
+
+    @staticmethod
+    def input_list_devices(input_list: list) -> Iterable[str]:
+        return (entry.get('csv-host-name') for entry in input_list)
+
+    def values_iter(self):
+        return (
+            (entry.get('csv-deviceId', ''), entry.get('csv-host-name', ''), entry)
+            for entry in self.data.get('data', [])
+        )
+
+    def title_dict(self):
+        return {column['property']: column['title'] for column in self.data.get('header', {}).get('columns', [])}
+
+    def __iter__(self):
+        return self.values_iter()
+
+    @classmethod
+    def get_values(cls, api: Rest, template_id: str, device_uuids: Iterable[str]):
+        try:
+            return cls(api.post(cls.api_params(template_id, device_uuids), cls.api_path.post))
+        except RestAPIException:
+            return None
+
+
 class DeviceTemplate(ConfigItem):
     api_path = CliOrFeatureApiPath(
         ApiPath('template/device/object', 'template/device/feature', 'template/device'),
@@ -283,12 +347,22 @@ class DeviceTemplate(ConfigItem):
     store_path = ('device_templates', 'template')
     store_file = '{item_name}.json'
     name_tag = 'templateName'
+    id_tag = 'templateId'
     post_filtered_tags = ('feature',)
     # templateClass, deviceRole, draftMode, templateId and copyEdited are new tags in 20.x+, adding to skip diff to not
     # trigger updates when restore --update is done between pre 20.x workdir and post 20.x vManage.
     skip_cmp_tag_set = {'createdOn', 'createdBy', 'lastUpdatedBy', 'lastUpdatedOn', '@rid', 'owner', 'infoTag',
                         'templateAttached', 'templateConfigurationEdited', 'templateClass', 'deviceRole', 'draftMode',
                         'templateId', 'copyEdited'}
+
+    def __init__(self, data):
+        """
+        @param data: dict containing the information to be associated with this config item
+        """
+        super().__init__(data)
+
+        self.devices_attached: Optional[DeviceTemplateAttached] = None
+        self.attach_values: Optional[DeviceTemplateValues] = None
 
     @property
     def is_type_cli(self) -> bool:
@@ -330,61 +404,25 @@ class DeviceTemplateIndex(IndexConfigItem):
             in self.iter('deviceType', 'devicesAttached', *self.iter_fields) if filter_fn(item_type, item_attached)
         )
 
+    @classmethod
+    def create(cls, item_list: Sequence[DeviceTemplate], id_hint_dict: Mapping[str, str]):
+        def index_entry_dict(item_obj: DeviceTemplate):
+            entry_dict = {
+                key: item_obj.data.get(key, id_hint_dict.get(item_obj.name)) for key in cls.iter_fields
+            }
+            entry_dict['deviceType'] = item_obj.data.get('deviceType')
 
-# This is a special case handled under DeviceTemplate
-class DeviceTemplateAttached(IndexConfigItem):
-    api_path = ApiPath('template/device/config/attached', None, None, None)
-    store_path = ('device_templates', 'attached')
-    store_file = '{item_name}.json'
-    iter_fields = ('uuid', 'personality')
+            if item_obj.devices_attached is not None:
+                entry_dict['devicesAttached'] = len(list(item_obj.devices_attached))
+            else:
+                entry_dict['devicesAttached'] = 0
 
+            return entry_dict
 
-# This is a special case handled under DeviceTemplate
-class DeviceTemplateValues(ConfigItem):
-    api_path = ApiPath(None, 'template/device/config/input', None, None)
-    store_path = ('device_templates', 'values')
-    store_file = '{item_name}.json'
-
-    @staticmethod
-    def api_params(template_id, device_uuid_list):
-        """
-        Build dictionary used to provide input parameters for api POST call
-        @param template_id: String containing the template ID
-        @param device_uuid_list: List of device UUIDs
-        @return: Dictionary used to provide POST input parameters
-        """
-        return {
-            "deviceIds": device_uuid_list,
-            "isEdited": False,
-            "isMasterEdited": False,
-            "templateId": template_id
+        index_payload = {
+            'data': [index_entry_dict(item) for item in item_list]
         }
-
-    def input_list(self, allowed_uuid_set=None):
-        """
-        Return list of device input entries. Each entry represents one attached device and is a dictionary of input
-        variable names and values.
-        @param allowed_uuid_set: Optional, set of uuids. If provided, only input entries for those uuids are returned
-        @return: [{<input_var_name>: <input_var_value>, ...}, ...]
-        """
-        return [entry for entry in self.data.get('data', [])
-                if allowed_uuid_set is None or entry.get('csv-deviceId') in allowed_uuid_set]
-
-    @staticmethod
-    def input_list_devices(input_list: list) -> Iterable[str]:
-        return (entry.get('csv-host-name') for entry in input_list)
-
-    def values_iter(self):
-        return (
-            (entry.get('csv-deviceId', ''), entry.get('csv-host-name', ''), entry)
-            for entry in self.data.get('data', [])
-        )
-
-    def title_dict(self):
-        return {column['property']: column['title'] for column in self.data.get('header', {}).get('columns', [])}
-
-    def __iter__(self):
-        return self.values_iter()
+        return cls(index_payload)
 
 
 class FeatureTemplate(ConfigItem):
@@ -427,28 +465,6 @@ class FeatureTemplateIndex(IndexConfigItem):
     api_path = ApiPath('template/feature', None, None, None)
     store_file = 'feature_templates.json'
     iter_fields = IdName('templateId', 'templateName')
-
-    @staticmethod
-    def filter_type_default(desired_type: str, desired_is_default: bool, item_type: str, item_is_default: bool) -> bool:
-        """
-        Intended to be used along with partial to create a filter_fn that matches on desired_type and
-        desired_is_default values. Partial locks the desired_type and desired_is_default parameters.
-        @param desired_type: Desired feature templateType
-        @param desired_is_default: Whether to match only factoryDefault templates
-        @param item_type: templateType from feature template being matched
-        @param item_is_default: factoryDefault from feature template being matched
-        @return: True if conditions matched, false otherwise
-        """
-        if desired_is_default and not item_is_default:
-            return False
-
-        return desired_type == item_type
-
-    def filtered_iter(self, filter_fn):
-        return (
-            (item_id, item_name) for item_type, item_is_default, item_id, item_name
-            in self.iter('templateType', 'factoryDefault', *self.iter_fields) if filter_fn(item_type, item_is_default)
-        )
 
 
 #

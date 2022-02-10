@@ -12,7 +12,7 @@ import json
 from pathlib import Path
 from shutil import rmtree
 from collections import namedtuple
-from typing import List, Tuple, Iterator, Union, Optional, Any, Iterable
+from typing import List, Tuple, Iterator, Union, Optional, Any, Iterable, Type, TypeVar
 from cisco_sdwan.base.rest_api import Rest, RestAPIException
 from cisco_sdwan.base.models_base import DATA_DIR
 from cisco_sdwan.base.models_vmanage import (DeviceTemplate, DeviceTemplateValues, DeviceTemplateAttached,
@@ -20,6 +20,8 @@ from cisco_sdwan.base.models_vmanage import (DeviceTemplate, DeviceTemplateValue
                                              ActionStatus, PolicyVsmartStatus, PolicyVsmartStatusException,
                                              PolicyVsmartActivate, PolicyVsmartIndex, PolicyVsmartDeactivate,
                                              Device)
+
+T = TypeVar('T')
 
 
 def regex_search(regex: str, *fields: str, inverse: bool = False) -> bool:
@@ -259,14 +261,15 @@ class Task:
         return ((tag, info, index, item_cls) for tag, info, index, item_cls in all_index_iter if index is not None)
 
     @staticmethod
-    def item_get(item_cls, backend, item_id, item_name, ext_name):
+    def item_get(item_cls: Type[T], backend: Union[Rest, str],
+                 item_id: str, item_name: str, ext_name: bool) -> Union[T, None]:
         if isinstance(backend, Rest):
             return item_cls.get(backend, item_id)
         else:
             return item_cls.load(backend, ext_name, item_name, item_id)
 
     @staticmethod
-    def index_get(index_cls, backend):
+    def index_get(index_cls: Type[T], backend: Union[Rest, str]) -> Union[T, None]:
         return index_cls.get(backend) if isinstance(backend, Rest) else index_cls.load(backend)
 
     def attach_template_data(self, api: Rest, workdir: str, ext_name: bool, templates_iter: Iterator[tuple],

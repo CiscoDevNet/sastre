@@ -10,7 +10,7 @@ from os import environ
 from pathlib import Path
 from itertools import zip_longest
 from collections import namedtuple
-from typing import Sequence, Dict, Tuple, Union, Iterator, Callable, Mapping, Any
+from typing import Sequence, Tuple, Union, Iterator, Callable, Mapping, Any, Optional
 from operator import attrgetter
 from requests.exceptions import Timeout
 from .rest_api import RestAPIException, Rest
@@ -558,25 +558,9 @@ class ConfigItem(ApiItem):
         return set(re.findall(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}',
                               json.dumps(filtered_data)))
 
-    def get_new_name(self, name_template: str) -> Tuple[str, bool]:
-        """
-        Return a new valid name for this item based on the format string template provided. Variable {name} is replaced
-        with the existing item name. Other variables are provided via kwargs.
-        @param name_template: str containing the name template to construct the new name.
-                              For example: migrated_{name&G_Branch_184_(.*)}
-        @return: Tuple containing new name and an indication whether it is valid
-        """
-        is_valid = False
-
-        try:
-            new_name = ExtendedTemplate(name_template)(self.data[self.name_tag])
-        except KeyError:
-            new_name = None
-        else:
-            if self.name_check_regex.search(new_name) is not None:
-                is_valid = True
-
-        return new_name, is_valid
+    @classmethod
+    def is_name_valid(cls, proposed_name: Optional[str]) -> bool:
+        return proposed_name is not None and cls.name_check_regex.search(proposed_name) is not None
 
     def find_key(self, key, from_key=None):
         """
@@ -639,16 +623,16 @@ class IndexConfigItem(ConfigItem):
     store_path = ('inventory',)
 
     @classmethod
-    def create(cls, item_list: Sequence[ConfigItem], id_hint_dict: Dict[str, str]):
-        def item_dict(item_obj: ConfigItem):
+    def create(cls, item_list: Sequence[ConfigItem], id_hint_dict: Mapping[str, str]):
+        def index_entry_dict(item_obj: ConfigItem):
             return {
                 key: item_obj.data.get(key, id_hint_dict.get(item_obj.name)) for key in cls.iter_fields
             }
 
-        index_dict = {
-            'data': [item_dict(item) for item in item_list]
+        index_payload = {
+            'data': [index_entry_dict(item) for item in item_list]
         }
-        return cls(index_dict)
+        return cls(index_payload)
 
     def iter(self, *iter_fields: str, default: Any = None) -> Iterator:
         """
@@ -750,15 +734,16 @@ def update_ids(id_mapping_dict, item_data):
 class ExtendedTemplate:
     template_pattern = re.compile(r'{name(?:\s+(?P<regex>.*?))?}')
 
-    def __init__(self, template):
-        self.src_template = template
+    def __init__(self, name_regex: str):
+        self.src_template = name_regex
         self.label_value_map = None
 
-    def __call__(self, name):
+    def __call__(self, name: str) -> str:
         """
-        Raise ValueError when issues are encountered while processing the name-regex
+        Raise ValueError when issues are encountered while processing the name_regex
+        @param name: Current item name
+        @return: New name from item name using the name_regex
         """
-
         def regex_replace(match_obj):
             regex = match_obj.group('regex')
             if regex is not None:
