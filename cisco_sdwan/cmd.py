@@ -22,9 +22,8 @@ from .tasks.common import TaskException
 from .tasks.implementation import *
 
 # vManage REST API defaults
-VMANAGE_PORT = '8443'
+VMANAGE_PORT = '443'
 REST_TIMEOUT = 300
-BASE_URL = 'https://{address}:{port}'
 
 # Default logging configuration - JSON formatted
 # Setting level at chardet.charsetprober to prevent unwanted debug messages from requests module
@@ -142,7 +141,7 @@ def main():
                 # Target address changed, re-run parser
                 parsed_task_args = task.parser(cli_args.task_args, target_address=cli_args.address)
 
-            base_url = BASE_URL.format(address=cli_args.address, port=cli_args.port)
+            base_url = f'https://{cli_args.address}{"" if cli_args.port == "443" else f":{cli_args.port}"}'
             with Rest(base_url, cli_args.user, cli_args.password, cli_args.tenant, timeout=cli_args.timeout) as api:
                 # Dispatch to the appropriate task handler
                 task_output = task.runner(parsed_task_args, api)
@@ -158,6 +157,6 @@ def main():
         if not cli_args.verbose and task.is_dryrun:
             print(str(task.dryrun_report))
 
-        task.log_info('Task completed %s', task.outcome('successfully', 'with caveats: {tally}'))
+        task.log_info(f'Task completed {task.outcome("successfully", "with caveats: {tally}")}')
     except (RestAPIException, ConnectionError, FileNotFoundError, ModelException, TaskException) as ex:
         logging.getLogger(__name__).critical(ex)
