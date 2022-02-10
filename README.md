@@ -27,7 +27,7 @@ Both flavors follow the same release numbering. For instance, if support for cer
 The command "sdwan --version" will indicate the flavor that is installed.
 
     % sdwan --version
-    Sastre-Pro Version 1.15. Catalog: 73 configuration items, 31 operational items.
+    Sastre-Pro Version 1.17. Catalog: 73 configuration items, 31 operational items.
 
 Tasks only available on Sastre-Pro are labeled as such in the [Introduction](#introduction) section below.
 
