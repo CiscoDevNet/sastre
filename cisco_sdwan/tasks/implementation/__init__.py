@@ -9,6 +9,7 @@ from ._restore import TaskRestore, RestoreArgs
 from ._delete import TaskDelete, DeleteArgs
 from ._migrate import TaskMigrate, MigrateArgs
 from ._attach_detach import TaskAttach, TaskDetach, AttachVsmartArgs, AttachEdgeArgs, DetachVsmartArgs, DetachEdgeArgs
+from ._transform import TaskTransform, TransformCopyArgs, TransformRenameArgs, TransformRecipeArgs
 
 __all__ = [
     'TaskBackup',
@@ -17,6 +18,7 @@ __all__ = [
     'TaskMigrate',
     'TaskAttach',
     'TaskDetach',
+    'TaskTransform',
     'BackupArgs',
     'RestoreArgs',
     'DeleteArgs',
@@ -24,5 +26,8 @@ __all__ = [
     'AttachVsmartArgs',
     'AttachEdgeArgs',
     'DetachVsmartArgs',
-    'DetachEdgeArgs'
+    'DetachEdgeArgs',
+    'TransformCopyArgs',
+    'TransformRenameArgs',
+    'TransformRecipeArgs'
 ]

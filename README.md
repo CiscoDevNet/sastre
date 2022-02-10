@@ -46,6 +46,7 @@ Task indicates the operation to be performed. The following tasks are currently 
 - Restore: Restore configuration items from a local backup to vManage.
 - Delete: Delete configuration items on vManage.
 - Migrate: Migrate configuration items from a vManage release to another. Currently, only 18.4, 19.2 or 19.3 to 20.1 is supported. Minor revision numbers (e.g. 20.1.1) are not relevant for the template migration.
+- Transform: Modify configuration items. Currently, copy and rename operations are supported. 
 - Attach: Attach WAN Edges/vSmarts to templates. Allows further customization on top of the functionality available via "restore --attach".
 - Detach: Detach WAN Edges/vSmarts from templates. Allows further customization on top of the functionality available via "delete --detach".
 - Certificate (Sastre-Pro): Restore device certificate validity status from a backup or set to a desired value (i.e. valid, invalid or staging).
@@ -69,7 +70,7 @@ Notes:
     Sastre-Pro - Automation Tools for Cisco SD-WAN Powered by Viptela
     
     positional arguments:
-      <task>                task to be performed (backup, restore, delete, migrate, attach, detach, certificate, list, show-template, show, report)
+      <task>                task to be performed (backup, restore, delete, migrate, attach, detach, certificate, transform, list, show-template, show, report)
       <arguments>           task parameters, if any
     
     optional arguments:
@@ -748,6 +749,131 @@ Verifying app-route data from 4 days ago:
     | pEdge4-ISR4331-2 | 100.1.140.2     | 100.1.150.2      | mpls         | mpls         | 133   | 0    | 30      | 3      | 100.1.140.2:mpls-100.1.150.2:mpls                 |
     +------------------+-----------------+------------------+--------------+--------------+-------+------+---------+--------+---------------------------------------------------+
     INFO: Task completed successfully
+
+### Renaming configuration items
+
+The transform task allows copying or renaming configuration items, including templates with attachments, activated policies and their dependencies.
+
+    % sdwan transform [-h] [--no-rollover] [--workdir <directory>] <output-directory> {rename,copy,recipe} ...
+    
+    Sastre-Pro - Automation Tools for Cisco SD-WAN Powered by Viptela
+    
+    Transform task:
+    
+    positional arguments:
+      <output-directory>    directory to save transform result
+    
+    optional arguments:
+      -h, --help            show this help message and exit
+      --no-rollover         by default, if the output directory already exists it is renamed using a rolling naming scheme. This option disables this automatic rollover.
+      --workdir <directory>
+                            transform will read from the specified directory instead of target vManage
+    
+    transform options:
+      {rename,copy,recipe}
+        rename              rename configuration items
+        copy                copy configuration items
+        recipe              transform using custom recipe
+
+Transform can read from a live vManage or from a backup directory (when --workdir is specified). It always save the processed items to the provided output directory. Then restore/attach tasks can be used to push those changes to vManage.
+
+Naming the new or renamed items can be done in a couple of ways:
+- Name template: A name_regex expression defines how to build the new name based on the old name. This method is available via CLI or custom recipe.
+- Name map: A 1-1 mapping from old name to new name is defined. This method is only available when using custom recipes.
+- Name map + name template: When both name map and name template are defined, name map lookup is done first. Only if no match is found on name map, name template processing is done.
+
+Renaming a feature-template using name template via transform rename:
+- Rename Logging_Template_cEdge to Logging_Template_v01
+
+
+    % sdwan list config template_feature --regex ^Logging
+    +=====================================================================================================+
+    | Name                   | ID                                   | Tag              | Type             |
+    +=====================================================================================================+
+    | Logging_Template_cEdge | 6de63643-ee0c-4f4c-b32a-4d80d3b804e8 | template_feature | feature template |
+    +------------------------+--------------------------------------+------------------+------------------+
+
+    % sdwan --verbose transform cleaned_configs rename template_feature --regex "^Logging" "{name (Logging_Template)_cEdge}_v01"
+    INFO: Transform task: vManage URL: "https://198.18.1.10:8443" -> Local output dir: "cleaned_configs"
+    INFO: Saved vManage server information
+    INFO: Inspecting policy_list items
+    INFO: Inspecting policy_profile items
+    INFO: Inspecting policy_definition items
+    INFO: Inspecting policy_customapp items
+    INFO: Inspecting policy_voice items
+    INFO: Inspecting policy_security items
+    INFO: Inspecting policy_vedge items
+    INFO: Inspecting policy_vsmart items
+    INFO: Inspecting template_feature items
+    INFO: Matched feature template Logging_Template_cEdge
+    INFO: Replacing feature template: Logging_Template_cEdge -> Logging_Template_v01
+    INFO: Inspecting template_device items
+    INFO: Task completed successfully
+
+Push changes to vManage using the restore task:
+- Note that --update option is used. This is so device template changes are detected and updated accordingly, with template reattach triggered as needed.
+
+
+    % sdwan --verbose restore all --update --workdir cleaned_configs                         
+    INFO: Restore task: Local workdir: "cleaned_configs" -> vManage URL: "https://198.18.1.10:8443"
+    INFO: Loading existing items from target vManage
+    INFO: Identifying items to be pushed
+    INFO: Inspecting template_device items
+    INFO: Inspecting template_feature items
+    INFO: Inspecting policy_vsmart items
+    INFO: Inspecting policy_vedge items
+    INFO: Inspecting policy_security items
+    INFO: Inspecting policy_voice items
+    INFO: Inspecting policy_customapp items
+    INFO: Inspecting policy_definition items
+    INFO: Inspecting policy_profile items
+    INFO: Inspecting policy_list items
+    INFO: Pushing items to vManage
+    INFO: Done: Create feature template Logging_Template_v01
+    INFO: Updating device template BranchType1Template-cEdge requires reattach
+    INFO: Template attach: BranchType1Template-cEdge (BR1-CEDGE2, BR1-CEDGE1)
+    INFO: Reattaching templates
+    INFO: Waiting...
+    INFO: Waiting...
+    INFO: Waiting...
+    INFO: Waiting...
+    INFO: Completed BranchType1Template-cEdge
+    INFO: Completed reattaching templates
+    INFO: Done: Update device template BranchType1Template-cEdge
+    INFO: Task completed successfully
+
+Renaming multiple feature-templates using name template and name map via transform recipe:
+- Using a custom recipe (defined in a YAML file or provided as a JSON string), allows more flexibility for defining which items are selected and how the new items should be named.
+
+
+    % cat recipe.yaml                                                          
+    ---
+    tag: template_feature
+    
+    name_template:
+      regex: "^All-"
+      name_regex: "{name ^All-(.+)}"
+    
+    name_map:
+      DC1-VPN10-Interface-Template: DC-VPN10-Interface_v01
+      DC1-VPN20-Interface-Template: DC-VPN20-Interface_v01
+    ...
+
+    % sdwan --verbose transform test-transform recipe --from-file recipe.yaml   
+    INFO: Transform task: vManage URL: "https://198.18.1.10:8443" -> Local output dir: "test-transform"
+    << snip >>
+    INFO: Matched feature template All-VPN0-TEMPLATE_cEdge
+    INFO: Replacing feature template: All-VPN0-TEMPLATE_cEdge -> VPN0-TEMPLATE_cEdge
+    INFO: Inspecting template_device items
+    INFO: Task completed successfully
+
+Push changes to vManage using the restore task:
+
+    % sdwan --verbose restore all --workdir test-transform --update             
+    INFO: Restore task: Local workdir: "test-transform" -> vManage URL: "https://198.18.1.10:8443"
+    << snip >>
+    INFO: Task completed successfully
+
 
 ## Notes
 
