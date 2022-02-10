@@ -1,0 +1,11 @@
+---
+tag: template_feature
+
+name_template:
+  regex: "^All-"
+  name_regex: "{name ^All-(.+)}"
+
+name_map:
+  DC1-VPN10-Interface-Template: DC-VPN10-Interface_v01
+  DC1-VPN20-Interface-Template: DC-VPN20-Interface_v01
+...
