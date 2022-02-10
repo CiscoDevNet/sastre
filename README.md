@@ -83,7 +83,7 @@ Notes:
                             password, can also be defined via VMANAGE_PASSWORD environment variable. If neither is provided user is prompted for password.
       --tenant <tenant>     tenant name, when using provider accounts in multi-tenant deployments.
       --pid <pid>           CX project id, can also be defined via CX_PID environment variable. This is collected for AIDE reporting purposes only.
-      --port <port>         vManage port number, can also be defined via VMANAGE_PORT environment variable (default: 8443)
+      --port <port>         vManage port number, can also be defined via VMANAGE_PORT environment variable (default: 443)
       --timeout <timeout>   REST API timeout (default: 300)
       --verbose             increase output verbosity
       --version             show program's version number and exit
@@ -132,7 +132,7 @@ Tasks that provide table output, such as show-template, list or show; have optio
 
 
 #### Important concepts:
-- vManage URL: Constructed from the provided vManage IP address and TCP port (default 8443). All operations target this vManage.
+- vManage URL: Constructed from the provided vManage IP address and TCP port (default 443). All operations target this vManage.
 - Workdir: Defines the location (in the local machine) where vManage data files are located. By default, it follows the format "backup_\<vmanage-ip\>_\<yyyymmdd\>". The --workdir parameter can be used to specify a different location.  Workdir is under a 'data' directory. This 'data' directory is relative to the directory where Sastre is run.
 - Tag: vManage configuration items are grouped by tags, such as policy_apply, policy_definition, policy_list, template_device, etc. The special tag 'all' is used to refer to all configuration elements. Depending on the task, one or more tags can be specified in order to select groups of configuration elements.
 
@@ -176,7 +176,7 @@ Any of those vManage parameters can be provided via command line as well:
 Perform a backup:
 
     % sdwan --verbose backup all
-    INFO: Starting backup: vManage URL: "https://198.18.1.10:8443" -> Local workdir: "backup_198.18.1.10_20210927"
+    INFO: Starting backup: vManage URL: "https://198.18.1.10" -> Local workdir: "backup_198.18.1.10_20210927"
     INFO: Saved vManage server information
     INFO: Saved WAN edge certificates
     INFO: Saved device template index
@@ -202,7 +202,7 @@ The backup is saved under data/backup_10.85.136.253_20191206:
 ### Customizing backup destination:
 
     % sdwan --verbose backup all --workdir my_custom_directory
-    INFO: Starting backup: vManage URL: "https://198.18.1.10:8443" -> Local workdir: "my_custom_directory"
+    INFO: Starting backup: vManage URL: "https://198.18.1.10" -> Local workdir: "my_custom_directory"
     INFO: Saved vManage server information
     INFO: Saved WAN edge certificates
     INFO: Saved device template index
@@ -217,7 +217,7 @@ The backup is saved under data/backup_10.85.136.253_20191206:
 ### Restoring from backup:
 
     % sdwan --verbose restore all        
-    INFO: Starting restore: Local workdir: "backup_10.85.136.253_20200617" -> vManage URL: "https://10.85.136.253:8443"
+    INFO: Starting restore: Local workdir: "backup_10.85.136.253_20200617" -> vManage URL: "https://10.85.136.253"
     INFO: Loading existing items from target vManage
     INFO: Identifying items to be pushed
     INFO: Inspecting template_device items
@@ -243,7 +243,7 @@ The backup is saved under data/backup_10.85.136.253_20191206:
 #### Restoring from a backup in a different directory than the default:
 
     % sdwan --verbose restore all --workdir my_custom_directory
-    INFO: Starting restore: Local workdir: "my_custom_directory" -> vManage URL: "https://10.85.136.253:8443"
+    INFO: Starting restore: Local workdir: "my_custom_directory" -> vManage URL: "https://10.85.136.253"
     INFO: Loading existing items from target vManage
     INFO: Identifying items to be pushed
     INFO: Inspecting template_device items
@@ -254,7 +254,7 @@ The backup is saved under data/backup_10.85.136.253_20191206:
 #### Restoring with template attachments and policy activation:
     
     % sdwan --verbose restore all --attach
-    INFO: Starting restore: Local workdir: "backup_10.85.136.253_20200617" -> vManage URL: "https://10.85.136.253:8443"
+    INFO: Starting restore: Local workdir: "backup_10.85.136.253_20200617" -> vManage URL: "https://10.85.136.253"
     INFO: Loading existing items from target vManage
     <snip>
     INFO: Attaching WAN Edge templates
@@ -287,7 +287,7 @@ The backup is saved under data/backup_10.85.136.253_20191206:
 Example:
 
     % sdwan --verbose restore all --workdir state_b --update
-    INFO: Starting restore: Local workdir: "state_b" -> vManage URL: "https://10.85.136.253:8443"
+    INFO: Starting restore: Local workdir: "state_b" -> vManage URL: "https://10.85.136.253"
     INFO: Loading existing items from target vManage
     INFO: Identifying items to be pushed
     INFO: Inspecting template_device items
@@ -316,7 +316,7 @@ Example:
 Dry-run, just list without deleting items matching the specified tag and regular expression:
 
     % sdwan --verbose delete all --regex "^DC" --dryrun
-    INFO: Starting delete, DRY-RUN mode: vManage URL: "https://10.85.136.253:8443"
+    INFO: Starting delete, DRY-RUN mode: vManage URL: "https://10.85.136.253"
     INFO: Inspecting template_device items
     INFO: DRY-RUN: Delete device template DC_BASIC
     INFO: DRY-RUN: Delete device template DC_ADVANCED
@@ -331,7 +331,7 @@ Dry-run, just list without deleting items matching the specified tag and regular
 Deleting items:
 
     % sdwan --verbose delete all --regex "^DC"
-    INFO: Starting delete: vManage URL: "https://10.85.136.253:8443"
+    INFO: Starting delete: vManage URL: "https://10.85.136.253"
     INFO: Inspecting template_device items
     INFO: Done: Delete device template DC_BASIC
     INFO: Done: Delete device template DC_ADVANCED
@@ -348,7 +348,7 @@ When vSmart policies are activated and device templates are attached the associa
 The --detach option performs the necessary template detach and vSmart policy deactivate before proceeding with delete.
 
     % sdwan --verbose delete all --detach
-    INFO: Starting delete: vManage URL: "https://10.85.136.253:8443"
+    INFO: Starting delete: vManage URL: "https://10.85.136.253"
     INFO: Detaching WAN Edge templates
     INFO: Waiting...
     INFO: Completed BRANCH_BASIC
@@ -374,7 +374,7 @@ The list task can be used to show items from a target vManage, or a backup direc
 List device templates and feature templates from target vManage:
 
     % sdwan --verbose list configuration template_device template_feature
-    INFO: Starting list configuration: vManage URL: "https://198.18.1.10:8443"
+    INFO: Starting list configuration: vManage URL: "https://198.18.1.10"
     INFO: List criteria matched 45 items
     +========================================================================================================+
     | Name                      | ID                                   | Tag              | Type             |
@@ -390,7 +390,7 @@ List device templates and feature templates from target vManage:
 List all items from target vManage with name starting with 'DC':
  
     % sdwan --verbose list configuration all --regex "^DC"
-    INFO: Starting list configuration: vManage URL: "https://198.18.1.10:8443"
+    INFO: Starting list configuration: vManage URL: "https://198.18.1.10"
     INFO: List criteria matched 2 items
     +========================================================================================+
     | Name        | ID                                   | Tag             | Type            |
@@ -416,7 +416,7 @@ List all items from backup directory with name starting with 'DC':
 List also allows displaying device certificate information.
 
     % sdwan --verbose list certificate                     
-    INFO: Starting list certificates: vManage URL: "https://198.18.1.10:8443"
+    INFO: Starting list certificates: vManage URL: "https://198.18.1.10"
     INFO: List criteria matched 5 items
     +================================================================================================================================+
     | Hostname   | Chassis                                  | Serial                           | State                      | Status |
@@ -476,7 +476,7 @@ Similar to the list task, show-template tasks can be used to display items from 
 Restore certificate validity status from a backup:
 
     % sdwan --verbose certificate restore --workdir test
-    INFO: Starting certificate: Restore status workdir: "test" > vManage URL: "https://198.18.1.10:8443"
+    INFO: Starting certificate: Restore status workdir: "test" > vManage URL: "https://198.18.1.10"
     INFO: Loading WAN edge certificate list from target vManage
     INFO: Identifying items to be pushed
     INFO: Will update DC1-VEDGE1 status: valid -> staging
@@ -493,7 +493,7 @@ Restore certificate validity status from a backup:
 Set certificate validity status to a desired value:
 
     % sdwan --verbose certificate set valid             
-    INFO: Starting certificate: Set status to "valid" > vManage URL: "https://198.18.1.10:8443"
+    INFO: Starting certificate: Set status to "valid" > vManage URL: "https://198.18.1.10"
     INFO: Loading WAN edge certificate list from target vManage
     INFO: Identifying items to be pushed
     INFO: Will update DC1-VEDGE1 status: staging -> valid
@@ -515,7 +515,7 @@ Set certificate validity status to a desired value:
 Migrating off a live vManage:
 
     % sdwan --verbose migrate all dcloud_migrated    
-    INFO: Starting migrate: vManage URL: "https://198.18.1.10:8443" 18.4 -> 20.1 Local output dir: "dcloud_migrated"
+    INFO: Starting migrate: vManage URL: "https://198.18.1.10" 18.4 -> 20.1 Local output dir: "dcloud_migrated"
     INFO: Loaded template migration recipes
     INFO: Inspecting policy_list items
     INFO: Saved VPN list index
@@ -621,14 +621,14 @@ The number of devices to include per attach/detach request (to vManage) can be d
 Using dry-run mode to validate what templates and devices would be included with the attach task:
 
     % sdwan --verbose attach edge --workdir dcloud_base --dryrun
-    INFO: Starting attach templates, DRY-RUN mode: Local workdir: "dcloud_base" -> vManage URL: "https://198.18.1.10:8443"
+    INFO: Starting attach templates, DRY-RUN mode: Local workdir: "dcloud_base" -> vManage URL: "https://198.18.1.10"
     INFO: DRY-RUN: Template attach: DC-vEdges (DC1-VEDGE1, DC1-VEDGE2), migrated_CSR_BranchType1Template-CSR (BR1-CEDGE2, BR1-CEDGE1)
     INFO: Task completed successfully
 
 Selecting devices to include in the attach task:
 
     % sdwan --verbose attach edge --workdir dcloud_base --templates "DC" --devices "VEDGE2"         
-    INFO: Starting attach templates: Local workdir: "dcloud_base" -> vManage URL: "https://198.18.1.10:8443"
+    INFO: Starting attach templates: Local workdir: "dcloud_base" -> vManage URL: "https://198.18.1.10"
     INFO: Template attach: DC-vEdges (DC1-VEDGE2)
     INFO: Attaching WAN Edges
     INFO: Waiting...
@@ -729,7 +729,7 @@ Verifying app-route data:
 Verifying app-route data from 4 days ago:
 
     % sdwan --verbose show statistics app-route --days 4 --reachable --regex "pEdge[3-4]" 
-    INFO: Starting show statistics: vManage URL: "https://10.122.41.140:443"
+    INFO: Starting show statistics: vManage URL: "https://10.122.41.140"
     INFO: Query timestamp: 2021-04-26 15:36:12 UTC
     INFO: Retrieving application-aware route statistics from 2 devices
     *** Application-aware route statistics ***
@@ -794,7 +794,7 @@ Renaming a feature-template using name template via transform rename:
     +------------------------+--------------------------------------+------------------+------------------+
 
     % sdwan --verbose transform cleaned_configs rename template_feature --regex "^Logging" "{name (Logging_Template)_cEdge}_v01"
-    INFO: Transform task: vManage URL: "https://198.18.1.10:8443" -> Local output dir: "cleaned_configs"
+    INFO: Transform task: vManage URL: "https://198.18.1.10" -> Local output dir: "cleaned_configs"
     INFO: Saved vManage server information
     INFO: Inspecting policy_list items
     INFO: Inspecting policy_profile items
@@ -815,7 +815,7 @@ Push changes to vManage using the restore task:
 
 
     % sdwan --verbose restore all --update --workdir cleaned_configs                         
-    INFO: Restore task: Local workdir: "cleaned_configs" -> vManage URL: "https://198.18.1.10:8443"
+    INFO: Restore task: Local workdir: "cleaned_configs" -> vManage URL: "https://198.18.1.10"
     INFO: Loading existing items from target vManage
     INFO: Identifying items to be pushed
     INFO: Inspecting template_device items
@@ -860,7 +860,7 @@ Renaming multiple feature-templates using name template and name map via transfo
     ...
 
     % sdwan --verbose transform test-transform recipe --from-file recipe.yaml   
-    INFO: Transform task: vManage URL: "https://198.18.1.10:8443" -> Local output dir: "test-transform"
+    INFO: Transform task: vManage URL: "https://198.18.1.10" -> Local output dir: "test-transform"
     << snip >>
     INFO: Matched feature template All-VPN0-TEMPLATE_cEdge
     INFO: Replacing feature template: All-VPN0-TEMPLATE_cEdge -> VPN0-TEMPLATE_cEdge
@@ -870,7 +870,7 @@ Renaming multiple feature-templates using name template and name map via transfo
 Push changes to vManage using the restore task:
 
     % sdwan --verbose restore all --workdir test-transform --update             
-    INFO: Restore task: Local workdir: "test-transform" -> vManage URL: "https://198.18.1.10:8443"
+    INFO: Restore task: Local workdir: "test-transform" -> vManage URL: "https://198.18.1.10"
     << snip >>
     INFO: Task completed successfully
 
@@ -1061,7 +1061,7 @@ Start the docker container:
       -p <password>, --password <password>
                             password, can also be defined via VMANAGE_PASSWORD environment variable. If neither is provided user is prompted for password.
       --tenant <tenant>     tenant name, when using provider accounts in multi-tenant deployments.
-      --port <port>         vManage port number, can also be defined via VMANAGE_PORT environment variable (default: 8443)
+      --port <port>         vManage port number, can also be defined via VMANAGE_PORT environment variable (default: 443)
       --timeout <timeout>   REST API timeout (default: 300)
       --verbose             increase output verbosity
       --version             show program's version number and exit
