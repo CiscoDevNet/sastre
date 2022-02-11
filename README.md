@@ -754,20 +754,15 @@ Verifying app-route data from 4 days ago:
 
 The transform task allows copying or renaming configuration items, including templates with attachments, activated policies and their dependencies.
 
-    % sdwan transform [-h] [--no-rollover] [--workdir <directory>] <output-directory> {rename,copy,recipe} ...
+    % sdwan --verbose transform -h       
+    usage: sdwan transform [-h] {rename,copy,recipe} ...
     
     Sastre-Pro - Automation Tools for Cisco SD-WAN Powered by Viptela
     
     Transform task:
     
-    positional arguments:
-      <output-directory>    directory to save transform result
-    
     optional arguments:
       -h, --help            show this help message and exit
-      --no-rollover         by default, if the output directory already exists it is renamed using a rolling naming scheme. This option disables this automatic rollover.
-      --workdir <directory>
-                            transform will read from the specified directory instead of target vManage
     
     transform options:
       {rename,copy,recipe}
@@ -793,7 +788,7 @@ Renaming a feature-template using name template via transform rename:
     | Logging_Template_cEdge | 6de63643-ee0c-4f4c-b32a-4d80d3b804e8 | template_feature | feature template |
     +------------------------+--------------------------------------+------------------+------------------+
 
-    % sdwan --verbose transform cleaned_configs rename template_feature --regex "^Logging" "{name (Logging_Template)_cEdge}_v01"
+    % sdwan --verbose transform rename template_feature --regex "^Logging" "{name (Logging_Template)_cEdge}_v01" cleaned_configs
     INFO: Transform task: vManage URL: "https://198.18.1.10" -> Local output dir: "cleaned_configs"
     INFO: Saved vManage server information
     INFO: Inspecting policy_list items
@@ -859,7 +854,7 @@ Renaming multiple feature-templates using name template and name map via transfo
       DC1-VPN20-Interface-Template: DC-VPN20-Interface_v01
     ...
 
-    % sdwan --verbose transform test-transform recipe --from-file recipe.yaml   
+    % sdwan --verbose transform recipe --from-file recipe.yaml test-transform
     INFO: Transform task: vManage URL: "https://198.18.1.10" -> Local output dir: "test-transform"
     << snip >>
     INFO: Matched feature template All-VPN0-TEMPLATE_cEdge

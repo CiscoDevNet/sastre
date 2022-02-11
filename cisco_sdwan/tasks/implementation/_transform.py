@@ -129,14 +129,6 @@ class TaskTransform(Task):
         task_parser.prog = f'{task_parser.prog} transform'
         task_parser.formatter_class = argparse.RawDescriptionHelpFormatter
 
-        task_parser.add_argument('output', metavar='<output-directory>', type=filename_type,
-                                 help='directory to save transform result')
-        task_parser.add_argument('--no-rollover', action='store_true',
-                                 help='by default, if the output directory already exists it is renamed using a '
-                                      'rolling naming scheme. This option disables this automatic rollover.')
-        task_parser.add_argument('--workdir', metavar='<directory>', type=existing_workdir_type,
-                                 help='transform will read from the specified directory instead of target vManage')
-
         sub_tasks = task_parser.add_subparsers(title='transform options')
         sub_tasks.required = True
 
@@ -145,6 +137,14 @@ class TaskTransform(Task):
 
         copy_parser = sub_tasks.add_parser('copy', help='copy configuration items')
         copy_parser.set_defaults(recipe_handler=TaskTransform.copy_recipe)
+
+        recipe_parser = sub_tasks.add_parser('recipe', help='transform using custom recipe')
+        recipe_parser.set_defaults(recipe_handler=TaskTransform.load_recipe)
+        recipe_mutex = recipe_parser.add_mutually_exclusive_group(required=True)
+        recipe_mutex.add_argument('--from-file', metavar='<filename>', type=existing_file_type,
+                                  help='load recipe from YAML file')
+        recipe_mutex.add_argument('--from-json', metavar='<json>',
+                                  help='load recipe from JSON-formatted string')
 
         for sub_task in (rename_parser, copy_parser):
             sub_task.add_argument('tag', metavar='<tag>', type=TagOptions.tag,
@@ -162,13 +162,14 @@ class TaskTransform(Task):
                                        'regular expression that must contain at least one capturing group. Capturing '
                                        'groups identify sections of the original name to keep.')
 
-        recipe_parser = sub_tasks.add_parser('recipe', help='transform using custom recipe')
-        recipe_parser.set_defaults(recipe_handler=TaskTransform.load_recipe)
-        recipe_mutex = recipe_parser.add_mutually_exclusive_group(required=True)
-        recipe_mutex.add_argument('--from-file', metavar='<filename>', type=existing_file_type,
-                                  help='load recipe from YAML file')
-        recipe_mutex.add_argument('--from-json', metavar='<json>',
-                                  help='load recipe from JSON-formatted string')
+        for sub_task in (rename_parser, copy_parser, recipe_parser):
+            sub_task.add_argument('output', metavar='<output-directory>', type=filename_type,
+                                  help='directory to save transform result')
+            sub_task.add_argument('--no-rollover', action='store_true',
+                                  help='by default, if the output directory already exists it is renamed using a '
+                                       'rolling naming scheme. This option disables this automatic rollover.')
+            sub_task.add_argument('--workdir', metavar='<directory>', type=existing_workdir_type,
+                                  help='transform will read from the specified directory instead of target vManage')
 
         return task_parser.parse_args(task_args)
 
@@ -300,7 +301,7 @@ class TaskTransform(Task):
                                 self.log_info(f'Replacing {info}: {item_name} -> {new_name}')
                                 item = new_item
                             else:
-                                self.log_info(f'Adding {info}: {new_name} (based on {item_name})')
+                                self.log_info(f'Adding {info}: {new_name}')
                                 export_list.append(new_item)
                                 id_mapping[item_id] = new_id
 
