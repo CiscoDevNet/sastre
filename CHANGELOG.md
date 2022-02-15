@@ -3,6 +3,8 @@ Sastre 1.17 [February 18, 2022]
 
 #### Enhancements:
 - New transform task, allowing renaming and copying of configuration items.
+- 20.5/20.6 vManage support, included support for the following API endpoints:
+  - Policy definitions: Advanced inspection profile, Security group, VPNQoSMap.
 
 #### Behavior changes:
 - The default TCP port used to connect to vManage is now 443, the default port for HTTPS. Originally it was 8443. TCP port can still be modified using the same options as before.
