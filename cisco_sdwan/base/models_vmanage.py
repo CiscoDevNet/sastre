@@ -246,7 +246,7 @@ class CliOrFeatureApiPath:
         return self.api_path_cli if is_cli_template else self.api_path_feature
 
 
-# Set of device types that use cedge template class. Updated as of vManage 20.6.1
+# Set of device types that use cedge template class. Updated as of vManage 20.7.1
 CEDGE_SET = {
     "vedge-CSR-1000v", "vedge-ISR-4331", "vedge-ISR-4431", "vedge-ISR-4461", "vedge-ISR-4451-X",
     "vedge-C8300-1N1S-4T2X", "vedge-IR-1101", "vedge-C8300-1N1S-6T", "vedge-ISRv", "vedge-ISR-4321", "vedge-ISR-4351",
@@ -270,9 +270,11 @@ CEDGE_SET = {
     "vedge-ISR1100X-4G-XE", "vedge-C1117-4PMWE", "vedge-IR-1821", "vedge-C1161-8PLTEP", "vedge-ISR1100-4GLTEGB-XE",
     "vedge-nfvis-C8200-UCPE", "vedge-C8000V", "vedge-C1117-4PW", "vedge-C8200-1N-4T", "vedge-C1112-8PLTEEA",
     "vedge-C1113-8P", "vedge-IR-1831", "vedge-C8200L-1N-4T", "vedge-nfvis-C8200-UCPEVM", "vedge-C8200L-1N-4T",
-    "vedge-nfvis-C8200-UCPEVM", "vedge-IR-8340"
+    "vedge-nfvis-C8200-UCPEVM", "vedge-IR-8340", "cellular-gateway-CG522MW-IO-GL", "vedge-IR-8140H", "vedge-C1131X-8PW",
+    "vedge-IR-8140H-P", "vedge-C1131-8PLTEPW", "vedge-C1131-8PW", "vedge-C1131X-8PLTEPW",
+    "cellular-gateway-CG522MW-IO-NA"
 }
-# Software devices. Updated as of vManage 20.6.1
+# Software devices. Updated as of vManage 20.7.1
 SOFT_EDGE_SET = {"vedge-CSR-1000v", "vedge-C8000V", "vedge-cloud", "vmanage", "vsmart"}
 
 
@@ -917,13 +919,14 @@ class PolicyDefRuleSetIndex(PolicyDefIndex):
 
 
 class AdvancedInspectionProfile(PolicyDef):
-    api_path = ApiPath('/template/policy/definition/advancedinspectionprofile')
+    api_path = ApiPath('template/policy/definition/advancedinspectionprofile')
     store_path = ('policy_definitions', 'AdvancedInspectionProfile')
 
 
-@register('policy_definition', 'advanced inspection profile policy definition', AdvancedInspectionProfile, min_version='20.6')
+@register('policy_definition', 'advanced inspection profile policy definition', AdvancedInspectionProfile,
+          min_version='20.6')
 class AdvancedInspectionProfileIndex(PolicyDefIndex):
-    api_path = ApiPath('/template/policy/definition/advancedinspectionprofile', None, None, None)
+    api_path = ApiPath('template/policy/definition/advancedinspectionprofile', None, None, None)
     store_file = 'policy_definitions_advancedinspectionprofile.json'
 
 
@@ -934,18 +937,18 @@ class VpnQosMap(PolicyDef):
 
 @register('policy_definition', 'vpn qos map policy definition', VpnQosMap, min_version='20.6')
 class VpnQosMapIndex(PolicyDefIndex):
-    api_path = ApiPath('/template/policy/definition/vpnqosmap', None, None, None)
+    api_path = ApiPath('template/policy/definition/vpnqosmap', None, None, None)
     store_file = 'policy_definitions_vpnqosmap.json'
 
 
 class SecurityGroup(PolicyDef):
-    api_path = ApiPath('/template/policy/definition/securitygroup')
+    api_path = ApiPath('template/policy/definition/securitygroup')
     store_path = ('policy_definitions', 'SecurityGroup')
 
 
 @register('policy_definition', 'security group policy definition', SecurityGroup, min_version='20.6')
 class SecurityGroupIndex(PolicyDefIndex):
-    api_path = ApiPath('/template/policy/definition/securitygroup', None, None, None)
+    api_path = ApiPath('template/policy/definition/securitygroup', None, None, None)
     store_file = 'policy_definitions_securitygroup.json'
 
 

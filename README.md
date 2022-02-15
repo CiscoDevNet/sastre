@@ -12,9 +12,8 @@ Some use-cases include:
 Please send your support questions to sastre-support@cisco.com.
 
 Note on vManage release support:
-- Sastre 1.16 has full support for vManage 20.4.x, and partial support for vManage 20.5.x. Please check CHANGELOG.md for details on specific 20.5 configuration elements that are supported.
-- Full 20.5 and 20.6 support is planned for Sastre 1.17.
-- Aside from supporting new configuration elements (associated with new features) added to the newer vManage releases, all other Sastre functionality has been validated to work with 20.6.x.
+- Sastre 1.17 supports up to vManage 20.6. However, specific support for resource groups and multi-cloud features will come in a future release.  
+- Aside from supporting new configuration elements (associated with new features) added to the newer vManage releases, all other Sastre functionality has been validated to work with 20.7.x.
 
 ## Sastre and Sastre-Pro
 
