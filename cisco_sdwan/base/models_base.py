@@ -10,8 +10,9 @@ from os import environ
 from pathlib import Path
 from itertools import zip_longest
 from collections import namedtuple
-from typing import Sequence, Tuple, Union, Iterator, Callable, Mapping, Any, Optional
+from typing import Sequence, Tuple, Union, Iterator, Callable, Mapping, Any, Optional, Dict
 from operator import attrgetter
+from datetime import datetime, timezone
 from requests.exceptions import Timeout
 from .rest_api import RestAPIException, Rest
 
@@ -307,6 +308,82 @@ class BulkStateItem(OperationalItem):
             if next_page is None:
                 break
             payload = api.get(cls.api_path.get, startId=next_page, count=obj.page_item_count)
+            obj.add_payload(payload)
+
+        return obj
+
+
+def entry_time_parse(timestamp: str) -> datetime:
+    return datetime.fromtimestamp(float(timestamp) / 1000, tz=timezone.utc)
+
+
+class RecordItem(OperationalItem):
+    # Datetime string format used in log item queries
+    TIME_FORMAT = "%Y-%m-%dT%H:%M:%S %Z"
+    QUERY_SIZE_MAX = 10000
+
+    def __init__(self, payload: Mapping[str, Any]) -> None:
+        super().__init__(payload)
+        self._page_info = payload['pageInfo']
+
+    @staticmethod
+    def query(start_time: datetime, end_time: datetime, size: int) -> Dict[str, Any]:
+        """
+        @param start_time: Starting date time for the query, i.e. oldest.
+        @param end_time: End date time for the query, i.e. newest.
+        @param size: Number of records to return. Positive integer.
+        @return: Query payload used to retrieve log items
+        """
+        return {
+            "size": RecordItem.QUERY_SIZE_MAX if size > RecordItem.QUERY_SIZE_MAX else size,
+            "query": {
+                "condition": "AND",
+                "rules": [
+                    {
+                        "field": "entry_time",
+                        "type": "date",
+                        "value": [
+                            start_time.strftime(RecordItem.TIME_FORMAT),
+                            end_time.strftime(RecordItem.TIME_FORMAT)
+                        ],
+                        "operator": "between"
+                    }
+                ]
+            },
+            "sort": [
+                {
+                    "field": "entry_time",
+                    "type": "date",
+                    "order": "desc"
+                }
+            ]
+        }
+
+    @property
+    def next_page(self) -> Union[datetime, None]:
+        if 'endTime' not in self._page_info or self.page_item_count < RecordItem.QUERY_SIZE_MAX:
+            return None
+
+        # endTime is provided as string in timestamp format
+        return entry_time_parse(self._page_info['endTime'])
+
+    def add_payload(self, payload: Mapping[str, Any]) -> None:
+        self._data.extend(payload['data'])
+        self._page_info = payload['pageInfo']
+
+    @property
+    def page_item_count(self) -> int:
+        return self._page_info['count']
+
+    @classmethod
+    def get_raise(cls, api: Rest, *, start_time: datetime = None, end_time: datetime = None, max_records: int = 0):
+        obj = cls(api.post(cls.query(start_time, end_time, max_records), cls.api_path.post))
+        while True:
+            next_page = obj.next_page
+            if next_page is None:
+                break
+
+            payload = api.post(cls.query(start_time, next_page, max_records - len(obj._data)), cls.api_path.post)
             obj.add_payload(payload)
 
         return obj
@@ -744,6 +821,7 @@ class ExtendedTemplate:
         @param name: Current item name
         @return: New name from item name using the name_regex
         """
+
         def regex_replace(match_obj):
             regex = match_obj.group('regex')
             if regex is not None:
