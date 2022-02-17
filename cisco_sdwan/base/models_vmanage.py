@@ -10,8 +10,8 @@ from collections import namedtuple
 from urllib.parse import quote_plus
 from .rest_api import Rest, RestAPIException
 from .catalog import register, op_register
-from .models_base import (ApiItem, IndexApiItem, ConfigItem, IndexConfigItem, RealtimeItem, BulkStatsItem,
-                          BulkStateItem, ApiPath, IdName)
+from .models_base import (ApiItem, IndexApiItem, ConfigItem, IndexConfigItem, RecordItem, RealtimeItem, BulkStatsItem,
+                          BulkStateItem, ApiPath, IdName, entry_time_parse)
 
 
 #
@@ -1462,6 +1462,32 @@ class EdgeCertificate(IndexConfigItem):
             }
             for uuid, status, hostname, chassis, serial, state in self.extended_iter() if uuid in new_status_dict
         ]
+
+
+#
+# Log items
+#
+def datetime_format(timestamp: Optional[str]) -> str:
+    return entry_time_parse(timestamp).strftime("%Y-%m-%d %H:%M:%S %Z") if timestamp is not None else ''
+
+
+class Alarm(RecordItem):
+    api_path = ApiPath(None, 'alarms', None, None)
+    fields_std = ('entry_time', 'devices', 'severity', 'type', 'message', 'active')
+    fields_ext = ('acknowledged', 'uuid', 'cleared_time')
+    field_conversion_fns = {
+        'entry_time': datetime_format,
+        'cleared_time': datetime_format
+    }
+
+
+class Event(RecordItem):
+    api_path = ApiPath(None, 'event', None, None)
+    fields_std = ('entry_time', 'host_name', 'severity_level', 'eventname')
+    fields_ext = ('details',)
+    field_conversion_fns = {
+        'entry_time': datetime_format
+    }
 
 
 #

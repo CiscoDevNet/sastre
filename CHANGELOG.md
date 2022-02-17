@@ -3,6 +3,7 @@ Sastre 1.17 [February 18, 2022]
 
 #### Enhancements:
 - New transform task, allowing renaming and copying of configuration items.
+- New show alarms and show events tasks, allowing retrieval of vManage alarms and events.
 - 20.5/20.6 vManage support, included support for the following API endpoints:
   - Policy definitions: Advanced inspection profile, Security group, VPNQoSMap.
 

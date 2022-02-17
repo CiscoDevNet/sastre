@@ -52,7 +52,7 @@ Task indicates the operation to be performed. The following tasks are currently 
 - List (Sastre-Pro): List configuration items or device certificate information from vManage or a local backup.
 - Show-template (Sastre-Pro): Show details about device templates on vManage or from a local backup.
 - Report (Sastre-Pro): Generate a customizable report file containing the output of multiple commands. Also provide option to generate a diff between reports.
-- Show (Sastre-Pro): Run vManage real-time, state or statistics commands; collecting data from one or more devices.
+- Show (Sastre-Pro): Run vManage real-time, state or statistics commands; collecting data from one or more devices. Query vManage alarms and events.
 
 Task-specific parameters are provided after the task argument, customizing the task behavior. For instance, whether to execute a restore task in dry-run mode or the destination directory for a backup task. 
 
@@ -639,9 +639,9 @@ Selecting devices to include in the attach task:
 
 ### Verifying device operational data
 
-The show task provides commands to display operational data from devices. 
+The show task provides commands to display operational data from devices, and vManage alarms and events.
 
-They all share the same set of options to filter devices to display:
+Show devices, realtime, state and statistics share the same set of options to filter devices to display:
   - --regex <regex> - Regular expression matching device name, type or model to display
   - --not-regex <regex> - Regular expression matching device name, type or model NOT to display.
   - --reachable - Display only reachable devices
@@ -747,6 +747,27 @@ Verifying app-route data from 4 days ago:
     | pEdge4-ISR4331-2 | 100.1.140.2     | 100.1.150.1      | mpls         | mpls         | 133   | 0    | 30      | 3      | 100.1.140.2:mpls-100.1.150.1:mpls                 |
     | pEdge4-ISR4331-2 | 100.1.140.2     | 100.1.150.2      | mpls         | mpls         | 133   | 0    | 30      | 3      | 100.1.140.2:mpls-100.1.150.2:mpls                 |
     +------------------+-----------------+------------------+--------------+--------------+-------+------+---------+--------+---------------------------------------------------+
+    INFO: Task completed successfully
+
+Checking vManage alarms:
+
+    % sdwan --verbose show alarms --days 1
+    INFO: Show alarms task: vManage URL: "https://198.18.1.10"
+    INFO: Records query: 2022-02-16 18:05:20 UTC -> 2022-02-17 19:05:20 UTC
+    +================================================================================================================================================================+
+    | Date & Time             | Devices    | Severity | Type                      | Message                                                                 | Active |
+    +================================================================================================================================================================+
+    | 2022-02-17 19:02:49 UTC | BR1-CEDGE1 | Critical | utd-ips-alert             | APP-DETECT DNS request for Dynamic Internet Technology domain dfgvx.com | True   |
+    | 2022-02-17 19:02:34 UTC | BR1-CEDGE1 | Critical | utd-ips-alert             | APP-DETECT DNS request for Dynamic Internet Technology domain dfgvx.com | True   |
+    | 2022-02-17 19:02:19 UTC | BR1-CEDGE1 | Critical | utd-ips-alert             | APP-DETECT DNS request for Dynamic Internet Technology domain dfgvx.com | True   |
+    | 2022-02-17 19:00:33 UTC | BR1-CEDGE1 | Critical | utd-file-reputation-alert | UTD file reputation alert                                               | True   |
+    | 2022-02-17 19:00:07 UTC | vManage    | Minor    | cpu-usage                 | System CPU usage is back to normal level (below 60%)                    | False  |
+    | 2022-02-17 19:00:03 UTC | BR1-CEDGE1 | Critical | utd-file-reputation-alert | UTD file reputation alert                                               | True   |
+    | 2022-02-17 19:00:03 UTC | BR1-CEDGE1 | Critical | utd-file-reputation-alert | UTD file reputation alert                                               | True   |
+    | 2022-02-17 19:00:03 UTC | vManage    | Medium   | cpu-usage                 | System CPU usage is above 60%                                           | False  |
+    | 2022-02-17 18:50:08 UTC | vManage    | Minor    | cpu-usage                 | System CPU usage is back to normal level (below 60%)                    | False  |
+    | 2022-02-17 18:50:03 UTC | vManage    | Medium   | cpu-usage                 | System CPU usage is above 60%                                           | False  |
+    +-------------------------+------------+----------+---------------------------+-------------------------------------------------------------------------+--------+
     INFO: Task completed successfully
 
 ### Renaming configuration items
