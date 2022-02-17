@@ -98,6 +98,12 @@ class Processor:
         if config_obj.id_tag and config_obj.id_tag in new_payload:
             new_payload[config_obj.id_tag] = new_id
 
+        # Reset attributes that would make this item read-Only
+        for ro_tag in (config_obj.factory_default_tag, config_obj.readonly_tag):
+            if new_payload.get(ro_tag, False):
+                new_payload[ro_tag] = False
+                trace_log.append(f'Resetting "{ro_tag}" flag to "False"')
+
         return new_payload, trace_log
 
     @property
@@ -371,7 +377,7 @@ class TaskTransform(Task):
     def processor_eval(self, p: Processor, config_obj: ConfigItem, new_name: str, new_id: str) -> dict:
         new_payload, trace_log = p.eval(config_obj, new_name, new_id)
         for trace in trace_log:
-            self.log_debug(f'Processor {p.name}: {trace}')
+            self.log_debug(f'Processor {p.name}, {new_name}: {trace}')
 
         return new_payload
 
