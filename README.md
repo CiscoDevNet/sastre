@@ -5,14 +5,14 @@
 Sastre provides functions to assist with managing configuration elements and visualize information from Cisco SD-WAN deployments. 
 
 Some use-cases include:
-- Transfer configuration from one vManage to another. E.g. Lab/POC to production, on-prem to cloud, etc.
+- Transfer configuration from one vManage to another. Lab or proof-of-concept environment to production, on-prem to cloud environments as examples.
 - Backup, restore and delete configuration items. Tags and regular expressions can be used to select all or a subset of items.
-- Visualize state across multiple devices. For instance, display status of control connections from multiple devices in a single table.
+- Visualize operational data across multiple devices. For instance, display status of control connections from multiple devices in a single table.
 
-Please send your support questions to sastre-support@cisco.com.
+Support enquires can be sent to sastre-support@cisco.com.
 
 Note on vManage release support:
-- Sastre 1.17 supports up to vManage 20.6. However, specific support for resource groups and multi-cloud features will come in a future release.  
+- Sastre 1.18 supports up to vManage 20.6. However, specific support for resource groups and multi-cloud features will come in a future release.  
 - Aside from supporting new configuration elements (associated with new features) added to the newer vManage releases, all other Sastre functionality has been validated to work with 20.7.x.
 
 ## Sastre and Sastre-Pro
@@ -26,7 +26,7 @@ Both flavors follow the same release numbering. For instance, if support for cer
 The command "sdwan --version" will indicate the flavor that is installed.
 
     % sdwan --version
-    Sastre-Pro Version 1.17. Catalog: 73 configuration items, 31 operational items.
+    Sastre-Pro Version 1.18. Catalog: 76 configuration items, 31 operational items.
 
 Tasks only available on Sastre-Pro are labeled as such in the [Introduction](#introduction) section below.
 
@@ -72,7 +72,7 @@ Notes:
       <task>                task to be performed (backup, restore, delete, migrate, attach, detach, certificate, transform, list, show-template, show, report)
       <arguments>           task parameters, if any
     
-    optional arguments:
+    options:
       -h, --help            show this help message and exit
       -a <vmanage-ip>, --address <vmanage-ip>
                             vManage IP address, can also be defined via VMANAGE_IP environment variable. If neither is provided user is prompted for the address.
@@ -115,25 +115,39 @@ Task-specific parameters and options are defined after the task is provided. Eac
     Backup task:
     
     positional arguments:
-      <tag>                 one or more tags for selecting items to be backed up. Multiple tags should be separated by space. Available tags: all, policy_customapp, policy_definition, policy_list, policy_profile, policy_security, policy_vedge, policy_voice, policy_vsmart,
-                            template_device, template_feature. Special tag "all" selects all items, including WAN edge certificates and device configurations.
+      <tag>                 one or more tags for selecting items to be backed up. Multiple tags should be separated by space. Available tags: all, policy_customapp, policy_definition, policy_list,
+                            policy_security, policy_vedge, policy_voice, policy_vsmart, template_device, template_feature. Special tag "all" selects all items, including WAN edge certificates and
+                            device configurations.
     
-    optional arguments:
+    options:
       -h, --help            show this help message and exit
       --workdir <directory>
-                            backup destination (default: backup_198.18.1.10_20210927)
+                            backup destination (default: backup_198.18.1.10_20220325)
       --no-rollover         by default, if workdir already exists (before a new backup is saved) the old workdir is renamed using a rolling naming scheme. This option disables this automatic rollover.
       --save-running        include the running config from each node to the backup. This is useful for reference or documentation purposes. It is not needed by the restore task.
       --regex <regex>       regular expression matching item names to backup, within selected tags.
       --not-regex <regex>   regular expression matching item names NOT to backup, within selected tags.
 
-Tasks that provide table output, such as show-template, list or show; have options to export the generated tables as CSV or JSON files via --save-csv and --save-json options. 
-
-
 #### Important concepts:
 - vManage URL: Constructed from the provided vManage IP address and TCP port (default 443). All operations target this vManage.
 - Workdir: Defines the location (in the local machine) where vManage data files are located. By default, it follows the format "backup_\<vmanage-ip\>_\<yyyymmdd\>". The --workdir parameter can be used to specify a different location.  Workdir is under a 'data' directory. This 'data' directory is relative to the directory where Sastre is run.
 - Tag: vManage configuration items are grouped by tags, such as policy_apply, policy_definition, policy_list, template_device, etc. The special tag 'all' is used to refer to all configuration elements. Depending on the task, one or more tags can be specified in order to select groups of configuration elements.
+
+#### Common behavior of "table" tasks:
+
+A number of Sastre tasks provide output in the form of one or more tables. For instance, list, show-template and show tasks. There is a common set of options shared by all such tasks:
+
+**Table export options:**
+- --save-csv: Export as CSV file(s).
+- --save-json: Export as JSON file(s).
+
+**Table filtering options:**
+- --include: Include rows matching the provided regular expression, exclude all other rows.
+- --exclude: Exclude rows matching the provided regular expression.
+
+Include/exclude regular expressions match on any cell value of the particular row. In other words, any cell value matching the regular expression will cause a row match.
+
+Both --include and --exclude can be provided at simultaneously. In this case, exclude match is performed first then include.
 
 ## Getting Started
 
@@ -314,7 +328,7 @@ Example:
 
 Dry-run, just list without deleting items matching the specified tag and regular expression:
 
-    % sdwan --verbose delete all --regex "^DC" --dryrun
+    % sdwan --verbose delete all --regex '^DC' --dryrun
     INFO: Starting delete, DRY-RUN mode: vManage URL: "https://10.85.136.253"
     INFO: Inspecting template_device items
     INFO: DRY-RUN: Delete device template DC_BASIC
@@ -329,7 +343,7 @@ Dry-run, just list without deleting items matching the specified tag and regular
 
 Deleting items:
 
-    % sdwan --verbose delete all --regex "^DC"
+    % sdwan --verbose delete all --regex '^DC'
     INFO: Starting delete: vManage URL: "https://10.85.136.253"
     INFO: Inspecting template_device items
     INFO: Done: Delete device template DC_BASIC
@@ -388,22 +402,29 @@ List device templates and feature templates from target vManage:
  
 List all items from target vManage with name starting with 'DC':
  
-    % sdwan --verbose list configuration all --regex "^DC"
-    INFO: Starting list configuration: vManage URL: "https://198.18.1.10"
-    INFO: List criteria matched 2 items
-    +========================================================================================+
-    | Name        | ID                                   | Tag             | Type            |
-    +========================================================================================+
-    | DC_BASIC    | 2ba8c66a-eadd-4a63-97c9-50d58a43b6b5 | template_device | device template |
-    | DC_ADVANCED | b042ed29-3875-4118-b800-a0b00542b58e | template_device | device template |
-    +-------------+--------------------------------------+-----------------+-----------------+
+    % sdwan --verbose list configuration all --include '^DC'                                  
+    INFO: List configuration task: vManage URL: "https://198.18.1.10"
+    INFO: Selection matched 9 items
+    +============================================================================================================+
+    | Name                         | ID                                   | Tag              | Type              |
+    +============================================================================================================+
+    | DC-vEdges                    | 87f79b8f-c295-4ba9-8279-a7866055281b | template_device  | device template   |
+    | DC-VPN-0                     | c684bdcd-8397-4e93-b185-0474afc6a711 | template_feature | feature template  |
+    | DC-VPN10                     | 9c0011b9-b2eb-48ba-a262-bf6a64bcba4d | template_feature | feature template  |
+    | DC-VPN20                     | d8bcbe02-21db-4297-856d-03ec8de53b44 | template_feature | feature template  |
+    | DC1-VPN10-Interface-Template | 72b0a69a-6ce7-445d-871e-39fb7122115b | template_feature | feature template  |
+    | DC1-VPN20-Interface-Template | ea3e73e3-2b31-498d-8663-b0a1240e9a3c | template_feature | feature template  |
+    | DC1                          | 8aefe416-4f02-40bc-a141-57fb605efe72 | policy_list      | site list         |
+    | DC-TLOCS                     | cc13e69d-3f3a-4af0-ad28-70915d297acc | policy_list      | TLOC list         |
+    | DCLOUD                       | bb90f933-37d2-4639-812b-e2fb73bbb95e | policy_list      | local-domain list |
+    +------------------------------+--------------------------------------+------------------+-------------------+
     INFO: Task completed successfully
 
 List all items from backup directory with name starting with 'DC':
 
-    % sdwan --verbose list configuration all --regex "^DC" --workdir backup_10.85.136.253_20191206
+    % sdwan --verbose list configuration all --include '^DC' --workdir backup_10.85.136.253_20191206
     INFO: Starting list configuration: Local workdir: "backup_10.85.136.253_20191206"
-    INFO: List criteria matched 2 items
+    INFO: Selection matched 2 items
     +========================================================================================+
     | Name        | ID                                   | Tag             | Type            |
     +========================================================================================+
@@ -415,60 +436,87 @@ List all items from backup directory with name starting with 'DC':
 List also allows displaying device certificate information.
 
     % sdwan --verbose list certificate                     
-    INFO: Starting list certificates: vManage URL: "https://198.18.1.10"
-    INFO: List criteria matched 5 items
+    INFO: List certificate task: vManage URL: "https://198.18.1.10"
+    INFO: Selection matched 5 items
     +================================================================================================================================+
     | Hostname   | Chassis                                  | Serial                           | State                      | Status |
     +================================================================================================================================+
-    | DC1-VEDGE1 | ebdc8bd9-17e5-4eb3-a5e0-f438403a83de     | ee08f743                         | certificate installed      | valid  |
     | -          | 52c7911f-c5b0-45df-b826-3155809a2a1a     | 24801375888299141d620fbdb02de2d4 | bootstrap config generated | valid  |
-    | DC1-VEDGE2 | f21dbb35-30b3-47f4-93bb-d2b2fe092d35     | b02445f6                         | certificate installed      | valid  |
-    | BR1-CEDGE2 | CSR-04ed104b-86bb-4cb3-bd2b-a0d0991f6872 | AAC6C8F0                         | certificate installed      | valid  |
     | BR1-CEDGE1 | CSR-940ad679-a16a-48ea-9920-16278597d98e | 487D703A                         | certificate installed      | valid  |
+    | BR1-CEDGE2 | CSR-04ed104b-86bb-4cb3-bd2b-a0d0991f6872 | AAC6C8F0                         | certificate installed      | valid  |
+    | DC1-VEDGE1 | ebdc8bd9-17e5-4eb3-a5e0-f438403a83de     | ee08f743                         | certificate installed      | valid  |
+    | DC1-VEDGE2 | f21dbb35-30b3-47f4-93bb-d2b2fe092d35     | b02445f6                         | certificate installed      | valid  |
     +------------+------------------------------------------+----------------------------------+----------------------------+--------+
     INFO: Task completed successfully
 
 
-Similar to the list task, show-template tasks can be used to display items from a target vManage, or a backup. With show-template values, additional details about the selected items are displayed. A regular expression can be used to select which device templates to inspect. If the inspected templates have devices attached their values are displayed.
+Similar to the list task, show-template tasks can be used to display items from a target vManage or backup. With show-template values, additional details about the selected items are displayed. A regular expression can be used to select which device templates to inspect. If the inspected templates have devices attached their values are displayed.
 
-    % sdwan show-template values --regex DC_BASIC
-    *** Template DC_BASIC, device vedge-dc1 ***
-    +===============================================================================================================================================+
-    | Name                              | Value                                | Variable                                                           |
-    +===============================================================================================================================================+
-    | Status                            | complete                             | csv-status                                                         |
-    | Chassis Number                    | b693be59-c03f-62d0-f9a4-2675374536b8 | csv-deviceId                                                       |
-    | System IP                         | 10.255.101.1                         | csv-deviceIP                                                       |
-    | Hostname                          | vedge-dc1                            | csv-host-name                                                      |
-    | Hostname(system_host_name)        | vedge-dc1                            | //system/host-name                                                 |
-    | System IP(system_system_ip)       | 10.255.101.1                         | //system/system-ip                                                 |
-    | Site ID(system_site_id)           | 101                                  | //system/site-id                                                   |
-    | IPv4 Address(vpn_if_ipv4_address) | 10.101.1.4/24                        | /10/ge0/2/interface/ip/address                                     |
-    | IPv4 Address(vpn_if_ipv4_address) | 5.254.4.110/24                       | /20/ge0/3/interface/ip/address                                     |
-    | AS Number(bgp_as_num)             | 65001                                | /20//router/bgp/as-num                                             |
-    | Address(bgp_neighbor_address)     | 5.254.4.1                            | /20//router/bgp/neighbor/bgp_neighbor_address/address              |
-    | Remote AS(bgp_neighbor_remote_as) | 65111                                | /20//router/bgp/neighbor/bgp_neighbor_address/remote-as            |
-    | Preference(transport1_preference) | 100                                  | /0/ge0/0/interface/tunnel-interface/encapsulation/ipsec/preference |
-    +-----------------------------------+--------------------------------------+--------------------------------------------------------------------+
-
-    *** Template DC_BASIC, device vedge-dc2 ***
-    +===============================================================================================================================================+
-    | Name                              | Value                                | Variable                                                           |
-    +===============================================================================================================================================+
-    | Status                            | complete                             | csv-status                                                         |
-    | Chassis Number                    | 0dd49ace-f6de-ce86-5d73-ca74d6db1747 | csv-deviceId                                                       |
-    | System IP                         | 10.255.102.1                         | csv-deviceIP                                                       |
-    | Hostname                          | vedge-dc2                            | csv-host-name                                                      |
-    | Hostname(system_host_name)        | vedge-dc2                            | //system/host-name                                                 |
-    | System IP(system_system_ip)       | 10.255.102.1                         | //system/system-ip                                                 |
-    | Site ID(system_site_id)           | 102                                  | //system/site-id                                                   |
-    | IPv4 Address(vpn_if_ipv4_address) | 10.102.1.3/24                        | /10/ge0/2/interface/ip/address                                     |
-    | IPv4 Address(vpn_if_ipv4_address) | 5.254.5.105/24                       | /20/ge0/3/interface/ip/address                                     |
-    | AS Number(bgp_as_num)             | 65002                                | /20//router/bgp/as-num                                             |
-    | Address(bgp_neighbor_address)     | 5.254.5.1                            | /20//router/bgp/neighbor/bgp_neighbor_address/address              |
-    | Remote AS(bgp_neighbor_remote_as) | 65222                                | /20//router/bgp/neighbor/bgp_neighbor_address/remote-as            |
-    | Preference(transport1_preference) | 0                                    | /0/ge0/0/interface/tunnel-interface/encapsulation/ipsec/preference |
-    +-----------------------------------+--------------------------------------+--------------------------------------------------------------------+
+    % sdwan --verbose show-template values --templates '^DC'
+    INFO: Show-template values task: vManage URL: "https://198.18.1.10"
+    INFO: Inspecting device template DC-vEdges values
+    *** Template DC-vEdges, device DC1-VEDGE1 ***
+    +====================================================================================================================================================+
+    | Name                                 | Value                                | Variable                                                             |
+    +====================================================================================================================================================+
+    | Latitude(system_latitude)            | 37.33                                | //system/gps-location/latitude                                       |
+    | Longitude(system_longitude)          | -121.88                              | //system/gps-location/longitude                                      |
+    | Hostname(system_host_name)           | DC1-VEDGE1                           | //system/host-name                                                   |
+    | Site ID(system_site_id)              | 100                                  | //system/site-id                                                     |
+    | System IP(system_system_ip)          | 10.1.0.1                             | //system/system-ip                                                   |
+    | IPv4 Address(MPLS-Interface-IP)      | 100.64.0.2/30                        | /0/ge0/1/interface/ip/address                                        |
+    | IPv4 Address(InternetTLOCIP)         | 100.64.2.26/30                       | /0/ge0/2/interface/ip/address                                        |
+    | Address(Internet-GW)                 | 100.64.2.25                          | /0/vpn-instance/ip/route/0.0.0.0/0/next-hop/Internet-GW/address      |
+    | Address(MPLS-GW)                     | 100.64.0.1                           | /0/vpn-instance/ip/route/0.0.0.0/0/next-hop/MPLS-GW/address          |
+    | Router ID(ospf_router_id)            | 10.1.0.1                             | /10//router/ospf/router-id                                           |
+    | IPv4 Address(VPN10-Interface-IP)     | 10.1.10.150/24                       | /10/ge0/0/interface/ip/address                                       |
+    | Address(VPN10_DEF_GW_DC)             | 10.1.10.1                            | /10/vpn-instance/ip/route/0.0.0.0/0/next-hop/VPN10_DEF_GW_DC/address |
+    | IPv4 address(fw_svc_ip)              | 10.1.10.200                          | /10/vpn-instance/service/FW/address                                  |
+    | Interface Name(OSPF_VPN20_IF)        | ge0/3                                | /20//router/ospf/area/0/interface/OSPF_VPN20_IF/name                 |
+    | Router ID(ospf_router_id)            | 10.1.0.1                             | /20//router/ospf/router-id                                           |
+    | Address(VPN20_DEF_GW_DC)             | 10.1.20.1                            | /20/vpn-instance/ip/route/0.0.0.0/0/next-hop/VPN20_DEF_GW_DC/address |
+    | Interface Name(vpn20-interface-name) | ge0/3                                | /20/vpn20-interface-name/interface/if-name                           |
+    | IPv4 Address(VPN20-IP-Address)       | 10.1.20.150/24                       | /20/vpn20-interface-name/interface/ip/address                        |
+    | Interface Name(VPN512_INTERFACE)     | eth0                                 | /512/VPN512_INTERFACE/interface/if-name                              |
+    | IPv4 Address(VPN512_IP_ADDR)         | 198.18.3.100/24                      | /512/VPN512_INTERFACE/interface/ip/address                           |
+    | Address(VPN512_GW)                   | 198.18.3.1                           | /512/vpn-instance/ip/route/0.0.0.0/0/next-hop/VPN512_GW/address      |
+    | System IP                            | 10.1.0.1                             | csv-deviceIP                                                         |
+    | Chassis Number                       | ebdc8bd9-17e5-4eb3-a5e0-f438403a83de | csv-deviceId                                                         |
+    | Hostname                             | DC1-VEDGE1                           | csv-host-name                                                        |
+    | Status                               | complete                             | csv-status                                                           |
+    +--------------------------------------+--------------------------------------+----------------------------------------------------------------------+
+    
+    *** Template DC-vEdges, device DC1-VEDGE2 ***
+    +====================================================================================================================================================+
+    | Name                                 | Value                                | Variable                                                             |
+    +====================================================================================================================================================+
+    | Latitude(system_latitude)            | 37.33                                | //system/gps-location/latitude                                       |
+    | Longitude(system_longitude)          | -121.88                              | //system/gps-location/longitude                                      |
+    | Hostname(system_host_name)           | DC1-VEDGE2                           | //system/host-name                                                   |
+    | Site ID(system_site_id)              | 100                                  | //system/site-id                                                     |
+    | System IP(system_system_ip)          | 10.1.0.2                             | //system/system-ip                                                   |
+    | IPv4 Address(MPLS-Interface-IP)      | 100.64.0.6/30                        | /0/ge0/1/interface/ip/address                                        |
+    | IPv4 Address(InternetTLOCIP)         | 100.64.2.30/30                       | /0/ge0/2/interface/ip/address                                        |
+    | Address(Internet-GW)                 | 100.64.2.29                          | /0/vpn-instance/ip/route/0.0.0.0/0/next-hop/Internet-GW/address      |
+    | Address(MPLS-GW)                     | 100.64.0.5                           | /0/vpn-instance/ip/route/0.0.0.0/0/next-hop/MPLS-GW/address          |
+    | Router ID(ospf_router_id)            | 10.1.0.2                             | /10//router/ospf/router-id                                           |
+    | IPv4 Address(VPN10-Interface-IP)     | 10.1.10.250/24                       | /10/ge0/0/interface/ip/address                                       |
+    | Address(VPN10_DEF_GW_DC)             | 10.1.10.1                            | /10/vpn-instance/ip/route/0.0.0.0/0/next-hop/VPN10_DEF_GW_DC/address |
+    | IPv4 address(fw_svc_ip)              | 10.1.10.200                          | /10/vpn-instance/service/FW/address                                  |
+    | Interface Name(OSPF_VPN20_IF)        | ge0/3                                | /20//router/ospf/area/0/interface/OSPF_VPN20_IF/name                 |
+    | Router ID(ospf_router_id)            | 10.1.0.2                             | /20//router/ospf/router-id                                           |
+    | Address(VPN20_DEF_GW_DC)             | 10.1.20.1                            | /20/vpn-instance/ip/route/0.0.0.0/0/next-hop/VPN20_DEF_GW_DC/address |
+    | Interface Name(vpn20-interface-name) | ge0/3                                | /20/vpn20-interface-name/interface/if-name                           |
+    | IPv4 Address(VPN20-IP-Address)       | 10.1.20.250/24                       | /20/vpn20-interface-name/interface/ip/address                        |
+    | Interface Name(VPN512_INTERFACE)     | eth0                                 | /512/VPN512_INTERFACE/interface/if-name                              |
+    | IPv4 Address(VPN512_IP_ADDR)         | 198.18.3.101/24                      | /512/VPN512_INTERFACE/interface/ip/address                           |
+    | Address(VPN512_GW)                   | 198.18.3.1                           | /512/vpn-instance/ip/route/0.0.0.0/0/next-hop/VPN512_GW/address      |
+    | System IP                            | 10.1.0.2                             | csv-deviceIP                                                         |
+    | Chassis Number                       | f21dbb35-30b3-47f4-93bb-d2b2fe092d35 | csv-deviceId                                                         |
+    | Hostname                             | DC1-VEDGE2                           | csv-host-name                                                        |
+    | Status                               | complete                             | csv-status                                                           |
+    +--------------------------------------+--------------------------------------+----------------------------------------------------------------------+
+    INFO: Task completed successfully
 
 ### Modifying device certificate validity status:
 
@@ -586,7 +634,7 @@ Regex-based customization of migrated template names:
 
 Example:
 
-    % sdwan --verbose migrate all sastre_cx_golden_repo_201 --workdir sastre_cx_golden_repo --name "{name (G_.+)_184_.+}{name (G_VPN.+)}_201{name G.+_184(_.+)}" 
+    % sdwan --verbose migrate all sastre_cx_golden_repo_201 --workdir sastre_cx_golden_repo --name '{name (G_.+)_184_.+}{name (G_VPN.+)}_201{name G.+_184(_.+)}'
     INFO: Starting migrate: Local workdir: "sastre_cx_golden_repo" 18.4 -> 20.1 Local output dir: "sastre_cx_golden_repo_201"
     INFO: Loaded template migration recipes
     INFO: Inspecting policy_list items
@@ -626,7 +674,7 @@ Using dry-run mode to validate what templates and devices would be included with
 
 Selecting devices to include in the attach task:
 
-    % sdwan --verbose attach edge --workdir dcloud_base --templates "DC" --devices "VEDGE2"         
+    % sdwan --verbose attach edge --workdir dcloud_base --templates 'DC' --devices 'VEDGE2'       
     INFO: Starting attach templates: Local workdir: "dcloud_base" -> vManage URL: "https://198.18.1.10"
     INFO: Template attach: DC-vEdges (DC1-VEDGE2)
     INFO: Attaching WAN Edges
@@ -650,7 +698,7 @@ Show devices, realtime, state and statistics share the same set of options to fi
 
 Verifying inventory of devices that are reachable and name starting with "pEdge3" or "pEdge4":
 
-    % sdwan show devices --reachable --regex "pEdge[3-4]"
+    % sdwan show devices --reachable --regex 'pEdge[3-4]'
     +==================================================================================+
     | Name             | System IP   | Site ID | Reachability | Type  | Model          |
     +==================================================================================+
@@ -660,7 +708,7 @@ Verifying inventory of devices that are reachable and name starting with "pEdge3
 
 Listing the advertised routes from those two devices:
 
-    % sdwan show realtime omp adv-routes --reachable --regex "pEdge[3-4]"
+    % sdwan show realtime omp adv-routes --reachable --regex 'pEdge[3-4]'
     *** OMP advertised routes ***
     +=====================================================================================================================================+
     | Device           | VPN ID | Prefix           | To Peer     | Tloc color   | Tloc IP     | Protocol        | Metric | OMP Preference |
@@ -678,7 +726,7 @@ Listing the advertised routes from those two devices:
 
 Checking control connections and local-properties:
 
-    % sdwan show state control --reachable --regex "pEdge[3-4]"
+    % sdwan show state control --reachable --regex 'pEdge[3-4]'
     *** Control connections ***
     +===============================================================================================+
     | Device           | Peer System IP | Site ID | Peer Type | Local Color  | Remote Color | State |
@@ -707,7 +755,7 @@ Checking control connections and local-properties:
 
 Verifying app-route data:
 
-    % sdwan show statistics app-route --reachable --regex "pEdge[3-4]"
+    % sdwan show statistics app-route --reachable --regex 'pEdge[3-4]'
     *** Application-aware route statistics ***
     +===========================================================================================================================================================================+
     | Device           | Local System Ip | Remote System Ip | Local Color  | Remote Color | Total | Loss | Latency | Jitter | Name                                              |
@@ -727,7 +775,7 @@ Verifying app-route data:
 
 Verifying app-route data from 4 days ago:
 
-    % sdwan --verbose show statistics app-route --days 4 --reachable --regex "pEdge[3-4]" 
+    % sdwan --verbose show statistics app-route --days 4 --reachable --regex 'pEdge[3-4]' 
     INFO: Starting show statistics: vManage URL: "https://10.122.41.140"
     INFO: Query timestamp: 2021-04-26 15:36:12 UTC
     INFO: Retrieving application-aware route statistics from 2 devices
@@ -801,14 +849,14 @@ Renaming a feature-template using name template via transform rename:
 - Rename Logging_Template_cEdge to Logging_Template_v01
 
 
-    % sdwan list config template_feature --regex ^Logging
+    % sdwan list config template_feature --include '^Logging'
     +=====================================================================================================+
     | Name                   | ID                                   | Tag              | Type             |
     +=====================================================================================================+
-    | Logging_Template_cEdge | 6de63643-ee0c-4f4c-b32a-4d80d3b804e8 | template_feature | feature template |
+    | Logging_Template_cEdge | 1613ce4c-d098-4a24-8192-ef77d27dd0c4 | template_feature | feature template |
     +------------------------+--------------------------------------+------------------+------------------+
 
-    % sdwan --verbose transform rename template_feature --regex "^Logging" "{name (Logging_Template)_cEdge}_v01" cleaned_configs
+    % sdwan --verbose transform rename template_feature --regex '^Logging' '{name (Logging_Template)_cEdge}_v01' cleaned_configs
     INFO: Transform task: vManage URL: "https://198.18.1.10" -> Local output dir: "cleaned_configs"
     INFO: Saved vManage server information
     INFO: Inspecting policy_list items
@@ -894,9 +942,9 @@ Push changes to vManage using the restore task:
 
 ### Regular Expressions
 
-It is recommended to always use double quotes when specifying a regular expression to --regex option:
+It is recommended to always use single quotes when specifying a regular expression to --regex option:
 
-    sdwan --verbose restore all --regex "VPN1"
+    sdwan --verbose restore all --regex 'VPN1'
      
 This is to prevent the shell from interpreting special characters that could be part of the pattern provided.
 
@@ -919,9 +967,9 @@ The regular expression syntax supported is described in https://docs.python.org/
 Example:
 
     Consider the template name "G_Branch_184_Single_cE4451-X_2xWAN_DHCP_L2_v01". 
-    In order to get the migrated name as "G_Branch_201_Single_cE4451-X_2xWAN_DHCP_L2_v01", one can use --name "{name (G_.+)_184_.+}_201_{name G.+_184_(.+)}".
+    In order to get the migrated name as "G_Branch_201_Single_cE4451-X_2xWAN_DHCP_L2_v01", one can use --name '{name (G_.+)_184_.+}_201_{name G.+_184_(.+)}'.
     
-    % sdwan list transform template_device --regex "G_Branch_184_Single_cE4451" --workdir sastre_cx_golden_repo "{name (G_.+)_184_.+}_201_{name G.+_184_(.+)}"
+    % sdwan list transform template_device --regex 'G_Branch_184_Single_cE4451' --workdir sastre_cx_golden_repo '{name (G_.+)_184_.+}_201_{name G.+_184_(.+)}'
     +===================================================================================================================================================================+
     | Name                                                          | Transformed                                                   | Tag             | Type            |
     +===================================================================================================================================================================+

@@ -160,3 +160,5 @@ def main():
         task.log_info(f'Task completed {task.outcome("successfully", "with caveats: {tally}")}')
     except (RestAPIException, ConnectionError, FileNotFoundError, ModelException, TaskException) as ex:
         logging.getLogger(__name__).critical(ex)
+    except KeyboardInterrupt:
+        logging.getLogger(__name__).critical('Interrupted by user')

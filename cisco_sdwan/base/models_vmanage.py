@@ -1279,7 +1279,7 @@ class PolicyListTransProfile(PolicyList):
     store_path = ('policy_lists', 'TranslationProfile')
 
 
-@register('policy_profile', 'translation profile', PolicyListTransProfile, min_version='20.1')
+@register('policy_list', 'translation profile', PolicyListTransProfile, min_version='20.1')
 class PolicyListTransProfileIndex(PolicyListIndex):
     api_path = ApiPath('template/policy/list/translationprofile', None, None, None)
     store_file = 'policy_lists_translationprofile.json'
