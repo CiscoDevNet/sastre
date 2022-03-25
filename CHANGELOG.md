@@ -1,3 +1,14 @@
+Sastre 1.18 [March 25, 2022]
+================================
+
+#### Enhancements:
+- All tasks containing table output now allow table row filtering via --include and --exclude regular expressions. 
+
+#### Behavior changes:
+- On list configuration and list certificate tasks, --regex / --not-regex functionality was replaced with the new --include and --exclude options.
+- With show-template values and show-template references tasks, --regex option was replaced with --templates, --not-regex was removed. And --include / --exclude options added.
+
+
 Sastre 1.17 [February 18, 2022]
 ================================
 

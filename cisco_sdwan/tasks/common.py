@@ -12,7 +12,7 @@ import json
 from pathlib import Path
 from shutil import rmtree
 from collections import namedtuple
-from typing import List, Tuple, Iterator, Union, Optional, Any, Iterable, Type, TypeVar
+from typing import List, Tuple, Iterator, Union, Optional, Any, Iterable, Type, TypeVar, Sequence
 from cisco_sdwan.base.rest_api import Rest, RestAPIException
 from cisco_sdwan.base.models_base import DATA_DIR
 from cisco_sdwan.base.models_vmanage import (DeviceTemplate, DeviceTemplateValues, DeviceTemplateAttached,
@@ -49,6 +49,45 @@ class Tally:
         self._tally[counter] += 1
 
 
+class TableFilter:
+    def __init__(self, regex: str, column: Optional[int] = None, inverse: bool = False):
+        """
+        Table row filter used by 'Table.filtered'
+        @param regex: Pattern to match
+        @param column: Column that the filter should match. When None, filter matches if any column matches the pattern.
+        @param inverse: If False (default) the filter returns True on matches. That is, a row that matches is allowed
+                        by the filter. When True, this is inverted; row that does not match is allowed by the filter.
+        """
+        if column is not None and column < 0:
+            raise ValueError('Column value, when provided, must be a positive integer')
+
+        self.regex_pattern = re.compile(regex)
+        self.column = column
+        self.inverse = inverse
+
+    def __call__(self, table_row: tuple) -> bool:
+        """
+        Callable used by 'Table.filtered' to evaluate whether a row should be allowed.
+        @return: True if row is allowed by the filter. False otherwise.
+        """
+        def match_column(column_value) -> bool:
+            if column_value is None:
+                return True
+
+            return self.regex_pattern.search(str(column_value)) is not None
+
+        # Table row is None when that is a marker row
+        if table_row is None:
+            return True
+
+        # When column is not provided, any column match is a row match
+        if self.column is None:
+            return self.inverse ^ any(match_column(cell_value) for cell_value in table_row)
+
+        # With column provided, match on that particular column is a row match
+        return self.inverse ^ match_column(table_row[self.column])
+
+
 class Table:
     DECIMAL_DIGITS = 1  # Number of decimal digits for float values
 
@@ -58,6 +97,18 @@ class Table:
         self.meta = meta
         self._row_class = namedtuple('Row', (f'column_{i}' for i in range(len(columns))))
         self._rows = list()
+
+    def filtered(self, *filter_fns: TableFilter):
+        """
+        Returns a new Table instance constructed off this Table object, with its rows filtered by evaluation of
+        one or more TableFilters. A row is included if it is allowed by all TableFilters.
+        @param filter_fns: one or more TableFilter instances
+        @return: New Table instance containing the filtered rows
+        """
+        new_table = Table(*self.header, name=self.name, meta=self.meta)
+        new_table._rows = [row for row in self if all(filter_fn(row) for filter_fn in filter_fns)]
+
+        return new_table
 
     @staticmethod
     def process_value(value):
@@ -139,6 +190,25 @@ class Table:
             writer = csv.writer(csv_file)
             writer.writerow(self.header)
             writer.writerows(row for row in self._rows if row is not None)
+
+
+def get_table_filters(exclude_regex: Optional[str], include_regex: Optional[str]) -> Sequence[TableFilter]:
+    filters = []
+    if exclude_regex is not None:
+        filters.append(TableFilter(exclude_regex, inverse=True))
+    if include_regex is not None:
+        filters.append(TableFilter(include_regex))
+
+    return filters
+
+
+def filtered_tables(tables: Sequence[Table], *filter_fns: TableFilter) -> Sequence[Table]:
+    if not filter_fns:
+        return tables
+
+    filtered_table_iter = (table.filtered(*filter_fns) for table in tables)
+
+    return [filtered_table for filtered_table in filtered_table_iter if filtered_table]
 
 
 class DryRunReport:

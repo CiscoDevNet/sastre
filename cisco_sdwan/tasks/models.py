@@ -1,7 +1,7 @@
 import json
 import re
 from pathlib import Path
-from typing import Optional, List, Callable, Any
+from typing import Optional, List, Any
 from pydantic import BaseModel, validator, Field, Extra
 from cisco_sdwan.base.catalog import OpType, CATALOG_TAG_ALL, op_catalog_tags, op_catalog_commands, catalog_tags
 from cisco_sdwan.base.models_base import filename_safe, DATA_DIR, ExtendedTemplate
@@ -126,14 +126,12 @@ class TaskArgs(BaseModel, extra=Extra.forbid):
         super().__init__(**kwargs)
 
 
-class SubTaskArgs(TaskArgs):
-    subtask_info: str
-    subtask_handler: Callable
-    regex: Optional[str] = None
-    not_regex: Optional[str] = None
+class TableTaskArgs(TaskArgs):
+    exclude: Optional[str] = None
+    include: Optional[str] = None
     save_csv: Optional[str] = None
     save_json: Optional[str] = None
 
     # Validators
-    _validate_regex = validator('regex', 'not_regex', allow_reuse=True)(validate_regex)
+    _validate_regex = validator('exclude', 'include', allow_reuse=True)(validate_regex)
     _validate_filename = validator('save_csv', 'save_json', allow_reuse=True)(validate_filename)
