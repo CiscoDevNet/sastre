@@ -59,7 +59,7 @@ Task-specific parameters are provided after the task argument, customizing the t
 Notes:
 - Either 'sdwan' or 'sastre' can be used as the main command.
 - The command line described above, and in all examples that follow, assume Sastre was installed via PIP. 
-- If Sastre was cloned from the git repository, then 'sdwan.py' or 'sastre.py' should be used instead. Please check the installation section for more details.
+- If Sastre was cloned from the git repository, then 'sdwan.py' or 'sastre.py' should be used instead. Please check the [Installing](#installing) section for more details.
 
 ### Base parameters
 
@@ -97,7 +97,7 @@ vManage address (-a/--address), username (-u/--user), password (-p/--password) o
 Similarly, CX project ID (--pid) can also be provided via environment variable:
 - CX_PID
 
-A good approach to reduce the number of parameters that need to be provided at execution time is to create rc text files exporting those environment variables for a particular vManage. This is demonstrated in the Getting Started section below.
+A good approach to reduce the number of parameters that need to be provided at execution time is to create rc text files exporting those environment variables for a particular vManage. This is demonstrated in the [Getting Started](#getting-started) section below.
 
 For any of these arguments, vManage address, user, password and CX pid; user is prompted for a value if they are not provided via the environment variables or command line arguments.
 
@@ -630,7 +630,7 @@ Example:
 
 Regex-based customization of migrated template names:
 - This example shows a more complex --name option, containing multiple {name} entries with regular expressions.
-- Additional details about the name regex syntax are provided in the "Migrate task template name manipulation" section.
+- Additional details about the name regex syntax are provided in the [Template name manipulation via name-regex](#template-name-manipulation-via-name-regex) section.
 
 Example:
 
@@ -958,11 +958,19 @@ The regular expression syntax supported is described in https://docs.python.org/
 - When --regex match on multiple fields (e.g. item name, item ID), an item is selected if the item name OR item ID match the regular expression provided.
 - With --not-regex, when it matches on multiple fields (e.g. item name, item ID), all items are selected, except the ones where item name OR item ID match the regular expression.
 
-### Migrate task template name manipulation
+### Template name manipulation via name-regex
+Multiple Sastre tasks utilize name-regex for name manipulation:
+- Migrate task --name option accepts a name-regex.
+- Transform copy/rename tasks have a `<name-regex>` mandatory parameter. 
+- Transform recipe task allow `name_regex` under `name_template` section of the recipe YAML file. 
+- The 'list transform' task also take a `<name-regex>` parameter. This task was designed to facilitate testing of those expressions.
 
-- The --name format specification can contain multiple occurrences of {name}. Each occurrence may contain a regular expression separated by a space: {name &lt;regex&gt;}. The regular expressions must contain one or more capturing groups, which define the segments of the original name to "copy". Segments matching each capturing group are concatenated and "pasted" to the {name} position.
-- If name regex does not match, {name &lt;regex&gt;} is replaced with an empty string.
-- The 'list transform' task can be used to verify the effect of a name-regex (e.g. as used by the --name format specification in the migrate task).
+A name-regex is a template for creating a new name based on segments of an original name.
+
+The following rules apply:
+- Occurrences of {name} are replaced with the original item name.
+- Sections of the original item name can be captured by providing a regular expression in the format: {name &lt;regex&gt;}. This regular expression must contain one or more capturing groups, which define segments of the original name to "copy". Segments matching each capturing group are concatenated and "pasted" to the {name} position.
+- If the regular expression does not match, {name &lt;regex&gt;} is replaced with an empty string.
 
 Example:
 
