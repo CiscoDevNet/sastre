@@ -1500,6 +1500,13 @@ class SystemStatus(RealtimeItem):
     fields_ext = ('disk_size', 'disk_used')
 
 
+@op_register('system', 'statistics', 'System statistics')
+class SystemStats(RealtimeItem):
+    api_path = ApiPath('device/system/statistics', None, None, None)
+    fields_std = ('rx_pkts', 'tx_pkts', 'rx_drops', 'fragment_df_drops')
+    fields_ext = ('ip_fwd_to_cpu', 'to_cpu_policer_drops')
+
+
 @op_register('bfd', 'sessions', 'BFD sessions')
 class BfdSessions(RealtimeItem):
     api_path = ApiPath('device/bfd/sessions', None, None, None)
@@ -1550,13 +1557,29 @@ class OrchestratorValidVsmarts(RealtimeItem):
     fields_std = ('serial_number',)
 
 
-@op_register('interface', 'info', 'Interface info')
-class InterfaceIpv4(RealtimeItem):
+@op_register('interface', 'vedge', 'vEdge interface information')
+class InterfaceVedge(RealtimeItem):
     api_path = ApiPath('device/interface', None, None, None)
     fields_std = ('vpn_id', 'ifname', 'af_type', 'ip_address', 'ipv6_address', 'if_admin_status', 'if_oper_status',
                   'desc')
     fields_ext = ('tx_drops', 'rx_drops', 'tx_kbps', 'rx_kbps')
     fields_sub = ('ifname',)
+
+    @classmethod
+    def is_in_scope(cls, device_model: str) -> bool:
+        return device_model not in CEDGE_SET
+
+
+@op_register('interface', 'cedge', 'cEdge interface information')
+class InterfaceCedge(RealtimeItem):
+    api_path = ApiPath('device/interface', None, None, None)
+    fields_std = ('vpn_id', 'ifname', 'ip_address', 'if_admin_status', 'if_oper_status')
+    fields_ext = ('tx_drops', 'rx_drops', 'tx_kbps', 'rx_kbps')
+    fields_sub = ('ifname',)
+
+    @classmethod
+    def is_in_scope(cls, device_model: str) -> bool:
+        return device_model in CEDGE_SET
 
 
 @op_register('app-route', 'stats', 'Application-aware route statistics')
@@ -1686,11 +1709,10 @@ class BulkInterfaceStats(BulkStatsItem):
 @op_register('system', 'status', 'System status')
 class BulkSystemStats(BulkStatsItem):
     api_path = ApiPath('data/device/statistics/devicesystemstatusstatistics', None, None, None)
-    fields_std = ('cpu_user', 'cpu_system', 'mem_util')
+    fields_std = ('cpu_user_new', 'mem_util')
     fields_ext = ('mem_used', 'mem_free', 'disk_used', 'disk_avail')
-    fields_to_avg = ('cpu_user', 'cpu_system', 'mem_util', 'mem_used', 'mem_free', 'disk_used', 'disk_avail')
+    fields_to_avg = ('cpu_user_new', 'mem_util', 'mem_used', 'mem_free', 'disk_used', 'disk_avail')
     field_conversion_fns = {
-        'cpu_system': abs,
         'mem_util': lambda x: 100 * x
     }
 

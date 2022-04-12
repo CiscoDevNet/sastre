@@ -247,6 +247,19 @@ class BulkStatsItem(OperationalItem):
 
     def aggregated_value_iter(self, interval_secs: int, *field_names: str,
                               **conv_fn_map: Mapping[str, Callable]) -> Iterator[namedtuple]:
+        """
+        Iterate over aggregated values off the different time series from this BulkStatsItem. Time series are identified
+        using time_series_key.
+
+        Aggregation is performed as follows:
+        - Fields in field_names that are in self.fields_to_avg are averaged over interval_secs.
+        - For remaining fields, the newest sample is used.
+
+        @param interval_secs: Interval to aggregate samples.
+        @param field_names: Desired field names to return on each iteration
+        @param conv_fn_map: Conversion functions to be applied on fields, before they are aggregated.
+        @return: Iterator of namedtuple, each instance corresponding to a time series.
+        """
         # Split bulk stats samples into different time series
         time_series_dict = {}
         for sample in self.field_value_iter(self.field_entry_time, *field_names, **conv_fn_map):
@@ -261,7 +274,7 @@ class BulkStatsItem(OperationalItem):
         Aggregate = namedtuple('Aggregate', field_names)
         values_get_fn = attrgetter(*field_names)
         fields_to_avg = set(field_names) & set(self.fields_to_avg)
-        for time_series_name, time_series in time_series_dict.items():
+        for time_series in time_series_dict.values():
             if not time_series:
                 continue
 

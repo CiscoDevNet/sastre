@@ -1,3 +1,14 @@
+Sastre 1.18.1 [April 11, 2022]
+================================
+
+#### Enhancements:
+- New 'show realtime system statistics' command.
+
+#### Behavior changes:
+- 'show statistics system' command now uses 'cpu_user_new' field for the data under 'CPU User(%)' column.
+- 'show realtime interface info' command was split into 'show realtime interface vedge' and 'show realtime interface cedge'. Each sub-command returns only the columns supported by the corresponding device type. Command 'show realtime interface' can be used to return interface information from both device types.
+
+
 Sastre 1.18 [March 25, 2022]
 ================================
 
