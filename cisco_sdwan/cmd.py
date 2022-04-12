@@ -11,7 +11,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from requests.exceptions import ConnectionError
+from requests.exceptions import ConnectionError, HTTPError
 from .base.rest_api import Rest, RestAPIException
 from .base.catalog import catalog_size, op_catalog_size
 from .base.models_base import ModelException, SASTRE_ROOT_DIR
@@ -158,7 +158,7 @@ def main():
             print(str(task.dryrun_report))
 
         task.log_info(f'Task completed {task.outcome("successfully", "with caveats: {tally}")}')
-    except (RestAPIException, ConnectionError, FileNotFoundError, ModelException, TaskException) as ex:
+    except (RestAPIException, ConnectionError, HTTPError, FileNotFoundError, ModelException, TaskException) as ex:
         logging.getLogger(__name__).critical(ex)
     except KeyboardInterrupt:
         logging.getLogger(__name__).critical('Interrupted by user')
