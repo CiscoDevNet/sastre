@@ -611,6 +611,12 @@ class ConfigItem(ApiItem):
             filtered_keys.update(self.post_filtered_tags)
         post_dict = {k: v for k, v in self.data.items() if k not in filtered_keys}
 
+        # Clear read-only flags
+        if post_dict.get(self.factory_default_tag, False):
+            post_dict[self.factory_default_tag] = False
+        if post_dict.get(self.readonly_tag, False):
+            post_dict[self.readonly_tag] = False
+
         # Rename item
         if new_name is not None:
             post_dict[self.name_tag] = new_name
