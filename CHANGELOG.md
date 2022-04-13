@@ -1,3 +1,10 @@
+Sastre 1.18.2 [April 13, 2022]
+================================
+
+#### Enhancements:
+- [#21] Restore task has now an improved handling of factory-default items. If a factory-default item in the backup is a dependency (referenced by other items) that is missing on the target vManage, it is converted to a non-default item and pushed to vManage. A warning message is logged when this condition happens.
+
+
 Sastre 1.18.1 [April 11, 2022]
 ================================
 

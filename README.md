@@ -9,6 +9,8 @@ Some use-cases include:
 - Backup, restore and delete configuration items. Tags and regular expressions can be used to select all or a subset of items.
 - Visualize operational data across multiple devices. For instance, display status of control connections from multiple devices in a single table.
 
+Sastre can also be used as an SDK to other applications, further information is available on [DevNet Sastre SDK](https://developer.cisco.com/docs/sdwan/#!sastre-sdk-overview).
+
 Support enquires can be sent to sastre-support@cisco.com.
 
 Note on vManage release support:
@@ -999,6 +1001,8 @@ By default, restore will skip items with the same name. If an existing item on v
 
 Any references/dependencies on that item are properly updated. For instance, if a feature template is not pushed to vManage because an item with the same name is already present, device templates being pushed will now point to the feature template which is already on vManage.
 
+**Restore with --update:**
+
 Adding the --update option to restore modifies this behavior. In this case, Sastre will update existing items containing the same name as in the backup, but only if their content is different.
 
 When an existing vManage item is modified, device templates may need to be reattached or vSmart policies may need to be re-activated. This is handled as follows:
@@ -1008,6 +1012,12 @@ When an existing vManage item is modified, device templates may need to be reatt
 - In all re-attach cases, Sastre will use the existing attachment values on vManage to feed the attach request.
 
 The implication is that if modified templates define new variables re-attach will fail, because not all variables would have values assigned. In this case, the recommended procedure is to detach the master template (e.g. using detach task), re-run "restore --update", then re-attach the device-template from vManage, where one would be able to supply any missing variable values.
+
+**Factory default items:**
+
+If a factory-default item in the backup is a dependency (referenced by other items) that is missing on the target vManage, it is converted to a non-default item and pushed to vManage. 
+
+A WARNING message is displayed when this condition happens. The user may want to review the corresponding templates/policies and update them to reference newer versions or equivalent factory-defaults that may be available on vManage. 
 
 ## Installing
 

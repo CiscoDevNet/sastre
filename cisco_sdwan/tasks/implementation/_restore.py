@@ -104,20 +104,18 @@ class TaskRestore(Task):
                             self.log_debug(f'Will skip {info} {item.name}, item already on target vManage')
                             continue
 
-                    if item.is_readonly:
-                        self.log_debug(f'Will skip read-only {info} {item.name}')
-                        continue
-
                     regex = parsed_args.regex or parsed_args.not_regex
                     item_matches = (
+                            not item.is_readonly and
                             (parsed_args.tag == CATALOG_TAG_ALL or parsed_args.tag == tag) and
                             (regex is None or regex_search(regex, item.name, inverse=parsed_args.regex is None))
                     )
                     if item_matches:
                         match_set.add(item_id)
                     if item_matches or item_id in dependency_set:
-                        # A target_id that is not None signals a put operation, as opposed to post.
+                        # A target_id that is not None signals a put operation (update), as opposed to post.
                         # target_id will be None unless --update is specified and item name is on target
+                        # Read-only items are added only if they are in dependency_set
                         restore_item_list.append((item_id, item, target_id))
                         dependency_set.update(item.id_references_set)
 
@@ -136,6 +134,9 @@ class TaskRestore(Task):
 
                     try:
                         if target_id is None:
+                            if item.is_readonly:
+                                self.log_warning(f'Factory default {info} {item.name} is a dependency that is missing '
+                                                 'on target vManage. Will be converted to non-default.')
                             # Create new item
                             if self.is_dryrun:
                                 self.log_info(f'{op_info} {info} {item.name}{reason}')
@@ -145,6 +146,10 @@ class TaskRestore(Task):
                             pushed_item_dict[item.name] = item_id
                         else:
                             # Update existing item
+                            if item.is_readonly:
+                                self.log_debug(f'{op_info} skipped (read-only) {info} {item.name}')
+                                continue
+
                             update_data = item.put_data(id_mapping)
                             if item.get_raise(api, target_id).is_equal(update_data):
                                 self.log_debug(f'{op_info} skipped (no diffs) {info} {item.name}')
