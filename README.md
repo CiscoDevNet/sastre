@@ -14,8 +14,7 @@ Sastre can also be used as an SDK to other applications, further information is 
 Support enquires can be sent to sastre-support@cisco.com.
 
 Note on vManage release support:
-- Sastre 1.18 supports up to vManage 20.6. However, specific support for resource groups and multi-cloud features will come in a future release.  
-- Aside from supporting new configuration elements (associated with new features) added to the newer vManage releases, all other Sastre functionality has been validated to work with 20.7.x.
+- Sastre 1.18.3 supports up to vManage 20.7. However, specific support for resource groups and multi-cloud features will come in a future release.  
 
 ## Sastre and Sastre-Pro
 
@@ -28,7 +27,7 @@ Both flavors follow the same release numbering. For instance, if support for cer
 The command "sdwan --version" will indicate the flavor that is installed.
 
     % sdwan --version
-    Sastre-Pro Version 1.18.2. Catalog: 76 configuration items, 33 operational items.
+    Sastre-Pro Version 1.18.3. Catalog: 77 configuration items, 33 operational items.
 
 Tasks only available on Sastre-Pro are labeled as such in the [Introduction](#introduction) section below.
 

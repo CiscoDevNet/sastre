@@ -1395,6 +1395,17 @@ class PolicyListGeoLocationIndex(PolicyListIndex):
     store_file = 'policy_lists_geo_location.json'
 
 
+class PolicyListRegion(PolicyList):
+    api_path = ApiPath('/template/policy/list/region')
+    store_path = ('policy_lists', 'Region')
+
+
+@register('policy_list', 'region list', PolicyListRegion, min_version='20.7')
+class PolicyListRegionIndex(PolicyListIndex):
+    api_path = ApiPath('/template/policy/list/region', None, None, None)
+    store_file = 'policy_lists_region.json'
+
+
 #
 # Admin Settings
 #
