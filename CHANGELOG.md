@@ -1,3 +1,11 @@
+Sastre 1.18.3 [April 21, 2022]
+================================
+
+#### Enhancements:
+- [#133] 20.7 vManage support, included support for the following API endpoints:
+  - Policy lists: Region list
+
+
 Sastre 1.18.2 [April 13, 2022]
 ================================
 
