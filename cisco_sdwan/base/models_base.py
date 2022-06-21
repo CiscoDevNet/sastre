@@ -10,15 +10,20 @@ from os import environ
 from pathlib import Path
 from itertools import zip_longest
 from collections import namedtuple
-from typing import Sequence, Tuple, Union, Iterator, Callable, Mapping, Any, Optional, Dict
+from typing import Sequence, Tuple, Union, Iterator, Callable, Mapping, Any, Optional, Dict, List, Generator
 from operator import attrgetter
 from datetime import datetime, timezone
+from pydantic import BaseModel, Extra, Field
 from requests.exceptions import Timeout
 from .rest_api import RestAPIException, Rest
 
 # Top-level directory for local data store
 SASTRE_ROOT_DIR = Path(environ.get('SASTRE_ROOT_DIR', Path.cwd()))
 DATA_DIR = str(Path(SASTRE_ROOT_DIR, 'data'))
+
+
+# Used for IndexConfigItem iter_fields when they follow (<item-id-label>, <item-name-label>) format
+IdName = namedtuple('IdName', ['id', 'name'])
 
 
 class UpdateEval:
@@ -53,18 +58,68 @@ class ApiPath:
     Groups the API path for different operations available in an API item (i.e. get, post, put, delete).
     Each field contains a str with the API path, or None if the particular operations is not supported on this item.
     """
-    __slots__ = ('get', 'post', 'put', 'delete')
+    __slots__ = ('path_vars', 'get', 'post', 'put', 'delete')
 
-    def __init__(self, get, *other_ops):
+    def __init__(self, get: Optional[str], *other_ops: Optional[str],
+                 path_vars: Optional[Sequence[str]] = None) -> None:
         """
         @param get: URL path for get operations
         @param other_ops: URL path for post, put and delete operations, in this order. If an item is not specified
                           the same URL as the last operation provided is used.
+        @param path_vars: Path variable names that may be present in defined paths
         """
+        if path_vars is None and get is not None:
+            self.path_vars = ApiPath.discover_path_vars(get)
+        else:
+            self.path_vars = path_vars
+
         self.get = get
         last_op = other_ops[-1] if other_ops else get
-        for field, value in zip_longest(self.__slots__[1:], other_ops, fillvalue=last_op):
+        for field, value in zip_longest(self.__slots__[2:], other_ops, fillvalue=last_op):
             setattr(self, field, value)
+
+    def resolve(self, *var_values: str) -> 'ApiPath':
+        if self.path_vars is None:
+            return self
+
+        if len(self.path_vars) != len(var_values):
+            raise ValueError(f"Expected {len(self.path_vars)} variables, received: {', '.join(var_values)} [{self}]")
+
+        var_bindings = dict(zip(self.path_vars, var_values))
+
+        def resolve_path(field):
+            path = getattr(self, field)
+            return path.format(**var_bindings) if path is not None else None
+
+        return ApiPath(*tuple(resolve_path(field) for field in self.__slots__[1:]))
+
+    def __repr__(self) -> str:
+        path_vars = f", path_vars=[{', '.join(self.path_vars)}]" if self.path_vars else ""
+        return f"{self.__class__.__name__}({self.get}, {self.post}, {self.put}, {self.delete}{path_vars})"
+
+    @staticmethod
+    def discover_path_vars(path_template: str) -> tuple:
+        return tuple(m.group(1) for m in re.finditer(r'{\s*([^}]+)\s*}', path_template))
+
+
+class CliOrFeatureApiPath:
+    def __init__(self, api_path_feature, api_path_cli):
+        self.api_path_feature = api_path_feature
+        self.api_path_cli = api_path_cli
+
+    def __get__(self, instance, owner):
+        # If called from class, assume it is a feature template
+        is_cli_template = instance is not None and instance.is_type_cli
+
+        return self.api_path_cli if is_cli_template else self.api_path_feature
+
+
+class ApiPathGroup:
+    def __init__(self, api_path_dict: Dict[str, ApiPath]) -> None:
+        self._path_dict = {key: api_path for key, api_path in api_path_dict.items()}
+
+    def api_path(self, key: str) -> Union[ApiPath, None]:
+        return self._path_dict.get(key)
 
 
 class OperationalItem:
@@ -510,9 +565,11 @@ class ConfigItem(ApiItem):
         """
         super().__init__(data)
 
-    def is_equal(self, other):
-        local_cmp_dict = {k: v for k, v in self.data.items() if k not in self.skip_cmp_tag_set | {self.id_tag}}
-        other_cmp_dict = {k: v for k, v in other.items() if k not in self.skip_cmp_tag_set | {self.id_tag}}
+    def is_equal(self, other_payload: Dict[str, Any]) -> bool:
+        exclude_set = self.skip_cmp_tag_set | {self.id_tag}
+
+        local_cmp_dict = {k: v for k, v in self.data.items() if k not in exclude_set}
+        other_cmp_dict = {k: v for k, v in other_payload.items() if k not in exclude_set}
 
         return sorted(json.dumps(local_cmp_dict)) == sorted(json.dumps(other_cmp_dict))
 
@@ -591,7 +648,7 @@ class ConfigItem(ApiItem):
 
         return True
 
-    def post_data(self, id_mapping_dict, new_name=None):
+    def post_data(self, id_mapping_dict: Mapping[str, str], new_name: Optional[str] = None) -> Dict[str, Any]:
         """
         Build payload to be used for POST requests against this config item. From "self.data", perform item id
         replacements defined in id_mapping_dict, also remove item id and rename item with new_name (if provided).
@@ -604,7 +661,9 @@ class ConfigItem(ApiItem):
         filtered_keys = {
             self.id_tag,
             '@rid',
+            'createdBy',
             'createdOn',
+            'lastUpdatedBy',
             'lastUpdatedOn'
         }
         if self.post_filtered_tags is not None:
@@ -623,7 +682,7 @@ class ConfigItem(ApiItem):
 
         return update_ids(id_mapping_dict, post_dict)
 
-    def put_data(self, id_mapping_dict):
+    def put_data(self, id_mapping_dict: Mapping[str, str]) -> Dict[str, Any]:
         """
         Build payload to be used for PUT requests against this config item. From "self.data", perform item id
         replacements defined in id_mapping_dict.
@@ -633,7 +692,9 @@ class ConfigItem(ApiItem):
         """
         filtered_keys = {
             '@rid',
+            'createdBy',
             'createdOn',
+            'lastUpdatedBy',
             'lastUpdatedOn'
         }
         put_dict = {k: v for k, v in self.data.items() if k not in filtered_keys}
@@ -683,10 +744,6 @@ class ConfigItem(ApiItem):
             return match_list
 
         return find_in(self.data) if from_key is None else find_in(self.data[from_key])
-
-
-# Used for IndexConfigItem iter_fields when they follow (<item-id-label>, <item-name-label>) format
-IdName = namedtuple('IdName', ['id', 'name'])
 
 
 class IndexConfigItem(ConfigItem):
@@ -749,6 +806,102 @@ class IndexConfigItem(ConfigItem):
         @return: Iterator of entries in the index object
         """
         return self.iter(*self.iter_fields, *self.extended_iter_fields, default=default)
+
+
+class ConfigRequestModel(BaseModel):
+    class Config:
+        extra = Extra.ignore
+
+
+class FeatureProfileModel(ConfigRequestModel):
+    # Using alias because in 20.8.1 retrieving the profile gives profileName, while post/put requests require name field
+    name: str = Field(..., alias='profileName')
+    description: str
+
+
+class ProfileParcelPayloadModel(ConfigRequestModel):
+    name: str
+    description: str = ''
+    data: Dict[str, Any]
+
+
+class ProfileParcelModel(ConfigRequestModel):
+    parcelId: str
+    parcelType: str
+    payload: ProfileParcelPayloadModel
+    subparcels: List['ProfileParcelModel']
+
+
+class Config2Item(ConfigItem):
+    """
+    Config2Item is a specialized ConfigItem to support vManage Config 2.0 elements
+
+    """
+    post_model: Callable[..., ConfigRequestModel] = None
+    put_model: Optional[Callable[..., ConfigRequestModel]] = None
+
+    def is_equal(self, other: Dict[str, Any]) -> bool:
+        exclude_set = self.skip_cmp_tag_set | {self.id_tag}
+
+        local_cmp_dict = self.put_model(**self.data).dict(exclude=exclude_set)
+        other_cmp_dict = {k: v for k, v in other.items() if k not in exclude_set}
+
+        return sorted(json.dumps(local_cmp_dict)) == sorted(json.dumps(other_cmp_dict))
+
+    def post_data(self, id_mapping_dict: Mapping[str, str], new_name: Optional[str] = None) -> Dict[str, Any]:
+        payload = self.post_model(**self.data)
+
+        return update_ids(id_mapping_dict, payload.dict())
+
+    def put_data(self, id_mapping_dict: Mapping[str, str]) -> Dict[str, Any]:
+        put_model = self.put_model or self.post_model
+        payload = put_model(**self.data)
+
+        return update_ids(id_mapping_dict, payload.dict())
+
+
+class FeatureProfile(Config2Item):
+    store_file = '{item_name}.json'
+    id_tag = 'profileId'
+    name_tag = 'profileName'
+    type_tag = 'profileType'
+    parcels_tag = 'associatedProfileParcels'
+    parcel_api_paths: ApiPathGroup = None
+
+    post_model = FeatureProfileModel
+
+    def associated_parcels(self, new_profile_id: str) -> Generator[Tuple[ApiPath, str, Dict[str, Any]], str, None]:
+        for raw_parcel in self.data.get(self.parcels_tag, []):
+            parcel = ProfileParcelModel(**raw_parcel)
+            yield from self.profile_parcel_coro(parcel, new_profile_id)
+
+    @classmethod
+    def profile_parcel_coro(cls, parcel: ProfileParcelModel,
+                            *element_ids: str) -> Generator[Tuple[ApiPath, str, Dict[str, Any]], str, None]:
+        """
+        Iterate over Config 2.0 feature profile parcels, starting with the provided parcel and recursively checking
+        sub-parcels it may contain.
+        @param parcel: parcel to be iterated over
+        @param element_ids: Element IDs used to resolve path variables. First one is the feature profile ID. Parcels
+                            with sub-parcels have their IDs included as well.
+        @yield: (<parcel type>, <parcel info>, <parcel payload>) tuples
+        @send: New element id, used to resolve the api path
+        """
+        api_path = cls.parcel_api_paths.api_path(parcel.parcelType)
+        if api_path is None:
+            raise ModelException(f"Parcel type {parcel.parcelType} is not supported")
+
+        parcel_info = f"{parcel.payload.name} [{parcel.parcelType}]"
+
+        new_element_id = yield api_path.resolve(*element_ids), parcel_info, parcel.payload.dict()
+
+        new_element_ids = element_ids + (new_element_id,)
+        for sub_parcel in parcel.subparcels:
+            yield from cls.profile_parcel_coro(sub_parcel, *new_element_ids)
+
+
+class FeatureProfileIndex(IndexConfigItem):
+    iter_fields = IdName('profileId', 'profileName')
 
 
 class ServerInfo:
@@ -816,7 +969,7 @@ def filename_safe(name: str, lower: bool = False) -> str:
     return cleaned.lower() if lower else cleaned
 
 
-def update_ids(id_mapping_dict, item_data):
+def update_ids(id_mapping_dict: Mapping[str, str], item_data: Dict[str, Any]) -> Dict[str, Any]:
     def replace_id(match):
         matched_id = match.group(0)
         return id_mapping_dict.get(matched_id, matched_id)

@@ -4,14 +4,15 @@
  cisco_sdwan.base.models_vmanage
  This module implements vManage API models
 """
-from typing import Iterable, Set, Optional, Sequence, Mapping
+from typing import Iterable, Set, Optional, Sequence, Mapping, List
 from pathlib import Path
 from collections import namedtuple
 from urllib.parse import quote_plus
 from .rest_api import Rest, RestAPIException
 from .catalog import register, op_register
-from .models_base import (ApiItem, IndexApiItem, ConfigItem, IndexConfigItem, RecordItem, RealtimeItem, BulkStatsItem,
-                          BulkStateItem, ApiPath, IdName, entry_time_parse)
+from .models_base import (ApiItem, IndexApiItem, ConfigItem, Config2Item, IndexConfigItem, RecordItem, RealtimeItem,
+                          BulkStatsItem, BulkStateItem, ApiPath, CliOrFeatureApiPath, ApiPathGroup, IdName,
+                          entry_time_parse, ConfigRequestModel, FeatureProfile, FeatureProfileIndex)
 
 
 #
@@ -234,18 +235,6 @@ class DeviceConfigRFS(DeviceConfig):
 #
 # Templates
 #
-class CliOrFeatureApiPath:
-    def __init__(self, api_path_feature, api_path_cli):
-        self.api_path_feature = api_path_feature
-        self.api_path_cli = api_path_cli
-
-    def __get__(self, instance, owner):
-        # If called from class, assume it is a feature template
-        is_cli_template = instance is not None and instance.is_type_cli
-
-        return self.api_path_cli if is_cli_template else self.api_path_feature
-
-
 # Set of device types that use cedge template class. Updated as of vManage 20.7.1
 CEDGE_SET = {
     "vedge-CSR-1000v", "vedge-ISR-4331", "vedge-ISR-4431", "vedge-ISR-4461", "vedge-ISR-4451-X",
@@ -468,6 +457,127 @@ class FeatureTemplateIndex(IndexConfigItem):
     store_file = 'feature_templates.json'
     iter_fields = IdName('templateId', 'templateName')
 
+
+#
+# Config Group
+#
+
+class ConfigGroupProfileModel(ConfigRequestModel):
+    id: str
+
+
+class ConfigGroupModel(ConfigRequestModel):
+    name: str
+    description: str
+    solution: str
+    profiles: Optional[List[ConfigGroupProfileModel]] = None
+
+
+class ConfigGroup(Config2Item):
+    api_path = ApiPath('v1/config-group')
+    store_path = ('config_groups',)
+    store_file = '{item_name}.json'
+    id_tag = 'id'
+    name_tag = 'name'
+
+    post_model = ConfigGroupModel
+
+
+@register('config_group', 'configuration group', ConfigGroup, min_version='20.8')
+class ConfigGroupIndex(IndexConfigItem):
+    api_path = ApiPath('v1/config-group', None, None, None)
+    store_file = 'config_groups.json'
+    iter_fields = IdName('id', 'name')
+
+
+#
+# Feature Profiles
+#
+
+class ProfileSdwanSystem(FeatureProfile):
+    api_path = ApiPath('v1/feature-profile/sdwan/system')
+    store_path = ('feature_profiles', 'sdwan', 'system')
+    parcel_api_paths = ApiPathGroup({
+        "aaa": ApiPath("v1/feature-profile/sdwan/system/{systemId}/aaa"),
+        "global": ApiPath("v1/feature-profile/sdwan/system/{systemId}/global"),
+        "banner": ApiPath("v1/feature-profile/sdwan/system/{systemId}/banner"),
+        "basic": ApiPath("v1/feature-profile/sdwan/system/{systemId}/basic"),
+        "bfd": ApiPath("v1/feature-profile/sdwan/system/{systemId}/bfd"),
+        "logging": ApiPath("v1/feature-profile/sdwan/system/{systemId}/logging"),
+        "ntp": ApiPath("v1/feature-profile/sdwan/system/{systemId}/ntp"),
+        "omp": ApiPath("v1/feature-profile/sdwan/system/{systemId}/omp")
+     })
+
+
+@register('feature_profile', 'SDWAN system profile', ProfileSdwanSystem, min_version='20.8')
+class ProfileSdwanSystemIndex(FeatureProfileIndex):
+    api_path = ApiPath('v1/feature-profile/sdwan/system', None, None, None)
+    store_file = 'feature_profiles_sdwan_system.json'
+
+
+class ProfileSdwanService(FeatureProfile):
+    api_path = ApiPath('v1/feature-profile/sdwan/service')
+    store_path = ('feature_profiles', 'sdwan', 'service')
+    parcel_api_paths = ApiPathGroup({
+        "lan/vpn": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/lan/vpn"),
+        "lan/vpn/interface/ethernet": ApiPath("v1/feature-profile/sdwan/service/{serviceId}"
+                                              "/lan/vpn/{vpnId}/interface/ethernet"),
+        "lan/vpn/interface/ethernet/tracker": ApiPath("v1/feature-profile/sdwan/service/{serviceId}"
+                                                      "/lan/vpn/{vpnId}/interface/ethernet/{ethernetId}/tracker"),
+        "lan/vpn/routing/bgp": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/routing/bgp"),
+        "lan/vpn/routing/ospf": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/routing/ospf"),
+        "routing/bgp": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/routing/bgp"),
+        "routing/ospf": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/routing/ospf"),
+        "tracker": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/tracker")
+    })
+
+
+@register('feature_profile', 'SDWAN service profile', ProfileSdwanService, min_version='20.8')
+class ProfileSdwanServiceIndex(FeatureProfileIndex):
+    api_path = ApiPath('v1/feature-profile/sdwan/service', None, None, None)
+    store_file = 'feature_profiles_sdwan_service.json'
+
+
+class ProfileSdwanTransport(FeatureProfile):
+    api_path = ApiPath('v1/feature-profile/sdwan/transport')
+    store_path = ('feature_profiles', 'sdwan', 'transport')
+    parcel_api_paths = ApiPathGroup({
+        "tracker": ApiPath("v1/feature-profile/sdwan/transport/{transportId}/tracker"),
+        "wan/vpn": ApiPath("v1/feature-profile/sdwan/transport/{transportId}/wan/vpn"),
+        "wan/vpn/interface/ethernet": ApiPath("v1/feature-profile/sdwan/transport/{transportId}"
+                                              "/wan/vpn/{vpnId}/interface/ethernet"),
+        "wan/vpn/interface/ethernet/tracker": ApiPath("v1/feature-profile/sdwan/transport/{transportId}"
+                                                      "/wan/vpn/{vpnId}/interface/ethernet/tracker"),
+        "management/vpn": ApiPath("v1/feature-profile/sdwan/transport/{transportId}/management/vpn"),
+        "management/vpn/interface/ethernet": ApiPath("v1/feature-profile/sdwan/transport/{transportId}"
+                                                     "/management/vpn/{vpnId}/interface/ethernet"),
+        "cellular-controller": ApiPath("v1/feature-profile/sdwan/transport/{transportId}/cellular-controller"),
+        "cellular-controller/cellular-profile": ApiPath("v1/feature-profile/sdwan/transport/{transportId}"
+                                                        "/cellular-controller/{cellularControllerId}/cellular-profile"),
+        "celular-profile": ApiPath("v1/feature-profile/sdwan/transport/{transportId}/cellular-profile")
+    })
+
+
+@register('feature_profile', 'SDWAN transport profile', ProfileSdwanTransport, min_version='20.8')
+class ProfileSdwanTransportIndex(FeatureProfileIndex):
+    api_path = ApiPath('v1/feature-profile/sdwan/transport', None, None, None)
+    store_file = 'feature_profiles_sdwan_transport.json'
+
+
+class ProfileSdwanCli(FeatureProfile):
+    api_path = ApiPath('v1/feature-profile/sdwan/cli')
+    store_path = ('feature_profiles', 'sdwan', 'cli')
+    parcel_api_paths = ApiPathGroup({
+        "config": ApiPath("v1/feature-profile/sdwan/cli/{cliId}/config")
+    })
+
+
+@register('feature_profile', 'SDWAN CLI profile', ProfileSdwanCli, min_version='20.8')
+class ProfileSdwanCliIndex(FeatureProfileIndex):
+    api_path = ApiPath('v1/feature-profile/sdwan/cli', None, None, None)
+    store_file = 'feature_profiles_sdwan_cli.json'
+
+#TODO: Add mobility feature profiles
 
 #
 # Policy vSmart
@@ -931,7 +1041,7 @@ class AdvancedInspectionProfileIndex(PolicyDefIndex):
 
 
 class VpnQosMap(PolicyDef):
-    api_path = ApiPath('/template/policy/definition/vpnqosmap')
+    api_path = ApiPath('template/policy/definition/vpnqosmap')
     store_path = ('policy_definitions', 'VpnQosMap')
 
 
@@ -1374,35 +1484,35 @@ class PolicyListProtocolIndex(PolicyListIndex):
 
 
 class PolicyListExpandedCommunity(PolicyList):
-    api_path = ApiPath('/template/policy/list/expandedcommunity')
+    api_path = ApiPath('template/policy/list/expandedcommunity')
     store_path = ('policy_lists', 'ExpandedCommunity')
 
 
 @register('policy_list', 'expanded community list', PolicyListExpandedCommunity, min_version='20.5')
 class PolicyListExpandedCommunityIndex(PolicyListIndex):
-    api_path = ApiPath('/template/policy/list/expandedcommunity', None, None, None)
+    api_path = ApiPath('template/policy/list/expandedcommunity', None, None, None)
     store_file = 'policy_lists_expanded_community.json'
 
 
 class PolicyListGeoLocation(PolicyList):
-    api_path = ApiPath('/template/policy/list/geolocation')
+    api_path = ApiPath('template/policy/list/geolocation')
     store_path = ('policy_lists', 'GeoLocation')
 
 
 @register('policy_list', 'geo location list', PolicyListGeoLocation, min_version='20.5')
 class PolicyListGeoLocationIndex(PolicyListIndex):
-    api_path = ApiPath('/template/policy/list/geolocation', None, None, None)
+    api_path = ApiPath('template/policy/list/geolocation', None, None, None)
     store_file = 'policy_lists_geo_location.json'
 
 
 class PolicyListRegion(PolicyList):
-    api_path = ApiPath('/template/policy/list/region')
+    api_path = ApiPath('template/policy/list/region')
     store_path = ('policy_lists', 'Region')
 
 
 @register('policy_list', 'region list', PolicyListRegion, min_version='20.7')
 class PolicyListRegionIndex(PolicyListIndex):
-    api_path = ApiPath('/template/policy/list/region', None, None, None)
+    api_path = ApiPath('template/policy/list/region', None, None, None)
     store_file = 'policy_lists_region.json'
 
 

@@ -8,7 +8,7 @@ import requests
 import urllib3
 import json
 from time import time
-from typing import Optional, Sequence
+from typing import Optional, Sequence, Dict
 
 
 class Rest:
@@ -170,6 +170,20 @@ def is_version_newer(version_1: str, version_2: str) -> bool:
         return [int(v) for v in f"{version_string}.0".split('.')[:2]]
 
     return parse(version_2) > parse(version_1)
+
+
+def post_id(post_response: Dict[str, str]) -> str:
+    """
+    Extracts the first value in a post response payload. Assumes that this first value contains the ID of the object
+    just created by the post request.
+    @param post_response: JSON payload
+    @return: The object id
+    """
+    if post_response is not None:
+        for value in post_response.values():
+            return value
+
+    raise RestAPIException("Bad POST response")
 
 
 class RestAPIException(Exception):

@@ -1,12 +1,12 @@
 import argparse
-from typing import Union, Optional
+from typing import Union, Optional, Sequence, Dict, Set
 from pydantic import validator
 from cisco_sdwan.__version__ import __doc__ as title
-from cisco_sdwan.base.rest_api import Rest, RestAPIException, is_version_newer
+from cisco_sdwan.base.rest_api import Rest, RestAPIException, is_version_newer, post_id
 from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL, ordered_tags
-from cisco_sdwan.base.models_base import UpdateEval, ServerInfo
+from cisco_sdwan.base.models_base import UpdateEval, ServerInfo, ModelException
 from cisco_sdwan.base.models_vmanage import (DeviceTemplateIndex, PolicyVsmartIndex, EdgeInventory, ControlInventory,
-                                             CheckVBond)
+                                             CheckVBond, FeatureProfile)
 from cisco_sdwan.tasks.utils import TaskOptions, TagOptions, existing_workdir_type, regex_type, default_workdir
 from cisco_sdwan.tasks.common import regex_search, Task, WaitActionsException
 from cisco_sdwan.tasks.models import TaskArgs, validate_workdir, validate_regex, validate_catalog_tag
@@ -124,130 +124,14 @@ class TaskRestore(Task):
 
         if len(restore_list) > 0:
             self.log_info('Pushing items to vManage', dryrun=False)
-            # Items were added to restore_list following ordered_tags() order (i.e. higher level items before lower
-            # level items). The reverse order needs to be followed on restore.
-            for info, index, restore_item_list in reversed(restore_list):
-                pushed_item_dict = {}
-                for item_id, item, target_id in restore_item_list:
-                    op_info = 'Create' if target_id is None else 'Update'
-                    reason = ' (dependency)' if item_id in dependency_set - match_set else ''
-
-                    try:
-                        if target_id is None:
-                            if item.is_readonly:
-                                self.log_warning(f'Factory default {info} {item.name} is a dependency that is missing '
-                                                 'on target vManage. Will be converted to non-default.')
-                            # Create new item
-                            if self.is_dryrun:
-                                self.log_info(f'{op_info} {info} {item.name}{reason}')
-                                continue
-                            # Not using item id returned from post because post can return empty (e.g. local policies)
-                            api.post(item.post_data(id_mapping), item.api_path.post)
-                            pushed_item_dict[item.name] = item_id
-                        else:
-                            # Update existing item
-                            if item.is_readonly:
-                                self.log_debug(f'{op_info} skipped (read-only) {info} {item.name}')
-                                continue
-
-                            update_data = item.put_data(id_mapping)
-                            if item.get_raise(api, target_id).is_equal(update_data):
-                                self.log_debug(f'{op_info} skipped (no diffs) {info} {item.name}')
-                                continue
-
-                            if self.is_dryrun:
-                                self.log_info(f'{op_info} {info} {item.name}{reason}')
-                                continue
-
-                            put_eval = UpdateEval(api.put(update_data, item.api_path.put, target_id))
-                            if put_eval.need_reattach:
-                                if put_eval.is_master:
-                                    self.log_info(f'Updating {info} {item.name} requires reattach')
-                                    attach_data = self.reattach_template_data(api, [(item.name, target_id)])
-                                else:
-                                    self.log_info(
-                                        f'Updating {info} {item.name} requires reattach of affected templates'
-                                    )
-                                    target_templates = {item_id: item_name
-                                                        for item_id, item_name in DeviceTemplateIndex.get_raise(api)}
-                                    templates_iter = (
-                                        (target_templates[tgt_id], tgt_id)
-                                        for tgt_id in put_eval.templates_affected_iter()
-                                    )
-                                    attach_data = self.reattach_template_data(api, templates_iter)
-
-                                # All re-attachments need to be done in a single request, thus 9999 for chunk_size
-                                reqs = self.attach(api, *attach_data, chunk_size=9999,
-                                                   log_context='reattaching templates')
-                                self.log_debug(f'Attach requests processed: {reqs}')
-                            elif put_eval.need_reactivate:
-                                self.log_info(f'Updating {info} {item.name} requires vSmart policy reactivate')
-                                action_list = self.activate_policy(
-                                    api, *PolicyVsmartIndex.get_raise(api).active_policy, is_edited=True
-                                )
-                                self.wait_actions(api, action_list, 'reactivating vSmart policy', raise_on_failure=True)
-                    except (RestAPIException, WaitActionsException) as ex:
-                        self.log_error(f'Failed {op_info} {info} {item.name}{reason}: {ex}')
-                    else:
-                        self.log_info(f'Done: {op_info} {info} {item.name}{reason}')
-
-                # Read new ids from target and update id_mapping
-                try:
-                    new_target_item_map = {item_name: item_id for item_id, item_name in index.get_raise(api)}
-                    for item_name, old_item_id in pushed_item_dict.items():
-                        id_mapping[old_item_id] = new_target_item_map[item_name]
-                except RestAPIException as ex:
-                    self.log_critical(f'Failed retrieving {info}: {ex}')
-                    break
+            self.restore_config_items(api, restore_list, id_mapping, dependency_set, match_set)
         else:
             self.log_info('No items to push')
 
         if parsed_args.attach:
             try:
-                target_templates = {item_name: item_id for item_id, item_name in DeviceTemplateIndex.get_raise(api)}
-                target_policies = {item_name: item_id for item_id, item_name in PolicyVsmartIndex.get_raise(api)}
-                saved_template_index = DeviceTemplateIndex.load(parsed_args.workdir, raise_not_found=True)
-
-                # Attach WAN Edge templates
-                edge_templates_iter = (
-                    (saved_name, saved_id, target_templates.get(saved_name))
-                    for saved_id, saved_name in saved_template_index.filtered_iter(DeviceTemplateIndex.is_not_vsmart)
-                )
-                attach_data = self.attach_template_data(
-                    api, parsed_args.workdir, saved_template_index.need_extended_name, edge_templates_iter,
-                    target_uuid_set={uuid for uuid, _ in EdgeInventory.get_raise(api)}
-                )
-                reqs = self.attach(api, *attach_data, log_context='attaching WAN Edges')
-                if reqs:
-                    self.log_debug(f'Attach requests processed: {reqs}')
-                else:
-                    self.log_info('No WAN Edge attachments needed')
-
-                # Attach vSmart template
-                vsmart_templates_iter = (
-                    (saved_name, saved_id, target_templates.get(saved_name))
-                    for saved_id, saved_name in saved_template_index.filtered_iter(DeviceTemplateIndex.is_vsmart)
-                )
-                vsmart_set = {
-                    uuid for uuid, _ in ControlInventory.get_raise(api).filtered_iter(ControlInventory.is_vsmart)
-                }
-                attach_data = self.attach_template_data(api, parsed_args.workdir,
-                                                        saved_template_index.need_extended_name, vsmart_templates_iter,
-                                                        target_uuid_set=vsmart_set)
-                reqs = self.attach(api, *attach_data, log_context="attaching vSmarts")
-                if reqs:
-                    self.log_debug(f'Attach requests processed: {reqs}')
-                else:
-                    self.log_info('No vSmart attachments needed')
-
-                # Activate vSmart policy
-                if not self.is_dryrun:
-                    _, policy_name = PolicyVsmartIndex.load(parsed_args.workdir, raise_not_found=True).active_policy
-                    action_list = self.activate_policy(api, target_policies.get(policy_name), policy_name)
-                    if len(action_list) == 0:
-                        self.log_info('No vSmart policy to activate')
-                    else:
-                        self.wait_actions(api, action_list, 'activating vSmart policy', raise_on_failure=True)
+                self.restore_attachments(api, parsed_args.workdir)
+                self.restore_active_policy(api, parsed_args.workdir)
             except (RestAPIException, FileNotFoundError, WaitActionsException) as ex:
                 self.log_critical(f'Attach failed: {ex}')
 
@@ -264,6 +148,155 @@ class TaskRestore(Task):
             return False
 
         return check_vbond.is_configured
+
+    def restore_config_items(self, api: Rest, restore_list: Sequence[tuple], id_mapping: Dict[str, str],
+                             dependency_set: Set[str], match_set: Set[str]) -> None:
+        # Items were added to restore_list following ordered_tags() order (i.e. higher level items before lower
+        # level items). The reverse order needs to be followed on restore.
+        for info, index, restore_item_list in reversed(restore_list):
+            pushed_item_dict = {}
+            for item_id, item, target_id in restore_item_list:
+                op_info = 'Create' if target_id is None else 'Update'
+                reason = ' (dependency)' if item_id in dependency_set - match_set else ''
+
+                try:
+                    if target_id is None:
+                        # Create new item
+                        if item.is_readonly:
+                            self.log_warning(f'Factory default {info} {item.name} is a dependency that is missing '
+                                             'on target vManage. Will be converted to non-default.')
+
+                        if self.is_dryrun:
+                            self.log_info(f'{op_info} {info} {item.name}{reason}')
+                            continue
+                        # Not using id returned from post because post can return empty (e.g. local policies)
+                        response = api.post(item.post_data(id_mapping), item.api_path.post)
+                        pushed_item_dict[item.name] = item_id
+
+                        # Special case for FeatureProfiles, creating linked parcels
+                        if isinstance(item, FeatureProfile):
+                            parcel_coro = item.associated_parcels(post_id(response))
+                            try:
+                                new_parcel_id = None
+                                while True:
+                                    try:
+                                        if new_parcel_id is None:
+                                            api_path, p_info, p_payload = next(parcel_coro)
+                                        else:
+                                            api_path, p_info, p_payload = parcel_coro.send(new_parcel_id)
+
+                                        new_parcel_id = post_id(api.post(p_payload, api_path.post))
+                                    except ModelException as ex:
+                                        self.log_error(f'Failed: {op_info} {info} {item.name} parcel{reason}: {ex}')
+                                    else:
+                                        self.log_info(f'Done: {op_info} {info} {item.name} parcel {p_info}{reason}')
+                            except StopIteration:
+                                pass
+
+                    else:
+                        # Update existing item
+                        if item.is_readonly:
+                            self.log_debug(f'{op_info} skipped (read-only) {info} {item.name}')
+                            continue
+
+                        update_data = item.put_data(id_mapping)
+                        if item.get_raise(api, target_id).is_equal(update_data):
+                            self.log_debug(f'{op_info} skipped (no diffs) {info} {item.name}')
+                            continue
+
+                        if self.is_dryrun:
+                            self.log_info(f'{op_info} {info} {item.name}{reason}')
+                            continue
+
+                        put_eval = UpdateEval(api.put(update_data, item.api_path.put, target_id))
+                        if put_eval.need_reattach:
+                            if put_eval.is_master:
+                                self.log_info(f'Updating {info} {item.name} requires reattach')
+                                attach_data = self.reattach_template_data(api, [(item.name, target_id)])
+                            else:
+                                self.log_info(
+                                    f'Updating {info} {item.name} requires reattach of affected templates'
+                                )
+                                target_templates = {item_id: item_name
+                                                    for item_id, item_name in DeviceTemplateIndex.get_raise(api)}
+                                templates_iter = (
+                                    (target_templates[tgt_id], tgt_id)
+                                    for tgt_id in put_eval.templates_affected_iter()
+                                )
+                                attach_data = self.reattach_template_data(api, templates_iter)
+
+                            # All re-attachments need to be done in a single request, thus 9999 for chunk_size
+                            reqs = self.attach(api, *attach_data, chunk_size=9999,
+                                               log_context='reattaching templates')
+                            self.log_debug(f'Attach requests processed: {reqs}')
+                        elif put_eval.need_reactivate:
+                            self.log_info(f'Updating {info} {item.name} requires vSmart policy reactivate')
+                            action_list = self.activate_policy(
+                                api, *PolicyVsmartIndex.get_raise(api).active_policy, is_edited=True
+                            )
+                            self.wait_actions(api, action_list, 'reactivating vSmart policy', raise_on_failure=True)
+                except (RestAPIException, WaitActionsException) as ex:
+                    self.log_error(f'Failed: {op_info} {info} {item.name}{reason}: {ex}')
+                else:
+                    self.log_info(f'Done: {op_info} {info} {item.name}{reason}')
+
+            # Read new ids from target and update id_mapping
+            try:
+                new_target_item_map = {item_name: item_id for item_id, item_name in index.get_raise(api)}
+                for item_name, old_item_id in pushed_item_dict.items():
+                    id_mapping[old_item_id] = new_target_item_map[item_name]
+            except RestAPIException as ex:
+                self.log_critical(f'Failed retrieving {info}: {ex}')
+                break
+
+    def restore_attachments(self, api: Rest, workdir: str) -> None:
+        target_templates = {item_name: item_id for item_id, item_name in DeviceTemplateIndex.get_raise(api)}
+        saved_template_index = DeviceTemplateIndex.load(workdir, raise_not_found=True)
+
+        # Attach WAN Edge templates
+        edge_templates_iter = (
+            (saved_name, saved_id, target_templates.get(saved_name))
+            for saved_id, saved_name in saved_template_index.filtered_iter(DeviceTemplateIndex.is_not_vsmart)
+        )
+        attach_data = self.attach_template_data(
+            api, workdir, saved_template_index.need_extended_name, edge_templates_iter,
+            target_uuid_set={uuid for uuid, _ in EdgeInventory.get_raise(api)}
+        )
+        reqs = self.attach(api, *attach_data, log_context='attaching WAN Edges')
+        if reqs:
+            self.log_debug(f'Attach requests processed: {reqs}')
+        else:
+            self.log_info('No WAN Edge attachments needed')
+
+        # Attach vSmart template
+        vsmart_templates_iter = (
+            (saved_name, saved_id, target_templates.get(saved_name))
+            for saved_id, saved_name in saved_template_index.filtered_iter(DeviceTemplateIndex.is_vsmart)
+        )
+        vsmart_set = {
+            uuid for uuid, _ in ControlInventory.get_raise(api).filtered_iter(ControlInventory.is_vsmart)
+        }
+        attach_data = self.attach_template_data(api, workdir,
+                                                saved_template_index.need_extended_name, vsmart_templates_iter,
+                                                target_uuid_set=vsmart_set)
+        reqs = self.attach(api, *attach_data, log_context="attaching vSmarts")
+        if reqs:
+            self.log_debug(f'Attach requests processed: {reqs}')
+        else:
+            self.log_info('No vSmart attachments needed')
+
+    def restore_active_policy(self, api: Rest, workdir: str) -> None:
+        target_policies = {item_name: item_id for item_id, item_name in PolicyVsmartIndex.get_raise(api)}
+        _, policy_name = PolicyVsmartIndex.load(workdir, raise_not_found=True).active_policy
+
+        if self.is_dryrun:
+            return
+
+        action_list = self.activate_policy(api, target_policies.get(policy_name), policy_name)
+        if len(action_list) == 0:
+            self.log_info('No vSmart policy to activate')
+        else:
+            self.wait_actions(api, action_list, 'activating vSmart policy', raise_on_failure=True)
 
 
 class RestoreArgs(TaskArgs):
