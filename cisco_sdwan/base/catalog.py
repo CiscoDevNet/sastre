@@ -51,6 +51,8 @@ _op_catalog = dict()  # {<OpType>: [(<tag>, <selector>, <info>, <op_cls>, <min_v
 # Order in which config items need to be deleted (i.e. reverse order in which they need to be pushed), considering
 # their high-level dependencies.
 _tag_dependency_list = [
+    'config_group',
+    'feature_profile',
     'template_device',
     'template_feature',
     'policy_vsmart',
