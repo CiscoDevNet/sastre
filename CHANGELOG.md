@@ -2,9 +2,9 @@ Sastre 1.19 [July xx, 2022]
 ================================
 
 #### Enhancements:
-- [#133] 20.8 vManage support, included support for the following API endpoints:
-  - Config group
-  - Feature profiles: 
+- [#145] 20.8 vManage support, included support for the following API endpoints:
+  - Config group, 
+  - SDWAN system, SDWAN service, SDWAN transport and SDWAN cli feature profiles and parcels
 
   
 Sastre 1.18.4 [July 12, 2022]

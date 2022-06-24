@@ -2,7 +2,7 @@ import argparse
 from typing import Union, Optional, Sequence, Dict, Set
 from pydantic import validator
 from cisco_sdwan.__version__ import __doc__ as title
-from cisco_sdwan.base.rest_api import Rest, RestAPIException, is_version_newer, post_id
+from cisco_sdwan.base.rest_api import Rest, RestAPIException, is_version_newer, response_id
 from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL, ordered_tags
 from cisco_sdwan.base.models_base import UpdateEval, ServerInfo, ModelException
 from cisco_sdwan.base.models_vmanage import (DeviceTemplateIndex, PolicyVsmartIndex, EdgeInventory, ControlInventory,
@@ -175,7 +175,7 @@ class TaskRestore(Task):
 
                         # Special case for FeatureProfiles, creating linked parcels
                         if isinstance(item, FeatureProfile):
-                            parcel_coro = item.associated_parcels(post_id(response))
+                            parcel_coro = item.associated_parcels(response_id(response))
                             try:
                                 new_parcel_id = None
                                 while True:
@@ -185,7 +185,7 @@ class TaskRestore(Task):
                                         else:
                                             api_path, p_info, p_payload = parcel_coro.send(new_parcel_id)
 
-                                        new_parcel_id = post_id(api.post(p_payload, api_path.post))
+                                        new_parcel_id = response_id(api.post(p_payload, api_path.post))
                                     except ModelException as ex:
                                         self.log_error(f'Failed: {op_info} {info} {item.name} parcel{reason}: {ex}')
                                     else:

@@ -842,8 +842,9 @@ class Config2Item(ConfigItem):
 
     def is_equal(self, other: Dict[str, Any]) -> bool:
         exclude_set = self.skip_cmp_tag_set | {self.id_tag}
+        put_model = self.put_model or self.post_model
 
-        local_cmp_dict = self.put_model(**self.data).dict(exclude=exclude_set)
+        local_cmp_dict = put_model(**self.data).dict(exclude=exclude_set)
         other_cmp_dict = {k: v for k, v in other.items() if k not in exclude_set}
 
         return sorted(json.dumps(local_cmp_dict)) == sorted(json.dumps(other_cmp_dict))
