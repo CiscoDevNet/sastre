@@ -235,7 +235,7 @@ class DeviceConfigRFS(DeviceConfig):
 #
 # Templates
 #
-# Set of device types that use cedge template class. Updated as of vManage 20.7.1
+# Set of device types that use cedge template class. Updated as of vManage 20.8.1
 CEDGE_SET = {
     "vedge-CSR-1000v", "vedge-ISR-4331", "vedge-ISR-4431", "vedge-ISR-4461", "vedge-ISR-4451-X",
     "vedge-C8300-1N1S-4T2X", "vedge-IR-1101", "vedge-C8300-1N1S-6T", "vedge-ISRv", "vedge-ISR-4321", "vedge-ISR-4351",
@@ -260,10 +260,13 @@ CEDGE_SET = {
     "vedge-nfvis-C8200-UCPE", "vedge-C8000V", "vedge-C1117-4PW", "vedge-C8200-1N-4T", "vedge-C1112-8PLTEEA",
     "vedge-C1113-8P", "vedge-IR-1831", "vedge-C8200L-1N-4T", "vedge-nfvis-C8200-UCPEVM", "vedge-C8200L-1N-4T",
     "vedge-nfvis-C8200-UCPEVM", "vedge-IR-8340", "cellular-gateway-CG522MW-IO-GL", "vedge-IR-8140H", "vedge-C1131X-8PW",
-    "vedge-IR-8140H-P", "vedge-C1131-8PLTEPW", "vedge-C1131-8PW", "vedge-C1131X-8PLTEPW",
-    "cellular-gateway-CG522MW-IO-NA"
+    "vedge-IR-8140H-P", "vedge-C1131-8PLTEPW", "vedge-C1131-8PW", "vedge-C1131X-8PLTEPW", "cellular-gateway-CG113-W6Z",
+    "cellular-gateway-CG113-W6B", "cellular-gateway-CG113-W6A", "cellular-gateway-CG113-4GW6E",
+    "cellular-gateway-CG113-4GW6H", "vedge-C8500-20X6C", "cellular-gateway-CG113-W6E",  "cellular-gateway-CG113-W6H",
+    "cellular-gateway-CG113-4GW6B", "cellular-gateway-CG113-4GW6Z", "cellular-gateway-CG113-4GW6A",
+    "cellular-gateway-CG113-4GW6Q", "cellular-gateway-CG113-W6Q", "cellular-gateway-CG522MW-IO-NA"
 }
-# Software devices. Updated as of vManage 20.7.1
+# Software devices. Updated as of vManage 20.8.1
 SOFT_EDGE_SET = {"vedge-CSR-1000v", "vedge-C8000V", "vedge-cloud", "vmanage", "vsmart"}
 
 
