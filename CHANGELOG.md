@@ -1,3 +1,10 @@
+Sastre 1.18.4 [July 12, 2022]
+================================
+
+#### Fixes:
+- [#148] 20.9 EFT release numbering scheme (20.9.0.02-li) causes traceback, this has been fixed.
+
+
 Sastre 1.18.3 [April 21, 2022]
 ================================
 

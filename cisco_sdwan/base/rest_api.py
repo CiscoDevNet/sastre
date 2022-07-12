@@ -8,7 +8,7 @@ import requests
 import urllib3
 import json
 from time import time
-from typing import Optional
+from typing import Optional, Sequence
 
 
 class Rest:
@@ -153,7 +153,7 @@ def raise_for_status(response):
                                f'{": " if details else ""}{details} [{response.request.method} {response.url}]')
 
 
-def is_version_newer(version_1, version_2):
+def is_version_newer(version_1: str, version_2: str) -> bool:
     """
     Indicates whether one vManage version is newer than another. Compares only the first 2 digits from version
     because maintenance (i.e. 3rd digit) differences are not likely to create any incompatibility between REST API JSON
@@ -165,10 +165,9 @@ def is_version_newer(version_1, version_2):
     @param version_2: String containing second version
     @return: True if version_2 is newer than version_1.
     """
-
-    def parse(version_string):
-        # Development versions may follow this format: '20.1.999-98'
-        return ([int(v) for v in version_string.replace('-', '.').split('.')] + [0, ])[:2]
+    def parse(version_string: str) -> Sequence[int]:
+        # Development versions may follow this format: '20.1.999-98' or '20.9.0.02-li'
+        return [int(v) for v in f"{version_string}.0".split('.')[:2]]
 
     return parse(version_2) > parse(version_1)
 
