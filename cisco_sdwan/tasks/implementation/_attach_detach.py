@@ -79,7 +79,8 @@ class TaskAttach(Task):
             saved_template_index = DeviceTemplateIndex.load(parsed_args.workdir, raise_not_found=True)
             matched_templates = (
                 (saved_name, saved_id, target_templates.get(saved_name))
-                for saved_id, saved_name in saved_template_index.filtered_iter(parsed_args.template_filter)
+                for saved_id, saved_name in saved_template_index.filtered_iter(parsed_args.template_filter,
+                                                                               DeviceTemplateIndex.is_attached)
                 if parsed_args.templates is None or regex_search(parsed_args.templates, saved_name)
             )
 
@@ -174,7 +175,8 @@ class TaskDetach(Task):
             )
             matched_templates = (
                 (t_id, t_name)
-                for t_id, t_name in DeviceTemplateIndex.get_raise(api).filtered_iter(parsed_args.template_filter)
+                for t_id, t_name in DeviceTemplateIndex.get_raise(api).filtered_iter(parsed_args.template_filter,
+                                                                                     DeviceTemplateIndex.is_attached)
                 if parsed_args.templates is None or regex_search(parsed_args.templates, t_name)
             )
             reqs = self.detach(api, matched_templates, matched_devices, chunk_size=parsed_args.batch,
