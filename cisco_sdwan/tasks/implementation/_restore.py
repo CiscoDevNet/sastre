@@ -6,7 +6,7 @@ from cisco_sdwan.base.rest_api import Rest, RestAPIException, is_version_newer, 
 from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL, ordered_tags
 from cisco_sdwan.base.models_base import UpdateEval, ServerInfo, ModelException
 from cisco_sdwan.base.models_vmanage import (DeviceTemplateIndex, PolicyVsmartIndex, EdgeInventory, ControlInventory,
-                                             CheckVBond, FeatureProfile)
+                                             CheckVBond, FeatureProfile, ConfigGroupIndex)
 from cisco_sdwan.tasks.utils import TaskOptions, TagOptions, existing_workdir_type, regex_type, default_workdir
 from cisco_sdwan.tasks.common import regex_search, Task, WaitActionsException
 from cisco_sdwan.tasks.models import TaskArgs, validate_workdir, validate_regex, validate_catalog_tag
@@ -131,6 +131,7 @@ class TaskRestore(Task):
         if parsed_args.attach:
             try:
                 self.restore_attachments(api, parsed_args.workdir)
+                self.restore_deployments(api, parsed_args.workdir)
                 self.restore_active_policy(api, parsed_args.workdir)
             except (RestAPIException, FileNotFoundError, WaitActionsException) as ex:
                 self.log_critical(f'Attach failed: {ex}')
@@ -250,19 +251,23 @@ class TaskRestore(Task):
                 break
 
     def restore_attachments(self, api: Rest, workdir: str) -> None:
+        saved_template_index = DeviceTemplateIndex.load(workdir)
+        if saved_template_index is None:
+            self.log_debug("Will skip attachments restore, no local device template index")
+            return
+
         target_templates = {item_name: item_id for item_id, item_name in DeviceTemplateIndex.get_raise(api)}
-        saved_template_index = DeviceTemplateIndex.load(workdir, raise_not_found=True)
 
         # Attach WAN Edge templates
         edge_templates_iter = (
             (saved_name, saved_id, target_templates.get(saved_name))
             for saved_id, saved_name in saved_template_index.filtered_iter(DeviceTemplateIndex.is_not_vsmart)
         )
+        edge_set = {uuid for uuid, _ in EdgeInventory.get_raise(api)}
         attach_data = self.attach_template_data(
-            api, workdir, saved_template_index.need_extended_name, edge_templates_iter,
-            target_uuid_set={uuid for uuid, _ in EdgeInventory.get_raise(api)}
+            api, workdir, saved_template_index.need_extended_name, edge_templates_iter, target_uuid_set=edge_set
         )
-        reqs = self.attach(api, *attach_data, log_context='attaching WAN Edges')
+        reqs = self.attach(api, *attach_data, log_context="attaching WAN Edges")
         if reqs:
             self.log_debug(f'Attach requests processed: {reqs}')
         else:
@@ -276,9 +281,9 @@ class TaskRestore(Task):
         vsmart_set = {
             uuid for uuid, _ in ControlInventory.get_raise(api).filtered_iter(ControlInventory.is_vsmart)
         }
-        attach_data = self.attach_template_data(api, workdir,
-                                                saved_template_index.need_extended_name, vsmart_templates_iter,
-                                                target_uuid_set=vsmart_set)
+        attach_data = self.attach_template_data(
+            api, workdir, saved_template_index.need_extended_name, vsmart_templates_iter, target_uuid_set=vsmart_set
+        )
         reqs = self.attach(api, *attach_data, log_context="attaching vSmarts")
         if reqs:
             self.log_debug(f'Attach requests processed: {reqs}')
@@ -286,8 +291,13 @@ class TaskRestore(Task):
             self.log_info('No vSmart attachments needed')
 
     def restore_active_policy(self, api: Rest, workdir: str) -> None:
+        saved_policy_vsmart_index = PolicyVsmartIndex.load(workdir)
+        if saved_policy_vsmart_index is None:
+            self.log_debug("Will skip active policy restore, no local vSmart policy index")
+            return
+
         target_policies = {item_name: item_id for item_id, item_name in PolicyVsmartIndex.get_raise(api)}
-        _, policy_name = PolicyVsmartIndex.load(workdir, raise_not_found=True).active_policy
+        _, policy_name = saved_policy_vsmart_index.active_policy
 
         if self.is_dryrun:
             return
@@ -297,6 +307,41 @@ class TaskRestore(Task):
             self.log_info('No vSmart policy to activate')
         else:
             self.wait_actions(api, action_list, 'activating vSmart policy', raise_on_failure=True)
+
+    def restore_deployments(self, api: Rest, workdir: str) -> None:
+        saved_groups_index = ConfigGroupIndex.load(workdir)
+        if saved_groups_index is None:
+            self.log_debug("Will skip deployments restore, no local config group index")
+            return
+
+        target_groups = {item_name: item_id for item_id, item_name in ConfigGroupIndex.get_raise(api)}
+        edges_map = {
+            entry.uuid: entry.name
+            for entry in EdgeInventory.get_raise(api).filtered_iter(EdgeInventory.is_cedge, EdgeInventory.is_cli_mode)
+        }
+        deploy_data = []
+        groups_iter = (
+            (saved_name, saved_id, target_groups.get(saved_name)) for saved_id, saved_name in saved_groups_index
+        )
+        for group_name, saved_id, target_id in groups_iter:
+            if target_id is None:
+                self.log_debug(f'Skip {group_name}, saved config group not on target node')
+                continue
+
+            self.associate_devices(
+                api, workdir, saved_groups_index.need_extended_name, group_name, saved_id, target_id, edges_map
+            )
+            affected_uuids = self.restore_values(
+                api, workdir, saved_groups_index.need_extended_name, group_name, saved_id, target_id, edges_map
+            )
+            if affected_uuids:
+                deploy_data.append((target_id, group_name, affected_uuids))
+
+        reqs = self.deploy_devices(api, deploy_data, edges_map, log_context="deploying WAN Edges")
+        if reqs:
+            self.log_debug(f'Deploy requests processed: {reqs}')
+        else:
+            self.log_info('No WAN Edge deployments needed')
 
 
 class RestoreArgs(TaskArgs):

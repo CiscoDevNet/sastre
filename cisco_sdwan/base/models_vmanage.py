@@ -4,10 +4,12 @@
  cisco_sdwan.base.models_vmanage
  This module implements vManage API models
 """
-from typing import Iterable, Set, Optional, Sequence, Mapping, List
+from typing import Iterable, Set, Optional, Sequence, Mapping, List, Any, Callable, Tuple, Dict
 from pathlib import Path
 from collections import namedtuple
+from copy import deepcopy
 from urllib.parse import quote_plus
+from pydantic import Field
 from .rest_api import Rest, RestAPIException
 from .catalog import register, op_register
 from .models_base import (ApiItem, IndexApiItem, ConfigItem, Config2Item, IndexConfigItem, RecordItem, RealtimeItem,
@@ -158,8 +160,39 @@ class Device(IndexApiItem):
 class EdgeInventory(IndexApiItem):
     api_path = ApiPath('system/device/vedges', None, None, None)
     iter_fields = ('uuid', 'vedgeCertificateState')
-
     extended_iter_fields = ('host-name', 'system-ip')
+
+    FilteredIterEntry = namedtuple('FilteredIterEntry',
+                                   ['uuid', 'cert_state', 'name', 'system_ip', 'model', 'config_mode'])
+
+    @staticmethod
+    def is_cedge(device_entry: FilteredIterEntry) -> bool:
+        """
+        Filtered_iter filter selecting CEDGE devices
+        """
+        return device_entry.model is not None and device_entry.model in CEDGE_SET
+
+    @staticmethod
+    def is_cli_mode(device_entry: FilteredIterEntry) -> bool:
+        """
+        Filtered_iter filter selecting devices in cli mode
+        """
+        return device_entry.config_mode is not None and device_entry.config_mode == 'cli'
+
+    @staticmethod
+    def is_cert_installed(device_entry: FilteredIterEntry) -> bool:
+        """
+        Filtered_iter filter selecting devices with certificate installed
+        """
+        return device_entry.cert_state is not None and device_entry.cert_state == 'certinstalled'
+
+    def filtered_iter(self, *filter_fns: Callable) -> Iterable[FilteredIterEntry]:
+        return (
+            entry for entry
+            in map(EdgeInventory.FilteredIterEntry._make,
+                   self.iter(*self.iter_fields, *self.extended_iter_fields, 'deviceModel', 'configOperationMode'))
+            if all(filter_fn(entry) for filter_fn in filter_fns)
+        )
 
 
 class ControlInventory(IndexApiItem):
@@ -169,20 +202,21 @@ class ControlInventory(IndexApiItem):
     extended_iter_fields = ('host-name', 'system-ip')
 
     @staticmethod
-    def is_vsmart(device_type):
+    def is_vsmart(device_type: Optional[str]) -> bool:
         return device_type is not None and device_type == 'vsmart'
 
     @staticmethod
-    def is_vbond(device_type):
+    def is_vbond(device_type: Optional[str]) -> bool:
         return device_type is not None and device_type == 'vbond'
 
     @staticmethod
-    def is_manage(device_type):
+    def is_manage(device_type: Optional[str]) -> bool:
         return device_type == 'vmanage'
 
-    def filtered_iter(self, filter_fn):
+    def filtered_iter(self, filter_fn: Callable) -> Iterable[Tuple[str, str]]:
+        # The contract for filtered_iter is that it should return an iterable of iter_fields tuples.
         return (
-            (item_id, item_name) for item_type, item_id, item_name
+            (item_id, item_validity) for item_type, item_id, item_validity
             in self.iter('deviceType', *self.iter_fields) if filter_fn(item_type)
         )
 
@@ -381,18 +415,19 @@ class DeviceTemplateIndex(IndexConfigItem):
     iter_fields = IdName('templateId', 'templateName')
 
     @staticmethod
-    def is_vsmart(device_type, num_attached):
+    def is_vsmart(device_type: Optional[str], num_attached: Optional[int]) -> bool:
         return device_type is not None and device_type == 'vsmart' and num_attached > 0
 
     @staticmethod
-    def is_not_vsmart(device_type, num_attached):
+    def is_not_vsmart(device_type: Optional[str], num_attached: Optional[int]) -> bool:
         return device_type is not None and device_type != 'vsmart' and num_attached > 0
 
     @staticmethod
-    def is_cedge(device_type, num_attached):
-        return device_type in CEDGE_SET
+    def is_cedge(device_type: Optional[str], _) -> bool:
+        return device_type is not None and device_type in CEDGE_SET
 
-    def filtered_iter(self, filter_fn):
+    def filtered_iter(self, filter_fn: Callable) -> Iterable[Tuple[str, str]]:
+        # The contract for filtered_iter is that it should return an iterable of iter_fields tuples.
         return (
             (item_id, item_name) for item_type, item_attached, item_id, item_name
             in self.iter('deviceType', 'devicesAttached', *self.iter_fields) if filter_fn(item_type, item_attached)
@@ -478,12 +513,16 @@ class ConfigGroupModel(ConfigRequestModel):
 
 class ConfigGroup(Config2Item):
     api_path = ApiPath('v1/config-group')
-    store_path = ('config_groups',)
+    store_path = ('config_groups', 'group')
     store_file = '{item_name}.json'
     id_tag = 'id'
     name_tag = 'name'
 
     post_model = ConfigGroupModel
+
+    @property
+    def devices_associated(self) -> int:
+        return len(self.data.get('devices', []))
 
 
 @register('config_group', 'configuration group', ConfigGroup, min_version='20.8')
@@ -491,6 +530,111 @@ class ConfigGroupIndex(IndexConfigItem):
     api_path = ApiPath('v1/config-group', None, None, None)
     store_file = 'config_groups.json'
     iter_fields = IdName('id', 'name')
+
+
+class NameValuePair(ConfigRequestModel):
+    name: str
+    value: Any
+
+
+class DeviceValuesModel(ConfigRequestModel):
+    device_id: str = Field(..., alias='device-id')
+    variables: List[NameValuePair]
+
+
+class ConfigGroupValuesModel(ConfigRequestModel):
+    solution: str
+    devices: List[DeviceValuesModel]
+
+    # In 20.8.1 get values contains 'family' key while put request requires 'solution' instead
+    def __init__(self, **kwargs):
+        solution = kwargs.pop('solution', None) or kwargs.pop('family', None)
+        if solution is not None:
+            kwargs['solution'] = solution
+        super().__init__(**kwargs)
+
+
+class ConfigGroupValues(Config2Item):
+    api_path = ApiPath('v1/config-group/{configGroupId}/device/variables', None,
+                       'v1/config-group/{configGroupId}/device/variables', None)
+    store_path = ('config_groups', 'values')
+    store_file = '{item_name}.json'
+
+    post_model = ConfigGroupValuesModel
+
+    @property
+    def uuids(self) -> Iterable[str]:
+        return (entry['device-id'] for entry in self.data.get('devices', []) if 'device-id' in entry)
+
+    @property
+    def is_empty(self):
+        return self.data is None or len(self.data.get('devices', [])) == 0
+
+    def filter(self, allowed_uuid_set: Set[str]) -> 'ConfigGroupValues':
+        new_payload = deepcopy(self.data)
+        new_payload['devices'] = [
+            entry for entry in new_payload.get('devices', []) if entry.get('device-id') in allowed_uuid_set
+        ]
+        return ConfigGroupValues(new_payload)
+
+    def put_raise(self, api, **path_vars) -> Sequence[str]:
+        result = api.put(self.put_data(), ConfigGroupValues.api_path.resolve(**path_vars).put)
+
+        return [entry.get('device-id') for entry in result]
+
+
+class AssociatedDeviceModel(ConfigRequestModel):
+    id: str
+
+
+class ConfigGroupAssociatedModel(ConfigRequestModel):
+    devices: List[AssociatedDeviceModel]
+
+
+class ConfigGroupAssociated(Config2Item):
+    api_path = ApiPath('v1/config-group/{configGroupId}/device/associate')
+    store_path = ('config_groups', 'associated')
+    store_file = '{item_name}.json'
+
+    post_model = ConfigGroupAssociatedModel
+
+    @property
+    def uuids(self) -> Iterable[str]:
+        return (entry['id'] for entry in self.data.get('devices', []) if 'id' in entry)
+
+    @property
+    def is_empty(self):
+        return self.data is None or len(self.data.get('devices', [])) == 0
+
+    def filter(self, allowed_uuid_set: Set[str]) -> 'ConfigGroupAssociated':
+        new_payload = deepcopy(self.data)
+        new_payload['devices'] = [
+            entry for entry in new_payload.get('devices', []) if entry.get('id') in allowed_uuid_set
+        ]
+        return ConfigGroupAssociated(new_payload)
+
+    def put_raise(self, api, **path_vars) -> None:
+        api.put(self.put_data(), ConfigGroupAssociated.api_path.resolve(**path_vars).put)
+
+        return
+
+
+class ConfigGroupDeploy(ApiItem):
+    api_path = ApiPath(None, 'v1/config-group/{configGroupId}/device/deploy', None, None)
+    id_tag = 'parentTaskId'
+
+    @staticmethod
+    def api_params(uuids: Iterable[str]) -> Dict[str, Any]:
+        """
+        Build dictionary used to provide input parameters for api POST call
+        @param uuids: An iterable of device UUIDs to deploy
+        @return: Dictionary used to provide POST input parameters
+        """
+        return {
+            "devices": [
+                {"id": device_id} for device_id in uuids
+            ]
+        }
 
 
 #
@@ -580,7 +724,8 @@ class ProfileSdwanCliIndex(FeatureProfileIndex):
     api_path = ApiPath('v1/feature-profile/sdwan/cli', None, None, None)
     store_file = 'feature_profiles_sdwan_cli.json'
 
-#TODO: Add mobility feature profiles
+
+# TODO: Add mobility feature profiles
 
 #
 # Policy vSmart
