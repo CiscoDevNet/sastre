@@ -414,23 +414,30 @@ class DeviceTemplateIndex(IndexConfigItem):
     store_file = 'device_templates.json'
     iter_fields = IdName('templateId', 'templateName')
 
-    @staticmethod
-    def is_vsmart(device_type: Optional[str], num_attached: Optional[int]) -> bool:
-        return device_type is not None and device_type == 'vsmart' and num_attached > 0
+    FilteredIterEntry = namedtuple('FilteredIterEntry', ['device_type', 'num_attached', 'uuid', 'name'])
 
     @staticmethod
-    def is_not_vsmart(device_type: Optional[str], num_attached: Optional[int]) -> bool:
-        return device_type is not None and device_type != 'vsmart' and num_attached > 0
+    def is_vsmart(iterator_entry: FilteredIterEntry) -> bool:
+        return iterator_entry.device_type is not None and iterator_entry.device_type == 'vsmart'
 
     @staticmethod
-    def is_cedge(device_type: Optional[str], _) -> bool:
-        return device_type is not None and device_type in CEDGE_SET
+    def is_not_vsmart(iterator_entry: FilteredIterEntry) -> bool:
+        return iterator_entry.device_type is not None and iterator_entry.device_type != 'vsmart'
 
-    def filtered_iter(self, filter_fn: Callable) -> Iterable[Tuple[str, str]]:
+    @staticmethod
+    def is_attached(iterator_entry: FilteredIterEntry) -> bool:
+        return iterator_entry.num_attached is not None and iterator_entry.num_attached > 0
+
+    @staticmethod
+    def is_cedge(iterator_entry: FilteredIterEntry) -> bool:
+        return iterator_entry.device_type is not None and iterator_entry.device_type in CEDGE_SET
+
+    def filtered_iter(self, *filter_fns: Callable) -> Iterable[Tuple[str, str]]:
         # The contract for filtered_iter is that it should return an iterable of iter_fields tuples.
         return (
-            (item_id, item_name) for item_type, item_attached, item_id, item_name
-            in self.iter('deviceType', 'devicesAttached', *self.iter_fields) if filter_fn(item_type, item_attached)
+            (entry.uuid, entry.name) for entry in map(DeviceTemplateIndex.FilteredIterEntry._make,
+                                                      self.iter('deviceType', 'devicesAttached', *self.iter_fields))
+            if all(filter_fn(entry) for filter_fn in filter_fns)
         )
 
     @classmethod
@@ -530,6 +537,23 @@ class ConfigGroupIndex(IndexConfigItem):
     api_path = ApiPath('v1/config-group', None, None, None)
     store_file = 'config_groups.json'
     iter_fields = IdName('id', 'name')
+
+    FilteredIterEntry = namedtuple('FilteredIterEntry', ['uuid', 'name', 'devices'])
+
+    @staticmethod
+    def is_associated(iterator_entry: FilteredIterEntry) -> bool:
+        """
+        Filtered_iter filter selecting config-groups with associated devices
+        """
+        return iterator_entry.devices is not None and len(iterator_entry.devices) > 0
+
+    def filtered_iter(self, *filter_fns: Callable) -> Iterable[Tuple[str, str]]:
+        # The contract for filtered_iter is that it should return an iterable of iter_fields tuples.
+        return (
+            (entry.uuid, entry.name)
+            for entry in map(ConfigGroupIndex.FilteredIterEntry._make, self.iter(*self.iter_fields, 'devices'))
+            if all(filter_fn(entry) for filter_fn in filter_fns)
+        )
 
 
 class NameValuePair(ConfigRequestModel):

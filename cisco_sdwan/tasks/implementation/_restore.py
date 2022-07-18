@@ -261,7 +261,8 @@ class TaskRestore(Task):
         # Attach WAN Edge templates
         edge_templates_iter = (
             (saved_name, saved_id, target_templates.get(saved_name))
-            for saved_id, saved_name in saved_template_index.filtered_iter(DeviceTemplateIndex.is_not_vsmart)
+            for saved_id, saved_name in saved_template_index.filtered_iter(DeviceTemplateIndex.is_not_vsmart,
+                                                                           DeviceTemplateIndex.is_attached)
         )
         edge_set = {uuid for uuid, _ in EdgeInventory.get_raise(api)}
         attach_data = self.attach_template_data(
@@ -276,7 +277,8 @@ class TaskRestore(Task):
         # Attach vSmart template
         vsmart_templates_iter = (
             (saved_name, saved_id, target_templates.get(saved_name))
-            for saved_id, saved_name in saved_template_index.filtered_iter(DeviceTemplateIndex.is_vsmart)
+            for saved_id, saved_name in saved_template_index.filtered_iter(DeviceTemplateIndex.is_vsmart,
+                                                                           DeviceTemplateIndex.is_attached)
         )
         vsmart_set = {
             uuid for uuid, _ in ControlInventory.get_raise(api).filtered_iter(ControlInventory.is_vsmart)
@@ -321,7 +323,8 @@ class TaskRestore(Task):
         }
         deploy_data = []
         groups_iter = (
-            (saved_name, saved_id, target_groups.get(saved_name)) for saved_id, saved_name in saved_groups_index
+            (saved_name, saved_id, target_groups.get(saved_name))
+            for saved_id, saved_name in saved_groups_index.filtered_iter(ConfigGroupIndex.is_associated)
         )
         for group_name, saved_id, target_id in groups_iter:
             if target_id is None:

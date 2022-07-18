@@ -4,7 +4,7 @@ from pydantic import validator
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest, RestAPIException
 from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL, ordered_tags
-from cisco_sdwan.base.models_vmanage import DeviceTemplateIndex
+from cisco_sdwan.base.models_vmanage import DeviceTemplateIndex, ConfigGroupIndex
 from cisco_sdwan.tasks.utils import TaskOptions, TagOptions, regex_type
 from cisco_sdwan.tasks.common import regex_search, Task, WaitActionsException
 from cisco_sdwan.tasks.models import TaskArgs, validate_regex, validate_catalog_tag
@@ -42,7 +42,9 @@ class TaskDelete(Task):
             try:
                 template_index = DeviceTemplateIndex.get_raise(api)
                 # Detach WAN Edge templates
-                reqs = self.detach(api, template_index.filtered_iter(DeviceTemplateIndex.is_not_vsmart),
+                reqs = self.detach(api,
+                                   template_index.filtered_iter(DeviceTemplateIndex.is_not_vsmart,
+                                                                DeviceTemplateIndex.is_attached),
                                    log_context='detaching WAN Edges')
                 if reqs:
                     self.log_debug(f'Detach requests processed: {reqs}')
@@ -56,12 +58,18 @@ class TaskDelete(Task):
                     else:
                         self.wait_actions(api, action_list, 'deactivating vSmart policy', raise_on_failure=True)
                 # Detach vSmart template
-                reqs = self.detach(api, template_index.filtered_iter(DeviceTemplateIndex.is_vsmart),
+                reqs = self.detach(api,
+                                   template_index.filtered_iter(DeviceTemplateIndex.is_vsmart,
+                                                                DeviceTemplateIndex.is_attached),
                                    log_context='detaching vSmarts')
                 if reqs:
                     self.log_debug(f'Detach requests processed: {reqs}')
                 else:
                     self.log_info('No vSmart attached')
+
+                # De-associate config-groups
+                # config_group_index = ConfigGroupIndex.get_raise(api).filtered_iter(ConfigGroupIndex.is_associated)
+
             except (RestAPIException, WaitActionsException) as ex:
                 self.log_critical(f'Detach failed: {ex}')
                 return
