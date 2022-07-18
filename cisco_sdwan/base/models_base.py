@@ -13,7 +13,8 @@ from collections import namedtuple
 from typing import Sequence, Tuple, Union, Iterator, Callable, Mapping, Any, Optional, Dict, List, Generator
 from operator import attrgetter
 from datetime import datetime, timezone
-from pydantic import BaseModel, Extra, Field
+from urllib.parse import quote_plus
+from pydantic import BaseModel, Extra
 from requests.exceptions import Timeout
 from .rest_api import RestAPIException, Rest
 
@@ -66,26 +67,44 @@ class ApiPath:
         @param get: URL path for get operations
         @param other_ops: URL path for post, put and delete operations, in this order. If an item is not specified
                           the same URL as the last operation provided is used.
-        @param path_vars: Path variable names that may be present in defined paths
+        @param path_vars: Path variable names that may be present in defined paths. It is assumed that all methods have
+                          the same path variables.
         """
-        if path_vars is None and get is not None:
-            self.path_vars = ApiPath.discover_path_vars(get)
-        else:
-            self.path_vars = path_vars
-
         self.get = get
         last_op = other_ops[-1] if other_ops else get
         for field, value in zip_longest(self.__slots__[2:], other_ops, fillvalue=last_op):
             setattr(self, field, value)
 
-    def resolve(self, *var_values: str) -> 'ApiPath':
-        if self.path_vars is None:
+        if path_vars is None:
+            for value in (getattr(self, field) for field in self.__slots__[1:]):
+                if value is not None:
+                    # The first valid path becomes the reference to discover path variables
+                    self.path_vars = ApiPath.discover_path_vars(value)
+                    break
+            else:
+                self.path_vars = None
+        else:
+            self.path_vars = tuple(path_vars)
+
+    def resolve(self, *var_values: str, **var_mappings: str) -> 'ApiPath':
+        """
+        Resolve an API Path containing path variables (ex. /v1/config/{config_id}/etc) into a concrete API path with
+        path variables replaced with their values, as provided via var_values or var_mappings.
+        @param var_values: Values for path variables, in the same order in which they are defined.
+        @param var_mappings: Key-value pairs associating values to path variable names.
+        @return: A new ApiPath instance containing path variables replaced with their values.
+        """
+        if not self.path_vars:
             return self
 
-        if len(self.path_vars) != len(var_values):
-            raise ValueError(f"Expected {len(self.path_vars)} variables, received: {', '.join(var_values)} [{self}]")
+        if not var_mappings and len(self.path_vars) != len(var_values):
+            raise ValueError(f"Unexpected var values provided: {', '.join(var_values) or 'None provided'} [{self}]")
+        if not var_values and set(self.path_vars) != var_mappings.keys():
+            raise ValueError(f"Unexpected var mappings provided: {', '.join(var_mappings) or 'None provided'} [{self}]")
 
-        var_bindings = dict(zip(self.path_vars, var_values))
+        var_bindings = var_mappings or dict(zip(self.path_vars, var_values))
+        # Ensure provided values are url-safe
+        var_bindings = {name: quote_plus(value) for name, value in var_bindings.items()}
 
         def resolve_path(field):
             path = getattr(self, field)
@@ -99,6 +118,7 @@ class ApiPath:
 
     @staticmethod
     def discover_path_vars(path_template: str) -> tuple:
+        # If no path variable is discovered an empty tuple is returned
         return tuple(m.group(1) for m in re.finditer(r'{\s*([^}]+)\s*}', path_template))
 
 
@@ -458,7 +478,7 @@ class RecordItem(OperationalItem):
 
 
 def attribute_safe(raw_attribute):
-    return re.sub(r'[^a-zA-Z0-9_]', '_', raw_attribute)
+    return re.sub(r'\W', '_', raw_attribute, flags=re.ASCII)
 
 
 class ApiItem:
@@ -489,15 +509,15 @@ class ApiItem:
         return self.data is None or len(self.data) == 0
 
     @classmethod
-    def get(cls, api, *path_entries):
+    def get(cls, api, *path_entries, **path_vars):
         try:
-            return cls.get_raise(api, *path_entries)
+            return cls.get_raise(api, *path_entries, **path_vars)
         except RestAPIException:
             return None
 
     @classmethod
-    def get_raise(cls, api, *path_entries):
-        return cls(api.get(cls.api_path.get, *path_entries))
+    def get_raise(cls, api, *path_entries, **path_vars):
+        return cls(api.get(cls.api_path.resolve(**path_vars).get, *path_entries))
 
     def __str__(self):
         return json.dumps(self.data, indent=2)
@@ -648,13 +668,12 @@ class ConfigItem(ApiItem):
 
         return True
 
-    def post_data(self, id_mapping_dict: Mapping[str, str], new_name: Optional[str] = None) -> Dict[str, Any]:
+    def post_data(self, id_mapping_dict: Optional[Mapping[str, str]] = None) -> Dict[str, Any]:
         """
         Build payload to be used for POST requests against this config item. From "self.data", perform item id
         replacements defined in id_mapping_dict, also remove item id and rename item with new_name (if provided).
-        @param id_mapping_dict: {<old item id>: <new item id>} dict. Matches of <old item id> are replaced with
-                                <new item id>
-        @param new_name: String containing new name
+        @param id_mapping_dict: {<old item id>: <new item id>} dict. If provided, <old item id> matches are replaced
+                                with <new item id>
         @return: Dict containing payload for POST requests
         """
         # Delete keys that shouldn't be on post requests
@@ -676,18 +695,17 @@ class ConfigItem(ApiItem):
         if post_dict.get(self.readonly_tag, False):
             post_dict[self.readonly_tag] = False
 
-        # Rename item
-        if new_name is not None:
-            post_dict[self.name_tag] = new_name
+        if id_mapping_dict is None:
+            return post_dict
 
         return update_ids(id_mapping_dict, post_dict)
 
-    def put_data(self, id_mapping_dict: Mapping[str, str]) -> Dict[str, Any]:
+    def put_data(self, id_mapping_dict: Optional[Mapping[str, str]] = None) -> Dict[str, Any]:
         """
         Build payload to be used for PUT requests against this config item. From "self.data", perform item id
         replacements defined in id_mapping_dict.
-        @param id_mapping_dict: {<old item id>: <new item id>} dict. Matches of <old item id> are replaced with
-                                <new item id>
+        @param id_mapping_dict: {<old item id>: <new item id>} dict. If provided, <old item id> matches are replaced
+                                with <new item id>
         @return: Dict containing payload for PUT requests
         """
         filtered_keys = {
@@ -698,6 +716,9 @@ class ConfigItem(ApiItem):
             'lastUpdatedOn'
         }
         put_dict = {k: v for k, v in self.data.items() if k not in filtered_keys}
+
+        if id_mapping_dict is None:
+            return put_dict
 
         return update_ids(id_mapping_dict, put_dict)
 
@@ -712,7 +733,7 @@ class ConfigItem(ApiItem):
         }
         filtered_data = {k: v for k, v in self.data.items() if k not in filtered_keys}
 
-        return set(re.findall(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}',
+        return set(re.findall(r'[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}',
                               json.dumps(filtered_data)))
 
     @classmethod
@@ -814,9 +835,15 @@ class ConfigRequestModel(BaseModel):
 
 
 class FeatureProfileModel(ConfigRequestModel):
-    # Using alias because in 20.8.1 retrieving the profile gives profileName, while post/put requests require name field
-    name: str = Field(..., alias='profileName')
+    name: str
     description: str
+
+    # In 20.8.1 get profile contains 'profileName', while post/put requests require 'name' instead
+    def __init__(self, **kwargs):
+        name = kwargs.pop('name', None) or kwargs.pop('profileName', None)
+        if name is not None:
+            kwargs['name'] = name
+        super().__init__(**kwargs)
 
 
 class ProfileParcelPayloadModel(ConfigRequestModel):
@@ -844,21 +871,41 @@ class Config2Item(ConfigItem):
         exclude_set = self.skip_cmp_tag_set | {self.id_tag}
         put_model = self.put_model or self.post_model
 
-        local_cmp_dict = put_model(**self.data).dict(exclude=exclude_set)
+        local_cmp_dict = put_model(**self.data).dict(by_alias=True, exclude=exclude_set)
         other_cmp_dict = {k: v for k, v in other.items() if k not in exclude_set}
 
         return sorted(json.dumps(local_cmp_dict)) == sorted(json.dumps(other_cmp_dict))
 
-    def post_data(self, id_mapping_dict: Mapping[str, str], new_name: Optional[str] = None) -> Dict[str, Any]:
+    def post_data(self, id_mapping_dict: Optional[Mapping[str, str]] = None) -> Dict[str, Any]:
+        """
+        Build payload to be used for POST requests against this config item. From "self.data", perform item id
+        replacements defined in id_mapping_dict, also remove item id and rename item with new_name (if provided).
+        @param id_mapping_dict: {<old item id>: <new item id>} dict. If provided, <old item id> matches are replaced
+                                with <new item id>
+        @return: Dict containing payload for POST requests
+        """
         payload = self.post_model(**self.data)
 
-        return update_ids(id_mapping_dict, payload.dict())
+        if id_mapping_dict is None:
+            return payload.dict(by_alias=True)
 
-    def put_data(self, id_mapping_dict: Mapping[str, str]) -> Dict[str, Any]:
+        return update_ids(id_mapping_dict, payload.dict(by_alias=True))
+
+    def put_data(self, id_mapping_dict: Optional[Mapping[str, str]] = None) -> Dict[str, Any]:
+        """
+        Build payload to be used for PUT requests against this config item. From "self.data", perform item id
+        replacements defined in id_mapping_dict.
+        @param id_mapping_dict: {<old item id>: <new item id>} dict. If provided, <old item id> matches are replaced
+                                with <new item id>
+        @return: Dict containing payload for PUT requests
+        """
         put_model = self.put_model or self.post_model
         payload = put_model(**self.data)
 
-        return update_ids(id_mapping_dict, payload.dict())
+        if id_mapping_dict is None:
+            return payload.dict(by_alias=True)
+
+        return update_ids(id_mapping_dict, payload.dict(by_alias=True))
 
 
 class FeatureProfile(Config2Item):
@@ -892,9 +939,7 @@ class FeatureProfile(Config2Item):
         if api_path is None:
             raise ModelException(f"Parcel type {parcel.parcelType} is not supported")
 
-        parcel_info = f"{parcel.payload.name} [{parcel.parcelType}]"
-
-        new_element_id = yield api_path.resolve(*element_ids), parcel_info, parcel.payload.dict()
+        new_element_id = yield api_path.resolve(*element_ids), parcel.payload.name, parcel.payload.dict(by_alias=True)
 
         new_element_ids = element_ids + (new_element_id,)
         for sub_parcel in parcel.subparcels:
@@ -966,7 +1011,7 @@ def filename_safe(name: str, lower: bool = False) -> str:
     @return: string containing the filename-save version of item_name
     """
     # Inspired by Django's slugify function
-    cleaned = re.sub(r'[^\w\s-]', '_', name)
+    cleaned = re.sub(r'[^\w\s-]', '_', name, flags=re.ASCII)
     return cleaned.lower() if lower else cleaned
 
 
@@ -975,8 +1020,7 @@ def update_ids(id_mapping_dict: Mapping[str, str], item_data: Dict[str, Any]) ->
         matched_id = match.group(0)
         return id_mapping_dict.get(matched_id, matched_id)
 
-    dict_json = re.sub(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}',
-                       replace_id, json.dumps(item_data))
+    dict_json = re.sub(r'[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}', replace_id, json.dumps(item_data))
 
     return json.loads(dict_json)
 

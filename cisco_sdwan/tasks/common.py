@@ -12,14 +12,14 @@ import json
 from pathlib import Path
 from shutil import rmtree
 from collections import namedtuple
-from typing import List, Tuple, Iterator, Union, Optional, Any, Iterable, Type, TypeVar, Sequence
+from typing import List, Tuple, Iterator, Union, Optional, Any, Iterable, Type, TypeVar, Sequence, Mapping
 from cisco_sdwan.base.rest_api import Rest, RestAPIException
 from cisco_sdwan.base.models_base import DATA_DIR
 from cisco_sdwan.base.models_vmanage import (DeviceTemplate, DeviceTemplateValues, DeviceTemplateAttached,
                                              DeviceTemplateAttach, DeviceTemplateCLIAttach, DeviceModeCli,
                                              ActionStatus, PolicyVsmartStatus, PolicyVsmartStatusException,
                                              PolicyVsmartActivate, PolicyVsmartIndex, PolicyVsmartDeactivate,
-                                             Device)
+                                             Device, ConfigGroupDeploy, ConfigGroupAssociated, ConfigGroupValues)
 
 T = TypeVar('T')
 
@@ -356,10 +356,9 @@ class Task:
                                 When absent, re-attach all currently attached devices on target.
         @return: Tuple containing attach data (<template input list>, <isEdited>)
         """
-
         def load_template_input(template_name: str, saved_id: str, target_id: str) -> Union[list, None]:
             if target_id is None:
-                self.log_debug(f'Skip {template_name}, saved template is not on target node')
+                self.log_debug(f'Skip {template_name}, saved template not on target node')
                 return None
 
             saved_values = DeviceTemplateValues.load(workdir, ext_name, template_name, saved_id)
@@ -405,7 +404,6 @@ class Task:
         @param templates_iter: Iterator of (<template_name>, <target_template_id>)
         @return: Tuple containing attach data (<template input list>, <isEdited>)
         """
-
         def get_template_input(template_id):
             uuid_list = [uuid for uuid, _ in DeviceTemplateAttached.get_raise(api, template_id)]
             values = DeviceTemplateValues(api.post(DeviceTemplateValues.api_params(template_id, uuid_list),
@@ -421,43 +419,43 @@ class Task:
         ]
         return template_input_list, True
 
-    def attach(self, api: Rest, template_input_list: List[tuple], is_edited: bool, *, chunk_size: int = 200,
+    def attach(self, api: Rest, template_input_list: Sequence[tuple], is_edited: bool, *, chunk_size: int = 200,
                log_context: str, raise_on_failure: bool = True) -> int:
         """
         Attach device templates to devices
         @param api: Instance of Rest API
-        @param template_input_list: List containing payload for template attachment
+        @param template_input_list: Sequence containing payload for template attachment
         @param is_edited: Boolean corresponding to the isEdited tag in the template attach payload
         @param chunk_size: Maximum number of device attachments per request
         @param raise_on_failure: If True, raise exception on action failures
         @param log_context: Message to log during wait actions
         @return: Number of attachment requests processed
         """
-
         def grouper(attach_cls, request_list):
             while True:
                 section_dict = yield from chopper(chunk_size)
                 if not section_dict:
                     continue
 
+                request_list.append(...)
                 request_details = (
                     f"{template_name} ({', '.join(DeviceTemplateValues.input_list_devices(input_list))})"
                     for template_name, key_dict in section_dict.items() for _, input_list in key_dict.items()
                 )
                 self.log_info(f'Template attach: {", ".join(request_details)}')
 
-                if not self.is_dryrun:
-                    template_input_iter = (
-                        (template_id, input_list)
-                        for key_dict in section_dict.values() for template_id, input_list in key_dict.items()
-                    )
-                    action_worker = attach_cls(
-                        api.post(attach_cls.api_params(template_input_iter, is_edited), attach_cls.api_path.post)
-                    )
-                    self.log_debug(f'Device template attach requested: {action_worker.uuid}')
-                    self.wait_actions(api, [(action_worker, ', '.join(section_dict))], log_context, raise_on_failure)
+                if self.is_dryrun:
+                    continue
 
-                request_list.append(...)
+                template_input_iter = (
+                    (template_id, input_list)
+                    for key_dict in section_dict.values() for template_id, input_list in key_dict.items()
+                )
+                action_worker = attach_cls(
+                    api.post(attach_cls.api_params(template_input_iter, is_edited), attach_cls.api_path.post)
+                )
+                self.log_debug(f'Device template attach requested: {action_worker.uuid}')
+                self.wait_actions(api, [(action_worker, ', '.join(section_dict))], log_context, raise_on_failure)
 
         def feeder(attach_cls, attach_data_iter):
             attach_reqs = []
@@ -484,6 +482,127 @@ class Task:
 
         return len(feature_based_reqs + cli_based_reqs)
 
+    def associate_devices(self, api: Rest, workdir: str, ext_name: bool, config_grp_name: str, config_grp_saved_id: str,
+                          config_grp_target_id: str, devices_map: Mapping[str, str]) -> None:
+        """
+        Prepare data for template attach considering local backup as the source of truth (i.e. where input values are)
+        @param api: Instance of Rest API
+        @param workdir: Directory containing saved items
+        @param ext_name: Boolean passed to .load methods indicating whether extended item names should be used.
+        @param config_grp_name: Name of config group
+        @param config_grp_saved_id: Config group ID on backup
+        @param config_grp_target_id: Config group ID on target
+        @param devices_map: Mapping of {<uuid>: <name>, ...} with available devices on target node. Name may be None if
+                            device has no hostname yet.
+        """
+        saved_associated = ConfigGroupAssociated.load(workdir, ext_name, config_grp_name, config_grp_saved_id)
+        if saved_associated is None:
+            self.log_error(f'ConfigGroupAssociated file not found: {config_grp_name} {config_grp_saved_id}')
+            return
+
+        # Associate devices in saved_associated that are available but not associated yet
+        diff_associated = saved_associated.filter(
+            devices_map.keys() - set(ConfigGroupAssociated.get_raise(api, configGroupId=config_grp_target_id).uuids)
+        )
+        if diff_associated.is_empty:
+            self.log_info(f"Config group {config_grp_name}, no devices to associate")
+            return
+
+        if not self.is_dryrun:
+            diff_associated.put_raise(api, configGroupId=config_grp_target_id)
+
+        self.log_info(f"Config group {config_grp_name}, "
+                      f"associate: {', '.join(devices_map.get(uuid) or uuid for uuid in diff_associated.uuids)}")
+
+    def restore_values(self, api: Rest, workdir: str, ext_name: bool, config_grp_name: str, config_grp_saved_id: str,
+                       config_grp_target_id: str, devices_map: Mapping[str, str]) -> Sequence[str]:
+        """
+        Prepare data for template attach considering local backup as the source of truth (i.e. where input values are)
+        @param api: Instance of Rest API
+        @param workdir: Directory containing saved items
+        @param ext_name: Boolean passed to .load methods indicating whether extended item names should be used.
+        @param config_grp_name: Name of config group
+        @param config_grp_saved_id: Config group ID on backup
+        @param config_grp_target_id: Config group ID on target
+        @param devices_map: Mapping of {<uuid>: <name>, ...} with available devices on target node. Name may be None if
+                            device has no hostname yet.
+        @return: [<device uuid>, ...] corresponding to the devices that had values pushed
+        """
+        saved_values = ConfigGroupValues.load(workdir, ext_name, config_grp_name, config_grp_saved_id)
+        if saved_values is None:
+            self.log_error(f'ConfigGroupValues file not found: {config_grp_name} {config_grp_saved_id}')
+            return []
+
+        # Restore values for devices in saved_values that are available
+        diff_values = saved_values.filter(devices_map.keys())
+        if diff_values.is_empty:
+            self.log_info(f"Config group {config_grp_name}, no values to push")
+            return []
+
+        if not self.is_dryrun:
+            # TODO: Capture pydantic.error_wrappers.ValidationError to make sure the values are good
+            affected_uuids = diff_values.put_raise(api, configGroupId=config_grp_target_id)
+        else:
+            affected_uuids = list(diff_values.uuids)
+
+        self.log_info(f"Config group {config_grp_name}, "
+                      f"push values: {', '.join(devices_map.get(uuid) or uuid for uuid in affected_uuids)}")
+
+        return affected_uuids
+
+    def deploy_devices(self, api: Rest, deploy_data: Sequence[Tuple[str, str, Sequence]],
+                       devices_map: Mapping[str, str], *, chunk_size: int = 200, log_context: str,
+                       raise_on_failure: bool = True) -> int:
+        """
+        Deploy config groups to devices
+        @param api: Instance of Rest API
+        @param deploy_data: Sequence of (<config_group_id>, <config_group_name>, [<device uuid>, ...]) tuples
+        @param devices_map: Mapping of {<uuid>: <name>, ...} with available devices on target node. Name may be None if
+                            device has no hostname yet.
+        @param chunk_size: Maximum number of device deployments per request
+        @param raise_on_failure: If True, raise exception on action failures
+        @param log_context: Message to log during wait actions
+        @return: Number of deploy requests processed
+        """
+        def grouper(request_list):
+            while True:
+                section_dict = yield from chopper(chunk_size)
+                if not section_dict:
+                    continue
+
+                wait_list = []
+                for group_id, key_dict in section_dict.items():
+                    request_list.append(...)
+                    request_details = (
+                        f"{group_name} ({', '.join(devices_map.get(uuid) or uuid for uuid in id_list)})"
+                        for group_name, id_list in key_dict.items()
+                    )
+                    self.log_info(f'Config group deploy: {", ".join(request_details)}')
+
+                    if self.is_dryrun:
+                        continue
+
+                    action_worker = ConfigGroupDeploy(
+                        api.post(ConfigGroupDeploy.api_params(uuid for uuids in key_dict.values() for uuid in uuids),
+                                 ConfigGroupDeploy.api_path.resolve(configGroupId=group_id).post)
+                    )
+                    wait_list.append((action_worker, ', '.join(key_dict)))
+                    self.log_debug(f'Config group deploy requested: {action_worker.uuid}')
+
+                if wait_list:
+                    self.wait_actions(api, wait_list, log_context, raise_on_failure)
+
+        deploy_reqs = []
+        group = grouper(deploy_reqs)
+        next(group)
+
+        for config_grp_id, config_grp_name, device_id_list in deploy_data:
+            for device_id in device_id_list:
+                group.send((config_grp_id, config_grp_name, device_id))
+        group.send(None)
+
+        return len(deploy_reqs)
+
     def detach(self, api: Rest, template_iter: Iterator[tuple], device_map: Optional[dict] = None, *,
                chunk_size: int = 200, log_context: str, raise_on_failure: bool = True) -> int:
         """
@@ -497,7 +616,6 @@ class Task:
         @param log_context: Message to log during wait actions
         @return: Number of detach requests processed
         """
-
         def grouper(request_list):
             while True:
                 section_dict = yield from chopper(chunk_size)

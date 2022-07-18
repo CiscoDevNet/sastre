@@ -152,7 +152,7 @@ def filename_type(name_str):
 
 
 def uuid_type(uuid_str):
-    if re.match(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', uuid_str) is None:
+    if re.match(r'[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$', uuid_str) is None:
         raise argparse.ArgumentTypeError(f'"{uuid_str}" is not a valid item ID.')
 
     return uuid_str

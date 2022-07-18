@@ -4,11 +4,12 @@
  cisco_sdwan.base.rest_api
  This module implements the lower level REST API
 """
-import requests
-import urllib3
 import json
+import requests
+from urllib3 import disable_warnings
+from urllib3.exceptions import InsecureRequestWarning
 from time import time
-from typing import Optional, Sequence, Dict
+from typing import Optional, Dict, Sequence
 
 
 class Rest:
@@ -22,7 +23,7 @@ class Rest:
         self.is_tenant_scope = False
 
         if not verify:
-            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+            disable_warnings(InsecureRequestWarning)
 
         if not self.login(username, password, tenant_name):
             raise LoginFailedException(f'Login to {self.base_url} failed, check credentials')
