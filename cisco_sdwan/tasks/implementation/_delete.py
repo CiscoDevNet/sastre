@@ -40,16 +40,6 @@ class TaskDelete(Task):
 
         if parsed_args.detach:
             try:
-                template_index = DeviceTemplateIndex.get_raise(api)
-                # Detach WAN Edge templates
-                reqs = self.detach(api,
-                                   template_index.filtered_iter(DeviceTemplateIndex.is_not_vsmart,
-                                                                DeviceTemplateIndex.is_attached),
-                                   log_context='detaching WAN Edges')
-                if reqs:
-                    self.log_debug(f'Detach requests processed: {reqs}')
-                else:
-                    self.log_info('No WAN Edge attached')
                 # Deactivate vSmart policy
                 if not self.is_dryrun:
                     action_list = self.deactivate_policy(api)
@@ -57,18 +47,33 @@ class TaskDelete(Task):
                         self.log_info('No vSmart policy activated')
                     else:
                         self.wait_actions(api, action_list, 'deactivating vSmart policy', raise_on_failure=True)
+
+                template_index = DeviceTemplateIndex.get_raise(api)
                 # Detach vSmart template
-                reqs = self.detach(api,
-                                   template_index.filtered_iter(DeviceTemplateIndex.is_vsmart,
-                                                                DeviceTemplateIndex.is_attached),
-                                   log_context='detaching vSmarts')
+                reqs = self.detach(api, template_index.filtered_iter(DeviceTemplateIndex.is_vsmart,
+                                                                     DeviceTemplateIndex.is_attached),
+                                   log_context='template detaching vSmarts')
                 if reqs:
                     self.log_debug(f'Detach requests processed: {reqs}')
                 else:
-                    self.log_info('No vSmart attached')
+                    self.log_info('No vSmart template detachments needed')
+                # Detach WAN Edge templates
+                reqs = self.detach(api, template_index.filtered_iter(DeviceTemplateIndex.is_not_vsmart,
+                                                                     DeviceTemplateIndex.is_attached),
+                                   log_context='template detaching WAN Edges')
+                if reqs:
+                    self.log_debug(f'Detach requests processed: {reqs}')
+                else:
+                    self.log_info('No WAN Edge template detachments needed')
 
-                # De-associate config-groups
-                # config_group_index = ConfigGroupIndex.get_raise(api).filtered_iter(ConfigGroupIndex.is_associated)
+                # Dissociate WAN Edge config-groups
+                config_group_index = ConfigGroupIndex.get_raise(api)
+                reqs = self.dissociate(api, config_group_index.filtered_iter(ConfigGroupIndex.is_associated),
+                                       log_context='config-group dissociating WAN Edges')
+                if reqs:
+                    self.log_debug(f'Dissociate requests processed: {reqs}')
+                else:
+                    self.log_info('No WAN Edge config-group dissociation needed')
 
             except (RestAPIException, WaitActionsException) as ex:
                 self.log_critical(f'Detach failed: {ex}')
@@ -95,10 +100,12 @@ class TaskDelete(Task):
                     self.log_info(f'Delete {info} {item_name}')
                     continue
 
-                if api.delete(item_cls.api_path.delete, item_id):
-                    self.log_info(f'Done: Delete {info} {item_name}')
+                try:
+                    api.delete(item_cls.api_path.delete, item_id)
+                except RestAPIException as ex:
+                    self.log_warning(f'Failed: Delete {info} {item_name}: {ex}')
                 else:
-                    self.log_warning(f'Failed deleting {info} {item_name}')
+                    self.log_info(f'Done: Delete {info} {item_name}')
 
         return
 

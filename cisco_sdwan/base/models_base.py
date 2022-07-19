@@ -866,6 +866,7 @@ class Config2Item(ConfigItem):
     """
     post_model: Callable[..., ConfigRequestModel] = None
     put_model: Optional[Callable[..., ConfigRequestModel]] = None
+    delete_model: Optional[Callable[..., ConfigRequestModel]] = None
 
     def is_equal(self, other: Dict[str, Any]) -> bool:
         exclude_set = self.skip_cmp_tag_set | {self.id_tag}
@@ -884,12 +885,7 @@ class Config2Item(ConfigItem):
                                 with <new item id>
         @return: Dict containing payload for POST requests
         """
-        payload = self.post_model(**self.data)
-
-        if id_mapping_dict is None:
-            return payload.dict(by_alias=True)
-
-        return update_ids(id_mapping_dict, payload.dict(by_alias=True))
+        return self._op_data(self.post_model, id_mapping_dict)
 
     def put_data(self, id_mapping_dict: Optional[Mapping[str, str]] = None) -> Dict[str, Any]:
         """
@@ -900,7 +896,22 @@ class Config2Item(ConfigItem):
         @return: Dict containing payload for PUT requests
         """
         put_model = self.put_model or self.post_model
-        payload = put_model(**self.data)
+        return self._op_data(put_model, id_mapping_dict)
+
+    def delete_data(self, id_mapping_dict: Optional[Mapping[str, str]] = None) -> Dict[str, Any]:
+        """
+        Build payload to be used for DELETE requests against this config item. From "self.data", perform item id
+        replacements defined in id_mapping_dict.
+        @param id_mapping_dict: {<old item id>: <new item id>} dict. If provided, <old item id> matches are replaced
+                                with <new item id>
+        @return: Dict containing payload for DELETE requests
+        """
+        delete_model = self.delete_model or self.put_model or self.post_model
+        return self._op_data(delete_model, id_mapping_dict)
+
+    def _op_data(self, op_model: Callable[..., ConfigRequestModel],
+                 id_mapping_dict: Optional[Mapping[str, str]]) -> Dict[str, Any]:
+        payload = op_model(**self.data)
 
         if id_mapping_dict is None:
             return payload.dict(by_alias=True)

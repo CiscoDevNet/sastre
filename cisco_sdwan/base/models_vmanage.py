@@ -591,17 +591,23 @@ class ConfigGroupValues(Config2Item):
         return (entry['device-id'] for entry in self.data.get('devices', []) if 'device-id' in entry)
 
     @property
-    def is_empty(self):
+    def is_empty(self) -> bool:
         return self.data is None or len(self.data.get('devices', [])) == 0
 
     def filter(self, allowed_uuid_set: Set[str]) -> 'ConfigGroupValues':
+        """
+        Return a new instance of ConfigGroupValues containing only device entries with an id that is present in
+        allowed_uuid_set.
+        @param allowed_uuid_set: Set of device uuids that are allowed
+        @return: Filtered ConfigGroupValues instance
+        """
         new_payload = deepcopy(self.data)
         new_payload['devices'] = [
             entry for entry in new_payload.get('devices', []) if entry.get('device-id') in allowed_uuid_set
         ]
         return ConfigGroupValues(new_payload)
 
-    def put_raise(self, api, **path_vars) -> Sequence[str]:
+    def put_raise(self, api: Rest, **path_vars: str) -> Sequence[str]:
         result = api.put(self.put_data(), ConfigGroupValues.api_path.resolve(**path_vars).put)
 
         return [entry.get('device-id') for entry in result]
@@ -622,25 +628,44 @@ class ConfigGroupAssociated(Config2Item):
 
     post_model = ConfigGroupAssociatedModel
 
+    ActionWorker = namedtuple('ActionWorker', ['uuid', ])
+
     @property
     def uuids(self) -> Iterable[str]:
         return (entry['id'] for entry in self.data.get('devices', []) if 'id' in entry)
 
     @property
-    def is_empty(self):
+    def is_empty(self) -> bool:
         return self.data is None or len(self.data.get('devices', [])) == 0
 
     def filter(self, allowed_uuid_set: Set[str]) -> 'ConfigGroupAssociated':
+        """
+        Return a new instance of ConfigGroupAssociated containing only device entries with an id that is present in
+        allowed_uuid_set.
+        @param allowed_uuid_set: Set of device uuids that are allowed
+        @return: Filtered ConfigGroupAssociated instance
+        """
         new_payload = deepcopy(self.data)
         new_payload['devices'] = [
             entry for entry in new_payload.get('devices', []) if entry.get('id') in allowed_uuid_set
         ]
         return ConfigGroupAssociated(new_payload)
 
-    def put_raise(self, api, **path_vars) -> None:
+    def put_raise(self, api: Rest, **path_vars: str) -> None:
         api.put(self.put_data(), ConfigGroupAssociated.api_path.resolve(**path_vars).put)
 
         return
+
+    @staticmethod
+    def delete_raise(api: Rest, uuids: Iterable[str], **path_vars: str) -> ActionWorker:
+        payload = {
+            "devices": [
+                {"id": device_id} for device_id in uuids
+            ]
+        }
+        response = api.delete(ConfigGroupAssociated.api_path.resolve(**path_vars).delete, input_data=payload)
+
+        return ConfigGroupAssociated.ActionWorker(uuid=response.get('parentTaskId'))
 
 
 class ConfigGroupDeploy(ApiItem):
