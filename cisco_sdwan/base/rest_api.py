@@ -9,7 +9,7 @@ import requests
 from urllib3 import disable_warnings
 from urllib3.exceptions import InsecureRequestWarning
 from time import time
-from typing import Optional, Dict, Sequence
+from typing import Optional, Dict, Sequence, Any, Union
 
 
 class Rest:
@@ -87,30 +87,30 @@ class Rest:
 
         return True
 
-    def logout(self):
+    def logout(self) -> bool:
         response = self.session.get(f'{self.base_url}/logout', params={'nocache': str(int(time()))})
         return response.status_code == requests.codes.ok
 
     @property
-    def server_version(self):
-        return self.server_facts.get('platformVersion')
+    def server_version(self) -> str:
+        return self.server_facts.get('platformVersion', '0.0')
 
     @property
-    def is_multi_tenant(self):
+    def is_multi_tenant(self) -> bool:
         return self.server_facts.get('tenancyMode', '') == 'MultiTenant'
 
     @property
-    def is_provider(self):
+    def is_provider(self) -> bool:
         return self.server_facts.get('userMode', '') == 'provider'
 
-    def get(self, *path_entries, **params):
+    def get(self, *path_entries: str, **params: Union[str, int]) -> Dict[str, Any]:
         response = self.session.get(self._url(*path_entries),
                                     params=params if params else None,
                                     timeout=self.timeout, verify=self.verify)
         raise_for_status(response)
         return response.json()
 
-    def post(self, input_data, *path_entries):
+    def post(self, input_data: Dict[str, Any], *path_entries: str) -> Union[Dict[str, Any], None]:
         # With large input_data, vManage fails the post request if payload is encoded in compact form. Thus encoding
         # with indent=1.
         response = self.session.post(self._url(*path_entries), data=json.dumps(input_data, indent=1),
@@ -120,7 +120,7 @@ class Rest:
         # POST may return an empty string, return None in this case
         return response.json() if response.text else None
 
-    def put(self, input_data, *path_entries):
+    def put(self, input_data: Dict[str, Any], *path_entries: str) -> Union[Dict[str, Any], None]:
         # With large input_data, vManage fails the put request if payload is encoded in compact form. Thus encoding
         # with indent=1.
         response = self.session.put(self._url(*path_entries), data=json.dumps(input_data, indent=1),
@@ -130,12 +130,16 @@ class Rest:
         # PUT may return an empty string, return None in this case
         return response.json() if response.text else None
 
-    def delete(self, resource, key_value):
-        response = self.session.delete(self._url(resource, key_value),
+    def delete(self, *path_entries: str, input_data: Optional[Dict[str, Any]] = None) -> Union[Dict[str, Any], None]:
+        response = self.session.delete(self._url(*path_entries),
+                                       data=json.dumps(input_data, indent=1) if input_data is not None else None,
                                        timeout=self.timeout, verify=self.verify)
-        return response.status_code == requests.codes.ok
+        raise_for_status(response)
 
-    def _url(self, *path_entries):
+        # DELETE normally returns an empty string, return None in this case
+        return response.json() if response.text else None
+
+    def _url(self, *path_entries: str) -> str:
         path = '/'.join(path.strip('/') for path in path_entries)
 
         return f'{self.base_url}/dataservice/{path}'

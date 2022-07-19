@@ -438,11 +438,11 @@ class Task:
                     continue
 
                 request_list.append(...)
-                request_details = (
+                attach_request_details = (
                     f"{template_name} ({', '.join(DeviceTemplateValues.input_list_devices(input_list))})"
-                    for template_name, key_dict in section_dict.items() for _, input_list in key_dict.items()
+                    for template_name, key_dict in section_dict.items() for input_list in key_dict.values()
                 )
-                self.log_info(f'Template attach: {", ".join(request_details)}')
+                self.log_info(f'Template attach: {", ".join(attach_request_details)}')
 
                 if self.is_dryrun:
                     continue
@@ -485,13 +485,13 @@ class Task:
     def associate_devices(self, api: Rest, workdir: str, ext_name: bool, config_grp_name: str, config_grp_saved_id: str,
                           config_grp_target_id: str, devices_map: Mapping[str, str]) -> None:
         """
-        Prepare data for template attach considering local backup as the source of truth (i.e. where input values are)
+        Associate devices to a config-group
         @param api: Instance of Rest API
         @param workdir: Directory containing saved items
         @param ext_name: Boolean passed to .load methods indicating whether extended item names should be used.
-        @param config_grp_name: Name of config group
-        @param config_grp_saved_id: Config group ID on backup
-        @param config_grp_target_id: Config group ID on target
+        @param config_grp_name: Name of config-group
+        @param config_grp_saved_id: Config-group ID on backup
+        @param config_grp_target_id: Config-group ID on target
         @param devices_map: Mapping of {<uuid>: <name>, ...} with available devices on target node. Name may be None if
                             device has no hostname yet.
         """
@@ -505,25 +505,25 @@ class Task:
             devices_map.keys() - set(ConfigGroupAssociated.get_raise(api, configGroupId=config_grp_target_id).uuids)
         )
         if diff_associated.is_empty:
-            self.log_info(f"Config group {config_grp_name}, no devices to associate")
+            self.log_info(f"Config-group {config_grp_name}, no devices to associate")
             return
 
         if not self.is_dryrun:
             diff_associated.put_raise(api, configGroupId=config_grp_target_id)
 
-        self.log_info(f"Config group {config_grp_name}, "
+        self.log_info(f"Config-group {config_grp_name}, "
                       f"associate: {', '.join(devices_map.get(uuid) or uuid for uuid in diff_associated.uuids)}")
 
     def restore_values(self, api: Rest, workdir: str, ext_name: bool, config_grp_name: str, config_grp_saved_id: str,
                        config_grp_target_id: str, devices_map: Mapping[str, str]) -> Sequence[str]:
         """
-        Prepare data for template attach considering local backup as the source of truth (i.e. where input values are)
+        Restore config-group values for associated devices
         @param api: Instance of Rest API
         @param workdir: Directory containing saved items
         @param ext_name: Boolean passed to .load methods indicating whether extended item names should be used.
-        @param config_grp_name: Name of config group
-        @param config_grp_saved_id: Config group ID on backup
-        @param config_grp_target_id: Config group ID on target
+        @param config_grp_name: Name of config-group
+        @param config_grp_saved_id: Config-group ID on backup
+        @param config_grp_target_id: Config-group ID on target
         @param devices_map: Mapping of {<uuid>: <name>, ...} with available devices on target node. Name may be None if
                             device has no hostname yet.
         @return: [<device uuid>, ...] corresponding to the devices that had values pushed
@@ -536,7 +536,7 @@ class Task:
         # Restore values for devices in saved_values that are available
         diff_values = saved_values.filter(devices_map.keys())
         if diff_values.is_empty:
-            self.log_info(f"Config group {config_grp_name}, no values to push")
+            self.log_info(f"Config-group {config_grp_name}, no values to push")
             return []
 
         if not self.is_dryrun:
@@ -545,7 +545,7 @@ class Task:
         else:
             affected_uuids = list(diff_values.uuids)
 
-        self.log_info(f"Config group {config_grp_name}, "
+        self.log_info(f"Config-group {config_grp_name}, "
                       f"push values: {', '.join(devices_map.get(uuid) or uuid for uuid in affected_uuids)}")
 
         return affected_uuids
@@ -554,7 +554,7 @@ class Task:
                        devices_map: Mapping[str, str], *, chunk_size: int = 200, log_context: str,
                        raise_on_failure: bool = True) -> int:
         """
-        Deploy config groups to devices
+        Deploy config-groups to devices
         @param api: Instance of Rest API
         @param deploy_data: Sequence of (<config_group_id>, <config_group_name>, [<device uuid>, ...]) tuples
         @param devices_map: Mapping of {<uuid>: <name>, ...} with available devices on target node. Name may be None if
@@ -573,11 +573,7 @@ class Task:
                 wait_list = []
                 for group_id, key_dict in section_dict.items():
                     request_list.append(...)
-                    request_details = (
-                        f"{group_name} ({', '.join(devices_map.get(uuid) or uuid for uuid in id_list)})"
-                        for group_name, id_list in key_dict.items()
-                    )
-                    self.log_info(f'Config group deploy: {", ".join(request_details)}')
+                    self.log_info(f'Config-group deploy: {request_details(key_dict, devices_map)}')
 
                     if self.is_dryrun:
                         continue
@@ -587,7 +583,7 @@ class Task:
                                  ConfigGroupDeploy.api_path.resolve(configGroupId=group_id).post)
                     )
                     wait_list.append((action_worker, ', '.join(key_dict)))
-                    self.log_debug(f'Config group deploy requested: {action_worker.uuid}')
+                    self.log_debug(f'Config-group deploy requested: {action_worker.uuid}')
 
                 if wait_list:
                     self.wait_actions(api, wait_list, log_context, raise_on_failure)
@@ -603,15 +599,15 @@ class Task:
 
         return len(deploy_reqs)
 
-    def detach(self, api: Rest, template_iter: Iterator[tuple], device_map: Optional[dict] = None, *,
-               chunk_size: int = 200, log_context: str, raise_on_failure: bool = True) -> int:
+    def detach(self, api: Rest, template_iter: Iterator[tuple], devices_map: Optional[Mapping[str, str]] = None,
+               *, chunk_size: int = 200, log_context: str, raise_on_failure: bool = True) -> int:
         """
         Detach devices from device templates
         @param api: Instance of Rest API
-        @param template_iter: An iterator of (<template id>, <template name>) tuples containing templates to detach
-        @param device_map: {<uuid>: <name>, ...} dict containing allowed devices for detach. If None, all attached
-                           devices are detached.
-        @param chunk_size: Maximum number of device detachments per request
+        @param template_iter: Iterator of (<template id>, <template name>) tuples containing templates to detach
+        @param devices_map: Mapping of {<uuid>: <name>, ...} containing allowed devices to detach. If None, all attached
+                            devices are detached.
+        @param chunk_size: Maximum number of devices per detachment request
         @param raise_on_failure: If True, raise exception on action failures
         @param log_context: Message to log during wait actions
         @return: Number of detach requests processed
@@ -624,21 +620,18 @@ class Task:
 
                 wait_list = []
                 for device_type, key_dict in section_dict.items():
-                    request_details = (
-                        f"{t_name} ({', '.join(device_map.get(device_id, '-') for device_id in device_id_list)})"
-                        for t_name, device_id_list in key_dict.items()
-                    )
-                    self.log_info(f'Template detach: {", ".join(request_details)}')
-
-                    if not self.is_dryrun:
-                        id_list = (device_id for device_id_list in key_dict.values() for device_id in device_id_list)
-                        action_worker = DeviceModeCli(
-                            api.post(DeviceModeCli.api_params(device_type, *id_list), DeviceModeCli.api_path.post)
-                        )
-                        wait_list.append((action_worker, ', '.join(key_dict)))
-                        self.log_debug(f'Device template attach requested: {action_worker.uuid}')
-
                     request_list.append(...)
+                    self.log_info(f'Template detach: {request_details(key_dict, devices_map)}')
+
+                    if self.is_dryrun:
+                        continue
+
+                    uuid_iter = (uuid for device_id_list in key_dict.values() for uuid in device_id_list)
+                    action_worker = DeviceModeCli(
+                        api.post(DeviceModeCli.api_params(device_type, *uuid_iter), DeviceModeCli.api_path.post)
+                    )
+                    wait_list.append((action_worker, ', '.join(key_dict)))
+                    self.log_debug(f'Device template attach requested: {action_worker.uuid}')
 
                 if wait_list:
                     self.wait_actions(api, wait_list, log_context, raise_on_failure)
@@ -647,20 +640,74 @@ class Task:
         group = grouper(detach_reqs)
         next(group)
 
-        if device_map is None:
-            device_map = dict(device_iter(api))
+        if devices_map is None:
+            devices_map = dict(device_iter(api))
 
         for template_id, template_name in template_iter:
             devices_attached = DeviceTemplateAttached.get(api, template_id)
             if devices_attached is None:
                 self.log_warning(f'Failed to retrieve {template_name} attached devices from vManage')
                 continue
-            for uuid, personality in devices_attached:
-                if uuid in device_map:
-                    group.send((personality, template_name, uuid))
+            for device_id, personality in devices_attached:
+                if device_id in devices_map:
+                    group.send((personality, template_name, device_id))
         group.send(None)
 
         return len(detach_reqs)
+
+    def dissociate(self, api: Rest, config_group_iter: Iterator[tuple], devices_map: Optional[Mapping[str, str]] = None,
+                   *, chunk_size: int = 200, log_context: str, raise_on_failure: bool = True) -> int:
+        """
+        Dissociate devices from config-groups
+        @param api: Instance of Rest API
+        @param config_group_iter: Iterator of (<group id>, <group name>) tuples containing config-groups to dissociate
+        @param devices_map: Mapping of {<uuid>: <name>, ...} containing allowed devices to dissociate. If None,
+                            dissociate all associated devices.
+        @param chunk_size: Maximum number of devices per association delete request
+        @param raise_on_failure: If True, raise exception on action failures
+        @param log_context: Message to log during wait actions
+        @return: Number of associate delete requests processed
+        """
+        def grouper(request_list):
+            while True:
+                section_dict = yield from chopper(chunk_size)
+                if not section_dict:
+                    continue
+
+                wait_list = []
+                for group_id, key_dict in section_dict.items():
+                    request_list.append(...)
+                    self.log_info(f'Config-group dissociate: {request_details(key_dict, devices_map)}')
+
+                    if self.is_dryrun:
+                        continue
+
+                    uuid_iter = (uuid for device_id_list in key_dict.values() for uuid in device_id_list)
+                    action_worker = ConfigGroupAssociated.delete_raise(api, uuid_iter, configGroupId=group_id)
+                    wait_list.append((action_worker, ', '.join(key_dict)))
+                    self.log_debug(f'Config-group device dissociate requested: {action_worker.uuid}')
+
+                if wait_list:
+                    self.wait_actions(api, wait_list, log_context, raise_on_failure)
+
+        dissociate_reqs = []
+        group = grouper(dissociate_reqs)
+        next(group)
+
+        if devices_map is None:
+            devices_map = dict(device_iter(api))
+
+        for config_grp_id, config_grp_name in config_group_iter:
+            devices_associated = ConfigGroupAssociated.get(api, configGroupId=config_grp_id)
+            if devices_associated is None:
+                self.log_warning(f'Failed to retrieve {config_grp_name} associated devices from vManage')
+                continue
+            for device_id in devices_associated.uuids:
+                if device_id in devices_map:
+                    group.send((config_grp_id, config_grp_name, device_id))
+        group.send(None)
+
+        return len(dissociate_reqs)
 
     def activate_policy(self, api: Rest, policy_id: Optional[str], policy_name: Optional[str],
                         is_edited: bool = False) -> List[tuple]:
@@ -775,6 +822,13 @@ def chopper(section_size: int):
         primary_key, secondary_key, item = data
         section.setdefault(primary_key, {}).setdefault(secondary_key, []).append(item)
     return section
+
+
+def request_details(secondary_dict: Mapping[str, Sequence[str]], devices_map: Mapping[str, str]) -> str:
+    return ', '.join(
+        f"{secondary_key} ({', '.join(devices_map.get(item) or item for item in item_list)})"
+        for secondary_key, item_list in secondary_dict.items()
+    )
 
 
 def device_iter(api: Rest, match_name_regex: Optional[str] = None, match_reachable: bool = False,
