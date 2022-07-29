@@ -4,7 +4,7 @@
  cisco_sdwan.base.catalog
  This module implements vManage API Catalogs
 """
-from typing import NamedTuple, Union, Optional, Iterator
+from typing import NamedTuple, Union, Optional, Iterator, Dict, Set, Tuple, Any
 from enum import Enum
 from .models_base import IndexConfigItem, ConfigItem, RealtimeItem, BulkStateItem, BulkStatsItem
 from .rest_api import is_version_newer
@@ -21,7 +21,7 @@ class CatalogItem(NamedTuple):
     min_version: Union[str, None]
 
 
-_catalog = list()  # [(<tag>, <info>, <index_cls>, <item_cls>, <min_version>), ...]
+_catalog: Dict[type, CatalogItem] = dict()  # {<item_cls>: (<tag>, <info>, <index_cls>, <item_cls>, <min_version>), ...}
 
 
 # Catalog for operational data items
@@ -112,7 +112,7 @@ def register(tag: str, info: str, item_cls: type, min_version: Optional[str] = N
         if tag not in _tag_dependency_list:
             raise CatalogException(f'Unknown tag provided: {tag}')
 
-        _catalog.append(CatalogItem(tag, info, index_cls, item_cls, min_version))
+        _catalog[index_cls] = CatalogItem(tag, info, index_cls, item_cls, min_version)
 
         return index_cls
 
@@ -127,7 +127,7 @@ def catalog_size() -> int:
     return len(_catalog)
 
 
-def catalog_iter(*tags: str, version: Optional[str] = None) -> Iterator[tuple]:
+def catalog_iter(*tags: str, version: Optional[str] = None) -> Iterator[Tuple[str, str, Any, Any]]:
     """
     Return an iterator of (<tag>, <info>, <index_cls>, <item_cls>) tuples matching the specified tag(s) and supported
     by vManage version.
@@ -145,16 +145,30 @@ def catalog_iter(*tags: str, version: Optional[str] = None) -> Iterator[tuple]:
 
     return (
         (item.tag, item.info, item.index_cls, item.item_cls)
-        for item in _catalog if match_tags(item) and match_version(item)
+        for item in _catalog.values() if match_tags(item) and match_version(item)
     )
 
 
-def catalog_tags() -> set:
+def catalog_tags() -> Set[str]:
     """
     Return unique tags used by items registered with the catalog
     @return: Set of unique tags
     """
-    return {entry.tag for entry in _catalog}
+    return {entry.tag for entry in _catalog.values()}
+
+
+def is_index_supported(index_cls: type, version: Optional[str] = None) -> bool:
+    """
+    Indicates whether the provided index_cls is supported by a given vManage version
+    @param index_cls: An index config item class.
+    @param version: Target vManage version. If None, always return true when index_cls is in the catalog
+    @return: True is index_cls is in the catalog and supported by the version provided, False otherwise.
+    """
+    catalog_entry = _catalog.get(index_cls)
+    if catalog_entry is None:
+        return False
+
+    return version is None or not is_version_newer(version, catalog_entry.min_version)
 
 
 #

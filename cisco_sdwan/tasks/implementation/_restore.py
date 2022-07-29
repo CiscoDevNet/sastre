@@ -3,7 +3,7 @@ from typing import Union, Optional, Sequence, Dict, Set
 from pydantic import validator
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest, RestAPIException, is_version_newer, response_id
-from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL, ordered_tags
+from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL, ordered_tags, is_index_supported
 from cisco_sdwan.base.models_base import UpdateEval, ServerInfo, ModelException
 from cisco_sdwan.base.models_vmanage import (DeviceTemplateIndex, PolicyVsmartIndex, EdgeInventory, ControlInventory,
                                              CheckVBond, FeatureProfile, ConfigGroupIndex)
@@ -31,7 +31,8 @@ class TaskRestore(Task):
         task_parser.add_argument('--dryrun', action='store_true',
                                  help='dry-run mode. Items to be restored are listed but not pushed to vManage.')
         task_parser.add_argument('--attach', action='store_true',
-                                 help='attach devices to templates and activate vSmart policy after restoring items')
+                                 help='attach templates, deploy config-groups and activate vSmart policy after '
+                                      'restoring items.')
         task_parser.add_argument('--update', action='store_true',
                                  help='update vManage items that have the same name but different content as the '
                                       'corresponding item in workdir. Without this option, such items are skipped '
@@ -129,12 +130,13 @@ class TaskRestore(Task):
             self.log_info('No items to push')
 
         if parsed_args.attach:
-            try:
-                self.restore_deployments(api, parsed_args.workdir)
-                self.restore_attachments(api, parsed_args.workdir)
-                self.restore_active_policy(api, parsed_args.workdir)
-            except (RestAPIException, FileNotFoundError, WaitActionsException) as ex:
-                self.log_critical(f'Attach failed: {ex}')
+            for attach_step_fn, info in (('restore_deployments', 'config-group deployments'),
+                                         ('restore_attachments', 'template attachments'),
+                                         ('restore_active_policy', 'vSmart policy activate')):
+                try:
+                    getattr(TaskRestore, attach_step_fn)(self, api, parsed_args.workdir)
+                except (RestAPIException, FileNotFoundError, WaitActionsException) as ex:
+                    self.log_error(f'Failed: {info}: {ex}')
 
         return
 
@@ -213,7 +215,7 @@ class TaskRestore(Task):
                         if put_eval.need_reattach:
                             if put_eval.is_master:
                                 self.log_info(f'Updating {info} {item.name} requires reattach')
-                                attach_data = self.reattach_template_data(api, [(item.name, target_id)])
+                                attach_data = self.template_reattach_data(api, [(item.name, target_id)])
                             else:
                                 self.log_info(
                                     f'Updating {info} {item.name} requires reattach of affected templates'
@@ -224,11 +226,11 @@ class TaskRestore(Task):
                                     (target_templates[tgt_id], tgt_id)
                                     for tgt_id in put_eval.templates_affected_iter()
                                 )
-                                attach_data = self.reattach_template_data(api, templates_iter)
+                                attach_data = self.template_reattach_data(api, templates_iter)
 
                             # All re-attachments need to be done in a single request, thus 9999 for chunk_size
-                            reqs = self.attach(api, *attach_data, chunk_size=9999,
-                                               log_context='reattaching templates')
+                            reqs = self.template_attach(api, *attach_data, chunk_size=9999,
+                                                        log_context='reattaching templates')
                             self.log_debug(f'Attach requests processed: {reqs}')
                         elif put_eval.need_reactivate:
                             self.log_info(f'Updating {info} {item.name} requires vSmart policy reactivate')
@@ -256,35 +258,27 @@ class TaskRestore(Task):
             self.log_debug("Will skip deployments restore, no local config-group index")
             return
 
+        if not is_index_supported(ConfigGroupIndex, version=api.server_version):
+            self.log_debug("Will skip deploy, target vManage does not support config-groups")
+            return
+
         target_groups = {item_name: item_id for item_id, item_name in ConfigGroupIndex.get_raise(api)}
         edges_map = {
             entry.uuid: entry.name
-            for entry in EdgeInventory.get_raise(api).filtered_iter(EdgeInventory.is_cedge, EdgeInventory.is_cli_mode)
+            for entry in EdgeInventory.get_raise(api).filtered_iter(EdgeInventory.is_available, EdgeInventory.is_cedge)
         }
-        deploy_data = []
         groups_iter = (
             (saved_name, saved_id, target_groups.get(saved_name))
             for saved_id, saved_name in saved_groups_index.filtered_iter(ConfigGroupIndex.is_associated)
         )
-        for group_name, saved_id, target_id in groups_iter:
-            if target_id is None:
-                self.log_debug(f'Skip {group_name}, saved config-group not on target node')
-                continue
-
-            self.associate_devices(
-                api, workdir, saved_groups_index.need_extended_name, group_name, saved_id, target_id, edges_map
-            )
-            affected_uuids = self.restore_values(
-                api, workdir, saved_groups_index.need_extended_name, group_name, saved_id, target_id, edges_map
-            )
-            if affected_uuids:
-                deploy_data.append((target_id, group_name, affected_uuids))
-
-        reqs = self.deploy_devices(api, deploy_data, edges_map, log_context="config-group deploying WAN Edges")
+        deploy_data = self.cfg_group_deploy_data(
+            api, workdir, saved_groups_index.need_extended_name, groups_iter, edges_map
+        )
+        reqs = self.cfg_group_deploy(api, deploy_data, edges_map, log_context="config-group deploying WAN Edges")
         if reqs:
-            self.log_debug(f'Deploy requests processed: {reqs}')
+            self.log_debug(f"Deploy requests processed: {reqs}")
         else:
-            self.log_info('No WAN Edge config-group deployments needed')
+            self.log_info("No WAN Edge config-group deployments needed")
 
     def restore_attachments(self, api: Rest, workdir: str) -> None:
         saved_template_index = DeviceTemplateIndex.load(workdir)
@@ -300,11 +294,11 @@ class TaskRestore(Task):
             for saved_id, saved_name in saved_template_index.filtered_iter(DeviceTemplateIndex.is_not_vsmart,
                                                                            DeviceTemplateIndex.is_attached)
         )
-        edge_set = {uuid for uuid, _ in EdgeInventory.get_raise(api)}
-        attach_data = self.attach_template_data(
+        edge_set = {entry.uuid for entry in EdgeInventory.get_raise(api).filtered_iter(EdgeInventory.is_available)}
+        attach_data = self.template_attach_data(
             api, workdir, saved_template_index.need_extended_name, edge_templates_iter, target_uuid_set=edge_set
         )
-        reqs = self.attach(api, *attach_data, log_context="template attaching WAN Edges")
+        reqs = self.template_attach(api, *attach_data, log_context="template attaching WAN Edges")
         if reqs:
             self.log_debug(f'Attach requests processed: {reqs}')
         else:
@@ -317,12 +311,13 @@ class TaskRestore(Task):
                                                                            DeviceTemplateIndex.is_attached)
         )
         vsmart_set = {
-            uuid for uuid, _ in ControlInventory.get_raise(api).filtered_iter(ControlInventory.is_vsmart)
+            entry.uuid for entry in ControlInventory.get_raise(api).filtered_iter(ControlInventory.is_available,
+                                                                                  ControlInventory.is_vsmart)
         }
-        attach_data = self.attach_template_data(
+        attach_data = self.template_attach_data(
             api, workdir, saved_template_index.need_extended_name, vsmart_templates_iter, target_uuid_set=vsmart_set
         )
-        reqs = self.attach(api, *attach_data, log_context="template attaching vSmarts")
+        reqs = self.template_attach(api, *attach_data, log_context="template attaching vSmarts")
         if reqs:
             self.log_debug(f'Attach requests processed: {reqs}')
         else:
