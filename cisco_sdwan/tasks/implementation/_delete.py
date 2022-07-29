@@ -3,7 +3,7 @@ from typing import Union, Optional
 from pydantic import validator
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest, RestAPIException
-from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL, ordered_tags
+from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL, ordered_tags, is_index_supported
 from cisco_sdwan.base.models_vmanage import DeviceTemplateIndex, ConfigGroupIndex
 from cisco_sdwan.tasks.utils import TaskOptions, TagOptions, regex_type
 from cisco_sdwan.tasks.common import regex_search, Task, WaitActionsException
@@ -26,9 +26,9 @@ class TaskDelete(Task):
         task_parser.add_argument('--dryrun', action='store_true',
                                  help='dry-run mode. Items matched for removal are listed but not deleted.')
         task_parser.add_argument('--detach', action='store_true',
-                                 help='USE WITH CAUTION! Detach devices from templates and deactivate vSmart policy '
-                                      'before deleting items. This allows deleting items that are associated with '
-                                      'attached templates and active policies.')
+                                 help='USE WITH CAUTION! Detach templates, dissociate config-groups and deactivate '
+                                      'vSmart policy before deleting items. This allows deleting items '
+                                      'that are associated with attachments, deployments and active policies.')
         task_parser.add_argument('tag', metavar='<tag>', type=TagOptions.tag,
                                  help='tag for selecting items to be deleted. Available tags: '
                                       f'{TagOptions.options()}. Special tag "{CATALOG_TAG_ALL}" selects all items.')
@@ -50,30 +50,32 @@ class TaskDelete(Task):
 
                 template_index = DeviceTemplateIndex.get_raise(api)
                 # Detach vSmart template
-                reqs = self.detach(api, template_index.filtered_iter(DeviceTemplateIndex.is_vsmart,
-                                                                     DeviceTemplateIndex.is_attached),
-                                   log_context='template detaching vSmarts')
+                reqs = self.template_detach(api, template_index.filtered_iter(DeviceTemplateIndex.is_vsmart,
+                                                                              DeviceTemplateIndex.is_attached),
+                                            log_context='template detaching vSmarts')
                 if reqs:
                     self.log_debug(f'Detach requests processed: {reqs}')
                 else:
                     self.log_info('No vSmart template detachments needed')
                 # Detach WAN Edge templates
-                reqs = self.detach(api, template_index.filtered_iter(DeviceTemplateIndex.is_not_vsmart,
-                                                                     DeviceTemplateIndex.is_attached),
-                                   log_context='template detaching WAN Edges')
+                reqs = self.template_detach(api, template_index.filtered_iter(DeviceTemplateIndex.is_not_vsmart,
+                                                                              DeviceTemplateIndex.is_attached),
+                                            log_context='template detaching WAN Edges')
                 if reqs:
                     self.log_debug(f'Detach requests processed: {reqs}')
                 else:
                     self.log_info('No WAN Edge template detachments needed')
 
                 # Dissociate WAN Edge config-groups
-                config_group_index = ConfigGroupIndex.get_raise(api)
-                reqs = self.dissociate(api, config_group_index.filtered_iter(ConfigGroupIndex.is_associated),
-                                       log_context='config-group dissociating WAN Edges')
-                if reqs:
-                    self.log_debug(f'Dissociate requests processed: {reqs}')
-                else:
-                    self.log_info('No WAN Edge config-group dissociation needed')
+                if is_index_supported(ConfigGroupIndex, version=api.server_version):
+                    config_group_index = ConfigGroupIndex.get_raise(api)
+                    reqs = self.cfg_group_dissociate(api,
+                                                     config_group_index.filtered_iter(ConfigGroupIndex.is_associated),
+                                                     log_context='config-group dissociating WAN Edges')
+                    if reqs:
+                        self.log_debug(f'Dissociate requests processed: {reqs}')
+                    else:
+                        self.log_info('No WAN Edge config-group dissociate needed')
 
             except (RestAPIException, WaitActionsException) as ex:
                 self.log_critical(f'Detach failed: {ex}')

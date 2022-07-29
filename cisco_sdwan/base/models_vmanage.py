@@ -157,68 +157,88 @@ class Device(IndexApiItem):
     extended_iter_fields = ('deviceId', 'site-id', 'reachability', 'device-type', 'device-model')
 
 
-class EdgeInventory(IndexApiItem):
-    api_path = ApiPath('system/device/vedges', None, None, None)
-    iter_fields = ('uuid', 'vedgeCertificateState')
-    extended_iter_fields = ('host-name', 'system-ip')
-
-    FilteredIterEntry = namedtuple('FilteredIterEntry',
-                                   ['uuid', 'cert_state', 'name', 'system_ip', 'model', 'config_mode'])
+class Inventory(IndexApiItem):
+    """
+    Parent class for the inventory-type classes EdgeInventory and ControlInventory.
+    Not supposed to be used directly, use the corresponding child classes instead.
+    """
+    FilterEntry = namedtuple('InventoryFilterEntry', ['uuid', 'cert_state', 'name', 'system_ip',
+                                                      'model', 'type', 'template', 'config_group'])
 
     @staticmethod
-    def is_cedge(device_entry: FilteredIterEntry) -> bool:
+    def is_cedge(device_entry: FilterEntry) -> bool:
         """
         Filtered_iter filter selecting CEDGE devices
         """
         return device_entry.model is not None and device_entry.model in CEDGE_SET
 
     @staticmethod
-    def is_cli_mode(device_entry: FilteredIterEntry) -> bool:
-        """
-        Filtered_iter filter selecting devices in cli mode
-        """
-        return device_entry.config_mode is not None and device_entry.config_mode == 'cli'
+    def is_vsmart(device_entry: FilterEntry) -> bool:
+        return device_entry.type is not None and device_entry.type == 'vsmart'
 
     @staticmethod
-    def is_cert_installed(device_entry: FilteredIterEntry) -> bool:
+    def is_vbond(device_entry: FilterEntry) -> bool:
+        return device_entry.type is not None and device_entry.type == 'vbond'
+
+    @staticmethod
+    def is_vmanage(device_entry: FilterEntry) -> bool:
+        return device_entry.type is not None and device_entry.type == 'vmanage'
+
+    @staticmethod
+    def is_available(device_entry: FilterEntry) -> bool:
+        """
+        Filtered_iter filter selecting devices available, that is, not yet attached to a template or config-group
+        """
+        return not device_entry.template and not device_entry.config_group
+
+    @staticmethod
+    def is_attached(device_entry: FilterEntry) -> bool:
+        """
+        Filtered_iter filter selecting devices currently attached to a template
+        """
+        return device_entry.template is not None and len(device_entry.template) > 0
+
+    @staticmethod
+    def is_associated(device_entry: FilterEntry) -> bool:
+        """
+        Filtered_iter filter selecting devices currently associated with a config-group
+        """
+        return device_entry.config_group is not None and len(device_entry.config_group) > 0
+
+    def filtered_iter(self, *filter_fns: Callable) -> Iterable[FilterEntry]:
+        # If no filter_fns is provided, no filtering is done and iterate over all entries
+        return (
+            entry for entry
+            in map(Inventory.FilterEntry._make, self.iter(*self.iter_fields, *self.extended_iter_fields,
+                                                          'deviceModel', 'deviceType', 'template', 'name'))
+            if all(filter_fn(entry) for filter_fn in filter_fns)
+        )
+
+
+class EdgeInventory(Inventory):
+    api_path = ApiPath('system/device/vedges', None, None, None)
+    iter_fields = ('uuid', 'vedgeCertificateState')
+    extended_iter_fields = ('host-name', 'system-ip')
+
+    @staticmethod
+    def is_cert_installed(device_entry: Inventory.FilterEntry) -> bool:
         """
         Filtered_iter filter selecting devices with certificate installed
         """
         return device_entry.cert_state is not None and device_entry.cert_state == 'certinstalled'
 
-    def filtered_iter(self, *filter_fns: Callable) -> Iterable[FilteredIterEntry]:
-        return (
-            entry for entry
-            in map(EdgeInventory.FilteredIterEntry._make,
-                   self.iter(*self.iter_fields, *self.extended_iter_fields, 'deviceModel', 'configOperationMode'))
-            if all(filter_fn(entry) for filter_fn in filter_fns)
-        )
 
-
-class ControlInventory(IndexApiItem):
+class ControlInventory(Inventory):
     api_path = ApiPath('system/device/controllers', None, None, None)
     iter_fields = ('uuid', 'validity')
-
     extended_iter_fields = ('host-name', 'system-ip')
 
     @staticmethod
-    def is_vsmart(device_type: Optional[str]) -> bool:
-        return device_type is not None and device_type == 'vsmart'
-
-    @staticmethod
-    def is_vbond(device_type: Optional[str]) -> bool:
-        return device_type is not None and device_type == 'vbond'
-
-    @staticmethod
-    def is_manage(device_type: Optional[str]) -> bool:
-        return device_type == 'vmanage'
-
-    def filtered_iter(self, filter_fn: Callable) -> Iterable[Tuple[str, str]]:
-        # The contract for filtered_iter is that it should return an iterable of iter_fields tuples.
-        return (
-            (item_id, item_validity) for item_type, item_id, item_validity
-            in self.iter('deviceType', *self.iter_fields) if filter_fn(item_type)
-        )
+    def is_cert_valid(device_entry: Inventory.FilterEntry) -> bool:
+        """
+        Filtered_iter filter selecting devices with certificate installed
+        """
+        return device_entry.cert_state is not None and device_entry.cert_state == 'valid'
 
 
 #
@@ -434,6 +454,7 @@ class DeviceTemplateIndex(IndexConfigItem):
 
     def filtered_iter(self, *filter_fns: Callable) -> Iterable[Tuple[str, str]]:
         # The contract for filtered_iter is that it should return an iterable of iter_fields tuples.
+        # If no filter_fns is provided, no filtering is done and iterate over all entries
         return (
             (entry.uuid, entry.name) for entry in map(DeviceTemplateIndex.FilteredIterEntry._make,
                                                       self.iter('deviceType', 'devicesAttached', *self.iter_fields))
@@ -538,20 +559,26 @@ class ConfigGroupIndex(IndexConfigItem):
     store_file = 'config_groups.json'
     iter_fields = IdName('id', 'name')
 
-    FilteredIterEntry = namedtuple('FilteredIterEntry', ['uuid', 'name', 'devices'])
+    FilteredIterEntry = namedtuple('FilteredIterEntry', ['uuid', 'name', 'devices', 'num_devices'])
 
     @staticmethod
     def is_associated(iterator_entry: FilteredIterEntry) -> bool:
         """
         Filtered_iter filter selecting config-groups with associated devices
         """
-        return iterator_entry.devices is not None and len(iterator_entry.devices) > 0
+        # 20.8.1 had devices list of uuids associated, 20.9 however switched to using numberOfDevices
+        return (
+                (iterator_entry.num_devices is not None and int(iterator_entry.num_devices) > 0) or
+                (iterator_entry.devices is not None and len(iterator_entry.devices) > 0)
+        )
 
     def filtered_iter(self, *filter_fns: Callable) -> Iterable[Tuple[str, str]]:
         # The contract for filtered_iter is that it should return an iterable of iter_fields tuples.
+        # If no filter_fns is provided, no filtering is done and iterate over all entries
         return (
             (entry.uuid, entry.name)
-            for entry in map(ConfigGroupIndex.FilteredIterEntry._make, self.iter(*self.iter_fields, 'devices'))
+            for entry in map(ConfigGroupIndex.FilteredIterEntry._make,
+                             self.iter(*self.iter_fields, 'devices', 'numberOfDevices'))
             if all(filter_fn(entry) for filter_fn in filter_fns)
         )
 
