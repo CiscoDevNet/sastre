@@ -234,10 +234,8 @@ class TaskRestore(Task):
                             self.log_debug(f'Attach requests processed: {reqs}')
                         elif put_eval.need_reactivate:
                             self.log_info(f'Updating {info} {item.name} requires vSmart policy reactivate')
-                            action_list = self.activate_policy(
-                                api, *PolicyVsmartIndex.get_raise(api).active_policy, is_edited=True
-                            )
-                            self.wait_actions(api, action_list, 'reactivating vSmart policy', raise_on_failure=True)
+                            self.policy_activate(api, *PolicyVsmartIndex.get_raise(api).active_policy, is_edited=True,
+                                                 log_context="reactivating vSmart policy")
                 except (RestAPIException, WaitActionsException) as ex:
                     self.log_error(f'Failed: {op_info} {info} {item.name}{reason}: {ex}')
                 else:
@@ -268,8 +266,7 @@ class TaskRestore(Task):
             for entry in EdgeInventory.get_raise(api).filtered_iter(EdgeInventory.is_available, EdgeInventory.is_cedge)
         }
         groups_iter = (
-            (saved_name, saved_id, target_groups.get(saved_name))
-            for saved_id, saved_name in saved_groups_index.filtered_iter(ConfigGroupIndex.is_associated)
+            (saved_name, saved_id, target_groups.get(saved_name)) for saved_id, saved_name in saved_groups_index
         )
         deploy_data = self.cfg_group_deploy_data(
             api, workdir, saved_groups_index.need_extended_name, groups_iter, edges_map
@@ -324,22 +321,17 @@ class TaskRestore(Task):
             self.log_info('No vSmart template attachments needed')
 
     def restore_active_policy(self, api: Rest, workdir: str) -> None:
-        saved_policy_vsmart_index = PolicyVsmartIndex.load(workdir)
-        if saved_policy_vsmart_index is None:
+        try:
+            _, policy_name = PolicyVsmartIndex.load(workdir, raise_not_found=True).active_policy
+            target_policies = {item_name: item_id for item_id, item_name in PolicyVsmartIndex.get_raise(api)}
+            reqs = self.policy_activate(api, target_policies.get(policy_name), policy_name,
+                                        log_context="activating vSmart policy")
+            if reqs:
+                self.log_debug(f'Activate requests processed: {reqs}')
+            else:
+                self.log_info('No vSmart policy activate needed')
+        except FileNotFoundError:
             self.log_debug("Will skip active policy restore, no local vSmart policy index")
-            return
-
-        target_policies = {item_name: item_id for item_id, item_name in PolicyVsmartIndex.get_raise(api)}
-        _, policy_name = saved_policy_vsmart_index.active_policy
-
-        if self.is_dryrun:
-            return
-
-        action_list = self.activate_policy(api, target_policies.get(policy_name), policy_name)
-        if len(action_list) == 0:
-            self.log_info('No vSmart policy to activate')
-        else:
-            self.wait_actions(api, action_list, 'activating vSmart policy', raise_on_failure=True)
 
 
 class RestoreArgs(TaskArgs):

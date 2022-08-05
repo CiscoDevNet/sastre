@@ -5,7 +5,8 @@ from pydantic import validator, conint
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest, RestAPIException
 from cisco_sdwan.base.catalog import is_index_supported
-from cisco_sdwan.base.models_vmanage import DeviceTemplateIndex, ConfigGroupIndex, EdgeInventory, ControlInventory
+from cisco_sdwan.base.models_vmanage import (DeviceTemplateIndex, ConfigGroupIndex, EdgeInventory, ControlInventory,
+                                             PolicyVsmartIndex)
 from cisco_sdwan.tasks.utils import (TaskOptions, existing_workdir_type, regex_type, default_workdir, ipv4_type,
                                      site_id_type, int_type)
 from cisco_sdwan.tasks.common import regex_search, Task, WaitActionsException, device_iter
@@ -40,12 +41,14 @@ class TaskAttach(Task):
         edge_parser = sub_tasks.add_parser('edge', help='attach/deploy WAN edges')
         edge_parser.set_defaults(template_filter=DeviceTemplateIndex.is_not_vsmart,
                                  device_sets=TaskAttach.edge_sets,
-                                 set_title="WAN Edges")
+                                 set_title="WAN Edge")
 
         vsmart_parser = sub_tasks.add_parser('vsmart', help='attach/deploy vSmarts')
         vsmart_parser.set_defaults(template_filter=DeviceTemplateIndex.is_vsmart,
                                    device_sets=TaskAttach.vsmart_sets,
-                                   set_title="vSmarts")
+                                   set_title="vSmart")
+        vsmart_parser.add_argument('--activate', action='store_true',
+                                   help='activate centralized policy after vSmart template attach/deploy')
 
         # Parameters common to all sub-tasks
         for sub_task in (edge_parser, vsmart_parser):
@@ -101,6 +104,7 @@ class TaskAttach(Task):
         )
 
         # Config-group deployments
+        deploy_reqs = 0
         if deploy_map:
             try:
                 saved_groups_index = ConfigGroupIndex.load(parsed_args.workdir)
@@ -115,29 +119,31 @@ class TaskAttach(Task):
                 target_cfg_groups = {item_name: item_id for item_id, item_name in ConfigGroupIndex.get_raise(api)}
                 selected_cfg_groups = (
                     (saved_name, saved_id, target_cfg_groups.get(saved_name))
-                    for saved_id, saved_name in saved_groups_index.filtered_iter(ConfigGroupIndex.is_associated)
+                    for saved_id, saved_name in saved_groups_index
                     if parsed_args.config_groups is None or regex_search(parsed_args.config_groups, saved_name)
                 )
                 deploy_data = self.cfg_group_deploy_data(api, parsed_args.workdir,
                                                          saved_groups_index.need_extended_name, selected_cfg_groups,
                                                          deploy_map)
-                reqs = self.cfg_group_deploy(api, deploy_data, deploy_map, chunk_size=parsed_args.batch,
-                                             log_context=f"config-group deploying {parsed_args.set_title}")
-                if reqs:
-                    self.log_debug(f'Deploy requests processed: {reqs}')
-                else:
-                    self.log_info(f'No {parsed_args.set_title} config-group deployments to process')
-
+                deploy_reqs = self.cfg_group_deploy(api, deploy_data, deploy_map, chunk_size=parsed_args.batch,
+                                                    log_context=f"config-group deploying {parsed_args.set_title}")
+                if deploy_reqs:
+                    self.log_debug(f'Deploy requests processed: {deploy_reqs}')
             except (RestAPIException, FileNotFoundError, WaitActionsException) as ex:
                 self.log_error(f'Failed: Config-group deployments: {ex}')
             except StopIteration:
                 pass
 
+        if not deploy_reqs:
+            self.log_info(f'No {parsed_args.set_title} config-group deployments to process')
+
         # Template attachments
+        attach_reqs = 0
         if attach_map:
             try:
                 saved_template_index = DeviceTemplateIndex.load(parsed_args.workdir)
                 if saved_template_index is None:
+                    self.log_debug("Will skip attach, no local device template index")
                     raise StopIteration()
 
                 target_templates = {item_name: item_id for item_id, item_name in DeviceTemplateIndex.get_raise(api)}
@@ -150,17 +156,35 @@ class TaskAttach(Task):
                 attach_data = self.template_attach_data(api, parsed_args.workdir,
                                                         saved_template_index.need_extended_name, selected_templates,
                                                         target_uuid_set=set(attach_map))
-                reqs = self.template_attach(api, *attach_data, chunk_size=parsed_args.batch,
-                                            log_context=f"template attaching {parsed_args.set_title}")
-                if reqs:
-                    self.log_debug(f"Attach requests processed: {reqs}")
-                else:
-                    self.log_info(f"No {parsed_args.set_title} template attachments to process")
-
+                attach_reqs = self.template_attach(api, *attach_data, chunk_size=parsed_args.batch,
+                                                   log_context=f"template attaching {parsed_args.set_title}")
+                if attach_reqs:
+                    self.log_debug(f"Attach requests processed: {attach_reqs}")
             except (RestAPIException, FileNotFoundError, WaitActionsException) as ex:
                 self.log_error(f"Failed: Template attachments: {ex}")
             except StopIteration:
-                self.log_debug("Will skip attach, no local device template index")
+                pass
+
+        if not attach_reqs:
+            self.log_info(f"No {parsed_args.set_title} template attachments to process")
+
+        # vSmart policy activate
+        if parsed_args.device_sets is TaskAttach.vsmart_sets and parsed_args.activate:
+            activate_reqs = 0
+            try:
+                _, policy_name = PolicyVsmartIndex.load(parsed_args.workdir, raise_not_found=True).active_policy
+                target_policies = {item_name: item_id for item_id, item_name in PolicyVsmartIndex.get_raise(api)}
+                activate_reqs = self.policy_activate(api, target_policies.get(policy_name), policy_name,
+                                                     log_context="activating vSmart policy")
+                if activate_reqs:
+                    self.log_debug(f'Activate requests processed: {activate_reqs}')
+            except (RestAPIException, WaitActionsException) as ex:
+                self.log_error(f"Failed: vSmart policy activate: {ex}")
+            except FileNotFoundError:
+                self.log_debug("Will skip vSmart policy activate, no local vSmart policy index")
+
+            if not activate_reqs:
+                self.log_info('No vSmart policy activate to process')
 
         return
 
@@ -179,12 +203,12 @@ class TaskDetach(Task):
         edge_parser = sub_tasks.add_parser('edge', help='detach/dissociate WAN edges')
         edge_parser.set_defaults(template_filter=DeviceTemplateIndex.is_not_vsmart,
                                  device_sets=TaskDetach.edge_sets,
-                                 set_title="WAN Edges")
+                                 set_title="WAN Edge")
 
         vsmart_parser = sub_tasks.add_parser('vsmart', help='detach/dissociate vSmarts')
         vsmart_parser.set_defaults(template_filter=DeviceTemplateIndex.is_vsmart,
                                    device_sets=TaskDetach.vsmart_sets,
-                                   set_title="vSmarts")
+                                   set_title="vSmart")
 
         # Parameters common to all sub-tasks
         for sub_task in (edge_parser, vsmart_parser):
@@ -239,41 +263,52 @@ class TaskDetach(Task):
         )
 
         # Template detachments
+        detach_reqs = 0
         if attached_map:
             try:
                 template_index = DeviceTemplateIndex.get_raise(api)
-                selected_templates = (
+                selected_templates = [
                     (t_id, t_name) for t_id, t_name in template_index.filtered_iter(parsed_args.template_filter,
                                                                                     DeviceTemplateIndex.is_attached)
                     if parsed_args.templates is None or regex_search(parsed_args.templates, t_name)
-                )
-                reqs = self.template_detach(api, selected_templates, attached_map, chunk_size=parsed_args.batch,
-                                            log_context=f"template detaching {parsed_args.set_title}")
-                if reqs:
-                    self.log_debug(f'Detach requests processed: {reqs}')
-                else:
-                    self.log_info(f'No {parsed_args.set_title} template detachments to process')
+                ]
+                # vSmart policy deactivate
+                if parsed_args.device_sets is TaskDetach.vsmart_sets and selected_templates:
+                    deactivate_reqs = self.policy_deactivate(api, log_context='deactivating vSmart policy')
+                    if deactivate_reqs:
+                        self.log_debug(f'Deactivate requests processed: {deactivate_reqs}')
+                    else:
+                        self.log_info('No vSmart policy deactivate needed')
 
+                detach_reqs = self.template_detach(api, selected_templates, attached_map,
+                                                   chunk_size=parsed_args.batch,
+                                                   log_context=f"template detaching {parsed_args.set_title}")
+                if detach_reqs:
+                    self.log_debug(f'Detach requests processed: {detach_reqs}')
             except (RestAPIException, WaitActionsException) as ex:
                 self.log_error(f'Failed: Template detachments: {ex}')
 
+        if not detach_reqs:
+            self.log_info(f'No {parsed_args.set_title} template detachments to process')
+
         # Config-group dissociates
+        dst_reqs = 0
         if associated_map:
             try:
-                cfg_group_index = ConfigGroupIndex.get_raise(api)
                 selected_cfg_groups = (
-                    (g_id, g_name) for g_id, g_name in cfg_group_index.filtered_iter(ConfigGroupIndex.is_associated)
-                    if parsed_args.config_groups is None or regex_search(parsed_args.config_groups, g_name)
+                    (cfg_group_id, cfg_group_name) for cfg_group_id, cfg_group_name in ConfigGroupIndex.get_raise(api)
+                    if parsed_args.config_groups is None or regex_search(parsed_args.config_groups, cfg_group_name)
                 )
-                reqs = self.cfg_group_dissociate(api, selected_cfg_groups, associated_map, chunk_size=parsed_args.batch,
-                                                 log_context=f"config-group dissociating {parsed_args.set_title}")
-                if reqs:
-                    self.log_debug(f'Dissociate requests processed: {reqs}')
-                else:
-                    self.log_info(f'No {parsed_args.set_title} config-group dissociate to process')
-
+                dst_reqs = self.cfg_group_dissociate(api, selected_cfg_groups, associated_map,
+                                                     chunk_size=parsed_args.batch,
+                                                     log_context=f"config-group dissociating {parsed_args.set_title}")
+                if dst_reqs:
+                    self.log_debug(f'Dissociate requests processed: {dst_reqs}')
             except (RestAPIException, WaitActionsException) as ex:
                 self.log_error(f'Failed: Config-group dissociate: {ex}')
+
+        if not dst_reqs:
+            self.log_info(f'No {parsed_args.set_title} config-group dissociate to process')
 
         return
 
@@ -296,9 +331,10 @@ class AttachDetachArgs(TaskArgs):
 
 class AttachVsmartArgs(AttachDetachArgs):
     workdir: str
+    activate: bool = False
     template_filter: Callable = const(DeviceTemplateIndex.is_vsmart)
     device_sets: Callable = const(TaskAttach.vsmart_sets)
-    set_title: str = const('vSmarts')
+    set_title: str = const('vSmart')
 
     # Validators
     _validate_workdir = validator('workdir', allow_reuse=True)(validate_workdir)
@@ -308,7 +344,7 @@ class AttachEdgeArgs(AttachDetachArgs):
     workdir: str
     template_filter: Callable = const(DeviceTemplateIndex.is_not_vsmart)
     device_sets: Callable = const(TaskAttach.edge_sets)
-    set_title: str = const('WAN Edges')
+    set_title: str = const('WAN Edge')
 
     # Validators
     _validate_workdir = validator('workdir', allow_reuse=True)(validate_workdir)
@@ -317,10 +353,10 @@ class AttachEdgeArgs(AttachDetachArgs):
 class DetachVsmartArgs(AttachDetachArgs):
     template_filter: Callable = const(DeviceTemplateIndex.is_vsmart)
     device_sets: Callable = const(TaskDetach.vsmart_sets)
-    set_title: str = const('vSmarts')
+    set_title: str = const('vSmart')
 
 
 class DetachEdgeArgs(AttachDetachArgs):
     template_filter: Callable = const(DeviceTemplateIndex.is_not_vsmart)
     device_sets: Callable = const(TaskDetach.edge_sets)
-    set_title: str = const('WAN Edges')
+    set_title: str = const('WAN Edge')

@@ -13,6 +13,7 @@ from pathlib import Path
 from shutil import rmtree
 from collections import namedtuple
 from typing import List, Tuple, Iterator, Union, Optional, Any, Iterable, Type, TypeVar, Sequence, Mapping
+from pydantic import ValidationError
 from cisco_sdwan.base.rest_api import Rest, RestAPIException
 from cisco_sdwan.base.models_base import DATA_DIR
 from cisco_sdwan.base.models_vmanage import (DeviceTemplate, DeviceTemplateValues, DeviceTemplateAttached,
@@ -529,8 +530,13 @@ class Task:
                 return []
 
             if not self.is_dryrun:
-                # TODO: Capture pydantic.error_wrappers.ValidationError to make sure the values are good
-                diff_uuids = diff_values.put_raise(api, configGroupId=config_grp_target_id)
+                try:
+                    diff_uuids = diff_values.put_raise(api, configGroupId=config_grp_target_id)
+                except (RestAPIException, ValidationError) as ex:
+                    # Pydantic validation error raised when the saved values fail local model validation.
+                    # RestAPIException when vManage validation fails.
+                    self.log_error(f"Failed: Config-group {config_grp_name} push values: {ex}")
+                    return []
             else:
                 diff_uuids = list(diff_values.uuids)
 
@@ -713,43 +719,63 @@ class Task:
 
         return len(dissociate_reqs)
 
-    def activate_policy(self, api: Rest, policy_id: Optional[str], policy_name: Optional[str],
-                        is_edited: bool = False) -> List[tuple]:
+    def policy_activate(self, api: Rest, policy_id: Optional[str], policy_name: Optional[str], *,
+                        log_context: str, raise_on_failure: bool = True, is_edited: bool = False) -> int:
         """
+        Activate a centralized policy
         @param api: Instance of Rest API
         @param policy_id: ID of policy to activate
         @param policy_name: Name of policy to activate
+        @param raise_on_failure: If True, raise exception on action failures
+        @param log_context: Message to log during wait actions
         @param is_edited: (optional) When true it indicates reactivation of an already active policy (e.x. due to
                                      in-place modifications)
-        @return: List of worker actions to monitor [(<action_worker>, <template_name>), ...]
+        @return: Number of policy activate requests processed
         """
-        action_list = []
-        if policy_id is None or policy_name is None:
-            # No policy is active or policy not on target vManage
-            return action_list
-
+        activate_reqs = []
         try:
+            if policy_id is None or policy_name is None:
+                raise StopIteration()
             PolicyVsmartStatus.get_raise(api).raise_for_status()
         except (RestAPIException, PolicyVsmartStatusException):
             self.log_debug('vSmarts not in vManage mode or otherwise not ready to have policy activated')
+        except StopIteration:
+            self.log_debug('No policy is active or policy not on target vManage')
         else:
-            action_worker = PolicyVsmartActivate(
-                api.post(PolicyVsmartActivate.api_params(is_edited), PolicyVsmartActivate.api_path.post, policy_id)
-            )
-            self.log_debug(f'Policy activate requested: {action_worker.uuid}')
-            action_list.append((action_worker, policy_name))
+            activate_reqs.append(...)
+            self.log_info(f'vSmart policy activate: {policy_name}')
 
-        return action_list
+            if not self.is_dryrun:
+                action_worker = PolicyVsmartActivate(
+                    api.post(PolicyVsmartActivate.api_params(is_edited), PolicyVsmartActivate.api_path.post, policy_id)
+                )
+                self.log_debug(f'Policy activate requested: {action_worker.uuid}')
+                self.wait_actions(api, [(action_worker, policy_name)], log_context, raise_on_failure)
 
-    def deactivate_policy(self, api: Rest) -> List[tuple]:
-        action_list = []
-        item_id, item_name = PolicyVsmartIndex.get_raise(api).active_policy
-        if item_id is not None and item_name is not None:
-            action_worker = PolicyVsmartDeactivate(api.post({}, PolicyVsmartDeactivate.api_path.post, item_id))
-            self.log_debug(f'Policy deactivate requested: {action_worker.uuid}')
-            action_list.append((action_worker, item_name))
+        return len(activate_reqs)
 
-        return action_list
+    def policy_deactivate(self, api: Rest, *, log_context: str, raise_on_failure: bool = True) -> int:
+        """
+        Deactivate the active centralized policy
+        @param api: Instance of Rest API
+        @param raise_on_failure: If True, raise exception on action failures
+        @param log_context: Message to log during wait actions
+        @return: Number of policy deactivate requests processed
+        """
+        deactivate_reqs = []
+        policy_id, policy_name = PolicyVsmartIndex.get_raise(api).active_policy
+        if policy_id is not None and policy_name is not None:
+            deactivate_reqs.append(...)
+            self.log_info(f'vSmart policy deactivate: {policy_name}')
+
+            if not self.is_dryrun:
+                action_worker = PolicyVsmartDeactivate(
+                    api.post({}, PolicyVsmartDeactivate.api_path.post, policy_id)
+                )
+                self.log_debug(f'Policy deactivate requested: {action_worker.uuid}')
+                self.wait_actions(api, [(action_worker, policy_name)], log_context, raise_on_failure)
+
+        return len(deactivate_reqs)
 
     def wait_actions(self, api: Rest, action_list: List[tuple], log_context: str, raise_on_failure: bool) -> bool:
         """

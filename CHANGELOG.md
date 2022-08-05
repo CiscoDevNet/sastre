@@ -1,10 +1,12 @@
-Sastre 1.19 [July xx, 2022]
+Sastre 1.19 [August xx, 2022]
 ================================
 
 #### Enhancements:
 - [#145] 20.8 vManage support, included support for the following API endpoints:
   - Config group, 
   - SDWAN system, SDWAN service, SDWAN transport and SDWAN cli feature profiles and parcels
+- Attach vSmart task has new --activate option to activate the centralized policy after vSmart template is attached.
+- Detach vSmart task now automatically deactivates the active centralized policy (if any) before detaching vSmart templates.
 
   
 Sastre 1.18.4 [July 12, 2022]
