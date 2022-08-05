@@ -128,13 +128,13 @@ class ActionStatus(ApiItem):
     @property
     def activity_details(self):
         def device_details(task_entry):
-            return '{hostname}: {activity}'.format(hostname=task_entry.get('host-name', '<unknown>'),
-                                                   activity=', '.join(task_entry.get('activity', [])))
+            return f"{task_entry.get('host-name', '<unknown>')}: {', '.join(task_entry.get('activity', []))}"
 
         data_list = self.data.get('data', [])
         # When action validation fails, returned data is empty
         if len(data_list) == 0:
-            return 'No data in action status'
+            validation_details = self.data.get('validation', {}).get('activity', [])
+            return ', '.join(validation_details) or 'No further details provided in received action status'
 
         return ', '.join(device_details(entry) for entry in data_list)
 
@@ -559,29 +559,6 @@ class ConfigGroupIndex(IndexConfigItem):
     store_file = 'config_groups.json'
     iter_fields = IdName('id', 'name')
 
-    FilteredIterEntry = namedtuple('FilteredIterEntry', ['uuid', 'name', 'devices', 'num_devices'])
-
-    @staticmethod
-    def is_associated(iterator_entry: FilteredIterEntry) -> bool:
-        """
-        Filtered_iter filter selecting config-groups with associated devices
-        """
-        # 20.8.1 had devices list of uuids associated, 20.9 however switched to using numberOfDevices
-        return (
-                (iterator_entry.num_devices is not None and int(iterator_entry.num_devices) > 0) or
-                (iterator_entry.devices is not None and len(iterator_entry.devices) > 0)
-        )
-
-    def filtered_iter(self, *filter_fns: Callable) -> Iterable[Tuple[str, str]]:
-        # The contract for filtered_iter is that it should return an iterable of iter_fields tuples.
-        # If no filter_fns is provided, no filtering is done and iterate over all entries
-        return (
-            (entry.uuid, entry.name)
-            for entry in map(ConfigGroupIndex.FilteredIterEntry._make,
-                             self.iter(*self.iter_fields, 'devices', 'numberOfDevices'))
-            if all(filter_fn(entry) for filter_fn in filter_fns)
-        )
-
 
 class NameValuePair(ConfigRequestModel):
     name: str
@@ -802,6 +779,24 @@ class ProfileSdwanCliIndex(FeatureProfileIndex):
 
 
 # TODO: Add mobility feature profiles
+
+#
+# Tag Rules
+#
+
+class TagRule(ConfigItem):
+    api_path = ApiPath('tag/tagRules')
+    store_path = ('tag_rules',)
+    store_file = '{item_name}.json'
+    name_tag = 'name'
+
+
+@register('tag_rule', 'tag rule', TagRule, min_version='20.8')
+class TagRuleIndex(IndexConfigItem):
+    api_path = ApiPath('tag/tagRules', None, None, None)
+    store_file = 'tag_rules.json'
+    iter_fields = IdName('id', 'name')
+
 
 #
 # Policy vSmart

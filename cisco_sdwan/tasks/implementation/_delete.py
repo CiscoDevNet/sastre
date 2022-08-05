@@ -41,15 +41,15 @@ class TaskDelete(Task):
         if parsed_args.detach:
             try:
                 # Deactivate vSmart policy
-                if not self.is_dryrun:
-                    action_list = self.deactivate_policy(api)
-                    if len(action_list) == 0:
-                        self.log_info('No vSmart policy activated')
-                    else:
-                        self.wait_actions(api, action_list, 'deactivating vSmart policy', raise_on_failure=True)
+                reqs = self.policy_deactivate(api, log_context='deactivating vSmart policy')
+                if reqs:
+                    self.log_debug(f'Deactivate requests processed: {reqs}')
+                else:
+                    self.log_info('No vSmart policy deactivate needed')
 
+                # Detach templates
                 template_index = DeviceTemplateIndex.get_raise(api)
-                # Detach vSmart template
+                # vSmarts
                 reqs = self.template_detach(api, template_index.filtered_iter(DeviceTemplateIndex.is_vsmart,
                                                                               DeviceTemplateIndex.is_attached),
                                             log_context='template detaching vSmarts')
@@ -57,7 +57,7 @@ class TaskDelete(Task):
                     self.log_debug(f'Detach requests processed: {reqs}')
                 else:
                     self.log_info('No vSmart template detachments needed')
-                # Detach WAN Edge templates
+                # WAN Edges
                 reqs = self.template_detach(api, template_index.filtered_iter(DeviceTemplateIndex.is_not_vsmart,
                                                                               DeviceTemplateIndex.is_attached),
                                             log_context='template detaching WAN Edges')
@@ -68,9 +68,7 @@ class TaskDelete(Task):
 
                 # Dissociate WAN Edge config-groups
                 if is_index_supported(ConfigGroupIndex, version=api.server_version):
-                    config_group_index = ConfigGroupIndex.get_raise(api)
-                    reqs = self.cfg_group_dissociate(api,
-                                                     config_group_index.filtered_iter(ConfigGroupIndex.is_associated),
+                    reqs = self.cfg_group_dissociate(api, ConfigGroupIndex.get_raise(api),
                                                      log_context='config-group dissociating WAN Edges')
                     if reqs:
                         self.log_debug(f'Dissociate requests processed: {reqs}')
