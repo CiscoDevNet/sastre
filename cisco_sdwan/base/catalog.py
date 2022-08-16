@@ -61,8 +61,7 @@ _tag_dependency_list = [
     'policy_voice',
     'policy_customapp',
     'policy_definition',
-    'policy_list',
-    'tag_rule'
+    'policy_list'
 ]
 
 

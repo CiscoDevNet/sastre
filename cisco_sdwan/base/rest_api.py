@@ -130,9 +130,11 @@ class Rest:
         # PUT may return an empty string, return None in this case
         return response.json() if response.text else None
 
-    def delete(self, *path_entries: str, input_data: Optional[Dict[str, Any]] = None) -> Union[Dict[str, Any], None]:
+    def delete(self, *path_entries: str, input_data: Optional[Dict[str, Any]] = None,
+               **params: str) -> Union[Dict[str, Any], None]:
         response = self.session.delete(self._url(*path_entries),
                                        data=json.dumps(input_data, indent=1) if input_data is not None else None,
+                                       params=params if params else None,
                                        timeout=self.timeout, verify=self.verify)
         raise_for_status(response)
 

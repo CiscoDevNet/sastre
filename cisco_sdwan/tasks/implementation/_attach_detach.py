@@ -279,7 +279,7 @@ class TaskDetach(Task):
                         self.log_debug(f'Deactivate requests processed: {deactivate_reqs}')
                     else:
                         self.log_info('No vSmart policy deactivate needed')
-
+                # Detach templates
                 detach_reqs = self.template_detach(api, selected_templates, attached_map,
                                                    chunk_size=parsed_args.batch,
                                                    log_context=f"template detaching {parsed_args.set_title}")
@@ -291,24 +291,28 @@ class TaskDetach(Task):
         if not detach_reqs:
             self.log_info(f'No {parsed_args.set_title} template detachments to process')
 
-        # Config-group dissociates
-        dst_reqs = 0
+        # Config-group dissociates and automated rule deletes
+        diss_reqs, rule_reqs = 0, 0
         if associated_map:
             try:
-                selected_cfg_groups = (
+                selected_cfg_groups = [
                     (cfg_group_id, cfg_group_name) for cfg_group_id, cfg_group_name in ConfigGroupIndex.get_raise(api)
                     if parsed_args.config_groups is None or regex_search(parsed_args.config_groups, cfg_group_name)
-                )
-                dst_reqs = self.cfg_group_dissociate(api, selected_cfg_groups, associated_map,
-                                                     chunk_size=parsed_args.batch,
-                                                     log_context=f"config-group dissociating {parsed_args.set_title}")
-                if dst_reqs:
-                    self.log_debug(f'Dissociate requests processed: {dst_reqs}')
+                ]
+                diss_reqs = self.cfg_group_dissociate(api, selected_cfg_groups, associated_map,
+                                                      chunk_size=parsed_args.batch,
+                                                      log_context=f"config-group dissociating {parsed_args.set_title}")
+                if diss_reqs:
+                    self.log_debug(f'Dissociate requests processed: {diss_reqs}')
+
+                rule_reqs = self.cfg_group_rules_delete(api, selected_cfg_groups)
+                if rule_reqs:
+                    self.log_debug(f'Automated rule delete requests processed: {rule_reqs}')
             except (RestAPIException, WaitActionsException) as ex:
                 self.log_error(f'Failed: Config-group dissociate: {ex}')
 
-        if not dst_reqs:
-            self.log_info(f'No {parsed_args.set_title} config-group dissociate to process')
+        if not (diss_reqs + rule_reqs):
+            self.log_info(f'No {parsed_args.set_title} config-group dissociate or automated rule deletes to process')
 
         return
 
