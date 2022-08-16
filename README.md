@@ -1,6 +1,6 @@
 [![published](https://static.production.devnetcloud.com/codeexchange/assets/images/devnet-published.svg)](https://developer.cisco.com/codeexchange/github/repo/reismarcelo/sastre)
 
-# Sastre - Automation Tools for Cisco SD-WAN Powered by Viptela
+# Sastre - Cisco-SDWAN Automation Toolset
 
 Sastre provides functions to assist with managing configuration elements and visualize information from Cisco SD-WAN deployments. 
 
@@ -14,7 +14,7 @@ Sastre can also be used as an SDK to other applications, further information is 
 Support enquires can be sent to sastre-support@cisco.com.
 
 Note on vManage release support:
-- Sastre 1.18.3 supports up to vManage 20.7. However, specific support for resource groups and multi-cloud features will come in a future release.  
+- Sastre 1.19 officially supports up to vManage 20.8. Newer vManage releases normally work without problems, just lacking support to the newer features added to that particular vManage release.
 
 ## Sastre and Sastre-Pro
 
@@ -22,12 +22,12 @@ Sastre is available in two flavors:
 - Sastre: Public open-source under MIT license available on [Cisco DevNet repository](https://github.com/CiscoDevNet/sastre). Supports a limited set of tasks.
 - Sastre-Pro: Cisco licensed version, supporting the full feature-set. Sastre-Pro is available for customers with a CX BCS subscription and Cisco internal at [Cisco eStore](https://cxtools.cisco.com/cxestore/#/toolDetail/46810).
 
-Both flavors follow the same release numbering. For instance, if support for certain new vManage release is added to Sastre-Pro 1.9, Sastre 1.9 will also have the same support (across its supported tasks).
+Both flavors follow the same release numbering. For instance, if support for certain new vManage release is added to Sastre-Pro 1.x, Sastre 1.x will also have the same support (across its supported tasks).
 
 The command "sdwan --version" will indicate the flavor that is installed.
 
     % sdwan --version
-    Sastre-Pro Version 1.18.3. Catalog: 77 configuration items, 33 operational items.
+    Sastre-Pro Version 1.19. Catalog: 82 configuration items, 33 operational items.
 
 Tasks only available on Sastre-Pro are labeled as such in the [Introduction](#introduction) section below.
 
@@ -64,10 +64,10 @@ Notes:
 
 ### Base parameters
 
-    % sdwan -h
+    % sdwan --help
     usage: sdwan [-h] [-a <vmanage-ip>] [-u <user>] [-p <password>] [--tenant <tenant>] [--pid <pid>] [--port <port>] [--timeout <timeout>] [--verbose] [--version] <task> ...
     
-    Sastre-Pro - Automation Tools for Cisco SD-WAN Powered by Viptela
+    Sastre-Pro - Cisco-SDWAN Automation Toolset
     
     positional arguments:
       <task>                task to be performed (backup, restore, delete, migrate, attach, detach, certificate, transform, list, show-template, show, report)
@@ -82,14 +82,13 @@ Notes:
       -p <password>, --password <password>
                             password, can also be defined via VMANAGE_PASSWORD environment variable. If neither is provided user is prompted for password.
       --tenant <tenant>     tenant name, when using provider accounts in multi-tenant deployments.
-      --pid <pid>           CX project id, can also be defined via CX_PID environment variable. This is collected for AIDE reporting purposes only. Use 000000 if not applicable
+      --pid <pid>           CX project id, can also be defined via CX_PID environment variable. This is collected for AIDE reporting purposes. Use 0 if not applicable.
       --port <port>         vManage port number, can also be defined via VMANAGE_PORT environment variable (default: 443)
       --timeout <timeout>   REST API timeout (default: 300)
       --verbose             increase output verbosity
       --version             show program's version number and exit
 
-
-vManage address (-a/--address), username (-u/--user), password (-p/--password), port (--port) or CX project ID (--pid) can also be provided via environment variables:
+vManage address (-a/--address), username (-u/--user), password (-p/--password), port (--port) and CX project ID (--pid) can also be provided via environment variables:
 - VMANAGE_IP
 - VMANAGE_USER
 - VMANAGE_PASSWORD
@@ -100,7 +99,7 @@ A good approach to reduce the number of parameters that need to be provided at e
 
 For any of these arguments, vManage address, user, password and CX pid; user is prompted for a value if they are not provided via the environment variables or command line arguments.
 
-CX project ID is only applicable to Sastre-Pro.  CX_PID and --pid option are not available in Sastre (std). Users outside the Cisco CX organization can bypass this option by using a value of 000000
+CX project ID is only applicable to Sastre-Pro. CX_PID and --pid option are not available in Sastre (std). If CX project ID is not applicable, simply use value 0.
 
 ### Task-specific parameters
 
@@ -109,14 +108,14 @@ Task-specific parameters and options are defined after the task is provided. Eac
     % sdwan backup -h
     usage: sdwan backup [-h] [--workdir <directory>] [--no-rollover] [--save-running] [--regex <regex> | --not-regex <regex>] <tag> [<tag> ...]
     
-    Sastre-Pro - Automation Tools for Cisco SD-WAN Powered by Viptela
+    Sastre-Pro - Cisco-SDWAN Automation Toolset
     
     Backup task:
     
     positional arguments:
-      <tag>                 one or more tags for selecting items to be backed up. Multiple tags should be separated by space. Available tags: all, policy_customapp, policy_definition, policy_list,
-                            policy_security, policy_vedge, policy_voice, policy_vsmart, template_device, template_feature. Special tag "all" selects all items, including WAN edge certificates and
-                            device configurations.
+      <tag>                 one or more tags for selecting items to be backed up. Multiple tags should be separated by space. Available tags: all, config_group, feature_profile, policy_customapp, policy_definition,
+                            policy_list, policy_security, policy_vedge, policy_voice, policy_vsmart, template_device, template_feature. Special tag "all" selects all items, including WAN edge certificates and device
+                            configurations.
     
     options:
       -h, --help            show this help message and exit
