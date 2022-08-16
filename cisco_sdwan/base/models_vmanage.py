@@ -642,16 +642,21 @@ class ConfigGroupAssociated(Config2Item):
     def is_empty(self) -> bool:
         return self.data is None or len(self.data.get('devices', [])) == 0
 
-    def filter(self, allowed_uuid_set: Set[str]) -> 'ConfigGroupAssociated':
+    def filter(self, allowed_uuid_set: Optional[Set[str]] = None, not_by_rule: bool = False) -> 'ConfigGroupAssociated':
         """
         Return a new instance of ConfigGroupAssociated containing only device entries with an id that is present in
         allowed_uuid_set.
-        @param allowed_uuid_set: Set of device uuids that are allowed
+        @param allowed_uuid_set: Set of device uuids that are allowed. If not provided, do not filter by uuid.
+        @param not_by_rule: If True, only include devices that were not added by tag rules.
         @return: Filtered ConfigGroupAssociated instance
         """
         new_payload = deepcopy(self.data)
         new_payload['devices'] = [
-            entry for entry in new_payload.get('devices', []) if entry.get('id') in allowed_uuid_set
+            entry for entry in new_payload.get('devices', [])
+            if (
+                (allowed_uuid_set is None or entry.get('id') in allowed_uuid_set) and
+                (not not_by_rule or not entry.get('addedByRule', False))
+            )
         ]
         return ConfigGroupAssociated(new_payload)
 
@@ -670,6 +675,35 @@ class ConfigGroupAssociated(Config2Item):
         response = api.delete(ConfigGroupAssociated.api_path.resolve(**path_vars).delete, input_data=payload)
 
         return ConfigGroupAssociated.ActionWorker(uuid=response.get('parentTaskId'))
+
+
+class ConfigGroupRules(IndexConfigItem):
+    api_path = ApiPath('tag/tagRules/{configGroupId}', 'tag/tagRules')
+    store_path = ('config_groups', 'tag_rules')
+    store_file = '{item_name}.json'
+    id_tag = 'tagId'
+    iter_fields = ('tagId', )
+
+    @staticmethod
+    def delete_raise(api: Rest, config_group_id: str, rule_id: str) -> None:
+        # 'tag/tagRules/{tag_rule_id}?configGroupId={config_group_id}'
+        api.delete(ConfigGroupRules.api_path.resolve(configGroupId=config_group_id).delete, rule_id,
+                   configGroupId=config_group_id)
+
+    def post_raise(self, api: Rest, config_group_id: str) -> List[str]:
+        filtered_keys = {
+            self.id_tag,
+        }
+        response_list = []
+        for rule in self.data:
+            post_data = {k: v for k, v in rule.items() if k not in filtered_keys}
+            post_data['configGroupId'] = config_group_id
+            response = api.post(post_data, ConfigGroupRules.api_path.resolve(configGroupId=config_group_id).post)
+            response_list.extend(
+                entry.get('chassisNumber') for entry in response.get('devices', {}).get('matchingDevices', [])
+            )
+
+        return response_list
 
 
 class ConfigGroupDeploy(ApiItem):
@@ -776,26 +810,6 @@ class ProfileSdwanCli(FeatureProfile):
 class ProfileSdwanCliIndex(FeatureProfileIndex):
     api_path = ApiPath('v1/feature-profile/sdwan/cli', None, None, None)
     store_file = 'feature_profiles_sdwan_cli.json'
-
-
-# TODO: Add mobility feature profiles
-
-#
-# Tag Rules
-#
-
-class TagRule(ConfigItem):
-    api_path = ApiPath('tag/tagRules')
-    store_path = ('tag_rules',)
-    store_file = '{item_name}.json'
-    name_tag = 'name'
-
-
-@register('tag_rule', 'tag rule', TagRule, min_version='20.8')
-class TagRuleIndex(IndexConfigItem):
-    api_path = ApiPath('tag/tagRules', None, None, None)
-    store_file = 'tag_rules.json'
-    iter_fields = IdName('id', 'name')
 
 
 #

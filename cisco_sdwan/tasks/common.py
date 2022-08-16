@@ -20,7 +20,8 @@ from cisco_sdwan.base.models_vmanage import (DeviceTemplate, DeviceTemplateValue
                                              DeviceTemplateAttach, DeviceTemplateCLIAttach, DeviceModeCli,
                                              ActionStatus, PolicyVsmartStatus, PolicyVsmartStatusException,
                                              PolicyVsmartActivate, PolicyVsmartIndex, PolicyVsmartDeactivate,
-                                             Device, ConfigGroupDeploy, ConfigGroupAssociated, ConfigGroupValues)
+                                             Device, ConfigGroupDeploy, ConfigGroupAssociated, ConfigGroupValues,
+                                             ConfigGroupRules)
 
 T = TypeVar('T')
 
@@ -497,36 +498,55 @@ class Task:
                             device has no hostname yet.
         @return: Sequence of (<config_group_id>, <config_group_name>, [<device uuid>, ...]) tuples
         """
-        def associate_devices(config_grp_name: str, config_grp_saved_id: str, config_grp_target_id: str):
+        def associate_devices(config_grp_name: str, config_grp_saved_id: str, config_grp_target_id: str) -> bool:
             saved_associated = ConfigGroupAssociated.load(workdir, ext_name, config_grp_name, config_grp_saved_id)
             if saved_associated is None:
-                self.log_error(f'ConfigGroupAssociated file not found: {config_grp_name} {config_grp_saved_id}')
-                return
+                self.log_debug(f"Skip config-group {config_grp_name} associate, no ConfigGroupAssociated file")
+                return False
 
             # Associate devices in saved_associated that are available but not associated yet
-            diff_associated = saved_associated.filter(
-                devices_map.keys() - set(ConfigGroupAssociated.get_raise(api, configGroupId=config_grp_target_id).uuids)
+            already_associated_uuids = set(
+                ConfigGroupAssociated.get_raise(api, configGroupId=config_grp_target_id).uuids
             )
+            diff_associated = saved_associated.filter(devices_map.keys() - already_associated_uuids, not_by_rule=True)
             if diff_associated.is_empty:
-                self.log_debug(f"Skip config-group {config_grp_name}, no devices to associate")
-                return
+                self.log_debug(f"Skip config-group {config_grp_name} associate, no devices to associate")
+                return False
 
             if not self.is_dryrun:
                 diff_associated.put_raise(api, configGroupId=config_grp_target_id)
 
             self.log_info(f"Config-group {config_grp_name}, "
                           f"associate: {', '.join(devices_map.get(uuid) or uuid for uuid in diff_associated.uuids)}")
+            return True
+
+        def restore_rules(config_grp_name: str, config_grp_saved_id: str, config_grp_target_id: str) -> bool:
+            saved_rules = ConfigGroupRules.load(workdir, ext_name, config_grp_name, config_grp_saved_id)
+            if saved_rules is None:
+                self.log_debug(f"Skip config-group {config_grp_name} restore rules, no ConfigGroupRules file")
+                return False
+
+            if self.is_dryrun:
+                self.log_info(f"Config-group {config_grp_name}, associate (via automated rules): "
+                              "device list is unknown during dry-run")
+                return True
+
+            matched_uuids = saved_rules.post_raise(api, config_grp_target_id)
+            self.log_info(f"Config-group {config_grp_name}, associate (via automated rules): "
+                          f"{', '.join(devices_map.get(uuid) or uuid for uuid in matched_uuids)}")
+
+            return len(matched_uuids) > 0
 
         def restore_values(config_grp_name: str, config_grp_saved_id: str, config_grp_target_id: str):
             saved_values = ConfigGroupValues.load(workdir, ext_name, config_grp_name, config_grp_saved_id)
             if saved_values is None:
-                self.log_error(f'ConfigGroupValues file not found: {config_grp_name} {config_grp_saved_id}')
+                self.log_debug(f"Skip config-group {config_grp_name} push values, no ConfigGroupValues file")
                 return []
 
             # Restore values for devices in saved_values that are available
             diff_values = saved_values.filter(devices_map.keys())
             if diff_values.is_empty:
-                self.log_debug(f"Skip config-group {config_grp_name}, no values to push")
+                self.log_debug(f"Skip config-group {config_grp_name} push values, no values to push")
                 return []
 
             if not self.is_dryrun:
@@ -551,10 +571,17 @@ class Task:
                 self.log_debug(f'Skip {group_name}, saved config-group not on target node')
                 continue
 
-            associate_devices(group_name, saved_id, target_id)
+            rules_associates = restore_rules(group_name, saved_id, target_id)
+            direct_associates = associate_devices(group_name, saved_id, target_id)
+
+            if not direct_associates and not rules_associates:
+                continue
+
             affected_uuids = restore_values(group_name, saved_id, target_id)
-            if affected_uuids:
-                deploy_data.append((target_id, group_name, affected_uuids))
+            if not affected_uuids:
+                continue
+
+            deploy_data.append((target_id, group_name, affected_uuids))
 
         return deploy_data
 
@@ -712,12 +739,39 @@ class Task:
             if devices_associated is None:
                 self.log_warning(f'Failed to retrieve {config_grp_name} associated devices from vManage')
                 continue
-            for device_id in devices_associated.uuids:
+            for device_id in devices_associated.filter(not_by_rule=True).uuids:
                 if device_id in devices_map:
                     group.send((config_grp_id, config_grp_name, device_id))
         group.send(None)
 
         return len(dissociate_reqs)
+
+    def cfg_group_rules_delete(self, api: Rest, cfg_group_iter: Iterator[Tuple[str, str]]) -> int:
+        """
+        Delete config-group device association automated rules
+        @param api: Instance of Rest API
+        @param cfg_group_iter: Iterator of (<group id>, <group name>) tuples containing config-groups to inspect
+        @return: Number of automated rules delete requests processed
+        """
+        delete_req_count = 0
+        for config_grp_id, config_grp_name in cfg_group_iter:
+            rules = ConfigGroupRules.get(api, configGroupId=config_grp_id)
+            if rules is None:
+                self.log_warning(f'Failed to retrieve {config_grp_name} automated rules from vManage')
+                continue
+            for rule_id in rules:
+                delete_req_count += 1
+                self.log_info(f'Config-group {config_grp_name} delete automated rule: {rule_id}')
+
+                if self.is_dryrun:
+                    continue
+
+                try:
+                    ConfigGroupRules.delete_raise(api, config_grp_id, rule_id)
+                except RestAPIException as ex:
+                    self.log_error(f'Failed to delete config-group {config_grp_name} automated rule {rule_id}: {ex}')
+
+        return delete_req_count
 
     def policy_activate(self, api: Rest, policy_id: Optional[str], policy_name: Optional[str], *,
                         log_context: str, raise_on_failure: bool = True, is_edited: bool = False) -> int:
