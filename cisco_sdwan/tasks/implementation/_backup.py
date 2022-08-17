@@ -4,14 +4,16 @@ from pydantic import validator
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest, RestAPIException
 from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL
-from cisco_sdwan.base.models_base import ServerInfo
+from cisco_sdwan.base.models_base import ServerInfo, DATA_DIR
 from cisco_sdwan.base.models_vmanage import (DeviceConfig, DeviceConfigRFS, DeviceTemplate, DeviceTemplateAttached,
                                              DeviceTemplateValues, EdgeInventory, ControlInventory, EdgeCertificate,
                                              ConfigGroup, ConfigGroupValues, ConfigGroupAssociated, ConfigGroupRules)
 from cisco_sdwan.tasks.utils import TaskOptions, TagOptions, filename_type, regex_type, default_workdir
 from cisco_sdwan.tasks.common import regex_search, clean_dir, Task
 from cisco_sdwan.tasks.models import TaskArgs, validate_regex, validate_filename, validate_catalog_tag
-
+import pathlib
+from zipfile import *
+import os
 
 @TaskOptions.register('backup')
 class TaskBackup(Task):
@@ -41,6 +43,7 @@ class TaskBackup(Task):
                                       f'separated by space. Available tags: {TagOptions.options()}. Special tag '
                                       f'"{CATALOG_TAG_ALL}" selects all items, including WAN edge certificates and '
                                       'device configurations.')
+        task_parser.add_argument('--zip', action='store_true', help='backup zipfile name (default: %(default_workdir(target_address)s).zip')
         return task_parser.parse_args(task_args)
 
     def runner(self, parsed_args, api: Optional[Rest] = None) -> Union[None, list]:
@@ -120,7 +123,20 @@ class TaskBackup(Task):
                             continue
                         if sub_item.save(parsed_args.workdir, item_index.need_extended_name, item_name, item_id):
                             self.log_info(f'Done {info} {item_name} {sub_item_info}')
-
+                            
+        # If --zip option is passed by the user, create a .zip file for the backup
+        if parsed_args.zip:
+            self.file_zipper(parsed_args.workdir)
+            self.log_info('Backup zip file "%s.zip" created', parsed_args.workdir)
+        return
+      
+    @staticmethod
+    def file_zipper(workdir: str) -> None:
+        backup_regular_directory = pathlib.Path(DATA_DIR, f'{workdir}')
+        backup_zipfile_directory = pathlib.Path(DATA_DIR, f'{workdir}.zip')
+        with ZipFile(backup_zipfile_directory, mode="w") as archive:
+            for file_path in backup_regular_directory.rglob("*"):
+                archive.write(file_path, arcname=file_path.relative_to(backup_regular_directory))
         return
 
     def save_running_configs(self, api: Optional[Rest], workdir: str) -> None:
@@ -152,6 +168,7 @@ class BackupArgs(TaskArgs):
     not_regex: Optional[str] = None
     no_rollover: bool = False
     save_running: bool = False
+    zip: bool = False
     workdir: str
     tags: List[str]
 
