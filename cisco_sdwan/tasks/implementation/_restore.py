@@ -4,12 +4,15 @@ from pydantic import validator
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest, RestAPIException, is_version_newer, response_id
 from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL, ordered_tags, is_index_supported
-from cisco_sdwan.base.models_base import UpdateEval, ServerInfo, ModelException
+from cisco_sdwan.base.models_base import UpdateEval, ServerInfo, ModelException, DATA_DIR
 from cisco_sdwan.base.models_vmanage import (DeviceTemplateIndex, PolicyVsmartIndex, EdgeInventory, ControlInventory,
                                              CheckVBond, FeatureProfile, ConfigGroupIndex)
 from cisco_sdwan.tasks.utils import TaskOptions, TagOptions, existing_workdir_type, regex_type, default_workdir
 from cisco_sdwan.tasks.common import regex_search, Task, WaitActionsException
 from cisco_sdwan.tasks.models import TaskArgs, validate_workdir, validate_regex, validate_catalog_tag
+import pathlib
+from zipfile import *
+import os
 
 
 @TaskOptions.register('restore')
@@ -41,9 +44,17 @@ class TaskRestore(Task):
                                  help='tag for selecting items to be restored. Items that are dependencies of the '
                                       'specified tag are automatically included. Available tags: '
                                       f'{TagOptions.options()}. Special tag "{CATALOG_TAG_ALL}" selects all items.')
+        task_parser.add_argument('--unzip', action='store_true',
+                                 help='restore file name (default: %(default_workdir(target_address)s)')
         return task_parser.parse_args(task_args)
 
     def runner(self, parsed_args, api: Optional[Rest] = None) -> Union[None, list]:
+      
+        # If --unzip option is passed by the user, unzip/decompress the zipfile for the restore
+        if parsed_args.unzip:
+            self.file_unzipper(parsed_args.workdir)
+            self.log_info('Unzipped file "%s.zip" and extracted all files', parsed_args.workdir)
+            
         def load_items(index, item_cls):
             item_iter = (
                 (item_id, item_cls.load(parsed_args.workdir, index.need_extended_name, item_name, item_id))
@@ -333,6 +344,13 @@ class TaskRestore(Task):
         except FileNotFoundError:
             self.log_debug("Will skip active policy restore, no local vSmart policy index")
 
+    @staticmethod
+    def file_unzipper(workdir: str) -> None:
+        backup_zipfile_directory = pathlib.Path(DATA_DIR, f'{workdir}.zip')
+        restore_zipped_directory = pathlib.Path(DATA_DIR, f'{workdir}_unzipped')
+        with ZipFile(backup_zipfile_directory, 'r') as zipObj:
+            zipObj.extractall(f'{DATA_DIR}/restore_unzipped')
+        return
 
 class RestoreArgs(TaskArgs):
     workdir: str
@@ -341,6 +359,7 @@ class RestoreArgs(TaskArgs):
     dryrun: bool = False
     attach: bool = False
     update: bool = False
+    unzip: bool = False
     tag: str
 
     # Validators
