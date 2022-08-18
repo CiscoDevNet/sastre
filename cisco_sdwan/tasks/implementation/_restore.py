@@ -359,7 +359,7 @@ class RestoreArgs(TaskArgs):
     dryrun: bool = False
     attach: bool = False
     update: bool = False
-    unzip: bool = False
+    zip: bool = False
     tag: str
 
     # Validators
