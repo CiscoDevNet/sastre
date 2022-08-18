@@ -4,7 +4,7 @@ from pydantic import validator
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest, RestAPIException, is_version_newer, response_id
 from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL, ordered_tags, is_index_supported
-from cisco_sdwan.base.models_base import UpdateEval, ServerInfo, ModelException, DATA_DIR
+from cisco_sdwan.base.models_base import UpdateEval, ServerInfo, ModelException, SASTRE_ROOT_DIR, DATA_DIR
 from cisco_sdwan.base.models_vmanage import (DeviceTemplateIndex, PolicyVsmartIndex, EdgeInventory, ControlInventory,
                                              CheckVBond, FeatureProfile, ConfigGroupIndex)
 from cisco_sdwan.tasks.utils import TaskOptions, TagOptions, existing_workdir_type, regex_type, default_workdir
@@ -23,14 +23,15 @@ class TaskRestore(Task):
         task_parser.prog = f'{task_parser.prog} restore'
         task_parser.formatter_class = argparse.RawDescriptionHelpFormatter
 
-        task_parser.add_argument('--workdir', metavar='<directory>', type=existing_workdir_type,
-                                 default=default_workdir(target_address),
-                                 help='restore source (default: %(default)s)')
         mutex = task_parser.add_mutually_exclusive_group()
         mutex.add_argument('--regex', metavar='<regex>', type=regex_type,
                            help='regular expression matching item names to restore, within selected tags.')
         mutex.add_argument('--not-regex', metavar='<regex>', type=regex_type,
                            help='regular expression matching item names NOT to restore, within selected tags.')
+        mutex.add_argument('--workdir', metavar='<directory>', type=existing_workdir_type, default=default_workdir(target_address),
+                           help='restore source (default: %(default)s)')
+        mutex.add_argument('--zip', metavar='<zipfile_path>.zip', type=zip, default=default_workdir(target_address),
+                           help='backup zipfile name (default: %(default_workdir(target_address)s).')
         task_parser.add_argument('--dryrun', action='store_true',
                                  help='dry-run mode. Items to be restored are listed but not pushed to vManage.')
         task_parser.add_argument('--attach', action='store_true',
@@ -44,16 +45,17 @@ class TaskRestore(Task):
                                  help='tag for selecting items to be restored. Items that are dependencies of the '
                                       'specified tag are automatically included. Available tags: '
                                       f'{TagOptions.options()}. Special tag "{CATALOG_TAG_ALL}" selects all items.')
-        task_parser.add_argument('--unzip', action='store_true',
-                                 help='restore file name (default: %(default_workdir(target_address)s)')
         return task_parser.parse_args(task_args)
 
     def runner(self, parsed_args, api: Optional[Rest] = None) -> Union[None, list]:
       
-        # If --unzip option is passed by the user, unzip/decompress the zipfile for the restore
-        if parsed_args.unzip:
-            self.file_unzipper(parsed_args.workdir)
-            self.log_info('Unzipped file "%s.zip" and extracted all files', parsed_args.workdir)
+        # If --zip option is passed by the user, unzip/decompress the zipfile for the restore
+        if parsed_args.zip or parsed_args.workdir:
+            default_path_to_backup_zipfile = pathlib.Path(SASTRE_ROOT_DIR, f'{parsed_args.workdir}.zip')
+            name_of_backup_zipfile = pathlib.PurePath(default_path_to_backup_zipfile).name
+            real_path_to_backup_zipfile = pathlib.Path(SASTRE_ROOT_DIR, name_of_backup_zipfile)
+            self.file_unzipper(real_path_to_backup_zipfile)
+            self.log_info('Unzipped file "%s" and extracted all files', real_path_to_backup_zipfile)
             
         def load_items(index, item_cls):
             item_iter = (
@@ -345,11 +347,9 @@ class TaskRestore(Task):
             self.log_debug("Will skip active policy restore, no local vSmart policy index")
 
     @staticmethod
-    def file_unzipper(workdir: str) -> None:
-        backup_zipfile_directory = pathlib.Path(DATA_DIR, f'{workdir}.zip')
-        restore_zipped_directory = pathlib.Path(DATA_DIR, f'{workdir}_unzipped')
-        with ZipFile(backup_zipfile_directory, 'r') as zipObj:
-            zipObj.extractall(f'{DATA_DIR}/restore_unzipped')
+    def file_unzipper(real_path_to_backup_zipfile) -> None:
+        with ZipFile(real_path_to_backup_zipfile, 'r') as zipObj:
+             zipObj.extractall(f'{SASTRE_ROOT_DIR}/restore_unzipped')
         return
 
 class RestoreArgs(TaskArgs):
