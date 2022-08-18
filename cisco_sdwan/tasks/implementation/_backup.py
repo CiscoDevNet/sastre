@@ -4,7 +4,7 @@ from pydantic import validator
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest, RestAPIException
 from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL
-from cisco_sdwan.base.models_base import ServerInfo, DATA_DIR
+from cisco_sdwan.base.models_base import ServerInfo, SASTRE_ROOT_DIR, DATA_DIR
 from cisco_sdwan.base.models_vmanage import (DeviceConfig, DeviceConfigRFS, DeviceTemplate, DeviceTemplateAttached,
                                              DeviceTemplateValues, EdgeInventory, ControlInventory, EdgeCertificate,
                                              ConfigGroup, ConfigGroupValues, ConfigGroupAssociated, ConfigGroupRules)
@@ -23,9 +23,6 @@ class TaskBackup(Task):
         task_parser.prog = f'{task_parser.prog} backup'
         task_parser.formatter_class = argparse.RawDescriptionHelpFormatter
 
-        task_parser.add_argument('--workdir', metavar='<directory>', type=filename_type,
-                                 default=default_workdir(target_address),
-                                 help='backup destination (default: %(default)s)')
         task_parser.add_argument('--no-rollover', action='store_true',
                                  help='by default, if workdir already exists (before a new backup is saved) the old '
                                       'workdir is renamed using a rolling naming scheme. This option disables this '
@@ -38,12 +35,15 @@ class TaskBackup(Task):
                            help='regular expression matching item names to backup, within selected tags.')
         mutex.add_argument('--not-regex', metavar='<regex>', type=regex_type,
                            help='regular expression matching item names NOT to backup, within selected tags.')
+         mutex.add_argument('--workdir', metavar='<directory>', type=filename_type, default=default_workdir(target_address),
+                           help='backup destination (default: %(default)s)')
+        mutex.add_argument('--zip', metavar='<zip_file_path>.zip', type=zip, default=f'{default_workdir(target_address)}.zip',
+                           help='backup zipfile name (default: %(default_workdir(target_address)s).zip')
         task_parser.add_argument('tags', metavar='<tag>', nargs='+', type=TagOptions.tag,
                                  help='one or more tags for selecting items to be backed up. Multiple tags should be '
                                       f'separated by space. Available tags: {TagOptions.options()}. Special tag '
                                       f'"{CATALOG_TAG_ALL}" selects all items, including WAN edge certificates and '
                                       'device configurations.')
-        task_parser.add_argument('--zip', action='store_true', help='backup zipfile name (default: %(default_workdir(target_address)s).zip')
         return task_parser.parse_args(task_args)
 
     def runner(self, parsed_args, api: Optional[Rest] = None) -> Union[None, list]:
@@ -125,15 +125,15 @@ class TaskBackup(Task):
                             self.log_info(f'Done {info} {item_name} {sub_item_info}')
                             
         # If --zip option is passed by the user, create a .zip file for the backup
-        if parsed_args.zip:
+        if parsed_args.zip or parsed_args.workdir:
             self.file_zipper(parsed_args.workdir)
             self.log_info('Backup zip file "%s.zip" created', parsed_args.workdir)
         return
       
-    @staticmethod
+  @staticmethod
     def file_zipper(workdir: str) -> None:
         backup_regular_directory = pathlib.Path(DATA_DIR, f'{workdir}')
-        backup_zipfile_directory = pathlib.Path(DATA_DIR, f'{workdir}.zip')
+        backup_zipfile_directory = pathlib.Path(SASTRE_ROOT_DIR, f'{workdir}.zip')
         with ZipFile(backup_zipfile_directory, mode="w") as archive:
             for file_path in backup_regular_directory.rglob("*"):
                 archive.write(file_path, arcname=file_path.relative_to(backup_regular_directory))
