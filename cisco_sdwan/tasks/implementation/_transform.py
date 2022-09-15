@@ -2,8 +2,8 @@ import argparse
 from uuid import uuid4
 from copy import deepcopy
 from contextlib import suppress
-from typing import Union, Optional, Tuple, List, Dict, Type, Callable
-from pydantic import BaseModel, validator, ValidationError, Extra
+from typing import Union, Optional, Tuple, List, Dict, Type, Callable, Any
+from pydantic import BaseModel, validator, ValidationError, Extra, root_validator
 import yaml
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest
@@ -14,8 +14,9 @@ from cisco_sdwan.base.processor import StopProcessorException, ProcessorExceptio
 from cisco_sdwan.tasks.utils import (TaskOptions, TagOptions, existing_workdir_type, filename_type, ext_template_type,
                                      regex_type, existing_file_type)
 from cisco_sdwan.tasks.common import clean_dir, Task, TaskException, regex_search
-from cisco_sdwan.tasks.models import (const, TaskArgs, validate_workdir, validate_ext_template, validate_filename,
-                                      validate_regex, validate_catalog_tag, validate_existing_file, validate_json)
+from cisco_sdwan.tasks.models import const, TaskArgs, validate_catalog_tag
+from cisco_sdwan.tasks.validators import (validate_workdir, validate_ext_template, validate_filename, validate_regex,
+                                          validate_existing_file, validate_json)
 
 
 class RecipeException(Exception):
@@ -404,6 +405,13 @@ class TransformCopyArgs(TransformArgs):
     _validate_regex = validator('regex', 'not_regex', allow_reuse=True)(validate_regex)
     _validate_name = validator('name_regex', allow_reuse=True)(validate_ext_template)
 
+    @root_validator(skip_on_failure=True)
+    def mutex_validations(cls, values: Dict[str, Any]) -> Dict[str, Any]:
+        if values.get('regex') is not None and values.get('not_regex') is not None:
+            raise ValueError('Argument "not_regex" not allowed with "regex"')
+
+        return values
+
 
 class TransformRenameArgs(TransformCopyArgs):
     recipe_handler: Callable = const(TaskTransform.rename_recipe)
@@ -417,3 +425,10 @@ class TransformRecipeArgs(TransformArgs):
     # Validators
     _validate_existing_file = validator('from_file', allow_reuse=True)(validate_existing_file)
     _validate_json = validator('from_json', allow_reuse=True)(validate_json)
+
+    @root_validator(skip_on_failure=True)
+    def mutex_validations(cls, values: Dict[str, Any]) -> Dict[str, Any]:
+        if values.get('from_file') is not None and values.get('from_json') is not None:
+            raise ValueError('Argument "from_file" not allowed with "from_json"')
+
+        return values

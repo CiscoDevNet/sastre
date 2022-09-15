@@ -9,10 +9,12 @@ import re
 import argparse
 from datetime import date
 from getpass import getpass
-from pathlib import Path
+from typing import Callable
 from cisco_sdwan.base.catalog import catalog_tags, op_catalog_tags, op_catalog_commands, CATALOG_TAG_ALL, OpType
-from cisco_sdwan.base.models_base import filename_safe, DATA_DIR, ExtendedTemplate
-from .common import Task
+from cisco_sdwan.tasks.common import Task
+from cisco_sdwan.tasks.validators import (validate_workdir, validate_regex, validate_existing_file, validate_zip_file,
+                                          validate_ipv4, validate_site_id, validate_ext_template, validate_version,
+                                          validate_filename)
 
 # Default local data store
 DEFAULT_WORKDIR_FORMAT = 'backup_{address}_{date:%Y%m%d}'
@@ -118,47 +120,104 @@ class StatsCmdSemantics(OpCmdSemantics):
     op_type: OpType = OpType.STATS
 
 
-def regex_type(regex_str):
+#
+# Validator wrappers to adapt pydantic validators to argparse
+#
+
+def regex_type(regex: str) -> str:
     try:
-        re.compile(regex_str)
-    except (re.error, TypeError):
-        if regex_str is not None:
-            raise argparse.ArgumentTypeError(f'"{regex_str}" is not a valid regular expression.') from None
+        validate_regex(regex)
+    except ValueError as ex:
+        raise argparse.ArgumentTypeError(ex) from None
 
-    return regex_str
-
-
-def existing_workdir_type(workdir_str):
-    if not Path(DATA_DIR, workdir_str).exists():
-        raise argparse.ArgumentTypeError(f'Work directory "{workdir_str}" not found.')
-
-    return workdir_str
+    return regex
 
 
-def existing_file_type(filename_str):
-    if not Path(filename_str).exists():
-        raise argparse.ArgumentTypeError(f'File "{filename_str}" not found.')
+def existing_workdir_type(workdir: str, *, skip_validation: bool = False) -> str:
+    if not skip_validation:
+        try:
+            validate_workdir(workdir)
+        except ValueError as ex:
+            raise argparse.ArgumentTypeError(ex) from None
 
-    return filename_str
-
-
-def filename_type(name_str):
-    # Also allow . on filename, on top of what's allowed by filename_safe
-    if re.sub(r'\.', '_', name_str) != filename_safe(name_str):
-        raise argparse.ArgumentTypeError(
-            f'Invalid name "{name_str}". Only alphanumeric characters, "-", "_", and "." are allowed.'
-        )
-    return name_str
+    return workdir
 
 
-def uuid_type(uuid_str):
+def filename_type(filename: str) -> str:
+    try:
+        validate_filename(filename)
+    except ValueError as ex:
+        raise argparse.ArgumentTypeError(ex) from None
+
+    return filename
+
+
+def existing_file_type(filename: str) -> str:
+    try:
+        validate_existing_file(filename)
+    except ValueError as ex:
+        raise argparse.ArgumentTypeError(ex) from None
+
+    return filename
+
+
+def zip_file_type(filename: str) -> str:
+    try:
+        validate_zip_file(filename)
+    except ValueError as ex:
+        raise argparse.ArgumentTypeError(ex) from None
+
+    return filename
+
+
+def ipv4_type(ipv4: str) -> str:
+    try:
+        validate_ipv4(ipv4)
+    except ValueError as ex:
+        raise argparse.ArgumentTypeError(ex) from None
+
+    return ipv4
+
+
+def site_id_type(site_id: str) -> str:
+    try:
+        validate_site_id(site_id)
+    except ValueError as ex:
+        raise argparse.ArgumentTypeError(ex) from None
+
+    return site_id
+
+
+def ext_template_type(template_str: str) -> str:
+    try:
+        validate_ext_template(template_str)
+    except ValueError as ex:
+        raise argparse.ArgumentTypeError(ex) from None
+
+    return template_str
+
+
+def version_type(version_str: str) -> str:
+    try:
+        cleaned_version = validate_version(version_str)
+    except ValueError as ex:
+        raise argparse.ArgumentTypeError(ex) from None
+
+    return cleaned_version
+
+
+#
+# Argparse specific validators
+#
+
+def uuid_type(uuid_str: str) -> str:
     if re.match(r'[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$', uuid_str) is None:
         raise argparse.ArgumentTypeError(f'"{uuid_str}" is not a valid item ID.')
 
     return uuid_str
 
 
-def non_empty_type(src_str):
+def non_empty_type(src_str: str) -> str:
     out_str = src_str.strip()
     if len(out_str) == 0:
         raise argparse.ArgumentTypeError('Value cannot be empty.')
@@ -166,33 +225,7 @@ def non_empty_type(src_str):
     return out_str
 
 
-def ipv4_type(ipv4_str):
-    if re.match(r'\d+(?:\.\d+){3}$', ipv4_str) is None:
-        raise argparse.ArgumentTypeError(f'"{ipv4_str}" is not a valid IPv4 address.')
-
-    return ipv4_str
-
-
-def site_id_type(site_id_str):
-    try:
-        site_id = int(site_id_str)
-        if not 0 <= site_id <= 4294967295:
-            raise ValueError()
-    except ValueError:
-        raise argparse.ArgumentTypeError(f'"{site_id_str}" is not a valid site-id.') from None
-
-    return site_id_str
-
-
-def version_type(version_str):
-    # Development versions may follow this format: '20.1.999-98'
-    if re.match(r'\d+([.-]\d+){1,3}$', version_str) is None:
-        raise argparse.ArgumentTypeError(f'"{version_str}" is not a valid version identifier.')
-
-    return '.'.join(([str(int(v)) for v in version_str.replace('-', '.').split('.')] + ['0', ])[:2])
-
-
-def int_type(min_val, max_val, value_str):
+def int_type(min_val: int, max_val: int, value_str: str) -> int:
     try:
         value_int = int(value_str)
         if not min_val <= value_int <= max_val:
@@ -202,6 +235,34 @@ def int_type(min_val, max_val, value_str):
                                          f'{min_val} and {max_val}, inclusive.') from None
 
     return value_int
+
+
+#
+# Miscellaneous cli-input / argparse
+#
+
+class TrackedValidator:
+    def __init__(self, validator_fn: Callable):
+        self.num_calls = 0
+        self.validator_fn = validator_fn
+
+    @property
+    def called(self) -> bool:
+        return self.num_calls > 0
+
+    def __call__(self, *validator_fn_args):
+        self.num_calls += 1
+
+        return self.validator_fn(*validator_fn_args)
+
+
+class ConditionalValidator:
+    def __init__(self, validator_fn: Callable, tracked_validator_obj: TrackedValidator):
+        self.validator_fn = validator_fn
+        self.tracked_validator_obj = tracked_validator_obj
+
+    def __call__(self, *validator_fn_args):
+        return self.validator_fn(*validator_fn_args, skip_validation=self.tracked_validator_obj.called)
 
 
 class EnvVar(argparse.Action):
@@ -236,14 +297,9 @@ class PromptArg:
                 return value
 
 
-def ext_template_type(template_str):
-    try:
-        ExtendedTemplate(template_str)('test')
-    except ValueError as ex:
-        raise argparse.ArgumentTypeError(ex) from None
-
-    return template_str
-
+#
+# Exceptions
+#
 
 class SastreException(Exception):
     """ Exception for main app errors """

@@ -1,18 +1,18 @@
 import argparse
-from typing import Union, Optional, Sequence, Dict, Set
-from pydantic import validator
+from typing import Union, Optional, Sequence, Dict, Set, Any
+from pydantic import validator, root_validator
+from uuid import uuid4
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest, RestAPIException, is_version_newer, response_id
 from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL, ordered_tags, is_index_supported
-from cisco_sdwan.base.models_base import UpdateEval, ServerInfo, ModelException, SASTRE_ROOT_DIR, DATA_DIR
+from cisco_sdwan.base.models_base import UpdateEval, ServerInfo, ModelException
 from cisco_sdwan.base.models_vmanage import (DeviceTemplateIndex, PolicyVsmartIndex, EdgeInventory, ControlInventory,
                                              CheckVBond, FeatureProfile, ConfigGroupIndex)
-from cisco_sdwan.tasks.utils import TaskOptions, TagOptions, existing_workdir_type, regex_type, default_workdir
-from cisco_sdwan.tasks.common import regex_search, Task, WaitActionsException
-from cisco_sdwan.tasks.models import TaskArgs, validate_workdir, validate_regex, validate_catalog_tag
-import pathlib
-from zipfile import *
-import os
+from cisco_sdwan.tasks.utils import (TaskOptions, TagOptions, regex_type, default_workdir, existing_workdir_type,
+                                     TrackedValidator, ConditionalValidator, zip_file_type)
+from cisco_sdwan.tasks.common import regex_search, Task, WaitActionsException, clean_dir, archive_extract
+from cisco_sdwan.tasks.models import TaskArgs, validate_catalog_tag, validate_workdir_conditional
+from cisco_sdwan.tasks.validators import validate_regex, validate_zip_file
 
 
 @TaskOptions.register('restore')
@@ -23,15 +23,21 @@ class TaskRestore(Task):
         task_parser.prog = f'{task_parser.prog} restore'
         task_parser.formatter_class = argparse.RawDescriptionHelpFormatter
 
-        mutex = task_parser.add_mutually_exclusive_group()
-        mutex.add_argument('--regex', metavar='<regex>', type=regex_type,
-                           help='regular expression matching item names to restore, within selected tags.')
-        mutex.add_argument('--not-regex', metavar='<regex>', type=regex_type,
-                           help='regular expression matching item names NOT to restore, within selected tags.')
-        mutex.add_argument('--workdir', metavar='<directory>', type=existing_workdir_type, default=default_workdir(target_address),
-                           help='restore source (default: %(default)s)')
-        mutex.add_argument('--zip', metavar='<zipfile_path>.zip', type=zip, default=default_workdir(target_address),
-                           help='backup zipfile name (default: %(default_workdir(target_address)s).')
+        # Workdir validation is done only if archive validation has not, that is if this is a restore from directory
+        tracked_archive_type = TrackedValidator(zip_file_type)
+        workdir_conditional_type = ConditionalValidator(existing_workdir_type, tracked_archive_type)
+
+        mutex_source = task_parser.add_mutually_exclusive_group()
+        mutex_source.add_argument('--archive', metavar='<filename>', type=tracked_archive_type,
+                                  help='restore from zip archive')
+        mutex_source.add_argument('--workdir', metavar='<directory>', type=workdir_conditional_type,
+                                  default=default_workdir(target_address),
+                                  help='restore from directory (default: %(default)s)')
+        mutex_regex = task_parser.add_mutually_exclusive_group()
+        mutex_regex.add_argument('--regex', metavar='<regex>', type=regex_type,
+                                 help='regular expression matching item names to restore, within selected tags.')
+        mutex_regex.add_argument('--not-regex', metavar='<regex>', type=regex_type,
+                                 help='regular expression matching item names NOT to restore, within selected tags.')
         task_parser.add_argument('--dryrun', action='store_true',
                                  help='dry-run mode. Items to be restored are listed but not pushed to vManage.')
         task_parser.add_argument('--attach', action='store_true',
@@ -48,15 +54,6 @@ class TaskRestore(Task):
         return task_parser.parse_args(task_args)
 
     def runner(self, parsed_args, api: Optional[Rest] = None) -> Union[None, list]:
-      
-        # If --zip option is passed by the user, unzip/decompress the zipfile for the restore
-        if parsed_args.zip or parsed_args.workdir:
-            default_path_to_backup_zipfile = pathlib.Path(SASTRE_ROOT_DIR, f'{parsed_args.workdir}.zip')
-            name_of_backup_zipfile = pathlib.PurePath(default_path_to_backup_zipfile).name
-            real_path_to_backup_zipfile = pathlib.Path(SASTRE_ROOT_DIR, name_of_backup_zipfile)
-            self.file_unzipper(real_path_to_backup_zipfile)
-            self.log_info('Unzipped file "%s" and extracted all files', real_path_to_backup_zipfile)
-            
         def load_items(index, item_cls):
             item_iter = (
                 (item_id, item_cls.load(parsed_args.workdir, index.need_extended_name, item_name, item_id))
@@ -65,7 +62,16 @@ class TaskRestore(Task):
             return ((item_id, item_obj) for item_id, item_obj in item_iter if item_obj is not None)
 
         self.is_dryrun = parsed_args.dryrun
-        self.log_info(f'Restore task: Local workdir: "{parsed_args.workdir}" -> vManage URL: "{api.base_url}"')
+
+        if parsed_args.archive:
+            self.log_info(f'Restore task: Local archive file: "{parsed_args.archive}" -> vManage URL: "{api.base_url}"')
+            parsed_args.workdir = str(uuid4())
+            self.log_debug(f'Temporary workdir: {parsed_args.workdir}')
+
+            archive_extract(parsed_args.archive, parsed_args.workdir)
+            self.log_info(f'Loaded archive file "{parsed_args.archive}"')
+        else:
+            self.log_info(f'Restore task: Local workdir: "{parsed_args.workdir}" -> vManage URL: "{api.base_url}"')
 
         local_info = ServerInfo.load(parsed_args.workdir)
         # Server info file may not be present (e.g. backup from older Sastre releases)
@@ -150,6 +156,10 @@ class TaskRestore(Task):
                     getattr(TaskRestore, attach_step_fn)(self, api, parsed_args.workdir)
                 except (RestAPIException, FileNotFoundError, WaitActionsException) as ex:
                     self.log_error(f'Failed: {info}: {ex}')
+
+        if parsed_args.archive:
+            clean_dir(parsed_args.workdir, max_saved=0)
+            self.log_debug('Temporary workdir deleted')
 
         return
 
@@ -346,23 +356,29 @@ class TaskRestore(Task):
         except FileNotFoundError:
             self.log_debug("Will skip active policy restore, no local vSmart policy index")
 
-    @staticmethod
-    def file_unzipper(real_path_to_backup_zipfile) -> None:
-        with ZipFile(real_path_to_backup_zipfile, 'r') as zipObj:
-             zipObj.extractall(f'{SASTRE_ROOT_DIR}/restore_unzipped')
-        return
 
 class RestoreArgs(TaskArgs):
-    workdir: str
+    archive: Optional[str] = None
+    workdir: Optional[str] = None
     regex: Optional[str] = None
     not_regex: Optional[str] = None
     dryrun: bool = False
     attach: bool = False
     update: bool = False
-    zip: bool = False
     tag: str
 
     # Validators
-    _validate_workdir = validator('workdir', allow_reuse=True)(validate_workdir)
+    _validate_archive = validator('archive', allow_reuse=True)(validate_zip_file)
+    _validate_workdir = validator('workdir', allow_reuse=True)(validate_workdir_conditional)
     _validate_regex = validator('regex', 'not_regex', allow_reuse=True)(validate_regex)
     _validate_tag = validator('tag', allow_reuse=True)(validate_catalog_tag)
+
+    @root_validator(skip_on_failure=True)
+    def mutex_validations(cls, values: Dict[str, Any]) -> Dict[str, Any]:
+        if bool(values.get('archive')) == bool(values.get('workdir')):
+            raise ValueError('Either "archive" or "workdir" must to be provided')
+
+        if values.get('regex') is not None and values.get('not_regex') is not None:
+            raise ValueError('Argument "not_regex" not allowed with "regex"')
+
+        return values

@@ -106,25 +106,32 @@ CX project ID is only applicable to Sastre-Pro. CX_PID and --pid option are not 
 Task-specific parameters and options are defined after the task is provided. Each task has its own set of parameters.
 
     % sdwan backup -h
-    usage: sdwan backup [-h] [--workdir <directory>] [--no-rollover] [--save-running] [--regex <regex> | --not-regex <regex>] <tag> [<tag> ...]
+    usage: sdwan backup [-h] [--archive <filename> | --workdir <directory>] [--no-rollover] [--save-running]
+                             [--regex <regex> | --not-regex <regex>]
+                             <tag> [<tag> ...]
     
     Sastre-Pro - Cisco-SDWAN Automation Toolset
     
     Backup task:
     
     positional arguments:
-      <tag>                 one or more tags for selecting items to be backed up. Multiple tags should be separated by space. Available tags: all, config_group, feature_profile, policy_customapp, policy_definition,
-                            policy_list, policy_security, policy_vedge, policy_voice, policy_vsmart, template_device, template_feature. Special tag "all" selects all items, including WAN edge certificates and device
-                            configurations.
+      <tag>                 one or more tags for selecting items to be backed up. Multiple tags should be separated by space. Available
+                            tags: all, config_group, feature_profile, policy_customapp, policy_definition, policy_list,
+                            policy_security, policy_vedge, policy_voice, policy_vsmart, template_device, template_feature. Special tag
+                            "all" selects all items, including WAN edge certificates and device configurations.
     
     options:
       -h, --help            show this help message and exit
+      --archive <filename>  backup to zip archive
       --workdir <directory>
-                            backup destination (default: backup_198.18.1.10_20220325)
-      --no-rollover         by default, if workdir already exists (before a new backup is saved) the old workdir is renamed using a rolling naming scheme. This option disables this automatic rollover.
-      --save-running        include the running config from each node to the backup. This is useful for reference or documentation purposes. It is not needed by the restore task.
+                            backup to directory (default: backup_198.18.1.10_20220915)
+      --no-rollover         by default, if workdir already exists (before a new backup is saved) the old workdir is renamed using a
+                            rolling naming scheme. This option disables this automatic rollover.
+      --save-running        include the running config from each node to the backup. This is useful for reference or documentation
+                            purposes. It is not needed by the restore task.
       --regex <regex>       regular expression matching item names to backup, within selected tags.
       --not-regex <regex>   regular expression matching item names NOT to backup, within selected tags.
+
 
 #### Important concepts:
 - vManage URL: Constructed from the provided vManage IP address and TCP port (default 443). All operations target this vManage.
@@ -225,6 +232,24 @@ The backup is saved under data/backup_10.85.136.253_20191206:
     INFO: Done local-domain list DCLOUD
     INFO: Task completed successfully
 
+### Backup saved as a zip file:
+
+    % sdwan --verbose backup all --archive my_backup_file.zip
+    INFO: Backup task: vManage URL: "https://198.18.1.10" -> Local archive file: "my_backup_file.zip"
+    INFO: Saved vManage server information
+    INFO: Saved WAN edge certificates
+    INFO: Saved device template index
+    <snip>
+    INFO: Saved local-domain list index
+    INFO: Done local-domain list DCLOUD
+    INFO: Created archive file "my_backup_file.zip"
+    INFO: Task completed successfully
+
+Note that the zip archive is created by default in the same directory where Sastre is executed (and not under a 'data' directory, as is the case for workdir):
+
+    % ls *.zip
+    my_backup_file.zip
+
 ### Restoring from backup:
 
     % sdwan --verbose restore all        
@@ -259,6 +284,19 @@ The backup is saved under data/backup_10.85.136.253_20191206:
     INFO: Identifying items to be pushed
     INFO: Inspecting template_device items
     INFO: Inspecting template_feature items
+    <snip>
+    INFO: Task completed successfully
+
+#### Restoring from a zip archive backup:
+
+    % sdwan --verbose restore all --archive my_backup_file.zip 
+    INFO: Restore task: Local archive file: "my_backup_file.zip" -> vManage URL: "https://198.18.1.10"
+    INFO: Loaded archive file "my_backup_file.zip"
+    INFO: Loading existing items from target vManage
+    INFO: Identifying items to be pushed
+    INFO: Inspecting config_group items
+    INFO: Inspecting feature_profile items
+    INFO: Inspecting template_device items
     <snip>
     INFO: Task completed successfully
 
