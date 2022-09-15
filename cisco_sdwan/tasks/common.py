@@ -13,6 +13,7 @@ from pathlib import Path
 from shutil import rmtree
 from collections import namedtuple
 from typing import List, Tuple, Iterator, Union, Optional, Any, Iterable, Type, TypeVar, Sequence, Mapping
+from zipfile import ZipFile, ZIP_DEFLATED
 from pydantic import ValidationError
 from cisco_sdwan.base.rest_api import Rest, RestAPIException
 from cisco_sdwan.base.models_base import DATA_DIR
@@ -976,3 +977,30 @@ def export_json(table_iter: Iterable[Table], filename: str) -> None:
     with open(filename, 'w') as export_file:
         data = [table.dict() for table in table_iter]
         json.dump(data, export_file, indent=2)
+
+
+def archive_create(archive_filename: str, workdir: str) -> None:
+    """
+    Create a zip archive with the contents of workdir
+    @param archive_filename: zip archive filename
+    @param workdir: a directory under DATA_DIR to be archived
+    """
+    source_dir = Path(DATA_DIR, workdir)
+    with ZipFile(archive_filename, mode='w', compression=ZIP_DEFLATED) as archive_file:
+        for member_path in source_dir.rglob("*"):
+            archive_file.write(member_path, arcname=member_path.relative_to(source_dir))
+
+    return
+
+
+def archive_extract(archive_filename: str, workdir: str) -> None:
+    """
+    Extract zip archive into workdir
+    @param archive_filename: zip archive filename
+    @param workdir: a directory under DATA_DIR where to extract to
+    """
+    destination_dir = Path(DATA_DIR, workdir)
+    with ZipFile(archive_filename, mode='r') as archive_file:
+        archive_file.extractall(destination_dir)
+
+    return

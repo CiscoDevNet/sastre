@@ -14,8 +14,8 @@ from cisco_sdwan.migration.feature_migration import FeatureProcessor
 from cisco_sdwan.migration.device_migration import DeviceProcessor
 from cisco_sdwan.tasks.utils import TaskOptions, existing_workdir_type, filename_type, version_type, ext_template_type
 from cisco_sdwan.tasks.common import clean_dir, Task, TaskException
-from cisco_sdwan.tasks.models import (TaskArgs, validate_workdir, validate_ext_template, validate_version,
-                                      validate_filename)
+from cisco_sdwan.tasks.models import TaskArgs
+from cisco_sdwan.tasks.validators import validate_workdir, validate_ext_template, validate_version, validate_filename
 
 
 @TaskOptions.register('migrate')

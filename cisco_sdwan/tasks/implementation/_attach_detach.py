@@ -10,7 +10,8 @@ from cisco_sdwan.base.models_vmanage import (DeviceTemplateIndex, ConfigGroupInd
 from cisco_sdwan.tasks.utils import (TaskOptions, existing_workdir_type, regex_type, default_workdir, ipv4_type,
                                      site_id_type, int_type)
 from cisco_sdwan.tasks.common import regex_search, Task, WaitActionsException, device_iter
-from cisco_sdwan.tasks.models import TaskArgs, const, validate_regex, validate_workdir, validate_site_id, validate_ipv4
+from cisco_sdwan.tasks.models import TaskArgs, const
+from cisco_sdwan.tasks.validators import validate_regex, validate_workdir, validate_site_id, validate_ipv4
 
 # Default number of devices to include per attach/detach request. The value of 200 was adopted because it is what was
 # validated in the lab
