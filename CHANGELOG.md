@@ -4,6 +4,8 @@ Sastre 1.20 [xx, 2022]
 #### Enhancements:
 - [#42] Option --archive added to backup and restore tasks. Allowing backups to be saved as a zip file, and restore to read from a zip file.
 
+#### Fixes:
+- [#165] CustomApp policies failed to be restored due to dependency resolution issues, this has been fixed.
 
 Sastre 1.19 [August 16, 2022]
 ================================

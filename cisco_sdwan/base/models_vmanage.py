@@ -913,7 +913,8 @@ class PolicyCustomApp(ConfigItem):
     store_file = '{item_name}.json'
     name_tag = 'appName'
     id_tag = 'appId'
-    skip_cmp_tag_set = {'lastUpdated', }
+    skip_cmp_tag_set = {'lastUpdated', 'referenceCount', 'references', 'activatedId', 'isActivatedByVsmart', 'owner'}
+    post_filtered_tags = ('referenceCount', 'references')
 
     def __init__(self, data):
         """
