@@ -6,10 +6,43 @@
 """
 import json
 import requests
+import functools
+import logging
 from urllib3 import disable_warnings
 from urllib3.exceptions import InsecureRequestWarning
-from time import time
+from time import time, sleep
 from typing import Optional, Dict, Sequence, Any, Union
+from random import uniform
+
+
+MAX_RETRIES = 10
+
+
+def backoff_wait_secs(retry_count: int, ceiling: int = 5, variance: float = 0.25) -> float:
+    """
+    Calculates the exponential backoff time in seconds
+    @param retry_count: Integer greater than or equal to 0
+    @param ceiling: Defines a ceiling for the backoff time
+    @param variance: Apply a random +/- variance percentage to the backoff time to avoid synchronization
+    @return: Backoff time in seconds
+    """
+    return (1 << min(retry_count, ceiling)) * (1 + uniform(-variance, variance))
+
+
+def backoff_retry(fn):
+    @functools.wraps(fn)
+    def retry_fn(*args, **kwargs):
+        for retry in range(MAX_RETRIES):
+            try:
+                return fn(*args, **kwargs)
+            except ServerRateLimitException as ex:
+                wait_secs = backoff_wait_secs(retry)
+                logging.getLogger(__name__).debug(f'{ex}: Retry {retry+1}/{MAX_RETRIES}, backoff {wait_secs:.3}s')
+                sleep(wait_secs)
+        else:
+            raise RestAPIException(f'Maximum retries exceeded ({MAX_RETRIES})')
+
+    return retry_fn
 
 
 class Rest:
@@ -103,6 +136,7 @@ class Rest:
     def is_provider(self) -> bool:
         return self.server_facts.get('userMode', '') == 'provider'
 
+    @backoff_retry
     def get(self, *path_entries: str, **params: Union[str, int]) -> Dict[str, Any]:
         response = self.session.get(self._url(*path_entries),
                                     params=params if params else None,
@@ -110,6 +144,7 @@ class Rest:
         raise_for_status(response)
         return response.json()
 
+    @backoff_retry
     def post(self, input_data: Dict[str, Any], *path_entries: str) -> Union[Dict[str, Any], None]:
         # With large input_data, vManage fails the post request if payload is encoded in compact form. Thus encoding
         # with indent=1.
@@ -120,6 +155,7 @@ class Rest:
         # POST may return an empty string, return None in this case
         return response.json() if response.text else None
 
+    @backoff_retry
     def put(self, input_data: Dict[str, Any], *path_entries: str) -> Union[Dict[str, Any], None]:
         # With large input_data, vManage fails the put request if payload is encoded in compact form. Thus encoding
         # with indent=1.
@@ -130,6 +166,7 @@ class Rest:
         # PUT may return an empty string, return None in this case
         return response.json() if response.text else None
 
+    @backoff_retry
     def delete(self, *path_entries: str, input_data: Optional[Dict[str, Any]] = None,
                **params: str) -> Union[Dict[str, Any], None]:
         response = self.session.delete(self._url(*path_entries),
@@ -149,6 +186,9 @@ class Rest:
 
 def raise_for_status(response):
     if response.status_code != requests.codes.ok:
+        if response.status_code == 429:
+            raise ServerRateLimitException('Received rate-limit signal (status-code 429)')
+
         try:
             reply_data = response.json() if response.text else {}
         except json.decoder.JSONDecodeError:
@@ -205,4 +245,9 @@ class LoginFailedException(RestAPIException):
 
 class BadTenantException(RestAPIException):
     """ Provided tenant is invalid or not applicable """
+    pass
+
+
+class ServerRateLimitException(RestAPIException):
+    """ REST API server is rate limiting the request via 429 status code """
     pass
