@@ -1,5 +1,5 @@
 """
-Sastre - Automation Tools for Cisco SD-WAN Powered by Viptela
+Sastre - Cisco-SDWAN Automation Toolset
 
 """
-from .__version__ import __author__, __version__, __copyright__, __email__, __url__
+from .__version__ import __version__, __copyright__

@@ -1,5 +1,5 @@
 """
- Sastre - Automation Tools for Cisco SD-WAN Powered by Viptela
+ Sastre - Cisco-SDWAN Automation Toolset
 
  cisco_sdwan.tasks.implementation
  This module contains the implementation of user-facing tasks

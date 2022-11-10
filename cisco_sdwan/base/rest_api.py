@@ -1,5 +1,5 @@
 """
- Sastre - Automation Tools for Cisco SD-WAN Powered by Viptela
+ Sastre - Cisco-SDWAN Automation Toolset
 
  cisco_sdwan.base.rest_api
  This module implements the lower level REST API
