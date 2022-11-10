@@ -259,7 +259,7 @@ class TaskRestore(Task):
                             self.log_info(f'Updating {info} {item.name} requires vSmart policy reactivate')
                             self.policy_activate(api, *PolicyVsmartIndex.get_raise(api).active_policy, is_edited=True,
                                                  log_context="reactivating vSmart policy")
-                except (RestAPIException, WaitActionsException) as ex:
+                except (RestAPIException, WaitActionsException, ValueError) as ex:
                     self.log_error(f'Failed: {op_info} {info} {item.name}{reason}: {ex}')
                 else:
                     self.log_info(f'Done: {op_info} {info} {item.name}{reason}')

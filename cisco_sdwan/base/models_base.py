@@ -10,7 +10,7 @@ from os import environ
 from pathlib import Path
 from itertools import zip_longest
 from collections import namedtuple
-from typing import Sequence, Tuple, Union, Iterator, Callable, Mapping, Any, Optional, Dict, List, Generator
+from typing import Sequence, Tuple, Union, Iterator, Callable, Mapping, Any, Optional, Dict, List, Generator, NamedTuple
 from operator import attrgetter
 from datetime import datetime, timezone
 from urllib.parse import quote_plus
@@ -134,12 +134,46 @@ class CliOrFeatureApiPath:
         return self.api_path_cli if is_cli_template else self.api_path_feature
 
 
-class ApiPathGroup:
-    def __init__(self, api_path_dict: Dict[str, ApiPath]) -> None:
-        self._path_dict = {key: api_path for key, api_path in api_path_dict.items()}
+class PathKey(NamedTuple):
+    """
+    PathKey tuples are used to lookup api paths in ApiPathGroup
+    """
+    parcel_type: str
+    parent_parcel_type: Optional[str] = None
 
-    def api_path(self, key: str) -> Union[ApiPath, None]:
-        return self._path_dict.get(key)
+
+class ApiPathGroup:
+    """
+    ApiPathGroup is used on feature profiles and contains mapping of parcelType to ApiPath. ApiPaths relative to parcel
+    references are registered using the optional parcel_reference_path_map.
+    """
+    def __init__(self, path_map: Mapping[str, ApiPath],
+                 parcel_reference_path_map: Optional[Mapping[PathKey, ApiPath]] = None) -> None:
+
+        self._path_map = dict(path_map)
+        self._parcel_ref_map = dict(parcel_reference_path_map) if parcel_reference_path_map is not None else {}
+        self._referenced_types = set(path_key.parcel_type for path_key in self._parcel_ref_map)
+
+    def api_path(self, key: PathKey) -> Tuple[Union[ApiPath, None], bool]:
+        """
+        Returns the api path associated with the provided key, along with whether this is a parcel reference or an
+        actual parcel.
+        @param key: A PathKey to find the api path
+        @return: (<parcel api path>, <is reference>) tuple
+        """
+        parcel_reference_path = self._parcel_ref_map.get(key)
+        if parcel_reference_path is not None:
+            return parcel_reference_path, True
+
+        return self._path_map.get(key.parcel_type), False
+
+    def is_referenced_type(self, parcel_type: str) -> bool:
+        """
+        Indicates whether the provided parcel_type is a type that can be referenced
+        @param parcel_type: Parcel type
+        @return: True if this parcel type is one that can be referenced, False otherwise
+        """
+        return parcel_type in self._referenced_types
 
 
 class OperationalItem:
@@ -859,6 +893,10 @@ class ProfileParcelModel(ConfigRequestModel):
     subparcels: List['ProfileParcelModel']
 
 
+class ProfileParcelReferenceModel(ConfigRequestModel):
+    parcelId: str
+
+
 class Config2Item(ConfigItem):
     """
     Config2Item is a specialized ConfigItem to support vManage Config 2.0 elements
@@ -929,32 +967,57 @@ class FeatureProfile(Config2Item):
 
     post_model = FeatureProfileModel
 
-    def associated_parcels(self, new_profile_id: str) -> Generator[Tuple[ApiPath, str, Dict[str, Any]], str, None]:
-        for raw_parcel in self.data.get(self.parcels_tag, []):
-            parcel = ProfileParcelModel(**raw_parcel)
-            yield from self.profile_parcel_coro(parcel, new_profile_id)
+    def __init__(self, data):
+        super().__init__(data)
 
-    @classmethod
-    def profile_parcel_coro(cls, parcel: ProfileParcelModel,
-                            *element_ids: str) -> Generator[Tuple[ApiPath, str, Dict[str, Any]], str, None]:
+        # {<old parcel id>: <new parcel id>} map used to update parcel references with the new parcel ids
+        self.id_mapping: Dict[str, str] = {}
+
+    def associated_parcels(self, new_profile_id: str) -> Generator[Tuple[ApiPath, str, Dict[str, Any]], str, None]:
+        def referenced_parcels_first(parcel_obj):
+            return not self.parcel_api_paths.is_referenced_type(parcel_obj.parcelType)
+
+        root_parcels = (ProfileParcelModel(**raw_parcel) for raw_parcel in self.data.get(self.parcels_tag, []))
+        for root_parcel in sorted(root_parcels, key=referenced_parcels_first):
+            # Traverse parcel tree under this root parcel
+            yield from self.profile_parcel_coro(root_parcel, new_profile_id)
+
+    def profile_parcel_coro(
+            self, parcel: ProfileParcelModel, *element_ids: str,
+            parent_parcel_type: Optional[str] = None) -> Generator[Tuple[ApiPath, str, Dict[str, Any]], str, None]:
         """
         Iterate over Config 2.0 feature profile parcels, starting with the provided parcel and recursively checking
         sub-parcels it may contain.
         @param parcel: parcel to be iterated over
         @param element_ids: Element IDs used to resolve path variables. First one is the feature profile ID. Parcels
                             with sub-parcels have their IDs included as well.
-        @yield: (<parcel type>, <parcel info>, <parcel payload>) tuples
+        @param parent_parcel_type: Parcel type of the parent, or None if this is a root parcel
+        @yield: (<parcel api path>, <parcel info>, <parcel payload>) tuples
         @send: New element id, used to resolve the api path
         """
-        api_path = cls.parcel_api_paths.api_path(parcel.parcelType)
+        api_path, is_reference = self.parcel_api_paths.api_path(PathKey(parcel.parcelType, parent_parcel_type))
         if api_path is None:
             raise ModelException(f"Parcel type {parcel.parcelType} is not supported")
 
-        new_element_id = yield api_path.resolve(*element_ids), parcel.payload.name, parcel.payload.dict(by_alias=True)
+        if is_reference:
+            parcel_info = f'{parcel.payload.name} (parcel reference)'
 
+            new_parcel_id = self.id_mapping.get(parcel.parcelId)
+            if new_parcel_id is None:
+                raise ModelException(f"{parcel_info}: Referenced parcel ID not found")
+
+            parcel_payload = ProfileParcelReferenceModel(parcelId=new_parcel_id)
+        else:
+            parcel_info = parcel.payload.name
+            parcel_payload = parcel.payload
+
+        new_element_id = yield api_path.resolve(*element_ids), parcel_info, parcel_payload.dict(by_alias=True)
+
+        self.id_mapping[parcel.parcelId] = new_element_id
         new_element_ids = element_ids + (new_element_id,)
+
         for sub_parcel in parcel.subparcels:
-            yield from cls.profile_parcel_coro(sub_parcel, *new_element_ids)
+            yield from self.profile_parcel_coro(sub_parcel, *new_element_ids, parent_parcel_type=parcel.parcelType)
 
 
 class FeatureProfileIndex(IndexConfigItem):

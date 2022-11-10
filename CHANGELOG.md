@@ -4,9 +4,16 @@ Sastre 1.20 [xx, 2022]
 #### Enhancements:
 - [#42] Option --archive added to backup and restore tasks. Allowing backups to be saved as a zip file, and restore to read from a zip file.
 - [#164] Implemented adaptive mechanism in the REST API client, to backoff and retry when rate-limit signal (429) is received from vManage. 
+- [#157] 20.9 vManage support, included support for the following API endpoints:
+  - Preferred color group policy list
+  - SDWAN other profile and ThousandEyes parcel
+  - New SDWAN system profile parcels: SNMP
+  - New SDWAN service profile parcels: interface SVI, dhcp-server, switchport, wirelesslan
+  - New SDWAN transport profile parcels: interface cellular, routing bgp
 
 #### Fixes:
 - [#165] CustomApp policies failed to be restored due to dependency resolution issues, this has been fixed.
+
 
 Sastre 1.19 [August 16, 2022]
 ================================

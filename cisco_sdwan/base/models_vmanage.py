@@ -13,7 +13,7 @@ from pydantic import Field
 from .rest_api import Rest, RestAPIException
 from .catalog import register, op_register
 from .models_base import (ApiItem, IndexApiItem, ConfigItem, Config2Item, IndexConfigItem, RecordItem, RealtimeItem,
-                          BulkStatsItem, BulkStateItem, ApiPath, CliOrFeatureApiPath, ApiPathGroup, IdName,
+                          BulkStatsItem, BulkStateItem, ApiPath, PathKey, CliOrFeatureApiPath, ApiPathGroup, IdName,
                           entry_time_parse, ConfigRequestModel, FeatureProfile, FeatureProfileIndex)
 
 
@@ -739,7 +739,8 @@ class ProfileSdwanSystem(FeatureProfile):
         "bfd": ApiPath("v1/feature-profile/sdwan/system/{systemId}/bfd"),
         "logging": ApiPath("v1/feature-profile/sdwan/system/{systemId}/logging"),
         "ntp": ApiPath("v1/feature-profile/sdwan/system/{systemId}/ntp"),
-        "omp": ApiPath("v1/feature-profile/sdwan/system/{systemId}/omp")
+        "omp": ApiPath("v1/feature-profile/sdwan/system/{systemId}/omp"),
+        "snmp": ApiPath("v1/feature-profile/sdwan/system/{systemId}/snmp")
      })
 
 
@@ -753,16 +754,24 @@ class ProfileSdwanService(FeatureProfile):
     api_path = ApiPath('v1/feature-profile/sdwan/service')
     store_path = ('feature_profiles', 'sdwan', 'service')
     parcel_api_paths = ApiPathGroup({
-        "lan/vpn": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/lan/vpn"),
-        "lan/vpn/interface/ethernet": ApiPath("v1/feature-profile/sdwan/service/{serviceId}"
-                                              "/lan/vpn/{vpnId}/interface/ethernet"),
-        "lan/vpn/interface/ethernet/tracker": ApiPath("v1/feature-profile/sdwan/service/{serviceId}"
-                                                      "/lan/vpn/{vpnId}/interface/ethernet/{ethernetId}/tracker"),
-        "lan/vpn/routing/bgp": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/routing/bgp"),
-        "lan/vpn/routing/ospf": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/routing/ospf"),
+        "dhcp-server": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/dhcp-server"),
         "routing/bgp": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/routing/bgp"),
         "routing/ospf": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/routing/ospf"),
-        "tracker": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/tracker")
+        "lan/vpn": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/lan/vpn"),
+        "lan/vpn/interface/ethernet": ApiPath(
+            "v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/interface/ethernet"),
+        "lan/vpn/interface/svi": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/interface/svi"),
+        "switchport": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/switchport"),
+        "wirelesslan": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/wirelesslan")
+    }, parcel_reference_path_map={
+        PathKey("dhcp-server", "lan/vpn/interface/ethernet"): ApiPath(
+            "v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/interface/ethernet/{ethId}/dhcp-server"),
+        PathKey("dhcp-server", "lan/vpn/interface/svi"): ApiPath(
+            "v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/interface/svi/{sviId}/dhcp-server"),
+        PathKey("routing/bgp", "lan/vpn"): ApiPath(
+            "v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/routing/bgp"),
+        PathKey("routing/ospf", "lan/vpn"): ApiPath(
+            "v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/routing/ospf"),
     })
 
 
@@ -776,19 +785,28 @@ class ProfileSdwanTransport(FeatureProfile):
     api_path = ApiPath('v1/feature-profile/sdwan/transport')
     store_path = ('feature_profiles', 'sdwan', 'transport')
     parcel_api_paths = ApiPathGroup({
+        "routing/bgp": ApiPath("v1/feature-profile/sdwan/transport/{transportId}/routing/bgp"),
         "tracker": ApiPath("v1/feature-profile/sdwan/transport/{transportId}/tracker"),
+        "cellular-profile": ApiPath("v1/feature-profile/sdwan/transport/{transportId}/cellular-profile"),
         "wan/vpn": ApiPath("v1/feature-profile/sdwan/transport/{transportId}/wan/vpn"),
-        "wan/vpn/interface/ethernet": ApiPath("v1/feature-profile/sdwan/transport/{transportId}"
-                                              "/wan/vpn/{vpnId}/interface/ethernet"),
-        "wan/vpn/interface/ethernet/tracker": ApiPath("v1/feature-profile/sdwan/transport/{transportId}"
-                                                      "/wan/vpn/{vpnId}/interface/ethernet/tracker"),
+        "wan/vpn/interface/ethernet": ApiPath(
+            "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/interface/ethernet"),
+        "wan/vpn/interface/cellular": ApiPath(
+            "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/interface/cellular"),
         "management/vpn": ApiPath("v1/feature-profile/sdwan/transport/{transportId}/management/vpn"),
-        "management/vpn/interface/ethernet": ApiPath("v1/feature-profile/sdwan/transport/{transportId}"
-                                                     "/management/vpn/{vpnId}/interface/ethernet"),
+        "management/vpn/interface/ethernet": ApiPath(
+            "v1/feature-profile/sdwan/transport/{transportId}/management/vpn/{vpnId}/interface/ethernet"),
         "cellular-controller": ApiPath("v1/feature-profile/sdwan/transport/{transportId}/cellular-controller"),
-        "cellular-controller/cellular-profile": ApiPath("v1/feature-profile/sdwan/transport/{transportId}"
-                                                        "/cellular-controller/{cellularControllerId}/cellular-profile"),
-        "celular-profile": ApiPath("v1/feature-profile/sdwan/transport/{transportId}/cellular-profile")
+    }, parcel_reference_path_map={
+        PathKey("routing/bgp", "wan/vpn"): ApiPath(
+            "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/routing/bgp"),
+        PathKey("tracker", "wan/vpn/interface/ethernet"): ApiPath(
+            "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/interface/ethernet/{ethernetId}/tracker"),
+        PathKey("tracker", "wan/vpn/interface/cellular"): ApiPath(
+            "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/interface/cellular/{cellularId}/tracker"),
+        PathKey("cellular-profile", "cellular-controller"): ApiPath(
+            "v1/feature-profile/sdwan/transport/{transportId}/cellular-controller/"
+            "{cellularControllerId}/cellular-profile"),
     })
 
 
@@ -810,6 +828,20 @@ class ProfileSdwanCli(FeatureProfile):
 class ProfileSdwanCliIndex(FeatureProfileIndex):
     api_path = ApiPath('v1/feature-profile/sdwan/cli', None, None, None)
     store_file = 'feature_profiles_sdwan_cli.json'
+
+
+class ProfileSdwanOther(FeatureProfile):
+    api_path = ApiPath('v1/feature-profile/sdwan/other')
+    store_path = ('feature_profiles', 'sdwan', 'other')
+    parcel_api_paths = ApiPathGroup({
+        "thousandeyes": ApiPath("v1/feature-profile/sdwan/other/{otherId}/thousandeyes")
+    })
+
+
+@register('feature_profile', 'SDWAN other profile', ProfileSdwanOther, min_version='20.9')
+class ProfileSdwanOtherIndex(FeatureProfileIndex):
+    api_path = ApiPath('v1/feature-profile/sdwan/other', None, None, None)
+    store_file = 'feature_profiles_sdwan_other.json'
 
 
 #
@@ -1748,6 +1780,17 @@ class PolicyListRegion(PolicyList):
 class PolicyListRegionIndex(PolicyListIndex):
     api_path = ApiPath('template/policy/list/region', None, None, None)
     store_file = 'policy_lists_region.json'
+
+
+class PolicyListPreferredColorGroup(PolicyList):
+    api_path = ApiPath('template/policy/list/preferredcolorgroup')
+    store_path = ('policy_lists', 'PreferredColorGroup')
+
+
+@register('policy_list', 'preferred color group list', PolicyListPreferredColorGroup, min_version='20.9')
+class PolicyListPreferredColorGroupIndex(PolicyListIndex):
+    api_path = ApiPath('template/policy/list/preferredcolorgroup', None, None, None)
+    store_file = 'policy_lists_preferredcolorgroup.json'
 
 
 #
