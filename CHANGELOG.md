@@ -1,4 +1,4 @@
-Sastre 1.20 [xx, 2022]
+Sastre 1.20 [November 10, 2022]
 ================================
 
 #### Enhancements:
@@ -10,6 +10,7 @@ Sastre 1.20 [xx, 2022]
   - New SDWAN system profile parcels: SNMP
   - New SDWAN service profile parcels: interface SVI, dhcp-server, switchport, wirelesslan
   - New SDWAN transport profile parcels: interface cellular, routing bgp
+- [#160] Migrated Python packaging to use pyproject.toml instead of setup.py 
 
 #### Fixes:
 - [#165] CustomApp policies failed to be restored due to dependency resolution issues, this has been fixed.

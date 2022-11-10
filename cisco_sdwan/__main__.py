@@ -1,7 +1,7 @@
 """
-  Sastre - Automation Tools for Cisco SD-WAN Powered by Viptela
+  Sastre - Cisco-SDWAN Automation Toolset
 
-  cisco_sdwan.cmd
+  cisco_sdwan.__main__
   This module implements the command line top-level parser and task dispatcher
 """
 import logging
@@ -162,3 +162,7 @@ def main():
         logging.getLogger(__name__).critical(ex)
     except KeyboardInterrupt:
         logging.getLogger(__name__).critical('Interrupted by user')
+
+
+if __name__ == '__main__':
+    main()
