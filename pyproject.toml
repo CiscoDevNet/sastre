@@ -9,7 +9,7 @@ authors = [
   { name = "Marcelo Reis", email = "sastre-support@cisco.com" },
 ]
 readme = "README.md"
-license = { file = "LICENSE" }
+license = "MIT"
 classifiers = [
     "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: 3.8",
