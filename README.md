@@ -25,9 +25,17 @@ Sastre is available in two flavors:
 Both flavors follow the same release numbering. For instance, if support for certain new vManage release is added to Sastre-Pro 1.x, Sastre 1.x will also have the same support (across its supported tasks).
 
 The command "sdwan --version" will indicate the flavor that is installed.
+
+Sastre:
 ```
 % sdwan --version
-Sastre-Pro Version 1.19. Catalog: 82 configuration items, 33 operational items.
+Sastre Version 1.20. Catalog: 84 configuration items, 33 operational items.
+```
+
+Sastre-Pro:
+```
+% sdwan --version
+Sastre-Pro Version 1.20. Catalog: 84 configuration items, 33 operational items.
 ```
 
 Tasks only available on Sastre-Pro are labeled as such in the [Introduction](#introduction) section below.
