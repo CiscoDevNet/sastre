@@ -10,7 +10,7 @@ WORKDIR /sastre-init
 COPY /examples/dcloud-lab.sh ./rc/
 
 RUN apk update && apk upgrade && apk add --no-cache git bash && \
-    pip install --no-cache-dir --upgrade pip setuptools && \
+    pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir cisco-sdwan && \
     echo "export PS1='\h:\w\$ '" >> /root/.bashrc && \
     echo "[ \${SASTRE_ROOT_DIR} ] && [ ! -d \${SASTRE_ROOT_DIR}/rc ] && cp -R /sastre-init/rc \${SASTRE_ROOT_DIR}" >> /root/.bashrc && \
