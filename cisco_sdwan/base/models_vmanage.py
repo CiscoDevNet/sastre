@@ -4,7 +4,8 @@
  cisco_sdwan.base.models_vmanage
  This module implements vManage API models
 """
-from typing import Iterable, Set, Optional, Sequence, Mapping, List, Any, Callable, Tuple, Dict
+import re
+from typing import Iterable, Set, Optional, Sequence, Mapping, List, Any, Callable, Tuple, Dict, Union
 from pathlib import Path
 from collections import namedtuple
 from copy import deepcopy
@@ -14,7 +15,7 @@ from .rest_api import Rest, RestAPIException
 from .catalog import register, op_register
 from .models_base import (ApiItem, IndexApiItem, ConfigItem, Config2Item, IndexConfigItem, RecordItem, RealtimeItem,
                           BulkStatsItem, BulkStateItem, ApiPath, PathKey, CliOrFeatureApiPath, ApiPathGroup, IdName,
-                          entry_time_parse, ConfigRequestModel, FeatureProfile, FeatureProfileIndex)
+                          entry_time_parse, ConfigRequestModel, FeatureProfile, FeatureProfileIndex, AdminSettingsItem)
 
 
 #
@@ -145,6 +146,52 @@ class CheckVBond(ApiItem):
     @property
     def is_configured(self):
         return self.data.get('isVbondConfigured', False)
+
+
+class DeviceBootstrap(ApiItem):
+    api_path = ApiPath('system/device/bootstrap/device/{uuid}', None, None, None)
+
+    @property
+    def uuid(self) -> str:
+        return self.parse(r'- uuid : ([^$]+?)$')
+
+    @property
+    def otp(self) -> str:
+        return self.parse(r'- otp : ([^$]+?)$')
+
+    @property
+    def vbond(self) -> str:
+        return self.parse(r'- vbond : ([^$]+?)$')
+
+    @property
+    def organization(self) -> str:
+        return self.parse(r'- org : ([^$]+?)$')
+
+    def parse(self, regex: str) -> str:
+        match = re.search(regex, self.data.get('bootstrapConfig', ''), re.MULTILINE)
+        if not match:
+            raise RestAPIException("Unexpected 'bootstrapConfig' format")
+
+        return match.group(1)
+
+    @property
+    def bootstrap_config(self) -> str:
+        config = self.data.get('bootstrapConfig')
+        if config is None:
+            raise RestAPIException("Missing 'bootstrapConfig'")
+
+        return config
+
+    @classmethod
+    def get(cls, api: Rest, *, uuid: Optional[str] = None,
+            config_type: str = 'cloudinit', include_default_root_certs: bool = True, version: str = 'v1'):
+
+        if uuid is None:
+            raise ValueError("Parameter 'uuid' is required")
+
+        return super().get(
+            api, uuid=uuid, configtype=config_type, inclDefRootCert=include_default_root_certs, version=version
+        )
 
 
 #
@@ -289,7 +336,7 @@ class DeviceConfigRFS(DeviceConfig):
 #
 # Templates
 #
-# Set of device types that use cedge template class. Updated as of vManage 20.8.1
+# Set of device types that use cedge template class. Updated as of vManage 20.10.0
 CEDGE_SET = {
     "vedge-CSR-1000v", "vedge-ISR-4331", "vedge-ISR-4431", "vedge-ISR-4461", "vedge-ISR-4451-X",
     "vedge-C8300-1N1S-4T2X", "vedge-IR-1101", "vedge-C8300-1N1S-6T", "vedge-ISRv", "vedge-ISR-4321", "vedge-ISR-4351",
@@ -318,9 +365,10 @@ CEDGE_SET = {
     "cellular-gateway-CG113-W6B", "cellular-gateway-CG113-W6A", "cellular-gateway-CG113-4GW6E",
     "cellular-gateway-CG113-4GW6H", "vedge-C8500-20X6C", "cellular-gateway-CG113-W6E",  "cellular-gateway-CG113-W6H",
     "cellular-gateway-CG113-4GW6B", "cellular-gateway-CG113-4GW6Z", "cellular-gateway-CG113-4GW6A",
-    "cellular-gateway-CG113-4GW6Q", "cellular-gateway-CG113-W6Q", "cellular-gateway-CG522MW-IO-NA"
+    "cellular-gateway-CG113-4GW6Q", "cellular-gateway-CG113-W6Q", "cellular-gateway-CG522MW-IO-NA",
+    "vedge-ESR-6300-NCP", "vedge-nfvis-CSP-5436", "vedge-nfvis-CSP-5228", "vedge-nfvis-CSP-5216"
 }
-# Software devices. Updated as of vManage 20.8.1
+# Software devices. Updated as of vManage 20.10.0
 SOFT_EDGE_SET = {"vedge-CSR-1000v", "vedge-C8000V", "vedge-cloud", "vmanage", "vsmart"}
 
 
@@ -740,7 +788,8 @@ class ProfileSdwanSystem(FeatureProfile):
         "logging": ApiPath("v1/feature-profile/sdwan/system/{systemId}/logging"),
         "ntp": ApiPath("v1/feature-profile/sdwan/system/{systemId}/ntp"),
         "omp": ApiPath("v1/feature-profile/sdwan/system/{systemId}/omp"),
-        "snmp": ApiPath("v1/feature-profile/sdwan/system/{systemId}/snmp")
+        "snmp": ApiPath("v1/feature-profile/sdwan/system/{systemId}/snmp"),
+        "perfmonitor": ApiPath("v1/feature-profile/sdwan/system/{systemId}/perfmonitor")
      })
 
 
@@ -761,6 +810,8 @@ class ProfileSdwanService(FeatureProfile):
         "lan/vpn/interface/ethernet": ApiPath(
             "v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/interface/ethernet"),
         "lan/vpn/interface/svi": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/interface/svi"),
+        "lan/vpn/interface/ipsec": ApiPath(
+            "v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/interface/ipsec"),
         "switchport": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/switchport"),
         "wirelesslan": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/wirelesslan")
     }, parcel_reference_path_map={
@@ -768,6 +819,8 @@ class ProfileSdwanService(FeatureProfile):
             "v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/interface/ethernet/{ethId}/dhcp-server"),
         PathKey("dhcp-server", "lan/vpn/interface/svi"): ApiPath(
             "v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/interface/svi/{sviId}/dhcp-server"),
+        PathKey("dhcp-server", "lan/vpn/interface/ipsec"): ApiPath(
+            "v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/interface/ipsec/{ipsecId}/dhcp-server"),
         PathKey("routing/bgp", "lan/vpn"): ApiPath(
             "v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/routing/bgp"),
         PathKey("routing/ospf", "lan/vpn"): ApiPath(
@@ -791,6 +844,8 @@ class ProfileSdwanTransport(FeatureProfile):
         "wan/vpn": ApiPath("v1/feature-profile/sdwan/transport/{transportId}/wan/vpn"),
         "wan/vpn/interface/ethernet": ApiPath(
             "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/interface/ethernet"),
+        "wan/vpn/interface/ipsec": ApiPath(
+            "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/interface/ipsec"),
         "wan/vpn/interface/cellular": ApiPath(
             "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/interface/cellular"),
         "management/vpn": ApiPath("v1/feature-profile/sdwan/transport/{transportId}/management/vpn"),
@@ -802,6 +857,8 @@ class ProfileSdwanTransport(FeatureProfile):
             "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/routing/bgp"),
         PathKey("tracker", "wan/vpn/interface/ethernet"): ApiPath(
             "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/interface/ethernet/{ethernetId}/tracker"),
+        PathKey("tracker", "wan/vpn/interface/ipsec"): ApiPath(
+            "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/interface/ipsec/{ipsecId}/tracker"),
         PathKey("tracker", "wan/vpn/interface/cellular"): ApiPath(
             "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/interface/cellular/{cellularId}/tracker"),
         PathKey("cellular-profile", "cellular-controller"): ApiPath(
@@ -842,6 +899,35 @@ class ProfileSdwanOther(FeatureProfile):
 class ProfileSdwanOtherIndex(FeatureProfileIndex):
     api_path = ApiPath('v1/feature-profile/sdwan/other', None, None, None)
     store_file = 'feature_profiles_sdwan_other.json'
+
+# Those profiles show in 20.10 GUI but don't have any entry in apidocs. DE indicated to hold off on those as they'll
+# have major changes. Plan to include in 20.12
+# class ProfileSdwanSecurity(FeatureProfile):
+#     api_path = ApiPath('v1/feature-profile/sdwan/security')
+#     store_path = ('feature_profiles', 'sdwan', 'security')
+#     parcel_api_paths = ApiPathGroup({
+#         "sig": ApiPath("v1/feature-profile/sdwan/security/{securityId}/sig")
+#     })
+#
+#
+# @register('feature_profile', 'SDWAN security profile', ProfileSdwanSecurity, min_version='20.10')
+# class ProfileSdwanSecurityIndex(FeatureProfileIndex):
+#     api_path = ApiPath('v1/feature-profile/sdwan/security', None, None, None)
+#     store_file = 'feature_profiles_sdwan_security.json'
+#
+#
+# class ProfileSdwanPolicy(FeatureProfile):
+#     api_path = ApiPath('v1/feature-profile/sdwan/policy-object')
+#     store_path = ('feature_profiles', 'sdwan', 'policy')
+#     parcel_api_paths = ApiPathGroup({
+#         "sig": ApiPath("v1/feature-profile/sdwan/security/{securityId}/sig")
+#     })
+#
+#
+# @register('feature_profile', 'SDWAN policy profile', ProfileSdwanPolicy, min_version='20.10')
+# class ProfileSdwanPolicyIndex(FeatureProfileIndex):
+#     api_path = ApiPath('v1/feature-profile/sdwan/policy-object', None, None, None)
+#     store_file = 'feature_profiles_sdwan_policy.json'
 
 
 #
@@ -1793,25 +1879,81 @@ class PolicyListPreferredColorGroupIndex(PolicyListIndex):
     store_file = 'policy_lists_preferredcolorgroup.json'
 
 
+class PolicyListIdentity(PolicyList):
+    api_path = ApiPath('template/policy/list/identity')
+    store_path = ('policy_lists', 'Identity')
+
+
+@register('policy_list', 'identity list', PolicyListIdentity, min_version='20.10')
+class PolicyListIdentityIndex(PolicyListIndex):
+    api_path = ApiPath('template/policy/list/identity', None, None, None)
+    store_file = 'policy_lists_identity.json'
+
+
+class PolicyListScalableGroupTag(PolicyList):
+    api_path = ApiPath('template/policy/list/scalablegrouptag')
+    store_path = ('policy_lists', 'ScalableGroupTag')
+
+
+@register('policy_list', 'scalable group tag list', PolicyListScalableGroupTag, min_version='20.10')
+class PolicyListScalableGroupTagIndex(PolicyListIndex):
+    api_path = ApiPath('template/policy/list/scalablegrouptag', None, None, None)
+    store_file = 'policy_lists_scalable_group_tag.json'
+
+
 #
 # Admin Settings
 #
-class SettingsVbond(ConfigItem):
-    api_path = ApiPath('settings/configuration/device', None, 'settings/configuration/device', None)
-    store_path = ('settings',)
+class SettingsVbond(AdminSettingsItem):
+    setting = 'device'
     store_file = 'vbond.json'
 
-    def __init__(self, data):
-        """
-        @param data: dict containing the information to be associated with this API item.
-        """
-        # Get requests return a dict as {'data': [{'domainIp': 'vbond.cisco.com', 'port': '12346'}]}
-        super().__init__(data.get('data', [''])[0])
-
     @property
-    def is_configured(self):
+    def is_configured(self) -> bool:
         domain_ip = self.data.get('domainIp', '')
         return len(domain_ip) > 0 and domain_ip != 'Not Configured'
+
+    @property
+    def domain_ip(self) -> Union[str, None]:
+        return self.data['domainIp'] if self.is_configured else None
+
+    @property
+    def port(self) -> Union[str, None]:
+        return self.data['port'] if self.is_configured else None
+
+
+class SettingsOrganization(AdminSettingsItem):
+    setting = 'organization'
+    store_file = 'organization.json'
+
+    @property
+    def organization(self) -> Union[str, None]:
+        return self.data.get('org')
+
+    @property
+    def is_control_up(self) -> bool:
+        return self.data.get('controlConnectionUp', False)
+
+
+class SettingsCertificate(AdminSettingsItem):
+    setting = 'certificate'
+    store_file = 'certificate.json'
+
+    @property
+    def signing(self) -> Union[str, None]:
+        return self.data.get('certificateSigning')
+
+    @classmethod
+    def set_signing_enterprise(cls, api: Rest, root_ca_certificate: str) -> None:
+        api_path = cls.api_path.resolve(setting=cls.setting).post
+
+        enterprise_reply = api.post({"certificateSigning": "enterprise"}, api_path)
+        if enterprise_reply.get("data", [{}, ])[0].get("certificateSigning") != "enterprise":
+            raise RestAPIException("Unable to set enterprise certificate signing")
+
+        root_ca_reply = api.put({"enterpriseRootCA": root_ca_certificate}, api_path, "enterpriserootca")
+        if root_ca_reply.get("data", [{}, ])[0].get("enterpriseRootCA") != root_ca_certificate:
+            raise RestAPIException("Unable to set enterprise root CA certificate")
 
 
 #

@@ -1,3 +1,14 @@
+Sastre 1.21 [December 19, 2022]
+================================
+
+#### Enhancements:
+- [#157] 20.10 vManage support, included support for the following API endpoints:
+  - Identity policy list, scalable group tag list
+  - New SDWAN system profile parcels: perfmonitor
+  - New SDWAN service profile parcels: interface ipsec
+  - New SDWAN transport profile parcels: interface ipsec
+
+
 Sastre 1.20 [November 10, 2022]
 ================================
 
