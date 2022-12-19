@@ -149,7 +149,11 @@ class ApiPathGroup:
     """
     def __init__(self, path_map: Mapping[str, ApiPath],
                  parcel_reference_path_map: Optional[Mapping[PathKey, ApiPath]] = None) -> None:
-
+        """
+        @param path_map: Register parcel ApiPaths to a feature profile. Mapping of {<parcelType>: ApiPath, ... }
+        @param parcel_reference_path_map: Register parcel reference ApiPaths to a feature profile. Mapping of
+                                          {PathKey(<ParcelType>, <parent ParcelType>): ApiPath, ...}
+        """
         self._path_map = dict(path_map)
         self._parcel_ref_map = dict(parcel_reference_path_map) if parcel_reference_path_map is not None else {}
         self._referenced_types = set(path_key.parcel_type for path_key in self._parcel_ref_map)
@@ -543,15 +547,23 @@ class ApiItem:
         return self.data is None or len(self.data) == 0
 
     @classmethod
-    def get(cls, api, *path_entries, **path_vars):
+    def get(cls, api: Rest, *args, **kwargs):
         try:
-            return cls.get_raise(api, *path_entries, **path_vars)
+            return cls.get_raise(api, *args, **kwargs)
         except RestAPIException:
             return None
 
     @classmethod
-    def get_raise(cls, api, *path_entries, **path_vars):
-        return cls(api.get(cls.api_path.resolve(**path_vars).get, *path_entries))
+    def get_raise(cls, api: Rest, *args, **kwargs):
+        # Extract path vars from kwargs, what is left becomes query vars
+        path_vars_map = {}
+        if cls.api_path.path_vars is not None:
+            for path_var in cls.api_path.path_vars:
+                path_var_value = kwargs.pop(path_var, None)
+                if path_var_value is not None:
+                    path_vars_map[path_var] = path_var_value
+
+        return cls(api.get(cls.api_path.resolve(**path_vars_map).get, *args, **kwargs))
 
     def __str__(self):
         return json.dumps(self.data, indent=2)
@@ -612,12 +624,6 @@ class ConfigItem(ApiItem):
     post_filtered_tags = None
     skip_cmp_tag_set = set()
     name_check_regex = re.compile(r'(?=^.{1,128}$)[^&<>! "]+$')
-
-    def __init__(self, data):
-        """
-        @param data: dict containing the information to be associated with this configuration item
-        """
-        super().__init__(data)
 
     def is_equal(self, other_payload: Dict[str, Any]) -> bool:
         exclude_set = self.skip_cmp_tag_set | {self.id_tag}
@@ -1022,6 +1028,25 @@ class FeatureProfile(Config2Item):
 
 class FeatureProfileIndex(IndexConfigItem):
     iter_fields = IdName('profileId', 'profileName')
+
+
+class AdminSettingsItem(ConfigItem):
+    api_path = ApiPath('settings/configuration/{setting}')
+    store_path = ('settings',)
+    setting = None
+
+    def __init__(self, data):
+        """
+        @param data: dict containing the information to be associated with this API item.
+        """
+        # Get requests return a dict as {'data': [{'domainIp': 'vbond.cisco.com', 'port': '12346'}]}
+        super().__init__(data.get('data', [''])[0])
+
+    @classmethod
+    def get_raise(cls, api: Rest, *args, **kwargs):
+        setting = kwargs.pop(cls.setting, None) or cls.setting
+
+        return super().get_raise(api, *args, setting=setting, **kwargs)
 
 
 class ServerInfo:
