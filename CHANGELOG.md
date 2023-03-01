@@ -1,8 +1,19 @@
+Sastre 1.21.1 [March 03, 2023]
+================================
+
+#### Enhancements:
+- [#181] 20.10 vManage support, adding support to API endpoints undocumented in the apidocs:
+  - SDWAN policy-object profile and parcels
+
+#### Fixes:
+- [#180] VPN QoS maps fail to be restored due to dependency resolution issues, this has been fixed.
+
+
 Sastre 1.21 [December 19, 2022]
 ================================
 
 #### Enhancements:
-- [#157] 20.10 vManage support, included support for the following API endpoints:
+- [#170] 20.10 vManage support, included support for the following API endpoints:
   - Identity policy list, scalable group tag list
   - New SDWAN system profile parcels: perfmonitor
   - New SDWAN service profile parcels: interface ipsec

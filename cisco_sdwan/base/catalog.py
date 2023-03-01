@@ -59,6 +59,7 @@ _tag_dependency_list = [
     'policy_vedge',
     'policy_security',
     'policy_voice',
+    'parent_policy_definition',
     'policy_definition',
     'policy_list',
     'policy_customapp'
