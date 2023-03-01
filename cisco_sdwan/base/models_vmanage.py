@@ -900,6 +900,33 @@ class ProfileSdwanOtherIndex(FeatureProfileIndex):
     api_path = ApiPath('v1/feature-profile/sdwan/other', None, None, None)
     store_file = 'feature_profiles_sdwan_other.json'
 
+
+# Policy-object profiles show up in 20.10, but there is no documentation in the apidocs
+class ProfileSdwanPolicy(FeatureProfile):
+    api_path = ApiPath('v1/feature-profile/sdwan/policy-object')
+    store_path = ('feature_profiles', 'sdwan', 'policy_object')
+    parcel_api_paths = ApiPathGroup({
+        "as-path": ApiPath("v1/feature-profile/sdwan/policy-object/{policyId}/as-path"),
+        "class": ApiPath("v1/feature-profile/sdwan/policy-object/{policyId}/class"),
+        "standard-community": ApiPath("v1/feature-profile/sdwan/policy-object/{policyId}/standard-community"),
+        "expanded-community": ApiPath("v1/feature-profile/sdwan/policy-object/{policyId}/expanded-community"),
+        "data-prefix": ApiPath("v1/feature-profile/sdwan/policy-object/{policyId}/data-prefix"),
+        "data-ipv6-prefix": ApiPath("v1/feature-profile/sdwan/policy-object/{policyId}/data-ipv6-prefix"),
+        "ipv6-prefix": ApiPath("v1/feature-profile/sdwan/policy-object/{policyId}/ipv6-prefix"),
+        "prefix": ApiPath("v1/feature-profile/sdwan/policy-object/{policyId}/prefix"),
+        "ext-community": ApiPath("v1/feature-profile/sdwan/policy-object/{policyId}/ext-community"),
+        "mirror": ApiPath("v1/feature-profile/sdwan/policy-object/{policyId}/mirror"),
+        "policer": ApiPath("v1/feature-profile/sdwan/policy-object/{policyId}/policer"),
+        "vpn-group": ApiPath("v1/feature-profile/sdwan/policy-object/{policyId}/vpn-group")
+    })
+
+
+@register('feature_profile', 'SDWAN policy object', ProfileSdwanPolicy, min_version='20.10')
+class ProfileSdwanPolicyIndex(FeatureProfileIndex):
+    api_path = ApiPath('v1/feature-profile/sdwan/policy-object', None, None, None)
+    store_file = 'feature_profiles_sdwan_policy_object.json'
+
+
 # Those profiles show in 20.10 GUI but don't have any entry in apidocs. DE indicated to hold off on those as they'll
 # have major changes. Plan to include in 20.12
 # class ProfileSdwanSecurity(FeatureProfile):
@@ -1392,12 +1419,13 @@ class AdvancedInspectionProfileIndex(PolicyDefIndex):
     store_file = 'policy_definitions_advancedinspectionprofile.json'
 
 
+# VPN QoS MAP is registered as a parent_policy_definition because it references other policy definitions (e.g. QoSMAP)
 class VpnQosMap(PolicyDef):
     api_path = ApiPath('template/policy/definition/vpnqosmap')
     store_path = ('policy_definitions', 'VpnQosMap')
 
 
-@register('policy_definition', 'vpn qos map policy definition', VpnQosMap, min_version='20.6')
+@register('parent_policy_definition', 'vpn qos map policy definition', VpnQosMap, min_version='20.6')
 class VpnQosMapIndex(PolicyDefIndex):
     api_path = ApiPath('template/policy/definition/vpnqosmap', None, None, None)
     store_file = 'policy_definitions_vpnqosmap.json'
