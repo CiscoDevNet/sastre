@@ -13,6 +13,7 @@ from cisco_sdwan.tasks.utils import TaskOptions, TagOptions, filename_type, rege
 from cisco_sdwan.tasks.common import regex_search, clean_dir, Task, archive_create
 from cisco_sdwan.tasks.models import TaskArgs, validate_catalog_tag
 from cisco_sdwan.tasks.validators import validate_regex, validate_filename
+from time import sleep
 
 
 @TaskOptions.register('backup')
@@ -97,6 +98,8 @@ class TaskBackup(Task):
                     continue
                 if item.save(parsed_args.workdir, item_index.need_extended_name, item_name, item_id):
                     self.log_info(f'Done {info} {item_name}')
+
+                sleep(0.5)
 
                 # Special case for DeviceTemplate, handle DeviceTemplateAttached and DeviceTemplateValues
                 if isinstance(item, DeviceTemplate):
