@@ -58,6 +58,9 @@ LOGGING_CONFIG = '''
         "level": "DEBUG"
     },
     "loggers": {
+        "urllib3.connectionpool": {
+            "level": "DEBUG"
+        },
         "chardet.charsetprober": {
             "level": "INFO"
         }
