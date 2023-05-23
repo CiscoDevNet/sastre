@@ -58,9 +58,6 @@ LOGGING_CONFIG = '''
         "level": "DEBUG"
     },
     "loggers": {
-        "urllib3.connectionpool": {
-            "level": "DEBUG"
-        },
         "chardet.charsetprober": {
             "level": "INFO"
         }
@@ -93,6 +90,8 @@ def main():
                             help='REST API timeout (default: %(default)s)')
     cli_parser.add_argument('--verbose', action='store_true',
                             help='increase output verbosity')
+    cli_parser.add_argument('--debug', action='store_true',
+                            help='include additional API call details to the log files')
     cli_parser.add_argument('--version', action='version',
                             version=f'Sastre Version {version}. Catalog: {catalog_size()} configuration items, '
                                     f'{op_catalog_size()} operational items.')
@@ -112,6 +111,8 @@ def main():
     console_handler = logging_config.get('handlers', {}).get('console')
     if cli_args.verbose and console_handler is not None:
         console_handler['level'] = 'INFO'
+    if cli_args.debug:
+        logging_config.setdefault('loggers',{}).setdefault('urllib3.connectionpool',{})['level'] = 'DEBUG'
 
     file_handler = logging_config.get('handlers', {}).get('file')
     if file_handler is not None:

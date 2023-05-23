@@ -1,3 +1,11 @@
+Sastre 1.21.2 [May 23, 2023]
+================================
+
+#### Enhancements:
+- Enhanced REST API rate-limit backoff/retry mechanism. It is now also triggered by 503 service unavailable response code, in addition to 429 response code.
+- Added a --debug option which saves additional API call details to the log files.
+
+
 Sastre 1.21.1 [March 03, 2023]
 ================================
 
