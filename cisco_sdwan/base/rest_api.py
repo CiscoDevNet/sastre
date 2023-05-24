@@ -26,7 +26,7 @@ def backoff_wait_secs(retry_count: int, ceiling: int = 5, variance: float = 0.25
     @param variance: Apply a random +/- variance percentage to the backoff time to avoid synchronization
     @return: Backoff time in seconds
     """
-    return (1 << min(retry_count, ceiling)) * (1 + uniform(-variance, variance))
+    return (1 << min(retry_count, ceiling)) * (1 + uniform(-variance, variance)) / 5
 
 
 def backoff_retry(fn):
@@ -186,8 +186,8 @@ class Rest:
 
 def raise_for_status(response):
     if response.status_code != requests.codes.ok:
-        if response.status_code == 429:
-            raise ServerRateLimitException('Received rate-limit signal (status-code 429)')
+        if response.status_code in {429, 503}:
+            raise ServerRateLimitException(f'Received rate-limit signal (status-code {response.status_code})')
 
         try:
             reply_data = response.json() if response.text else {}
