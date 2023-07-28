@@ -1,3 +1,9 @@
+Sastre 1.21.3 [July 27, 2023]
+================================
+
+### Fixes:
+- Fixed pydantic.errors.PydanticUserError traceback errors found with new installations. This was due to incompatible changes on new pydantic 2.x release.
+
 Sastre 1.21.2 [May 23, 2023]
 ================================
 
