@@ -1,4 +1,4 @@
-Sastre 1.22 [November 27, 2023]
+Sastre 1.22 [November 17, 2023]
 ================================
 
 ### Improvements
