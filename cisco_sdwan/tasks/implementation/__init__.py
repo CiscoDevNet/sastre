@@ -9,7 +9,13 @@ from ._restore import TaskRestore, RestoreArgs
 from ._delete import TaskDelete, DeleteArgs
 from ._migrate import TaskMigrate, MigrateArgs
 from ._attach_detach import TaskAttach, TaskDetach, AttachVsmartArgs, AttachEdgeArgs, DetachVsmartArgs, DetachEdgeArgs
+from ._certificate import TaskCertificate, CertificateSetArgs, CertificateRestoreArgs
 from ._transform import TaskTransform, TransformCopyArgs, TransformRenameArgs, TransformRecipeArgs
+from ._list import TaskList, ListConfigArgs, ListCertificateArgs, ListTransformArgs
+from ._show_template import TaskShowTemplate, ShowTemplateValuesArgs, ShowTemplateRefArgs
+from ._report import TaskReport, ReportCreateArgs, ReportDiffArgs
+from ._show import (TaskShow, ShowDevicesArgs, ShowRealtimeArgs, ShowStateArgs, ShowStatisticsArgs, ShowEventsArgs,
+                    ShowAlarmsArgs)
 
 __all__ = [
     'TaskBackup',
@@ -18,16 +24,36 @@ __all__ = [
     'TaskMigrate',
     'TaskAttach',
     'TaskDetach',
+    'TaskCertificate',
     'TaskTransform',
-    'BackupArgs',
+    'TaskList',
+    'TaskShowTemplate',
+    'TaskReport',
+    'TaskShow',
+    'ReportCreateArgs',
+    'ReportDiffArgs',
     'RestoreArgs',
-    'DeleteArgs',
     'MigrateArgs',
+    'CertificateSetArgs',
+    'CertificateRestoreArgs',
+    'TransformCopyArgs',
+    'TransformRenameArgs',
+    'TransformRecipeArgs',
+    'ListConfigArgs',
+    'ListCertificateArgs',
+    'ListTransformArgs',
+    'ShowTemplateValuesArgs',
+    'ShowTemplateRefArgs',
     'AttachVsmartArgs',
     'AttachEdgeArgs',
     'DetachVsmartArgs',
     'DetachEdgeArgs',
-    'TransformCopyArgs',
-    'TransformRenameArgs',
-    'TransformRecipeArgs'
+    'BackupArgs',
+    'DeleteArgs',
+    'ShowDevicesArgs',
+    'ShowRealtimeArgs',
+    'ShowStateArgs',
+    'ShowStatisticsArgs',
+    'ShowEventsArgs',
+    'ShowAlarmsArgs'
 ]

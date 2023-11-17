@@ -82,18 +82,15 @@ options:
   --version             show program's version number and exit
 ```
 
-vManage address (-a/--address), username (-u/--user), password (-p/--password), port (--port) and CX project ID (--pid) can also be provided via environment variables:
+vManage address (-a/--address), username (-u/--user), password (-p/--password) and port (--port) can also be provided via environment variables:
 - VMANAGE_IP
 - VMANAGE_USER
 - VMANAGE_PASSWORD
 - VMANAGE_PORT
-- CX_PID
 
 A good approach to reduce the number of parameters that need to be provided at execution time is to create rc text files exporting those environment variables for a particular vManage. This is demonstrated in the [Getting Started](#getting-started) section below.
 
 For any of these arguments, vManage address, user, password and CX pid; user is prompted for a value if they are not provided via the environment variables or command line arguments.
-
-CX project ID is only applicable to Sastre-Pro. CX_PID and --pid option are not available in Sastre (std). If CX project ID is not applicable, simply use value 0.
 
 ### Task-specific parameters
 
