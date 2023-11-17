@@ -14,31 +14,13 @@ Sastre can also be used as an SDK to other applications, further information is 
 Support enquires can be sent to sastre-support@cisco.com.
 
 Note on vManage release support:
-- Sastre 1.21 officially supports up to vManage 20.10. Newer vManage releases normally work without problems, just lacking support to the newer features added to that particular vManage release.
+- Sastre 1.22 officially supports up to vManage 20.10. Newer vManage releases normally work without problems, just lacking support to the newer features added to that particular vManage release.
 
 ## Sastre and Sastre-Pro
 
-Sastre is available in two flavors:
-- Sastre: Public open-source under MIT license available on [Cisco DevNet repository](https://github.com/CiscoDevNet/sastre). Supports a limited set of tasks.
-- Sastre-Pro: Cisco licensed version, supporting the full feature-set. Sastre-Pro is available for customers with a CX BCS subscription and Cisco internal at [Cisco eStore](https://cxtools.cisco.com/cxestore/#/toolDetail/46810).
+As of release 1.22, all functionality from Sastre-Pro is now available in Sastre. There is no functional difference between the two anymore.
 
-Both flavors follow the same release numbering. For instance, if support for certain new vManage release is added to Sastre-Pro 1.x, Sastre 1.x will also have the same support (across its supported tasks).
-
-The command "sdwan --version" will indicate the flavor that is installed.
-
-Sastre:
-```
-% sdwan --version
-Sastre Version 1.20. Catalog: 84 configuration items, 33 operational items.
-```
-
-Sastre-Pro:
-```
-% sdwan --version
-Sastre-Pro Version 1.20. Catalog: 84 configuration items, 33 operational items.
-```
-
-Tasks only available on Sastre-Pro are labeled as such in the [Introduction](#introduction) section below.
+Sastre continues as public open-source under MIT license available on [Cisco DevNet repository](https://github.com/CiscoDevNet/sastre). Supporting all tasks from Sastre-Pro.
 
 ## Introduction
 
@@ -59,11 +41,11 @@ Task indicates the operation to be performed. The following tasks are currently 
 - Transform: Modify configuration items. Currently, copy and rename operations are supported. 
 - Attach: Attach WAN Edges/vSmarts to templates. Allows further customization on top of the functionality available via "restore --attach".
 - Detach: Detach WAN Edges/vSmarts from templates. Allows further customization on top of the functionality available via "delete --detach".
-- Certificate (Sastre-Pro): Restore device certificate validity status from a backup or set to a desired value (i.e. valid, invalid or staging).
-- List (Sastre-Pro): List configuration items or device certificate information from vManage or a local backup.
-- Show-template (Sastre-Pro): Show details about device templates on vManage or from a local backup.
-- Report (Sastre-Pro): Generate a customizable report file containing the output of multiple commands. Also provide option to generate a diff between reports.
-- Show (Sastre-Pro): Run vManage real-time, state or statistics commands; collecting data from one or more devices. Query vManage alarms and events.
+- Certificate: Restore device certificate validity status from a backup or set to a desired value (i.e. valid, invalid or staging).
+- List: List configuration items or device certificate information from vManage or a local backup.
+- Show-template: Show details about device templates on vManage or from a local backup.
+- Report: Generate a customizable report file containing the output of multiple commands. Also provide option to generate a diff between reports.
+- Show: Run vManage real-time, state or statistics commands; collecting data from one or more devices. Query vManage alarms and events.
 
 Task-specific parameters are provided after the task argument, customizing the task behavior. For instance, whether to execute a restore task in dry-run mode or the destination directory for a backup task. 
 
@@ -78,7 +60,7 @@ Notes:
 % sdwan --help
 usage: sdwan [-h] [-a <vmanage-ip>] [-u <user>] [-p <password>] [--tenant <tenant>] [--pid <pid>] [--port <port>] [--timeout <timeout>] [--verbose] [--version] <task> ...
 
-Sastre-Pro - Cisco-SDWAN Automation Toolset
+Sastre - Cisco-SDWAN Automation Toolset
 
 positional arguments:
   <task>                task to be performed (backup, restore, delete, migrate, attach, detach, certificate, transform, list, show-template, show, report)
@@ -122,7 +104,7 @@ usage: sdwan backup [-h] [--archive <filename> | --workdir <directory>] [--no-ro
                          [--regex <regex> | --not-regex <regex>]
                          <tag> [<tag> ...]
 
-Sastre-Pro - Cisco-SDWAN Automation Toolset
+Sastre - Cisco-SDWAN Automation Toolset
 
 Backup task:
 
@@ -916,7 +898,7 @@ The transform task allows copying or renaming configuration items, including tem
 % sdwan --verbose transform -h       
 usage: sdwan transform [-h] {rename,copy,recipe} ...
 
-Sastre-Pro - Automation Tools for Cisco SD-WAN Powered by Viptela
+Sastre - Automation Tools for Cisco SD-WAN Powered by Viptela
 
 Transform task:
 

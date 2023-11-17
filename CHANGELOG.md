@@ -1,3 +1,9 @@
+Sastre 1.22 [November 27, 2023]
+================================
+
+### Improvements
+- Sastre and Sastre-Pro now contain the same tasks. There is no functional differences between the two.
+
 Sastre 1.21.3 [July 27, 2023]
 ================================
 
