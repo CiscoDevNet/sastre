@@ -9,12 +9,6 @@ set "sastreVolume=sastre-volume"
 set "currentDir=%CD%"
 set "volumePath=%currentDir%\%sastreVolume%"
 
-set list_existing_sastre_images=
-
-for /f "delims=" %%A in ('docker images --filter "reference=%PRODUCT%:%SASTRE_VERSION%" --format "{{.Repository}}"') do (
-    set "list_existing_sastre_images=%%A"
-)
-
 set "containers_stopped_count=0"
 for /f %%A in ('docker ps -q --filter "ancestor=%PRODUCT%:%SASTRE_VERSION%"') do (
     set /a "containers_stopped_count+=1"
