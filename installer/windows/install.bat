@@ -2,10 +2,8 @@
 setlocal enabledelayedexpansion
 
 echo ===============Sastre-Pro installation process started=============
-:: Configuration
 set "SASTRE_VERSION=latest"
 set "PRODUCT=sastre-pro"
-:: Sleep interval in seconds
 set "SLEEP_INTERVAL=5"
 set "sastreVolume=sastre-volume"
 set "currentDir=%CD%"

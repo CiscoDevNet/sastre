@@ -1,7 +1,6 @@
 @echo off
 setlocal enabledelayedexpansion
 echo ===============Sastre-Pro application uninstallating process started=============
-:: Configuration
 set "SASTRE_VERSION=latest"
 set "PRODUCT=sastre-pro"
 set "SLEEP_INTERVAL=5"
