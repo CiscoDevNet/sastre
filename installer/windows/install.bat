@@ -27,7 +27,7 @@ if %containers_stopped_count% neq 0 (
 )
 
 set "containers_removed_count=0"
-:: Function to check if containers are removed
+:: Function to check if sastre-pro containers are removed
 for /f %%A in ('docker ps -aq --filter "ancestor=%PRODUCT%:%SASTRE_VERSION%"') do (
     set /a "containers_removed_count+=1"
     docker rm %%A
@@ -39,10 +39,10 @@ if %containers_removed_count% neq 0 (
 )
 
 set "images_removed_count=0"
-:: Remove sastre containers and images
+:: Remove sastre-pro containers and images
 for /f %%A in ('docker images %PRODUCT%:%SASTRE_VERSION% ^| findstr "%PRODUCT%"') do (
     set /a "images_removed_count+=1"
-    echo Deleting sastre image: %%A
+    echo Deleting sastre-pro image: %%A
     docker rmi -f %%A
 )
 
@@ -63,9 +63,9 @@ if %ERRORLEVEL% equ 0 (
 if not exist "%volumePath%" (
     mkdir "%volumePath%"
     icacls "%volumePath%" /grant:r "Everyone:(OI)(CI)W" /t
-    echo Sastre volume path created: %volumePath%
+    echo Sastre-Pro volume path created: %volumePath%
 ) else (
-    echo Sastre volume path already exists: %volumePath%
+    echo Sastre-Pro volume path already exists: %volumePath%
 )
 
 echo ===============Sastre-Pro installation process finished==============
