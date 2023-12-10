@@ -28,6 +28,8 @@ Name | Description
 [Run Sastre Steps](sastre-pro.nsi)|Update RunSastrePage function
 [Uninstall Sastre Steps](sastre-pro.nsi)|Update UninstallSastrePage function
 [Application Logo](sastre-pro.ico)|Update Application logo
+[Main script](main.bat)|Update main script
+[Install script](install.bat)|Update install script
 [Uninstall script](uninstall.bat)|Update uninstall script
 
 
