@@ -13,7 +13,7 @@ for /f "delims=" %%A in ('docker images --filter "reference=%PRODUCT%:%SASTRE_VE
 )
 
 set "containers_stopped_count=0"
-:: Function to check if containers are stopped
+:: Function to check if sastre-pro containers are stopped
 for /f %%A in ('docker ps -q --filter "ancestor=%PRODUCT%:%SASTRE_VERSION%"') do (
     set /a "containers_stopped_count+=1"
     docker stop %%A
@@ -25,7 +25,7 @@ if %containers_stopped_count% neq 0 (
 )
 
 set "containers_removed_count=0"
-:: Function to check if containers are removed
+:: Function to check if sastre-pro containers are removed
 for /f %%A in ('docker ps -aq --filter "ancestor=%PRODUCT%:%SASTRE_VERSION%"') do (
     set /a "containers_removed_count+=1"
     docker rm %%A
@@ -37,10 +37,10 @@ if %containers_removed_count% neq 0 (
 )
 
 set "images_removed_count=0"
-:: Remove sastre containers and images
+:: Remove sastre-pro containers and images
 for /f %%A in ('docker images %PRODUCT%:%SASTRE_VERSION% ^| findstr "%PRODUCT%"') do (
     set /a "images_removed_count+=1"
-    echo Deleting sastre image: %%A
+    echo Deleting sastre-pro image: %%A
     docker rmi -f %%A
 )
 
