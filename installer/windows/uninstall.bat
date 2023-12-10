@@ -6,12 +6,6 @@ set "PRODUCT=sastre-pro"
 set "SLEEP_INTERVAL=5"
 set "currentDir=%CD%"
 
-set list_existing_sastre_images=
-
-for /f "delims=" %%A in ('docker images --filter "reference=%PRODUCT%:%SASTRE_VERSION%" --format "{{.Repository}}"') do (
-    set "list_existing_sastre_images=%%A"
-)
-
 set "containers_stopped_count=0"
 :: Function to check if sastre-pro containers are stopped
 for /f %%A in ('docker ps -q --filter "ancestor=%PRODUCT%:%SASTRE_VERSION%"') do (
