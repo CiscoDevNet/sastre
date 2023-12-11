@@ -5,9 +5,10 @@ echo ===============Sastre-Pro installation process started=============
 set "SASTRE_VERSION=latest"
 set "PRODUCT=sastre-pro"
 set "SLEEP_INTERVAL=5"
-set "sastreVolume=sastre-volume"
-set "currentDir=%CD%"
-set "volumePath=%currentDir%\%sastreVolume%"
+set "SASTRE_VOLUME=sastre-volume"
+set "CURRENT_DIR=%CD%"
+set "SASTRE_VOLUME_PATH=%CURRENT_DIR%\%SASTRE_VOLUME%"
+
 
 set "containers_stopped_count=0"
 for /f %%A in ('docker ps -q --filter "ancestor=%PRODUCT%:%SASTRE_VERSION%"') do (
@@ -21,7 +22,7 @@ if %containers_stopped_count% neq 0 (
 )
 
 set "containers_removed_count=0"
-:: Function to check if sastre-pro containers are removed
+:: Function to check if containers are removed
 for /f %%A in ('docker ps -aq --filter "ancestor=%PRODUCT%:%SASTRE_VERSION%"') do (
     set /a "containers_removed_count+=1"
     docker rm %%A
@@ -33,10 +34,10 @@ if %containers_removed_count% neq 0 (
 )
 
 set "images_removed_count=0"
-:: Remove sastre-pro containers and images
+:: Remove sastre containers and images
 for /f %%A in ('docker images %PRODUCT%:%SASTRE_VERSION% ^| findstr "%PRODUCT%"') do (
     set /a "images_removed_count+=1"
-    echo Deleting sastre-pro image: %%A
+    echo Deleting sastre image: %%A
     docker rmi -f %%A
 )
 
@@ -54,12 +55,12 @@ if %ERRORLEVEL% equ 0 (
     echo Failed to load latest sastre-pro docker image with exit code: %ERRORLEVEL%
 )
 
-if not exist "%volumePath%" (
-    mkdir "%volumePath%"
-    icacls "%volumePath%" /grant:r "Everyone:(OI)(CI)W" /t
-    echo Sastre-Pro volume path created: %volumePath%
+if not exist "%SASTRE_VOLUME_PATH%" (
+    mkdir "%SASTRE_VOLUME_PATH%"
+    icacls "%SASTRE_VOLUME_PATH%" /grant:r "Everyone:(OI)(CI)W" /t
+    echo Sastre volume path created: %SASTRE_VOLUME_PATH%
 ) else (
-    echo Sastre-Pro volume path already exists: %volumePath%
+    echo Sastre volume path already exists: %SASTRE_VOLUME_PATH%
 )
 
 echo ===============Sastre-Pro installation process finished==============

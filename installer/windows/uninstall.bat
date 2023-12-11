@@ -4,10 +4,11 @@ echo ===============Sastre-Pro application uninstallating process started=======
 set "SASTRE_VERSION=latest"
 set "PRODUCT=sastre-pro"
 set "SLEEP_INTERVAL=5"
-set "currentDir=%CD%"
+set "CURRENT_DIR=%CD%"
+
 
 set "containers_stopped_count=0"
-:: Function to check if sastre-pro containers are stopped
+:: Function to check if containers are stopped
 for /f %%A in ('docker ps -q --filter "ancestor=%PRODUCT%:%SASTRE_VERSION%"') do (
     set /a "containers_stopped_count+=1"
     docker stop %%A
@@ -19,7 +20,7 @@ if %containers_stopped_count% neq 0 (
 )
 
 set "containers_removed_count=0"
-:: Function to check if sastre-pro containers are removed
+:: Function to check if containers are removed
 for /f %%A in ('docker ps -aq --filter "ancestor=%PRODUCT%:%SASTRE_VERSION%"') do (
     set /a "containers_removed_count+=1"
     docker rm %%A
@@ -31,10 +32,10 @@ if %containers_removed_count% neq 0 (
 )
 
 set "images_removed_count=0"
-:: Remove sastre-pro containers and images
+:: Remove sastre containers and images
 for /f %%A in ('docker images %PRODUCT%:%SASTRE_VERSION% ^| findstr "%PRODUCT%"') do (
     set /a "images_removed_count+=1"
-    echo Deleting sastre-pro image: %%A
+    echo Deleting sastre image: %%A
     docker rmi -f %%A
 )
 
@@ -44,6 +45,6 @@ if %images_removed_count% neq 0 (
 )
 
 echo =============Sastre-Pro application uninstall process finished=============
-echo NOTE: Please delete %currentDir%\sastre-volume folder manually (if you choose so)
+echo NOTE: Please delete %CURRENT_DIR%\sastre-volume folder manually (if you choose so)
 
 exit /b 0
