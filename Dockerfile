@@ -7,7 +7,7 @@ ARG no_proxy
 ENV SASTRE_ROOT_DIR="/shared-data"
 
 WORKDIR /sastre-init
-COPY /examples/dcloud-lab.sh ./rc/
+COPY /examples/sastre-env.sh ./rc/
 
 RUN apk update && apk upgrade && apk add --no-cache git bash && \
     pip install --no-cache-dir --upgrade pip setuptools wheel && \
