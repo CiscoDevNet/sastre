@@ -5,7 +5,7 @@ import yaml
 from datetime import date
 from difflib import unified_diff, HtmlDiff
 from typing import Union, Optional, Iterator, List, Dict, Any, NamedTuple, Type, Tuple, Callable, Set
-from pydantic import BaseModel, ValidationError, validator, Extra, root_validator
+from pydantic.v1 import  BaseModel, ValidationError, validator, Extra, root_validator
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest
 from cisco_sdwan.base.catalog import CATALOG_TAG_ALL, ordered_tags

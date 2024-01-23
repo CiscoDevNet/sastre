@@ -1,6 +1,6 @@
 import argparse
 from typing import Union, Optional, Sequence, Dict, Set, Any
-from pydantic import validator, root_validator
+from pydantic.v1 import  validator, root_validator
 from uuid import uuid4
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest, RestAPIException, is_version_newer, response_id

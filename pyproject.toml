@@ -26,7 +26,7 @@ requires-python = ">=3.8"
 dependencies = [
     "requests",
     "PyYAML",
-    "pydantic>=1.10, <2.0"
+    "pydantic==2.5"
 ]
 dynamic = ["version"]
 

@@ -1,6 +1,6 @@
 import argparse
 from typing import Union, Optional, Callable, Dict, Any
-from pydantic import validator, root_validator
+from pydantic.v1 import  validator, root_validator
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest, RestAPIException
 from cisco_sdwan.base.models_vmanage import EdgeCertificate, EdgeCertificateSync

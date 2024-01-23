@@ -2,7 +2,7 @@ import argparse
 from typing import Union, Optional
 from uuid import uuid4
 from contextlib import suppress
-from pydantic import validator
+from pydantic.v1 import  validator
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest
 from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL, ordered_tags

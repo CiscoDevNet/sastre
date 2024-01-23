@@ -1,5 +1,5 @@
 from typing import Optional, List, Any, Dict
-from pydantic import BaseModel, validator, Field, Extra
+from pydantic.v1 import  BaseModel, validator, Field, Extra
 from cisco_sdwan.base.catalog import OpType, CATALOG_TAG_ALL, op_catalog_tags, op_catalog_commands, catalog_tags
 from cisco_sdwan.tasks.utils import OpCmdOptions
 from cisco_sdwan.tasks.validators import validate_regex, validate_filename, validate_workdir

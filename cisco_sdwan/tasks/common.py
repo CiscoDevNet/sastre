@@ -14,7 +14,7 @@ from shutil import rmtree
 from collections import namedtuple
 from typing import List, Tuple, Iterator, Union, Optional, Any, Iterable, Type, TypeVar, Sequence, Mapping
 from zipfile import ZipFile, ZIP_DEFLATED
-from pydantic import ValidationError
+from pydantic.v1 import  ValidationError
 from cisco_sdwan.base.rest_api import Rest, RestAPIException
 from cisco_sdwan.base.models_base import DATA_DIR
 from cisco_sdwan.base.models_vmanage import (DeviceTemplate, DeviceTemplateValues, DeviceTemplateAttached,
