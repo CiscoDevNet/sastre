@@ -10,7 +10,7 @@ from pathlib import Path
 from collections import namedtuple
 from copy import deepcopy
 from urllib.parse import quote_plus
-from pydantic import Field
+from pydantic.v1 import Field
 from .rest_api import Rest, RestAPIException
 from .catalog import register, op_register
 from .models_base import (ApiItem, IndexApiItem, ConfigItem, Config2Item, IndexConfigItem, RecordItem, RealtimeItem,

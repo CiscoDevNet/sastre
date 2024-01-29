@@ -5,7 +5,7 @@ from functools import partial
 from concurrent import futures
 from datetime import datetime, timedelta, timezone
 from operator import attrgetter
-from pydantic import validator, conint, root_validator
+from pydantic.v1 import validator, conint, root_validator
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest
 from cisco_sdwan.base.catalog import CATALOG_TAG_ALL, op_catalog_iter, OpType

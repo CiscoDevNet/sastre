@@ -3,7 +3,7 @@ from uuid import uuid4
 from copy import deepcopy
 from contextlib import suppress
 from typing import Union, Optional, Tuple, List, Dict, Type, Callable, Any
-from pydantic import BaseModel, validator, ValidationError, Extra, root_validator
+from pydantic.v1 import BaseModel, validator, ValidationError, Extra, root_validator
 import yaml
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest

@@ -14,7 +14,7 @@ from typing import Sequence, Tuple, Union, Iterator, Callable, Mapping, Any, Opt
 from operator import attrgetter
 from datetime import datetime, timezone
 from urllib.parse import quote_plus
-from pydantic import BaseModel, Extra
+from pydantic.v1 import BaseModel, Extra
 from requests.exceptions import Timeout
 from .rest_api import RestAPIException, Rest
 
