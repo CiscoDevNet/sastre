@@ -3,7 +3,7 @@ from pathlib import Path
 from collections import namedtuple
 from typing import List, Union, Optional, Callable
 from operator import itemgetter, attrgetter
-from pydantic.v1 import  validator
+from pydantic.v1 import validator
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import RestAPIException, Rest
 from cisco_sdwan.base.catalog import catalog_iter
