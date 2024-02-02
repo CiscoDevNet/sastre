@@ -51,6 +51,7 @@ Section "install"
     File "uninstall.bat"
     File "install.bat"
     File "sastre-pro.tar"
+    File "sastre-pro.ico"
 
     ; Execute the batch file from the temporary directory
     ExecWait "install.bat"
@@ -66,7 +67,7 @@ Section "install"
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ImageMaker" \
                     "UninstallString" "$\"$InstDir\uninstaller.exe$\""
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ImageMaker" \
-                    "DisplayIcon" "$0"
+                    "DisplayIcon" "$\"$InstDir\sastre-pro.ico$\""
 
     ; Create the uninstaller
     WriteUninstaller "uninstaller.exe"
@@ -131,4 +132,5 @@ Section Uninstall ; Section for uninstallation
     Delete /REBOOTOK  "$InstDir\sastre-pro.bat"
     Delete /REBOOTOK  "$InstDir\uninstall.bat"
     Delete /REBOOTOK  "$InstDir\uninstaller.exe"
+    Delete /REBOOTOK  "$InstDir\sastre-pro.ico"
 SectionEnd
