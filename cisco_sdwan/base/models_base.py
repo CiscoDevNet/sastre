@@ -776,6 +776,13 @@ class ConfigItem(ApiItem):
         return set(re.findall(r'[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}',
                               json.dumps(filtered_data)))
 
+    @property
+    def crypt_cluster_values(self) -> Iterator[str]:
+        """
+        Extracts values that were encrypted by vManage. That is, with $CRYPT_CLUSTER$ prefix.
+        """
+        yield from re.findall(r'"(\$CRYPT_CLUSTER\$[^"]+)"', json.dumps(self.data))
+
     @classmethod
     def is_name_valid(cls, proposed_name: Optional[str]) -> bool:
         return proposed_name is not None and cls.name_check_regex.search(proposed_name) is not None
@@ -1114,12 +1121,22 @@ def filename_safe(name: str, lower: bool = False) -> str:
     return cleaned.lower() if lower else cleaned
 
 
-def update_ids(id_mapping_dict: Mapping[str, str], item_data: Dict[str, Any]) -> Dict[str, Any]:
+def update_ids(id_map: Mapping[str, str], item_data: Dict[str, Any]) -> Dict[str, Any]:
     def replace_id(match):
         matched_id = match.group(0)
-        return id_mapping_dict.get(matched_id, matched_id)
+        return id_map.get(matched_id, matched_id)
 
     dict_json = re.sub(r'[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}', replace_id, json.dumps(item_data))
+
+    return json.loads(dict_json)
+
+
+def update_crypts(crypt_map: Mapping[str, str], item_data: Dict[str, Any]) -> Dict[str, Any]:
+    def replace_crypt(match):
+        matched_crypt = match.group(1)
+        return f'"{crypt_map.get(matched_crypt, matched_crypt)}"'
+
+    dict_json = re.sub(r'"(\$CRYPT_CLUSTER\$[^"]+)"', replace_crypt, json.dumps(item_data))
 
     return json.loads(dict_json)
 

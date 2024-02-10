@@ -73,6 +73,7 @@ class TableFilter:
         Callable used by 'Table.filtered' to evaluate whether a row should be allowed.
         @return: True if row is allowed by the filter. False otherwise.
         """
+
         def match_column(column_value) -> bool:
             if column_value is None:
                 return True
@@ -359,6 +360,7 @@ class Task:
                                 When absent, re-attach all currently attached devices on target.
         @return: Tuple containing attach data (<template input list>, <isEdited>)
         """
+
         def load_template_input(template_name: str, saved_id: str, target_id: str) -> Union[list, None]:
             if target_id is None:
                 self.log_debug(f'Skip {template_name}, saved template not on target node')
@@ -407,6 +409,7 @@ class Task:
         @param templates_iter: Iterator of (<template_name>, <target_template_id>)
         @return: Tuple containing attach data (<template input list>, <isEdited>)
         """
+
         def get_template_input(template_id):
             uuid_list = [uuid for uuid, _ in DeviceTemplateAttached.get_raise(api, template_id)]
             values = DeviceTemplateValues(api.post(DeviceTemplateValues.api_params(template_id, uuid_list),
@@ -434,6 +437,7 @@ class Task:
         @param log_context: Message to log during wait actions
         @return: Number of attachment requests processed
         """
+
         def grouper(attach_cls, request_list):
             while True:
                 section_dict = yield from chopper(chunk_size)
@@ -499,6 +503,7 @@ class Task:
                             device has no hostname yet.
         @return: Sequence of (<config_group_id>, <config_group_name>, [<device uuid>, ...]) tuples
         """
+
         def associate_devices(config_grp_name: str, config_grp_saved_id: str, config_grp_target_id: str) -> bool:
             saved_associated = ConfigGroupAssociated.load(workdir, ext_name, config_grp_name, config_grp_saved_id)
             if saved_associated is None:
@@ -600,6 +605,7 @@ class Task:
         @param log_context: Message to log during wait actions
         @return: Number of deploy requests processed
         """
+
         def grouper(request_list):
             while True:
                 section_dict = yield from chopper(chunk_size)
@@ -649,6 +655,7 @@ class Task:
         @param log_context: Message to log during wait actions
         @return: Number of detach requests processed
         """
+
         def grouper(request_list):
             while True:
                 section_dict = yield from chopper(chunk_size)
@@ -706,6 +713,7 @@ class Task:
         @param log_context: Message to log during wait actions
         @return: Number of associate delete requests processed
         """
+
         def grouper(request_list):
             while True:
                 section_dict = yield from chopper(chunk_size)
