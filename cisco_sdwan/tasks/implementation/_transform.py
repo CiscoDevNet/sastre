@@ -8,7 +8,7 @@ import yaml
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest
 from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL, ordered_tags
-from cisco_sdwan.base.models_base import update_ids, ServerInfo, ConfigItem, ExtendedTemplate
+from cisco_sdwan.base.models_base import update_ids, update_crypts, ServerInfo, ConfigItem, ExtendedTemplate
 from cisco_sdwan.base.models_vmanage import DeviceTemplate, DeviceTemplateAttached, DeviceTemplateValues
 from cisco_sdwan.base.processor import StopProcessorException, ProcessorException
 from cisco_sdwan.tasks.utils import (TaskOptions, TagOptions, existing_workdir_type, filename_type, ext_template_type,
@@ -33,18 +33,29 @@ class TransformRecipeNameTemplate(BaseModel, extra=Extra.forbid):
     _validate_name_regex = validator('name_regex', allow_reuse=True)(validate_ext_template)
 
 
+class ValueMap(BaseModel):
+    from_value: str
+    to_value: str
+
+
+class CryptResourceUpdate(BaseModel):
+    resource_name: str
+    replacements: List[ValueMap]
+
+
 class TransformRecipe(BaseModel, extra=Extra.forbid):
     tag: str
     name_template: Optional[TransformRecipeNameTemplate] = None
     name_map: Optional[Dict[str, str]] = None
+    crypt_updates:  Optional[List[CryptResourceUpdate]] = None
     replace_source: bool = True
 
     # Validators
     _validate_tag = validator('tag', allow_reuse=True)(validate_catalog_tag)
 
-    @validator('name_map',  always=True)
+    @validator('name_map', always=True)
     def validate_name_map(cls, v, values):
-        if v is None and values.get('name_template') is None:
+        if v is None and values.get('name_template') is None and values.get('crypt_updates') is not None:
             raise ValueError('At least one of "name_map" or "name_template" needs to be provided')
         return v
 
@@ -87,6 +98,11 @@ class Processor:
             if regex is None or regex_search(regex, name, inverse=self.recipe.name_template.regex is None):
                 new_name = ExtendedTemplate(self.recipe.name_template.name_regex)(name)
 
+        # Match crypt_updates
+        if new_name is None and self.recipe.crypt_updates is not None:
+            if name in {entry.resource_name for entry in self.recipe.crypt_updates}:
+                new_name = name
+
         return new_name
 
     def eval(self, config_obj: ConfigItem, new_name: str, new_id: str) -> Tuple[dict, List[str]]:
@@ -104,6 +120,13 @@ class Processor:
             if new_payload.get(ro_tag, False):
                 new_payload[ro_tag] = False
                 trace_log.append(f'Resetting "{ro_tag}" flag to "False"')
+
+        # Process crypt updates
+        if self.recipe.crypt_updates:
+            for matched_resource in (rsc for rsc in self.recipe.crypt_updates if rsc.resource_name == new_name):
+                trace_log.append(f'Applying crypt updates')
+                replacements_map = {entry.from_value: entry.to_value for entry in matched_resource.replacements}
+                new_payload = update_crypts(replacements_map, new_payload)
 
         return new_payload, trace_log
 
@@ -140,18 +163,27 @@ class TaskTransform(Task):
         sub_tasks.required = True
 
         rename_parser = sub_tasks.add_parser('rename', help='rename configuration items')
-        rename_parser.set_defaults(recipe_handler=TaskTransform.rename_recipe)
+        rename_parser.set_defaults(subtask_handler=TaskTransform.transform,
+                                   recipe_handler=TaskTransform.rename_recipe)
 
         copy_parser = sub_tasks.add_parser('copy', help='copy configuration items')
-        copy_parser.set_defaults(recipe_handler=TaskTransform.copy_recipe)
+        copy_parser.set_defaults(subtask_handler=TaskTransform.transform,
+                                 recipe_handler=TaskTransform.copy_recipe)
 
         recipe_parser = sub_tasks.add_parser('recipe', help='transform using custom recipe')
-        recipe_parser.set_defaults(recipe_handler=TaskTransform.load_recipe)
+        recipe_parser.set_defaults(subtask_handler=TaskTransform.transform,
+                                   recipe_handler=TaskTransform.load_recipe)
         recipe_mutex = recipe_parser.add_mutually_exclusive_group(required=True)
         recipe_mutex.add_argument('--from-file', metavar='<filename>', type=existing_file_type,
                                   help='load recipe from YAML file')
         recipe_mutex.add_argument('--from-json', metavar='<json>',
                                   help='load recipe from JSON-formatted string')
+
+        build_parser = sub_tasks.add_parser('build-recipe',
+                                            help='generate recipe file for updating vManage-encrypted fields')
+        build_parser.set_defaults(subtask_handler=TaskTransform.build_recipe)
+        build_parser.add_argument('recipe_file', metavar='<filename>', type=filename_type,
+                                  help='name for generated recipe file')
 
         for sub_task in (rename_parser, copy_parser):
             sub_task.add_argument('tag', metavar='<tag>', type=TagOptions.tag,
@@ -175,6 +207,8 @@ class TaskTransform(Task):
             sub_task.add_argument('--no-rollover', action='store_true',
                                   help='by default, if the output directory already exists it is renamed using a '
                                        'rolling naming scheme. This option disables this automatic rollover.')
+
+        for sub_task in (rename_parser, copy_parser, recipe_parser, build_parser):
             sub_task.add_argument('--workdir', metavar='<directory>', type=existing_workdir_type,
                                   help='transform will read from the specified directory instead of target vManage')
 
@@ -216,9 +250,23 @@ class TaskTransform(Task):
             return TransformRecipe.parse_raw(parsed_args.from_json)
 
     def runner(self, parsed_args, api: Optional[Rest] = None) -> Union[None, list]:
-        source_info = f'Local workdir: "{parsed_args.workdir}"' if api is None else f'vManage URL: "{api.base_url}"'
-        self.log_info(f'Transform task: {source_info} -> Local output dir: "{parsed_args.output}"')
+        source_info = f'Local workdir: "{parsed_args.workdir}"' if parsed_args.workdir is not None else f'vManage URL: "{api.base_url}"'
+        if hasattr(parsed_args, 'output'):
+            self.log_info(f'Transform task: {source_info} -> Local output dir: "{parsed_args.output}"')
+        else:
+            self.log_info(f'Transform build-recipe task: {source_info} -> Recipe file: "{parsed_args.recipe_file}"')
 
+        if api is None:
+            backend = parsed_args.workdir
+            local_info = ServerInfo.load(backend)
+            server_version = local_info.server_version if local_info is not None else None
+        else:
+            backend = api
+            server_version = backend.server_version
+
+        return parsed_args.subtask_handler(self, parsed_args, backend, server_version)
+
+    def transform(self, parsed_args, backend: Union[Rest, str], server_version: Optional[str]) -> Union[None, list]:
         # Load processors
         try:
             recipe = parsed_args.recipe_handler(parsed_args)
@@ -234,15 +282,6 @@ class TaskTransform(Task):
         saved_output = clean_dir(parsed_args.output, max_saved=0 if parsed_args.no_rollover else 99)
         if saved_output:
             self.log_info(f'Previous output under "{parsed_args.output}" was saved as "{saved_output}"')
-
-        # Identify backend and server version
-        if api is None:
-            backend = parsed_args.workdir
-            local_info = ServerInfo.load(backend)
-            server_version = local_info.server_version if local_info is not None else None
-        else:
-            backend = api
-            server_version = backend.server_version
 
         if server_version is not None:
             if ServerInfo(server_version=server_version).save(parsed_args.output):
@@ -345,6 +384,58 @@ class TaskTransform(Task):
 
         return
 
+    def build_recipe(self, parsed_args, backend: Union[Rest, str], server_version: Optional[str]) -> Union[None, list]:
+        try:
+            tag_set = set()
+            resources = []
+            for tag in ordered_tags(CATALOG_TAG_ALL, reverse=True):
+                self.log_info(f'Inspecting {tag} items')
+                for _, info, index_cls, item_cls in catalog_iter(tag, version=server_version):
+                    item_index = self.index_get(index_cls, backend)
+                    if item_index is None:
+                        self.log_debug(f'Skipped {info}, none found')
+                        continue
+
+                    for item_id, item_name in item_index:
+                        item = self.retrieve(item_cls, backend, item_id, item_name, item_index.need_extended_name)
+                        if item is None:
+                            self.log_error(f'Failed loading {info} {item_name}')
+                            continue
+                        self.log_debug(f'Evaluating {info} {item_name}')
+
+                        crypt_values_set = set(item.crypt_cluster_values)
+
+                        if isinstance(item, DeviceTemplate):
+                            if item.devices_attached is not None:
+                                crypt_values_set.update(item.devices_attached.crypt_cluster_values)
+
+                            if item.attach_values is not None:
+                                crypt_values_set.update(item.attach_values.crypt_cluster_values)
+
+                        if crypt_values_set:
+                            self.log_info(f'Found {len(crypt_values_set)} crypt value{"s"[:len(crypt_values_set) ^ 1]} '
+                                          f'from {info} {item_name}')
+                            replacements = [
+                                ValueMap(from_value=value, to_value='< CHANGE ME >') for value in crypt_values_set
+                            ]
+                            resources.append(CryptResourceUpdate(resource_name=item_name, replacements=replacements))
+                            tag_set.add(tag)
+
+            if resources:
+                update_recipe = TransformRecipe(tag=next(iter(tag_set)) if len(tag_set) == 1 else CATALOG_TAG_ALL,
+                                                crypt_updates=resources)
+                with open(parsed_args.recipe_file, 'w') as file:
+                    yaml.dump(update_recipe.dict(exclude_none=True, exclude={'replace_source'}),
+                              sort_keys=False, indent=2, stream=file)
+                self.log_info(f'Recipe file saved as "{parsed_args.recipe_file}"')
+            else:
+                self.log_warning(f'No encrypted passwords found!')
+
+        except ProcessorException as ex:
+            raise TaskException(f'Transform build-recipe aborted: {ex}') from None
+
+        return
+
     def retrieve(self, item_cls: Type[ConfigItem], backend: Union[Rest, str],
                  item_id: str, item_name: str, ext_name: bool) -> Union[ConfigItem, None]:
 
@@ -384,6 +475,7 @@ class TaskTransform(Task):
 
 
 class TransformArgs(TaskArgs):
+    subtask_handler: Callable = const(TaskTransform.transform)
     output: str
     workdir: Optional[str] = None
     no_rollover: bool = False
@@ -432,3 +524,13 @@ class TransformRecipeArgs(TransformArgs):
             raise ValueError('Argument "from_file" not allowed with "from_json"')
 
         return values
+
+
+class TransformBuildArgs(TaskArgs):
+    subtask_handler: Callable = const(TaskTransform.build_recipe)
+    workdir: Optional[str] = None
+    recipe_file: str
+
+    # Validators
+    _validate_filename = validator('recipe_file', allow_reuse=True)(validate_filename)
+    _validate_workdir = validator('workdir', allow_reuse=True)(validate_workdir)

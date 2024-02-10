@@ -33,6 +33,21 @@ class DeviceModeCli(ApiItem):
         }
 
 
+class EncryptText(ApiItem):
+    api_path = ApiPath(None, 'template/security/encryptText/encrypt', None, None)
+    id_tag = 'id'
+
+    @staticmethod
+    def api_params(input_string):
+        return {
+            "inputString": input_string
+        }
+
+    @property
+    def encrypted_value(self):
+        return self.data.get('encryptedText', None)
+
+
 class DeviceTemplateAttach(ApiItem):
     api_path = ApiPath(None, 'template/device/config/attachfeature', None, None)
     id_tag = 'id'
@@ -363,7 +378,7 @@ CEDGE_SET = {
     "vedge-nfvis-C8200-UCPEVM", "vedge-IR-8340", "cellular-gateway-CG522MW-IO-GL", "vedge-IR-8140H", "vedge-C1131X-8PW",
     "vedge-IR-8140H-P", "vedge-C1131-8PLTEPW", "vedge-C1131-8PW", "vedge-C1131X-8PLTEPW", "cellular-gateway-CG113-W6Z",
     "cellular-gateway-CG113-W6B", "cellular-gateway-CG113-W6A", "cellular-gateway-CG113-4GW6E",
-    "cellular-gateway-CG113-4GW6H", "vedge-C8500-20X6C", "cellular-gateway-CG113-W6E",  "cellular-gateway-CG113-W6H",
+    "cellular-gateway-CG113-4GW6H", "vedge-C8500-20X6C", "cellular-gateway-CG113-W6E", "cellular-gateway-CG113-W6H",
     "cellular-gateway-CG113-4GW6B", "cellular-gateway-CG113-4GW6Z", "cellular-gateway-CG113-4GW6A",
     "cellular-gateway-CG113-4GW6Q", "cellular-gateway-CG113-W6Q", "cellular-gateway-CG522MW-IO-NA",
     "vedge-ESR-6300-NCP", "vedge-nfvis-CSP-5436", "vedge-nfvis-CSP-5228", "vedge-nfvis-CSP-5216"
@@ -702,8 +717,8 @@ class ConfigGroupAssociated(Config2Item):
         new_payload['devices'] = [
             entry for entry in new_payload.get('devices', [])
             if (
-                (allowed_uuid_set is None or entry.get('id') in allowed_uuid_set) and
-                (not not_by_rule or not entry.get('addedByRule', False))
+                    (allowed_uuid_set is None or entry.get('id') in allowed_uuid_set) and
+                    (not not_by_rule or not entry.get('addedByRule', False))
             )
         ]
         return ConfigGroupAssociated(new_payload)
@@ -730,7 +745,7 @@ class ConfigGroupRules(IndexConfigItem):
     store_path = ('config_groups', 'tag_rules')
     store_file = '{item_name}.json'
     id_tag = 'tagId'
-    iter_fields = ('tagId', )
+    iter_fields = ('tagId',)
 
     @staticmethod
     def delete_raise(api: Rest, config_group_id: str, rule_id: str) -> None:
@@ -790,7 +805,7 @@ class ProfileSdwanSystem(FeatureProfile):
         "omp": ApiPath("v1/feature-profile/sdwan/system/{systemId}/omp"),
         "snmp": ApiPath("v1/feature-profile/sdwan/system/{systemId}/snmp"),
         "perfmonitor": ApiPath("v1/feature-profile/sdwan/system/{systemId}/perfmonitor")
-     })
+    })
 
 
 @register('feature_profile', 'SDWAN system profile', ProfileSdwanSystem, min_version='20.8')

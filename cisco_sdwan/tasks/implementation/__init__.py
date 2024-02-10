@@ -10,7 +10,8 @@ from ._delete import TaskDelete, DeleteArgs
 from ._migrate import TaskMigrate, MigrateArgs
 from ._attach_detach import TaskAttach, TaskDetach, AttachVsmartArgs, AttachEdgeArgs, DetachVsmartArgs, DetachEdgeArgs
 from ._certificate import TaskCertificate, CertificateSetArgs, CertificateRestoreArgs
-from ._transform import TaskTransform, TransformCopyArgs, TransformRenameArgs, TransformRecipeArgs
+from ._transform import (TaskTransform, TransformCopyArgs, TransformRenameArgs, TransformRecipeArgs,
+                         TransformBuildArgs)
 from ._list import TaskList, ListConfigArgs, ListCertificateArgs, ListTransformArgs
 from ._show_template import TaskShowTemplate, ShowTemplateValuesArgs, ShowTemplateRefArgs
 from ._report import TaskReport, ReportCreateArgs, ReportDiffArgs
@@ -39,6 +40,7 @@ __all__ = [
     'TransformCopyArgs',
     'TransformRenameArgs',
     'TransformRecipeArgs',
+    'TransformBuildArgs',
     'ListConfigArgs',
     'ListCertificateArgs',
     'ListTransformArgs',

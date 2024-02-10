@@ -1,4 +1,11 @@
-Sastre 1.22 [November 17, 2023]
+Sastre 1.23 [January x, 2024]
+================================
+
+### Improvements
+- Handling of templates with encrypted fields
+
+
+Sastre 1.22 [November 27, 2023]
 ================================
 
 ### Improvements
