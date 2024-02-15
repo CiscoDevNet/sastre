@@ -677,7 +677,7 @@ class ConfigGroupValues(Config2Item):
     def put_raise(self, api: Rest, **path_vars: str) -> Sequence[str]:
         result = api.put(self.put_data(), ConfigGroupValues.api_path.resolve(**path_vars).put)
 
-        return result
+        return result if all(isinstance(item, str) for item in result) else [item['device-id'] for item in result]
 
 
 class AssociatedDeviceModel(ConfigRequestModel):
