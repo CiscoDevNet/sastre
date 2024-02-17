@@ -1,8 +1,12 @@
-Sastre 1.23 [January x, 2024]
+Sastre 1.23 [February x, 2024]
 ================================
 
 ### Improvements
-- Handling of templates with encrypted fields
+- Handling of templates with encrypted fields (e.g. SNMP feature template community value)
+  - New encrypt task.
+  - New transform build-recipe task.
+  - Added support for new crypt_updates keyword in transform recipe files.
+- Migration to Pydantic 2.x
 
 
 Sastre 1.22 [November 27, 2023]

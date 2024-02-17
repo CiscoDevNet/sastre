@@ -1,6 +1,6 @@
 import argparse
-from typing import Union, Optional, List, Dict, Any
-from pydantic import validator, root_validator
+from typing import Union, Optional, List
+from pydantic import model_validator, field_validator
 from uuid import uuid4
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest, RestAPIException
@@ -11,7 +11,7 @@ from cisco_sdwan.base.models_vmanage import (DeviceConfig, DeviceConfigRFS, Devi
                                              ConfigGroup, ConfigGroupValues, ConfigGroupAssociated, ConfigGroupRules)
 from cisco_sdwan.tasks.utils import TaskOptions, TagOptions, filename_type, regex_type, default_workdir
 from cisco_sdwan.tasks.common import regex_search, clean_dir, Task, archive_create
-from cisco_sdwan.tasks.models import TaskArgs, validate_catalog_tag
+from cisco_sdwan.tasks.models import TaskArgs, CatalogTag
 from cisco_sdwan.tasks.validators import validate_regex, validate_filename
 
 
@@ -170,19 +170,18 @@ class BackupArgs(TaskArgs):
     not_regex: Optional[str] = None
     no_rollover: bool = False
     save_running: bool = False
-    tags: List[str]
+    tags: List[CatalogTag]
 
     # Validators
-    _validate_filename = validator('workdir', 'archive', allow_reuse=True)(validate_filename)
-    _validate_regex = validator('regex', 'not_regex', allow_reuse=True)(validate_regex)
-    _validate_tags = validator('tags', each_item=True, allow_reuse=True)(validate_catalog_tag)
+    _validate_filename = field_validator('workdir', 'archive')(validate_filename)
+    _validate_regex = field_validator('regex', 'not_regex')(validate_regex)
 
-    @root_validator(skip_on_failure=True)
-    def mutex_validations(cls, values: Dict[str, Any]) -> Dict[str, Any]:
-        if bool(values.get('archive')) == bool(values.get('workdir')):
+    @model_validator(mode='after')
+    def mutex_validations(self) -> 'BackupArgs':
+        if bool(self.archive) == bool(self.workdir):
             raise ValueError('Either "archive" or "workdir" must to be provided')
 
-        if values.get('regex') is not None and values.get('not_regex') is not None:
+        if self.regex is not None and self.not_regex is not None:
             raise ValueError('Argument "not_regex" not allowed with "regex"')
 
-        return values
+        return self

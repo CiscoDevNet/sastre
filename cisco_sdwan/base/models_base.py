@@ -14,7 +14,7 @@ from typing import Sequence, Tuple, Union, Iterator, Callable, Mapping, Any, Opt
 from operator import attrgetter
 from datetime import datetime, timezone
 from urllib.parse import quote_plus
-from pydantic import BaseModel, Extra
+from pydantic import ConfigDict, BaseModel
 from requests.exceptions import Timeout
 from .rest_api import RestAPIException, Rest
 
@@ -877,8 +877,7 @@ class IndexConfigItem(ConfigItem):
 
 
 class ConfigRequestModel(BaseModel):
-    class Config:
-        extra = Extra.ignore
+    model_config = ConfigDict(extra="ignore")
 
 
 class FeatureProfileModel(ConfigRequestModel):

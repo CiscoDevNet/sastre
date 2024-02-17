@@ -1,5 +1,6 @@
 from typing import Optional, List, Any, Dict
-from pydantic import BaseModel, validator, Field, Extra
+from typing_extensions import Annotated
+from pydantic import BaseModel, field_validator, Field, AfterValidator, ConfigDict, ValidationInfo
 from cisco_sdwan.base.catalog import OpType, CATALOG_TAG_ALL, op_catalog_tags, op_catalog_commands, catalog_tags
 from cisco_sdwan.tasks.utils import OpCmdOptions
 from cisco_sdwan.tasks.validators import validate_regex, validate_filename, validate_workdir
@@ -31,29 +32,34 @@ def validate_catalog_tag(tag: str) -> str:
     return tag
 
 
-def validate_workdir_conditional(workdir: str, values: Dict[str, Any]) -> str:
+CatalogTag = Annotated[str, AfterValidator(validate_catalog_tag)]
+
+
+def validate_workdir_conditional(workdir: str, info: ValidationInfo) -> str:
     """
     Validate workdir only if archive was not set (i.e. is None).
     In the model, the archive attribute needs to be defined before workdir.
     """
-    if not values.get('archive'):
+    if not info.data.get('archive'):
         validate_workdir(workdir)
 
     return workdir
 
 
-def const(default_value: Any) -> Field:
+def const(field_type: type[Any], default_value: Any) -> Annotated[type[Any], ...]:
     """
-    Defines a model field as constant. That is, it cannot be set to any value other than the default value
+    Defines a model field as constant. That is, it cannot be set to any value other than the default value.
     """
-    return Field(default_value, const=True)
+    # noinspection PyUnusedLocal
+    def validate(value):
+        raise ValueError('This is a constant field and cannot be explicitly set or modified')
+
+    return Annotated[field_type, Field(default_value, frozen=True), AfterValidator(validate)]
 
 
 # Models
-class TaskArgs(BaseModel, extra=Extra.forbid):
-    def __init__(self, **kwargs):
-        # Dummy init used so PyCharm type checker can recognize TaskArgs parameters
-        super().__init__(**kwargs)
+class TaskArgs(BaseModel):
+    model_config = ConfigDict(extra='forbid')
 
 
 class TableTaskArgs(TaskArgs):
@@ -63,5 +69,5 @@ class TableTaskArgs(TaskArgs):
     save_json: Optional[str] = None
 
     # Validators
-    _validate_regex = validator('exclude', 'include', allow_reuse=True)(validate_regex)
-    _validate_filename = validator('save_csv', 'save_json', allow_reuse=True)(validate_filename)
+    _validate_regex = field_validator('exclude', 'include')(validate_regex)
+    _validate_filename = field_validator('save_csv', 'save_json')(validate_filename)

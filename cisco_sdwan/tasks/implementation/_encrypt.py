@@ -1,7 +1,7 @@
 import argparse
 from getpass import getpass
 from typing import Union, Optional, List
-from pydantic import validator
+from pydantic import field_validator
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest, RestAPIException
 from cisco_sdwan.base.models_vmanage import EncryptText
@@ -76,7 +76,8 @@ class EncryptArgs(TaskArgs):
     values: List[str]
 
     # Validators
-    @validator('values')
+    @field_validator('values')
+    @classmethod
     def validate_cmd(cls, values: List[str]) -> List[str]:
         # Zero length values indicate interactive mode, which is not allowed when encrypt is called programmatically
         if len(values) == 0:
