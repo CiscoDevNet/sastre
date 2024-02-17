@@ -3,7 +3,7 @@ from pathlib import Path
 from collections import namedtuple
 from typing import List, Union, Optional, Callable
 from operator import itemgetter, attrgetter
-from pydantic import validator
+from pydantic import field_validator
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import RestAPIException, Rest
 from cisco_sdwan.base.catalog import catalog_iter
@@ -212,16 +212,16 @@ class ShowTemplateArgs(TableTaskArgs):
     templates: Optional[str] = None
 
     # Validators
-    _validate_workdir = validator('workdir', allow_reuse=True)(validate_workdir)
-    _validate_templates = validator('templates', allow_reuse=True)(validate_regex)
+    _validate_workdir = field_validator('workdir')(validate_workdir)
+    _validate_templates = field_validator('templates')(validate_regex)
 
 
 class ShowTemplateValuesArgs(ShowTemplateArgs):
-    subtask_info: str = const('values')
-    subtask_handler: Callable = const(TaskShowTemplate.values_table)
+    subtask_info: const(str, 'values')
+    subtask_handler: const(Callable, TaskShowTemplate.values_table)
 
 
 class ShowTemplateRefArgs(ShowTemplateArgs):
-    subtask_info: str = const('references')
-    subtask_handler: Callable = const(TaskShowTemplate.references_table)
+    subtask_info: const(str, 'references')
+    subtask_handler: const(Callable, TaskShowTemplate.references_table)
     with_refs: bool = False

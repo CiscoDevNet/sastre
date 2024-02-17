@@ -2,7 +2,7 @@ import argparse
 from typing import Union, Optional
 from uuid import uuid4
 from contextlib import suppress
-from pydantic import validator
+from pydantic import field_validator
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest
 from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL, ordered_tags
@@ -193,13 +193,14 @@ class MigrateArgs(TaskArgs):
     workdir: Optional[str] = None
 
     # Validators
-    _validate_filename = validator('output', allow_reuse=True)(validate_filename)
-    _validate_name = validator('name', allow_reuse=True)(validate_ext_template)
-    _validate_version = validator('from_version', 'to_version', allow_reuse=True)(validate_version)
-    _validate_workdir = validator('workdir', allow_reuse=True)(validate_workdir)
+    _validate_filename = field_validator('output')(validate_filename)
+    _validate_name = field_validator('name')(validate_ext_template)
+    _validate_version = field_validator('from_version', 'to_version')(validate_version)
+    _validate_workdir = field_validator('workdir')(validate_workdir)
 
-    @validator('scope')
-    def validate_scope(cls, v):
+    @field_validator('scope')
+    @classmethod
+    def validate_scope(cls, v: str) -> str:
         scope_options = ('all', 'attached')
         if v not in scope_options:
             raise ValueError(f'"{v}" is not a valid scope. Options are: {", ".join(scope_options)}.')

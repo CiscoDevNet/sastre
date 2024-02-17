@@ -1,11 +1,12 @@
 import argparse
-from typing import Tuple, List, Any, NamedTuple, Type, Union, Optional, Sequence, Callable, Dict
+from typing import Tuple, List, Any, NamedTuple, Type, Union, Optional, Sequence, Callable
+from typing_extensions import Annotated
 from pathlib import Path
 from functools import partial
 from concurrent import futures
 from datetime import datetime, timedelta, timezone
 from operator import attrgetter
-from pydantic import validator, conint, root_validator
+from pydantic import field_validator, model_validator, Field
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest
 from cisco_sdwan.base.catalog import CATALOG_TAG_ALL, op_catalog_iter, OpType
@@ -336,90 +337,93 @@ class ShowArgs(TableTaskArgs):
     system_ip: Optional[str] = None
 
     # Validators
-    _validate_regex = validator('regex', 'not_regex', allow_reuse=True)(validate_regex)
-    _validate_site_id = validator('site', allow_reuse=True)(validate_site_id)
-    _validate_ipv4 = validator('system_ip', allow_reuse=True)(validate_ipv4)
+    _validate_regex = field_validator('regex', 'not_regex')(validate_regex)
+    _validate_site_id = field_validator('site')(validate_site_id)
+    _validate_ipv4 = field_validator('system_ip')(validate_ipv4)
 
-    @root_validator(skip_on_failure=True)
-    def mutex_validations(cls, values: Dict[str, Any]) -> Dict[str, Any]:
-        if values.get('regex') is not None and values.get('not_regex') is not None:
+    @model_validator(mode='after')
+    def mutex_validations(self) -> 'ShowArgs':
+        if self.regex is not None and self.not_regex is not None:
             raise ValueError('Argument "not_regex" not allowed with "regex"')
 
-        if values.get('detail', False) and values.get('simple', False):
+        if getattr(self, 'detail', False) and getattr(self, 'simple', False):
             raise ValueError('Argument "detail" not allowed with "simple"')
 
-        return values
+        return self
 
 
 class ShowDevicesArgs(ShowArgs):
-    subtask_info: str = const('devices')
-    subtask_handler: Callable = const(TaskShow.devices)
+    subtask_info: const(str, 'devices')
+    subtask_handler: const(Callable, TaskShow.devices)
 
 
 class ShowRealtimeArgs(ShowArgs):
-    subtask_info: str = const('realtime')
-    subtask_handler: Callable = const(TaskShow.realtime)
+    subtask_info: const(str, 'realtime')
+    subtask_handler: const(Callable, TaskShow.realtime)
     cmd: List[str]
     detail: bool = False
     simple: bool = False
 
     # Validators
-    @validator('cmd')
+    @field_validator('cmd')
+    @classmethod
     def validate_cmd(cls, cmd_list: List[str]) -> List[str]:
         return validate_op_cmd(OpType.RT, cmd_list)
 
 
 class ShowStateArgs(ShowArgs):
-    subtask_info: str = const('state')
-    subtask_handler: Callable = const(TaskShow.bulk_state)
+    subtask_info: const(str, 'state')
+    subtask_handler: const(Callable, TaskShow.bulk_state)
     cmd: List[str]
     detail: bool = False
     simple: bool = False
 
     # Validators
-    @validator('cmd')
+    @field_validator('cmd')
+    @classmethod
     def validate_cmd(cls, cmd_list: List[str]) -> List[str]:
         return validate_op_cmd(OpType.STATE, cmd_list)
 
 
 class ShowStatisticsArgs(ShowArgs):
-    subtask_info: str = const('statistics')
-    subtask_handler: Callable = const(TaskShow.bulk_stats)
+    subtask_info: const(str, 'statistics')
+    subtask_handler: const(Callable, TaskShow.bulk_stats)
     cmd: List[str]
     detail: bool = False
     simple: bool = False
-    days: conint(ge=0, lt=10000) = 0
-    hours: conint(ge=0, lt=10000) = 0
+    days: Annotated[int, Field(ge=0, lt=10000)] = 0
+    hours: Annotated[int, Field(ge=0, lt=10000)] = 0
 
     # Validators
-    @validator('cmd')
+    @field_validator('cmd')
+    @classmethod
     def validate_cmd(cls, cmd_list: List[str]) -> List[str]:
         return validate_op_cmd(OpType.STATS, cmd_list)
 
 
 class ShowRecordsArgs(TableTaskArgs):
     subtask_info: str
-    subtask_handler: Callable = const(TaskShow.records)
+    subtask_handler: const(Callable, TaskShow.records)
     subtask_op_cls: Callable
-    max: conint(ge=1, lt=1000000) = 100
-    days: conint(ge=0, lt=10000) = 0
-    hours: conint(ge=0, lt=10000) = 1
+    max: Annotated[int, Field(ge=1, lt=1000000)] = 100
+    days: Annotated[int, Field(ge=0, lt=10000)] = 0
+    hours: Annotated[int, Field(ge=0, lt=10000)] = 1
     detail: bool = False
     simple: bool = False
 
-    @root_validator(skip_on_failure=True)
-    def mutex_validations(cls, values: Dict[str, Any]) -> Dict[str, Any]:
-        if values.get('detail', False) and values.get('simple', False):
+    @model_validator(mode='after')
+    def mutex_validations(self) -> 'ShowRecordsArgs':
+        if getattr(self, 'detail', False) and getattr(self, 'simple', False):
             raise ValueError('Argument "detail" not allowed with "simple"')
 
-        return values
+        return self
 
 
 class ShowAlarmsArgs(ShowRecordsArgs):
-    subtask_info: str = const('alarms')
-    subtask_op_cls: Callable = const(Alarm)
+    subtask_info: const(str, 'alarms')
+    subtask_op_cls: const(Callable, Alarm)
 
 
 class ShowEventsArgs(ShowRecordsArgs):
-    subtask_info: str = const('events')
-    subtask_op_cls: Callable = const(Event)
+    subtask_info: const(str, 'events')
+    subtask_op_cls: const(Callable, Event)

@@ -1,7 +1,8 @@
 import argparse
 from functools import partial
 from typing import Union, Optional, Callable, Tuple, Set, Mapping, Iterable
-from pydantic import validator, conint
+from pydantic import Field, field_validator
+from typing_extensions import Annotated
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest, RestAPIException
 from cisco_sdwan.base.catalog import is_index_supported
@@ -326,42 +327,42 @@ class AttachDetachArgs(TaskArgs):
     system_ip: Optional[str] = None
     reachable: bool = False
     dryrun: bool = False
-    batch: conint(ge=1, lt=9999) = DEFAULT_BATCH_SIZE
+    batch: Annotated[int, Field(ge=1, lt=9999)] = DEFAULT_BATCH_SIZE
 
     # Validators
-    _validate_regex = validator('templates', 'config_groups', 'devices', allow_reuse=True)(validate_regex)
-    _validate_site_id = validator('site', allow_reuse=True)(validate_site_id)
-    _validate_ipv4 = validator('system_ip', allow_reuse=True)(validate_ipv4)
+    _validate_regex = field_validator('templates', 'config_groups', 'devices')(validate_regex)
+    _validate_site_id = field_validator('site')(validate_site_id)
+    _validate_ipv4 = field_validator('system_ip')(validate_ipv4)
 
 
 class AttachVsmartArgs(AttachDetachArgs):
     workdir: str
     activate: bool = False
-    template_filter: Callable = const(DeviceTemplateIndex.is_vsmart)
-    device_sets: Callable = const(TaskAttach.vsmart_sets)
-    set_title: str = const('vSmart')
+    template_filter: const(Callable, DeviceTemplateIndex.is_vsmart)
+    device_sets: const(Callable, TaskAttach.vsmart_sets)
+    set_title: const(str, 'vSmart')
 
     # Validators
-    _validate_workdir = validator('workdir', allow_reuse=True)(validate_workdir)
+    _validate_workdir = field_validator('workdir')(validate_workdir)
 
 
 class AttachEdgeArgs(AttachDetachArgs):
     workdir: str
-    template_filter: Callable = const(DeviceTemplateIndex.is_not_vsmart)
-    device_sets: Callable = const(TaskAttach.edge_sets)
-    set_title: str = const('WAN Edge')
+    template_filter: const(Callable, DeviceTemplateIndex.is_not_vsmart)
+    device_sets: const(Callable, TaskAttach.edge_sets)
+    set_title: const(str, 'WAN Edge')
 
     # Validators
-    _validate_workdir = validator('workdir', allow_reuse=True)(validate_workdir)
+    _validate_workdir = field_validator('workdir')(validate_workdir)
 
 
 class DetachVsmartArgs(AttachDetachArgs):
-    template_filter: Callable = const(DeviceTemplateIndex.is_vsmart)
-    device_sets: Callable = const(TaskDetach.vsmart_sets)
-    set_title: str = const('vSmart')
+    template_filter: const(Callable, DeviceTemplateIndex.is_vsmart)
+    device_sets: const(Callable, TaskDetach.vsmart_sets)
+    set_title: const(str, 'vSmart')
 
 
 class DetachEdgeArgs(AttachDetachArgs):
-    template_filter: Callable = const(DeviceTemplateIndex.is_not_vsmart)
-    device_sets: Callable = const(TaskDetach.edge_sets)
-    set_title: str = const('WAN Edge')
+    template_filter: const(Callable, DeviceTemplateIndex.is_not_vsmart)
+    device_sets: const(Callable, TaskDetach.edge_sets)
+    set_title: const(str, 'WAN Edge')
