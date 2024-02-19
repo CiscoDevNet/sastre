@@ -437,7 +437,7 @@ class TaskTransform(Task):
 
                         if crypt_values_set:
                             self.log_info(f'Found {len(crypt_values_set)} crypt value{"s"[:len(crypt_values_set) ^ 1]} '
-                                          f'from {info} {item_name}')
+                                          f'in {info} {item_name}')
                             replacements = [
                                 ValueMap(from_value=value, to_value='< CHANGE ME >') for value in crypt_values_set
                             ]

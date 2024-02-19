@@ -19,7 +19,8 @@ class TaskEncrypt(Task):
         task_parser.formatter_class = argparse.RawDescriptionHelpFormatter
 
         task_parser.add_argument('values', metavar='<value>', nargs='*',
-                                 help='zero or more clear text values to be encrypted by the target vManage')
+                                 help='one or more clear text values to be encrypted by vManage. If no value is '
+                                      'provided, enter interactive mode.')
         return task_parser.parse_args(task_args)
 
     def runner(self, parsed_args, api: Optional[Rest] = None) -> Union[None, list]:
@@ -27,7 +28,7 @@ class TaskEncrypt(Task):
 
         # Interactive mode
         if not parsed_args.values:
-            print('Interactive mode, press <ENTER> or ^C to quit.')
+            print('Interactive mode, press <ENTER> on empty value or ^C to quit.')
             while True:
                 try:
                     input_value = getpass('Value to encrypt: ')
