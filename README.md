@@ -38,7 +38,8 @@ Task indicates the operation to be performed. The following tasks are currently 
 - Restore: Restore configuration items from a local backup to vManage.
 - Delete: Delete configuration items on vManage.
 - Migrate: Migrate configuration items from a vManage release to another. Currently, only 18.4, 19.2 or 19.3 to 20.1 is supported. Minor revision numbers (e.g. 20.1.1) are not relevant for the template migration.
-- Transform: Modify configuration items. Currently, copy and rename operations are supported. 
+- Encrypt: Encrypt values using target vManage keys. Used to generate CRYPT_CLUSTER encrypted values, which can only be decrypted by the target vManage.
+- Transform: Modify configuration items. Currently, copy, rename and crypt-update operations are supported. 
 - Attach: Attach WAN Edges/vSmarts to templates. Allows further customization on top of the functionality available via "restore --attach".
 - Detach: Detach WAN Edges/vSmarts from templates. Allows further customization on top of the functionality available via "delete --detach".
 - Certificate: Restore device certificate validity status from a backup or set to a desired value (i.e. valid, invalid or staging).
@@ -58,12 +59,12 @@ Notes:
 
 ```
 % sdwan --help
-usage: sdwan [-h] [-a <vmanage-ip>] [-u <user>] [-p <password>] [--tenant <tenant>] [--pid <pid>] [--port <port>] [--timeout <timeout>] [--verbose] [--version] <task> ...
+usage: sdwan [-h] [-a <vmanage-ip>] [-u <user>] [-p <password>] [--tenant <tenant>] [--pid <pid>] [--port <port>] [--timeout <timeout>] [--verbose] [--debug] [--version] <task> ...
 
 Sastre - Cisco-SDWAN Automation Toolset
 
 positional arguments:
-  <task>                task to be performed (backup, restore, delete, migrate, attach, detach, certificate, transform, list, show-template, show, report)
+  <task>                task to be performed (backup, restore, delete, migrate, attach, detach, certificate, transform, list, show-template, show, report, encrypt)
   <arguments>           task parameters, if any
 
 options:
@@ -79,6 +80,7 @@ options:
   --port <port>         vManage port number, can also be defined via VMANAGE_PORT environment variable (default: 443)
   --timeout <timeout>   REST API timeout (default: 300)
   --verbose             increase output verbosity
+  --debug               include additional API call details to the log files
   --version             show program's version number and exit
 ```
 
@@ -890,23 +892,24 @@ INFO: Task completed successfully
 
 ### Renaming configuration items
 
-The transform task allows copying or renaming configuration items, including templates with attachments, activated policies and their dependencies.
+The transform task allows copying or renaming configuration items, including templates with attachments, activated policies and their dependencies. Transform task also supports updating vManage-encrypted values, allowing configuration items with values containing a CRYPT_CLUSTER prefix to be transferred to a different vManage.
 ```
 % sdwan --verbose transform -h       
-usage: sdwan transform [-h] {rename,copy,recipe} ...
+usage: sdwan transform [-h] {rename,copy,recipe,build-recipe} ...
 
-Sastre - Automation Tools for Cisco SD-WAN Powered by Viptela
+Sastre - Cisco-SDWAN Automation Toolset
 
 Transform task:
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
 
 transform options:
-  {rename,copy,recipe}
+  {rename,copy,recipe,build-recipe}
     rename              rename configuration items
     copy                copy configuration items
     recipe              transform using custom recipe
+    build-recipe        generate recipe file for updating vManage-encrypted fields
 ```
 
 Transform can read from a live vManage or from a backup directory (when --workdir is specified). It always save the processed items to the provided output directory. Then restore/attach tasks can be used to push those changes to vManage.
@@ -1009,6 +1012,216 @@ INFO: Restore task: Local workdir: "test-transform" -> vManage URL: "https://198
 INFO: Task completed successfully
 ```
 
+### Updating vManage-Encrypted values in configuration items
+
+Transform task also supports updating vManage-encrypted values, allowing configuration items with values containing a CRYPT_CLUSTER prefix to be transferred to a different vManage.
+
+The first step is to find out the vManage-encrypted values present on vManage or a backup. This is accomplished with the transform build-recipe task.
+
+Generate a recipe skeleton for the transform task:
+```
+% sdwan --verbose transform build-recipe --workdir dcloud-clean dcloud-clean-pwd.yml
+INFO: Transform build-recipe task: Local workdir: "dcloud-clean" -> Recipe file: "dcloud-clean-pwd.yml"
+INFO: Inspecting policy_customapp items
+INFO: Inspecting policy_list items
+INFO: Inspecting policy_definition items
+INFO: Inspecting parent_policy_definition items
+INFO: Inspecting policy_voice items
+INFO: Inspecting policy_security items
+INFO: Inspecting policy_vedge items
+INFO: Inspecting policy_vsmart items
+INFO: Inspecting template_feature items
+INFO: Found 2 crypt values in feature template AAA_CISCO_Template_v1
+INFO: Found 1 crypt value in feature template All-SNMP-Basic_cEdge
+INFO: Found 2 crypt values in feature template SNMP-dCloud-Feature
+INFO: Inspecting template_device items
+INFO: Inspecting feature_profile items
+INFO: Inspecting config_group items
+INFO: Recipe file saved as "dcloud-clean-pwd.yml"
+INFO: Task completed successfully
+```
+
+The generated recipe file contains all the current vManage-encrypted values found:
+```                                                        
+% cat dcloud-clean-pwd.yml 
+tag: template_feature
+crypt_updates:
+- resource_name: AAA_CISCO_Template_v1
+  replacements:
+  - from_value: $CRYPT_CLUSTER$U3EZmWrJkb9ppJUL74sfiQ==$w874yYHyGxWkeA6Gr296ZQ==
+    to_value: < CHANGE ME >
+  - from_value: $CRYPT_CLUSTER$9TtNiBCZtu4F+1GF/mFZNg==$ORI8eQXNMKTVYqk86XRcTg==
+    to_value: < CHANGE ME >
+- resource_name: All-SNMP-Basic_cEdge
+  replacements:
+  - from_value: $CRYPT_CLUSTER$lpkx7wdnLPHHJ8M+0hEngQ==$sKYrCKjl7JCdHGPaFWX5UQ==
+    to_value: < CHANGE ME >
+- resource_name: SNMP-dCloud-Feature
+  replacements:
+  - from_value: $CRYPT_CLUSTER$ik9ahDk0PSw+rp7LSU8ssg==$dxdNLoJy0Pk2Bnw4ee+tJw==
+    to_value: < CHANGE ME >
+  - from_value: $CRYPT_CLUSTER$lpkx7wdnLPHHJ8M+0hEngQ==$sKYrCKjl7JCdHGPaFWX5UQ==
+    to_value: < CHANGE ME >
+```
+
+Entries with a '< CHANGE ME >' placeholder need to be replaced with new values encrypted by the target vManage where you need to restore this backup to. This is done using the encrypt task.
+
+From the recipe file above, note that there are 5 encrypted values that need to be updated (i.e. < CHANGE ME > entries).
+
+Generate new vManage-encrypted values:
+```
+% sdwan --verbose encrypt secret1 secret2 secret3 secret4 secret5 
+INFO: Encrypt task: vManage URL: "https://198.18.1.10"
++================================================================================+
+| Input Value | Encrypted Value                                                  |
++================================================================================+
+| secret1     | $CRYPT_CLUSTER$8WjsVKdbe4PXcpiCbOBuDw==$ndJr/aGd/cC1fWhYoLm0Uw== |
+| secret2     | $CRYPT_CLUSTER$JTyv90yMT4LcDTT1fNYxCQ==$L5Zl6AjEVzKiOTtwv1/9kw== |
+| secret3     | $CRYPT_CLUSTER$K/TWR/MPNMQNVUqgTq5r1w==$NDN5+mN45Vez2g/49AivEA== |
+| secret4     | $CRYPT_CLUSTER$LGxPhLzRfk8/CeyEF+4YRQ==$PFI5mWtQSIjoUyacwJ6bGQ== |
+| secret5     | $CRYPT_CLUSTER$aFO6pUo+gzczZO95mWy/Tg==$i8w9HFBlHMR97lLoiASLtw== |
++-------------+------------------------------------------------------------------+
+INFO: Task completed successfully
+```
+
+Update the recipe file with the new vManage-encrypted values:
+```
+% cat dcloud-clean-pwd.yml                                       
+tag: template_feature
+crypt_updates:
+- resource_name: AAA_CISCO_Template_v1
+  replacements:
+  - from_value: $CRYPT_CLUSTER$U3EZmWrJkb9ppJUL74sfiQ==$w874yYHyGxWkeA6Gr296ZQ==
+    to_value: $CRYPT_CLUSTER$8WjsVKdbe4PXcpiCbOBuDw==$ndJr/aGd/cC1fWhYoLm0Uw==
+  - from_value: $CRYPT_CLUSTER$9TtNiBCZtu4F+1GF/mFZNg==$ORI8eQXNMKTVYqk86XRcTg==
+    to_value: $CRYPT_CLUSTER$JTyv90yMT4LcDTT1fNYxCQ==$L5Zl6AjEVzKiOTtwv1/9kw==
+- resource_name: All-SNMP-Basic_cEdge
+  replacements:
+  - from_value: $CRYPT_CLUSTER$lpkx7wdnLPHHJ8M+0hEngQ==$sKYrCKjl7JCdHGPaFWX5UQ==
+    to_value: $CRYPT_CLUSTER$K/TWR/MPNMQNVUqgTq5r1w==$NDN5+mN45Vez2g/49AivEA==
+- resource_name: SNMP-dCloud-Feature
+  replacements:
+  - from_value: $CRYPT_CLUSTER$ik9ahDk0PSw+rp7LSU8ssg==$dxdNLoJy0Pk2Bnw4ee+tJw==
+    to_value: $CRYPT_CLUSTER$LGxPhLzRfk8/CeyEF+4YRQ==$PFI5mWtQSIjoUyacwJ6bGQ==
+  - from_value: $CRYPT_CLUSTER$lpkx7wdnLPHHJ8M+0hEngQ==$sKYrCKjl7JCdHGPaFWX5UQ==
+    to_value: $CRYPT_CLUSTER$aFO6pUo+gzczZO95mWy/Tg==$i8w9HFBlHMR97lLoiASLtw==
+```
+
+Note that the 'dcloud-clean-pwd.yml' recipe file can also include name_template and/or name_map statements. This allows configuration items to be renamed or copied from, in addition to the crypt_updates.
+
+Processing of crypt_updates happen after name_map and name_template. This means that resource_name entries under crypt_update match on the new names, post name_map and name_template processing. 
+
+As an example, this is a new version of 'dcloud-clean-pwd.yml' that also rename templates in the process:
+```
+tag: template_feature
+
+name_template:
+  regex: '^All-'
+  name_regex: '{name ^All-(.+)}'
+
+name_map:
+  AAA_CISCO_Template_v1: AAA_CISCO_Template_v2
+
+crypt_updates:
+- resource_name: AAA_CISCO_Template_v2
+  replacements:
+  - from_value: $CRYPT_CLUSTER$U3EZmWrJkb9ppJUL74sfiQ==$w874yYHyGxWkeA6Gr296ZQ==
+    to_value: $CRYPT_CLUSTER$8WjsVKdbe4PXcpiCbOBuDw==$ndJr/aGd/cC1fWhYoLm0Uw==
+  - from_value: $CRYPT_CLUSTER$9TtNiBCZtu4F+1GF/mFZNg==$ORI8eQXNMKTVYqk86XRcTg==
+    to_value: $CRYPT_CLUSTER$JTyv90yMT4LcDTT1fNYxCQ==$L5Zl6AjEVzKiOTtwv1/9kw==
+- resource_name: SNMP-Basic_cEdge
+  replacements:
+  - from_value: $CRYPT_CLUSTER$lpkx7wdnLPHHJ8M+0hEngQ==$sKYrCKjl7JCdHGPaFWX5UQ==
+    to_value: $CRYPT_CLUSTER$K/TWR/MPNMQNVUqgTq5r1w==$NDN5+mN45Vez2g/49AivEA==
+- resource_name: SNMP-dCloud-Feature
+  replacements:
+  - from_value: $CRYPT_CLUSTER$ik9ahDk0PSw+rp7LSU8ssg==$dxdNLoJy0Pk2Bnw4ee+tJw==
+    to_value: $CRYPT_CLUSTER$LGxPhLzRfk8/CeyEF+4YRQ==$PFI5mWtQSIjoUyacwJ6bGQ==
+  - from_value: $CRYPT_CLUSTER$lpkx7wdnLPHHJ8M+0hEngQ==$sKYrCKjl7JCdHGPaFWX5UQ==
+    to_value: $CRYPT_CLUSTER$aFO6pUo+gzczZO95mWy/Tg==$i8w9HFBlHMR97lLoiASLtw==
+```
+
+Note that crypt_update resource_name AAA_CISCO_Template_v2 is matching the new name post name_map update. And SNMP-Basic_cEdge is matching the new name post name_template processing.
+
+With the new recipe file prepared, the next step is to execute the transform recipe command.
+
+Transform backup using the recipe file:
+```
+% sdwan --verbose transform recipe --from-file dcloud-clean-pwd.yml --workdir dcloud-clean dcloud-clean-transformed
+INFO: Transform task: Local workdir: "dcloud-clean" -> Local output dir: "dcloud-clean-transformed"
+<snip>
+INFO: Inspecting template_feature items
+INFO: Matched feature template All-SNMP-Basic
+INFO: Replacing feature template: All-SNMP-Basic -> SNMP-Basic
+INFO: Matched feature template All-BFDTemplate
+INFO: Replacing feature template: All-BFDTemplate -> BFDTemplate
+INFO: Matched feature template All-Banner-dCloud
+INFO: Replacing feature template: All-Banner-dCloud -> Banner-dCloud
+INFO: Matched feature template All-System-Template_cEdge
+INFO: Replacing feature template: All-System-Template_cEdge -> System-Template_cEdge
+INFO: Matched feature template All-Banner-dCloud_cEdge
+INFO: Replacing feature template: All-Banner-dCloud_cEdge -> Banner-dCloud_cEdge
+INFO: Matched feature template AAA_CISCO_Template_v1
+INFO: Replacing feature template: AAA_CISCO_Template_v1 -> AAA_CISCO_Template_v2
+INFO: Matched feature template All-System-Template
+INFO: Replacing feature template: All-System-Template -> System-Template
+INFO: Matched feature template All-OMP-Basic
+INFO: Replacing feature template: All-OMP-Basic -> OMP-Basic
+INFO: Matched feature template All-OMP-Basic_cEdge
+INFO: Replacing feature template: All-OMP-Basic_cEdge -> OMP-Basic_cEdge
+INFO: Matched feature template All-VPN0-TEMPLATE
+INFO: Replacing feature template: All-VPN0-TEMPLATE -> VPN0-TEMPLATE
+INFO: Matched feature template All-VPN0-TEMPLATE_cEdge
+INFO: Replacing feature template: All-VPN0-TEMPLATE_cEdge -> VPN0-TEMPLATE_cEdge
+INFO: Matched feature template All-SNMP-Basic_cEdge
+INFO: Replacing feature template: All-SNMP-Basic_cEdge -> SNMP-Basic_cEdge
+INFO: Matched feature template SNMP-dCloud-Feature
+INFO: Replacing feature template: SNMP-dCloud-Feature -> SNMP-dCloud-Feature
+INFO: Matched feature template All-BFDTemplate_cEdge
+INFO: Replacing feature template: All-BFDTemplate_cEdge -> BFDTemplate_cEdge
+INFO: Inspecting template_device items
+INFO: Inspecting feature_profile items
+INFO: Inspecting config_group items
+INFO: Task completed successfully
+```
+
+The final step is to restore 'dcloud-clean-transformed' to vManage:
+```
+% sdwan --verbose restore all --workdir dcloud-clean-transformed --update
+INFO: Restore task: Local workdir: "dcloud-clean-transformed" -> vManage URL: "https://198.18.1.10"
+<snip>
+INFO: Pushing items to vManage
+INFO: Done: Create feature template SNMP-Basic
+INFO: Done: Create feature template BFDTemplate
+INFO: Done: Create feature template Banner-dCloud
+INFO: Done: Create feature template System-Template_cEdge
+INFO: Done: Create feature template Banner-dCloud_cEdge
+INFO: Done: Create feature template AAA_CISCO_Template_v2
+INFO: Done: Create feature template System-Template
+INFO: Done: Create feature template OMP-Basic
+INFO: Done: Create feature template OMP-Basic_cEdge
+INFO: Done: Create feature template VPN0-TEMPLATE
+INFO: Done: Create feature template VPN0-TEMPLATE_cEdge
+INFO: Done: Create feature template SNMP-Basic_cEdge
+INFO: Updating feature template SNMP-dCloud-Feature requires reattach of affected templates
+INFO: Template attach: DC-vEdges (DC1-VEDGE1, DC1-VEDGE2)
+INFO: Reattaching templates
+INFO: Waiting...
+INFO: Completed DC-vEdges
+INFO: Completed reattaching templates
+INFO: Done: Update feature template SNMP-dCloud-Feature
+INFO: Done: Create feature template BFDTemplate_cEdge
+INFO: Done: Update device template BranchType2Template-vEdge
+INFO: Updating device template BranchType1Template-cEdge requires reattach
+INFO: Template attach: BranchType1Template-cEdge (BR1-CEDGE2, BR1-CEDGE1)
+INFO: Reattaching templates
+INFO: Waiting...
+INFO: Waiting...
+INFO: Completed BranchType1Template-cEdge
+INFO: Completed reattaching templates
+INFO: Done: Update device template BranchType1Template-cEdge
+INFO: Task completed successfully
+```
 
 ## Notes
 
