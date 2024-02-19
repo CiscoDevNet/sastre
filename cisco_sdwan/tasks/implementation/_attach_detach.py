@@ -1,7 +1,7 @@
 import argparse
 from functools import partial
 from typing import Union, Optional, Callable, Tuple, Set, Mapping, Iterable
-from pydantic.v1 import validator, conint
+from pydantic import validator, conint
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest, RestAPIException
 from cisco_sdwan.base.catalog import is_index_supported
