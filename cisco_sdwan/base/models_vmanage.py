@@ -677,7 +677,8 @@ class ConfigGroupValues(Config2Item):
     def put_raise(self, api: Rest, **path_vars: str) -> Sequence[str]:
         result = api.put(self.put_data(), ConfigGroupValues.api_path.resolve(**path_vars).put)
 
-        return result if all(isinstance(entry, str) for entry in result) else [entry.get('device-id') for entry in result]
+        # Prior to 20.12, this api call returned a list of dicts. Since 20.12, it now returns a list of strings.
+        return result if any(isinstance(dvc, str) for dvc in result) else [dvc.get('device-id') for dvc in result]
 
 
 class AssociatedDeviceModel(ConfigRequestModel):
