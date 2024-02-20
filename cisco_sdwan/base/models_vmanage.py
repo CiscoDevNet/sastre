@@ -805,7 +805,9 @@ class ProfileSdwanSystem(FeatureProfile):
         "ntp": ApiPath("v1/feature-profile/sdwan/system/{systemId}/ntp"),
         "omp": ApiPath("v1/feature-profile/sdwan/system/{systemId}/omp"),
         "snmp": ApiPath("v1/feature-profile/sdwan/system/{systemId}/snmp"),
-        "perfmonitor": ApiPath("v1/feature-profile/sdwan/system/{systemId}/perfmonitor")
+        "perfmonitor": ApiPath("v1/feature-profile/sdwan/system/{systemId}/perfmonitor"),
+        "mrf": ApiPath("/v1/feature-profile/sdwan/system/{systemId}/mrf"),
+        "security": ApiPath("/v1/feature-profile/sdwan/system/{systemId}/security")
     })
 
 
@@ -829,7 +831,11 @@ class ProfileSdwanService(FeatureProfile):
         "lan/vpn/interface/ipsec": ApiPath(
             "v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/interface/ipsec"),
         "switchport": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/switchport"),
-        "wirelesslan": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/wirelesslan")
+        "wirelesslan": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/wirelesslan"),
+        "appqoe": ApiPath("/v1/feature-profile/sdwan/service/{serviceId}/appqoe"),
+        "routing/multicast": ApiPath("/v1/feature-profile/sdwan/service/{serviceId}/routing/multicast"),
+        "tracker": ApiPath("/v1/feature-profile/sdwan/service/{serviceId}/tracker"),
+        "trackergroup": ApiPath("/v1/feature-profile/sdwan/service/{serviceId}/trackergroup")
     }, parcel_reference_path_map={
         PathKey("dhcp-server", "lan/vpn/interface/ethernet"): ApiPath(
             "v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/interface/ethernet/{ethId}/dhcp-server"),
@@ -841,6 +847,12 @@ class ProfileSdwanService(FeatureProfile):
             "v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/routing/bgp"),
         PathKey("routing/ospf", "lan/vpn"): ApiPath(
             "v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/routing/ospf"),
+        PathKey("routing/multicast", "lan/vpn"): ApiPath(
+            "/v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/routing/multicast"), 
+        PathKey("tracker", "lan/vpn/interface/ethernet"): ApiPath(
+            "/v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/interface/ethernet/{ethId}/tracker"),  
+        PathKey("trackergroup", "lan/vpn/interface/ethernet"): ApiPath(
+            "/v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/interface/ethernet/{ethId}/trackergroup")
     })
 
 
@@ -868,6 +880,11 @@ class ProfileSdwanTransport(FeatureProfile):
         "management/vpn/interface/ethernet": ApiPath(
             "v1/feature-profile/sdwan/transport/{transportId}/management/vpn/{vpnId}/interface/ethernet"),
         "cellular-controller": ApiPath("v1/feature-profile/sdwan/transport/{transportId}/cellular-controller"),
+        "routing/ospf": ApiPath("v1/feature-profile/sdwan/transport/{transportId}/routing/ospf"),
+        "gps": ApiPath("v1/feature-profile/sdwan/transport/{transportId}/gps"),
+        "trackergroup": ApiPath("v1/feature-profile/sdwan/transport/{transportId}/trackergroup"),
+        "ipv6-trackergroup": ApiPath("v1/feature-profile/sdwan/transport/{transportId}/ipv6-trackergroup"),
+        "ipv6-tracker": ApiPath("v1/feature-profile/sdwan/transport/{transportId}/ipv6-tracker")
     }, parcel_reference_path_map={
         PathKey("routing/bgp", "wan/vpn"): ApiPath(
             "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/routing/bgp"),
@@ -880,6 +897,20 @@ class ProfileSdwanTransport(FeatureProfile):
         PathKey("cellular-profile", "cellular-controller"): ApiPath(
             "v1/feature-profile/sdwan/transport/{transportId}/cellular-controller/"
             "{cellularControllerId}/cellular-profile"),
+        PathKey("routing/ospf", "wan/vpn"): ApiPath(
+            "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/routing/ospf"),
+        PathKey("gps", "cellular-controller"): ApiPath(
+            "v1/feature-profile/sdwan/transport/{transportId}/cellular-controller/{cellularControllerId}/gps"),
+        PathKey("trackergroup", "wan/vpn/interface/ethernet"): ApiPath(
+            "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/interface/ethernet/{ethernetId}/trackergroup"),
+        PathKey("ipv6-trackergroup", "wan/vpn/interface/ethernet"): ApiPath(
+            "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/interface/ethernet/{ethernetId}/ipv6-trackergroup"),
+        PathKey("ipv6-trackergroup", "wan/vpn/interface/cellular"): ApiPath(
+            "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/interface/cellular/{cellularId}/ipv6-trackergroup"),
+        PathKey("ipv6-tracker", "wan/vpn/interface/cellular"): ApiPath(
+            "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/interface/cellular/{cellularId}/ipv6-tracker"),
+        PathKey("ipv6-tracker", "wan/vpn/interface/ethernet"): ApiPath(
+            "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/interface/ethernet/{ethernetId}/ipv6-tracker")
     })
 
 
@@ -907,7 +938,8 @@ class ProfileSdwanOther(FeatureProfile):
     api_path = ApiPath('v1/feature-profile/sdwan/other')
     store_path = ('feature_profiles', 'sdwan', 'other')
     parcel_api_paths = ApiPathGroup({
-        "thousandeyes": ApiPath("v1/feature-profile/sdwan/other/{otherId}/thousandeyes")
+        "thousandeyes": ApiPath("v1/feature-profile/sdwan/other/{otherId}/thousandeyes"),
+        "ucse": ApiPath("/v1/feature-profile/sdwan/other/{otherId}/ucse")
     })
 
 
