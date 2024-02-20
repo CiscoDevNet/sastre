@@ -8,6 +8,8 @@ Sastre 1.23 [February x, 2024]
   - Added support for new crypt_updates keyword in transform recipe files.
 - Migration to Pydantic 2.x
 
+#### Fixes:
+- [#16] Fixed config group attachment error with vManage 20.12
 
 Sastre 1.22 [November 27, 2023]
 ================================
