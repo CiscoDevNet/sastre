@@ -1,0 +1,78 @@
+#!/bin/bash
+echo "=============Sastre-Pro post installation process started============="
+
+DOCKER_PATH="/usr/local/bin/docker"
+
+#remove sastre-pro containers and images
+list_existing_sastre_images=$($DOCKER_PATH images --filter=reference="sastre-pro:latest" -q)
+# Sleep interval in seconds
+SLEEP_INTERVAL=5
+
+function are_containers_stopped() {
+    local containers
+    containers=$($DOCKER_PATH ps -q --filter "ancestor=sastre-pro:latest")
+    [[ -z "$containers" ]]
+}
+
+# Function to check if the list of containers is empty
+function are_containers_removed() {
+    local containers
+    containers=$($DOCKER_PATH ps -aq --filter "ancestor=sastre-pro:latest")
+    [[ -z "$containers" ]]
+}
+
+if [ -z "$list_existing_sastre_images" ]; then
+    echo "[4/4] [DONE] No sastre-pro:latest image(s) found."
+else
+    echo "sastre-pro:latest image(s) found, going to delete sastre-pro containers if any"
+    $DOCKER_PATH stop $($DOCKER_PATH ps -q --filter "ancestor=sastre-pro:latest")
+    while ! are_containers_stopped; do
+      echo "Waiting for containers to stop..."
+      sleep "$SLEEP_INTERVAL"
+    done
+    $DOCKER_PATH rm $($DOCKER_PATH ps -aq --filter "ancestor=sastre-pro:latest")
+    
+    while ! are_containers_removed; do
+      echo "Waiting for containers to be removed..."
+      sleep "$SLEEP_INTERVAL"
+    done
+
+    for image_id in $list_existing_sastre_images; do
+        echo "Deleting sastre-pro image: $image_id"
+        $DOCKER_PATH rmi -f "$image_id"
+    done
+    echo "[4/4] [DONE] Successfully deleted latest sastre-pro docker image"
+fi
+
+if [ -e "/tmp/sastre-pro/sastre-pro.tar.gz" ]; then
+    gunzip /tmp/sastre-pro/sastre-pro.tar.gz
+else
+    echo "File /tmp/sastre-pro/sastre-pro.tar.gz does not exist."
+fi
+
+$DOCKER_PATH load -i /tmp/sastre-pro/sastre-pro.tar
+
+if [ $? -eq 0 ]; then
+    echo "Latest sastre-pro docker image loaded successfully"
+else
+    echo "Failed to load latest sastre-pro docker image with exit code $?"
+fi
+
+rm /tmp/sastre-pro/sastre-pro.tar
+if [ ! -d ~/sastre-pro ]; then
+    mkdir ~/sastre-pro    
+fi
+
+# Check if the sastre-volume already exists
+if [ ! -d ~/sastre-pro/sastre-volume ]; then
+    mkdir ~/sastre-pro/sastre-volume 
+    chmod go+w ~/sastre-pro/sastre-volume
+    echo "sastre-volume created successfully"
+else
+    echo "sastre-volume folder already exists"
+fi
+
+cp -r /tmp/sastre-pro/* ~/sastre-pro/
+rm -r /tmp/sastre-pro
+
+echo "=============Sastre-Pro post installation process finished============="
