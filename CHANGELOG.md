@@ -1,14 +1,35 @@
-Sastre 1.22 [November 17, 2023]
+Sastre 1.23 [February x, 2024]
+================================
+
+### Improvements
+- Handling of templates with encrypted fields (e.g. SNMP feature template community value)
+  - New encrypt task.
+  - New transform build-recipe task.
+  - Added support for new crypt_updates keyword in transform recipe files.
+- Migration to Pydantic 2.x
+- 20.11 vManage support, included support for the following API endpoints:
+  - New SDWAN system profile parcels: mrf, security
+  - New SDWAN service profile parcels: routing multicast, tracker, trackergroup, appqoe
+  - New SDWAN transport profile parcels: routing ospf, trackergroup, ipv6-tracker, ipv6-trackergroup, interface gre, gps
+  - New SDWAN other profile parcels: ucse
+
+#### Fixes:
+- [#16] Fixed config group attachment error with vManage 20.12
+
+
+Sastre 1.22 [November 27, 2023]
 ================================
 
 ### Improvements
 - Sastre and Sastre-Pro now contain the same tasks. There is no functional differences between the two.
+
 
 Sastre 1.21.3 [July 27, 2023]
 ================================
 
 ### Fixes:
 - Fixed pydantic.errors.PydanticUserError traceback errors found with new installations. This was due to incompatible changes on new pydantic 2.x release.
+
 
 Sastre 1.21.2 [May 23, 2023]
 ================================

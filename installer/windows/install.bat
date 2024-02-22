@@ -1,0 +1,67 @@
+@echo off
+setlocal enabledelayedexpansion
+
+echo ===============Sastre-Pro installation process started=============
+set "SASTRE_VERSION=latest"
+set "PRODUCT=sastre-pro"
+set "SLEEP_INTERVAL=5"
+set "SASTRE_VOLUME=sastre-volume"
+set "CURRENT_DIR=%CD%"
+set "SASTRE_VOLUME_PATH=%CURRENT_DIR%\%SASTRE_VOLUME%"
+
+
+set "containers_stopped_count=0"
+for /f %%A in ('docker ps -q --filter "ancestor=%PRODUCT%:%SASTRE_VERSION%"') do (
+    set /a "containers_stopped_count+=1"
+    docker stop %%A
+)
+timeout /t %SLEEP_INTERVAL% /nobreak
+
+if %containers_stopped_count% neq 0 (
+    echo %containers_stopped_count% containers stopped.
+)
+
+set "containers_removed_count=0"
+:: Function to check if containers are removed
+for /f %%A in ('docker ps -aq --filter "ancestor=%PRODUCT%:%SASTRE_VERSION%"') do (
+    set /a "containers_removed_count+=1"
+    docker rm %%A
+)
+timeout /t %SLEEP_INTERVAL% /nobreak
+
+if %containers_removed_count% neq 0 (   
+    echo %containers_removed_count% containers removed.
+)
+
+set "images_removed_count=0"
+:: Remove sastre containers and images
+for /f %%A in ('docker images %PRODUCT%:%SASTRE_VERSION% ^| findstr "%PRODUCT%"') do (
+    set /a "images_removed_count+=1"
+    echo Deleting sastre image: %%A
+    docker rmi -f %%A
+)
+
+if %images_removed_count% neq 0 (   
+    echo %images_removed_count% images removed.
+    echo Successfully deleted sastre-pro docker image %PRODUCT%:%SASTRE_VERSION%
+)
+
+docker load -i %PRODUCT%.tar
+
+:: Check if the sastre-pro image was loaded successfully
+if %ERRORLEVEL% equ 0 (
+    echo Latest sastre-pro docker image loaded successfully
+) else (
+    echo Failed to load latest sastre-pro docker image with exit code: %ERRORLEVEL%
+)
+
+if not exist "%SASTRE_VOLUME_PATH%" (
+    mkdir "%SASTRE_VOLUME_PATH%"
+    icacls "%SASTRE_VOLUME_PATH%" /grant:r "Everyone:(OI)(CI)W" /t
+    echo Sastre volume path created: %SASTRE_VOLUME_PATH%
+) else (
+    echo Sastre volume path already exists: %SASTRE_VOLUME_PATH%
+)
+
+echo ===============Sastre-Pro installation process finished==============
+exit /b 0

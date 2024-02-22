@@ -73,6 +73,7 @@ class TableFilter:
         Callable used by 'Table.filtered' to evaluate whether a row should be allowed.
         @return: True if row is allowed by the filter. False otherwise.
         """
+
         def match_column(column_value) -> bool:
             if column_value is None:
                 return True
@@ -345,20 +346,21 @@ class Task:
     def index_get(index_cls: Type[T], backend: Union[Rest, str]) -> Union[T, None]:
         return index_cls.get(backend) if isinstance(backend, Rest) else index_cls.load(backend)
 
-    def template_attach_data(self, api: Rest, workdir: str, ext_name: bool, templates_iter: Iterator[tuple],
+    def template_attach_data(self, api: Rest, workdir: str, ext_name: bool, templates_iter: Iterable[tuple],
                              target_uuid_set: Optional[set] = None) -> Tuple[list, bool]:
         """
         Prepare data for template attach considering local backup as the source of truth (i.e. where input values are)
         @param api: Instance of Rest API
         @param workdir: Directory containing saved items
         @param ext_name: Boolean passed to .load methods indicating whether extended item names should be used.
-        @param templates_iter: Iterator of (<template_name>, <saved_template_id>, <target_template_id>)
+        @param templates_iter: Iterable of (<template_name>, <saved_template_id>, <target_template_id>)
         @param target_uuid_set: (optional) Set of existing device uuids on target node.
                                 When provided, attach only devices that were previously attached (on saved) and are on
                                 target node but are not yet attached.
                                 When absent, re-attach all currently attached devices on target.
         @return: Tuple containing attach data (<template input list>, <isEdited>)
         """
+
         def load_template_input(template_name: str, saved_id: str, target_id: str) -> Union[list, None]:
             if target_id is None:
                 self.log_debug(f'Skip {template_name}, saved template not on target node')
@@ -400,13 +402,14 @@ class Task:
         return template_input_list, target_uuid_set is None
 
     @staticmethod
-    def template_reattach_data(api: Rest, templates_iter: Iterator[tuple]) -> Tuple[list, bool]:
+    def template_reattach_data(api: Rest, templates_iter: Iterable[tuple]) -> Tuple[list, bool]:
         """
         Prepare data for template reattach considering vManage as the source of truth (i.e. where input values are)
         @param api: Instance of Rest API
-        @param templates_iter: Iterator of (<template_name>, <target_template_id>)
+        @param templates_iter: Iterable of (<template_name>, <target_template_id>)
         @return: Tuple containing attach data (<template input list>, <isEdited>)
         """
+
         def get_template_input(template_id):
             uuid_list = [uuid for uuid, _ in DeviceTemplateAttached.get_raise(api, template_id)]
             values = DeviceTemplateValues(api.post(DeviceTemplateValues.api_params(template_id, uuid_list),
@@ -434,6 +437,7 @@ class Task:
         @param log_context: Message to log during wait actions
         @return: Number of attachment requests processed
         """
+
         def grouper(attach_cls, request_list):
             while True:
                 section_dict = yield from chopper(chunk_size)
@@ -486,7 +490,7 @@ class Task:
         return len(feature_based_reqs + cli_based_reqs)
 
     def cfg_group_deploy_data(self, api: Rest, workdir: str, ext_name: bool,
-                              cfg_group_iter: Iterator[Tuple[str, str, Union[str, None]]],
+                              cfg_group_iter: Iterable[Tuple[str, str, Union[str, None]]],
                               devices_map: Mapping[str, str]) -> Sequence[Tuple[str, str, Sequence]]:
         """
         Prepare data for config-group deploy assuming local backup as source of truth. Associate devices and
@@ -494,11 +498,12 @@ class Task:
         @param api: Instance of Rest API
         @param workdir: Directory containing saved items
         @param ext_name: Boolean passed to .load methods indicating whether extended item names should be used.
-        @param cfg_group_iter: Iterator of (<config_group_name>, <saved_config_group_id>, <target_config_group_id>)
+        @param cfg_group_iter: Iterable of (<config_group_name>, <saved_config_group_id>, <target_config_group_id>)
         @param devices_map: Mapping of {<uuid>: <name>, ...} with available devices on target node. Name may be None if
                             device has no hostname yet.
         @return: Sequence of (<config_group_id>, <config_group_name>, [<device uuid>, ...]) tuples
         """
+
         def associate_devices(config_grp_name: str, config_grp_saved_id: str, config_grp_target_id: str) -> bool:
             saved_associated = ConfigGroupAssociated.load(workdir, ext_name, config_grp_name, config_grp_saved_id)
             if saved_associated is None:
@@ -600,6 +605,7 @@ class Task:
         @param log_context: Message to log during wait actions
         @return: Number of deploy requests processed
         """
+
         def grouper(request_list):
             while True:
                 section_dict = yield from chopper(chunk_size)
@@ -635,13 +641,13 @@ class Task:
 
         return len(deploy_reqs)
 
-    def template_detach(self, api: Rest, template_iter: Iterator[Tuple[str, str]],
+    def template_detach(self, api: Rest, template_iter: Iterable[Tuple[str, str]],
                         devices_map: Optional[Mapping[str, str]] = None, *,
                         chunk_size: int = 200, log_context: str, raise_on_failure: bool = True) -> int:
         """
         Detach devices from device templates
         @param api: Instance of Rest API
-        @param template_iter: Iterator of (<template id>, <template name>) tuples containing templates to detach
+        @param template_iter: Iterable of (<template id>, <template name>) tuples containing templates to detach
         @param devices_map: Mapping of {<uuid>: <name>, ...} containing allowed devices to detach. If None, all attached
                             devices are detached.
         @param chunk_size: Maximum number of devices per detachment request
@@ -649,6 +655,7 @@ class Task:
         @param log_context: Message to log during wait actions
         @return: Number of detach requests processed
         """
+
         def grouper(request_list):
             while True:
                 section_dict = yield from chopper(chunk_size)
@@ -692,13 +699,13 @@ class Task:
 
         return len(detach_reqs)
 
-    def cfg_group_dissociate(self, api: Rest, cfg_group_iter: Iterator[Tuple[str, str]],
+    def cfg_group_dissociate(self, api: Rest, cfg_group_iter: Iterable[Tuple[str, str]],
                              devices_map: Optional[Mapping[str, str]] = None, *,
                              chunk_size: int = 200, log_context: str, raise_on_failure: bool = True) -> int:
         """
         Dissociate devices from config-groups
         @param api: Instance of Rest API
-        @param cfg_group_iter: Iterator of (<group id>, <group name>) tuples containing config-groups to dissociate
+        @param cfg_group_iter: Iterable of (<group id>, <group name>) tuples containing config-groups to dissociate
         @param devices_map: Mapping of {<uuid>: <name>, ...} containing allowed devices to dissociate. If None,
                             dissociate all associated devices.
         @param chunk_size: Maximum number of devices per association delete request
@@ -706,6 +713,7 @@ class Task:
         @param log_context: Message to log during wait actions
         @return: Number of associate delete requests processed
         """
+
         def grouper(request_list):
             while True:
                 section_dict = yield from chopper(chunk_size)
@@ -747,11 +755,11 @@ class Task:
 
         return len(dissociate_reqs)
 
-    def cfg_group_rules_delete(self, api: Rest, cfg_group_iter: Iterator[Tuple[str, str]]) -> int:
+    def cfg_group_rules_delete(self, api: Rest, cfg_group_iter: Iterable[Tuple[str, str]]) -> int:
         """
         Delete config-group device association automated rules
         @param api: Instance of Rest API
-        @param cfg_group_iter: Iterator of (<group id>, <group name>) tuples containing config-groups to inspect
+        @param cfg_group_iter: Iterable of (<group id>, <group name>) tuples containing config-groups to inspect
         @return: Number of automated rules delete requests processed
         """
         delete_req_count = 0

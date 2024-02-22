@@ -33,6 +33,21 @@ class DeviceModeCli(ApiItem):
         }
 
 
+class EncryptText(ApiItem):
+    api_path = ApiPath(None, 'template/security/encryptText/encrypt', None, None)
+    id_tag = 'id'
+
+    @staticmethod
+    def api_params(input_string):
+        return {
+            "inputString": input_string
+        }
+
+    @property
+    def encrypted_value(self):
+        return self.data.get('encryptedText', None)
+
+
 class DeviceTemplateAttach(ApiItem):
     api_path = ApiPath(None, 'template/device/config/attachfeature', None, None)
     id_tag = 'id'
@@ -336,40 +351,74 @@ class DeviceConfigRFS(DeviceConfig):
 #
 # Templates
 #
-# Set of device types that use cedge template class. Updated as of vManage 20.10.0
+# Set of device types that use cedge template class. Updated as of vManage 20.12
 CEDGE_SET = {
-    "vedge-CSR-1000v", "vedge-ISR-4331", "vedge-ISR-4431", "vedge-ISR-4461", "vedge-ISR-4451-X",
-    "vedge-C8300-1N1S-4T2X", "vedge-IR-1101", "vedge-C8300-1N1S-6T", "vedge-ISRv", "vedge-ISR-4321", "vedge-ISR-4351",
-    "vedge-ISR-4221", "vedge-ISR-4221X", "vedge-ASR-1001-X", "vedge-ASR-1002-X", "vedge-ASR-1002-HX",
-    "vedge-ASR-1001-HX", "vedge-C8500-12X4QC", "vedge-C8500-12X", "vedge-C1101-4P", "vedge-C1101-4PLTEP",
-    "vedge-C1111-4P", "vedge-C1161X-8P", "vedge-C1111-8P", "vedge-C1113-8PLTEEA", "vedge-C1121X-8P", "vedge-C1111X-8P",
-    "vedge-C1111-8PW", "vedge-C1111-8PLTEEA", "vedge-C1121-8PLTEPW", "vedge-C1111-8PLTELAW", "vedge-C1111-8PLTEEAW",
-    "vedge-C1111-8PLTELA", "vedge-C1111-4PLTEEA", "vedge-C1101-4PLTEPW", "vedge-C1109-4PLTE2PW", "vedge-C1109-4PLTE2P",
-    "vedge-C1109-2PLTEVZ", "vedge-C1109-2PLTEUS", "vedge-C1109-2PLTEGB", "vedge-C1121X-8PLTEP", "vedge-C1161X-8PLTEP",
-    "vedge-C1113-8PMLTEEA", "vedge-C1111-4PLTELA", "vedge-C1116-4P", "vedge-C1116-4PLTEEA", "vedge-C1121-8P",
-    "vedge-C1121-8PLTEP", "vedge-C1128-8PLTEP", "vedge-C1121-4PLTEP", "vedge-C1121-4P", "vedge-C1126-8PLTEP",
-    "vedge-C1127-8PLTEP", "vedge-C1161-8P", "vedge-C1117-4P", "vedge-C1117-4PM", "vedge-C1117-4PLTEEA",
-    "vedge-C1126X-8PLTEP", "vedge-C1127X-8PLTEP", "vedge-C1121X-8PLTEPW", "vedge-C1127X-8PMLTEP", "vedge-C1127-8PMLTEP",
-    "vedge-C1117-4PLTELA", "vedge-nfvis-ENCS5400", 'vedge-C1113-8PLTEW', 'vedge-ESR-6300', "vedge-C8300-2N2S-6T",
-    "vedge-C8300-2N2S-4T2X", "vedge-C1117-4PMLTEEA", "vedge-C1113-8PW", "vedge-ISR1100-4GLTENA-XE",
-    "vedge-C1117-4PMLTEEAWE", "vedge-ASR-1006-X", "vedge-ISR1100X-6G-XE", "vedge-C1113-8PM", "vedge-C1116-4PWE",
-    "vedge-IR-1835", "vedge-C8500L-8S4X", "vedge-C1113-8PLTEEAW", "vedge-C1117-4PLTELAWZ", "vedge-C1112-8PWE",
-    "cellular-gateway-CG522-E", "vedge-C1117-4PLTEEAW", "vedge-C1116-4PLTEEAWE", "vedge-C1112-8PLTEEAWE",
-    "vedge-C1113-8PLTELAWZ", "cellular-gateway-CG418-E", "vedge-ISR1100-6G-XE", "vedge-C1113-8PMWE", "vedge-C1111-4PW",
-    "vedge-C1113-8PLTELA", "vedge-C1118-8P", "vedge-C1112-8P", "vedge-ISR1100-4G-XE", "vedge-IR-1833",
-    "vedge-ISR1100X-4G-XE", "vedge-C1117-4PMWE", "vedge-IR-1821", "vedge-C1161-8PLTEP", "vedge-ISR1100-4GLTEGB-XE",
-    "vedge-nfvis-C8200-UCPE", "vedge-C8000V", "vedge-C1117-4PW", "vedge-C8200-1N-4T", "vedge-C1112-8PLTEEA",
-    "vedge-C1113-8P", "vedge-IR-1831", "vedge-C8200L-1N-4T", "vedge-nfvis-C8200-UCPEVM", "vedge-C8200L-1N-4T",
-    "vedge-nfvis-C8200-UCPEVM", "vedge-IR-8340", "cellular-gateway-CG522MW-IO-GL", "vedge-IR-8140H", "vedge-C1131X-8PW",
-    "vedge-IR-8140H-P", "vedge-C1131-8PLTEPW", "vedge-C1131-8PW", "vedge-C1131X-8PLTEPW", "cellular-gateway-CG113-W6Z",
-    "cellular-gateway-CG113-W6B", "cellular-gateway-CG113-W6A", "cellular-gateway-CG113-4GW6E",
-    "cellular-gateway-CG113-4GW6H", "vedge-C8500-20X6C", "cellular-gateway-CG113-W6E",  "cellular-gateway-CG113-W6H",
-    "cellular-gateway-CG113-4GW6B", "cellular-gateway-CG113-4GW6Z", "cellular-gateway-CG113-4GW6A",
-    "cellular-gateway-CG113-4GW6Q", "cellular-gateway-CG113-W6Q", "cellular-gateway-CG522MW-IO-NA",
-    "vedge-ESR-6300-NCP", "vedge-nfvis-CSP-5436", "vedge-nfvis-CSP-5228", "vedge-nfvis-CSP-5216"
+    "cellular-gateway-CG113-4GW6A", "cellular-gateway-CG113-4GW6B", "cellular-gateway-CG113-4GW6E",
+    "cellular-gateway-CG113-4GW6H", "cellular-gateway-CG113-4GW6Q", "cellular-gateway-CG113-4GW6Z",
+    "cellular-gateway-CG113-W6A", "cellular-gateway-CG113-W6B", "cellular-gateway-CG113-W6E",
+    "cellular-gateway-CG113-W6H", "cellular-gateway-CG113-W6Q", "cellular-gateway-CG113-W6Z",
+    "cellular-gateway-CG418-E", "cellular-gateway-CG522-E", "vedge-ASR-1001-HX", "vedge-ASR-1001-HX-SD-ROUTING",
+    "vedge-ASR-1001-X", "vedge-ASR-1002-HX", "vedge-ASR-1002-HX-SD-ROUTING", "vedge-ASR-1002-X", "vedge-ASR-1006-X",
+    "vedge-C1101-4P", "vedge-C1101-4P-SD-ROUTING", "vedge-C1101-4PLTEP", "vedge-C1101-4PLTEP-SD-ROUTING",
+    "vedge-C1101-4PLTEPW", "vedge-C1101-4PLTEPW-SD-ROUTING", "vedge-C1109-2PLTEGB", "vedge-C1109-2PLTEGB-SD-ROUTING",
+    "vedge-C1109-2PLTEUS", "vedge-C1109-2PLTEUS-SD-ROUTING", "vedge-C1109-2PLTEVZ", "vedge-C1109-2PLTEVZ-SD-ROUTING",
+    "vedge-C1109-4PLTE2P", "vedge-C1109-4PLTE2P-SD-ROUTING", "vedge-C1109-4PLTE2PW", "vedge-C1109-4PLTE2PW-SD-ROUTING",
+    "vedge-C1111-4P", "vedge-C1111-4P-SD-ROUTING", "vedge-C1111-4PLTEEA", "vedge-C1111-4PLTEEA-SD-ROUTING",
+    "vedge-C1111-4PLTELA", "vedge-C1111-4PLTELA-SD-ROUTING", "vedge-C1111-4PW", "vedge-C1111-4PW-SD-ROUTING",
+    "vedge-C1111-8P", "vedge-C1111-8P-SD-ROUTING", "vedge-C1111-8PLTEEA", "vedge-C1111-8PLTEEA-SD-ROUTING",
+    "vedge-C1111-8PLTEEAW", "vedge-C1111-8PLTEEAW-SD-ROUTING", "vedge-C1111-8PLTELA", "vedge-C1111-8PLTELA-SD-ROUTING",
+    "vedge-C1111-8PLTELAW", "vedge-C1111-8PLTELAW-SD-ROUTING", "vedge-C1111-8PW", "vedge-C1111-8PW-SD-ROUTING",
+    "vedge-C1111X-8P", "vedge-C1111X-8P-SD-ROUTING", "vedge-C1112-8P", "vedge-C1112-8P-SD-ROUTING",
+    "vedge-C1112-8PLTEEA", "vedge-C1112-8PLTEEA-SD-ROUTING", "vedge-C1112-8PLTEEAWE",
+    "vedge-C1112-8PLTEEAWE-SD-ROUTING", "vedge-C1112-8PWE", "vedge-C1112-8PWE-SD-ROUTING", "vedge-C1113-8P",
+    "vedge-C1113-8P-SD-ROUTING", "vedge-C1113-8PLTEEA", "vedge-C1113-8PLTEEA-SD-ROUTING", "vedge-C1113-8PLTEEAW",
+    "vedge-C1113-8PLTEEAW-SD-ROUTING", "vedge-C1113-8PLTELA", "vedge-C1113-8PLTELA-SD-ROUTING", "vedge-C1113-8PLTELAWZ",
+    "vedge-C1113-8PLTELAWZ-SD-ROUTING", "vedge-C1113-8PLTEW", "vedge-C1113-8PLTEW-SD-ROUTING", "vedge-C1113-8PM",
+    "vedge-C1113-8PM-SD-ROUTING", "vedge-C1113-8PMLTEEA", "vedge-C1113-8PMLTEEA-SD-ROUTING", "vedge-C1113-8PMWE",
+    "vedge-C1113-8PMWE-SD-ROUTING", "vedge-C1113-8PW", "vedge-C1113-8PW-SD-ROUTING", "vedge-C1116-4P",
+    "vedge-C1116-4P-SD-ROUTING", "vedge-C1116-4PLTEEA", "vedge-C1116-4PLTEEA-SD-ROUTING", "vedge-C1116-4PLTEEAWE",
+    "vedge-C1116-4PLTEEAWE-SD-ROUTING", "vedge-C1116-4PWE", "vedge-C1116-4PWE-SD-ROUTING", "vedge-C1117-4P",
+    "vedge-C1117-4P-SD-ROUTING", "vedge-C1117-4PLTEEA", "vedge-C1117-4PLTEEA-SD-ROUTING", "vedge-C1117-4PLTEEAW",
+    "vedge-C1117-4PLTEEAW-SD-ROUTING", "vedge-C1117-4PLTELA", "vedge-C1117-4PLTELA-SD-ROUTING", "vedge-C1117-4PLTELAWZ",
+    "vedge-C1117-4PLTELAWZ-SD-ROUTING", "vedge-C1117-4PM", "vedge-C1117-4PM-SD-ROUTING", "vedge-C1117-4PMLTEEA",
+    "vedge-C1117-4PMLTEEA-SD-ROUTING", "vedge-C1117-4PMLTEEAWE", "vedge-C1117-4PMLTEEAWE-SD-ROUTING",
+    "vedge-C1117-4PMWE", "vedge-C1117-4PMWE-SD-ROUTING", "vedge-C1117-4PW", "vedge-C1117-4PW-SD-ROUTING",
+    "vedge-C1118-8P", "vedge-C1118-8P-SD-ROUTING", "vedge-C1121-4P", "vedge-C1121-4P-SD-ROUTING", "vedge-C1121-4PLTEP",
+    "vedge-C1121-4PLTEP-SD-ROUTING", "vedge-C1121-8P", "vedge-C1121-8P-SD-ROUTING", "vedge-C1121-8PLTEP",
+    "vedge-C1121-8PLTEP-SD-ROUTING", "vedge-C1121-8PLTEPW", "vedge-C1121-8PLTEPW-SD-ROUTING", "vedge-C1121X-8P",
+    "vedge-C1121X-8P-SD-ROUTING", "vedge-C1121X-8PLTEP", "vedge-C1121X-8PLTEP-SD-ROUTING", "vedge-C1121X-8PLTEPW",
+    "vedge-C1121X-8PLTEPW-SD-ROUTING", "vedge-C1126-8PLTEP", "vedge-C1126-8PLTEP-SD-ROUTING", "vedge-C1126X-8PLTEP",
+    "vedge-C1126X-8PLTEP-SD-ROUTING", "vedge-C1127-8PLTEP", "vedge-C1127-8PLTEP-SD-ROUTING", "vedge-C1127-8PMLTEP",
+    "vedge-C1127-8PMLTEP-SD-ROUTING", "vedge-C1127X-8PLTEP", "vedge-C1127X-8PLTEP-SD-ROUTING", "vedge-C1127X-8PMLTEP",
+    "vedge-C1127X-8PMLTEP-SD-ROUTING", "vedge-C1128-8PLTEP", "vedge-C1128-8PLTEP-SD-ROUTING", "vedge-C1131-8PLTEPW",
+    "vedge-C1131-8PLTEPW-SD-ROUTING", "vedge-C1131-8PW", "vedge-C1131-8PW-SD-ROUTING", "vedge-C1131X-8PLTEPW",
+    "vedge-C1131X-8PLTEPW-SD-ROUTING", "vedge-C1131X-8PW", "vedge-C1131X-8PW-SD-ROUTING", "vedge-C1161-8P",
+    "vedge-C1161-8P-SD-ROUTING", "vedge-C1161-8PLTEP", "vedge-C1161-8PLTEP-SD-ROUTING", "vedge-C1161X-8P",
+    "vedge-C1161X-8P-SD-ROUTING", "vedge-C1161X-8PLTEP", "vedge-C1161X-8PLTEP-SD-ROUTING", "vedge-C8000V",
+    "vedge-C8000V-SD-ROUTING", "vedge-C8200-1N-4T", "vedge-C8200-1N-4T-SD-ROUTING", "vedge-C8200L-1N-4T",
+    "vedge-C8200L-1N-4T-SD-ROUTING", "vedge-C8300-1N1S-4T2X", "vedge-C8300-1N1S-4T2X-SD-ROUTING", "vedge-C8300-1N1S-6T",
+    "vedge-C8300-1N1S-6T-SD-ROUTING", "vedge-C8300-2N2S-4T2X", "vedge-C8300-2N2S-4T2X-SD-ROUTING",
+    "vedge-C8300-2N2S-6T", "vedge-C8300-2N2S-6T-SD-ROUTING", "vedge-C8500-12X", "vedge-C8500-12X-SD-ROUTING",
+    "vedge-C8500-12X4QC", "vedge-C8500-12X4QC-SD-ROUTING", "vedge-C8500-20X6C", "vedge-C8500-20X6C-SD-ROUTING",
+    "vedge-C8500L-8S4X", "vedge-C8500L-8S4X-SD-ROUTING", "vedge-CSR-1000v", "vedge-ESR-6300", "vedge-ESR-6300-LIC",
+    "vedge-ESR-6300-LIC-SD-ROUTING", "vedge-ESR-6300-NCP", "vedge-ESR-6300-NCP-SD-ROUTING", "vedge-ESR-6300-SD-ROUTING",
+    "vedge-IR-1101", "vedge-IR-1101-SD-ROUTING", "vedge-IR-1821", "vedge-IR-1821-SD-ROUTING", "vedge-IR-1831",
+    "vedge-IR-1831-SD-ROUTING", "vedge-IR-1833", "vedge-IR-1833-SD-ROUTING", "vedge-IR-1835",
+    "vedge-IR-1835-SD-ROUTING", "vedge-IR-8140H", "vedge-IR-8140H-P", "vedge-IR-8140H-P-SD-ROUTING",
+    "vedge-IR-8140H-SD-ROUTING", "vedge-IR-8340", "vedge-IR-8340-SD-ROUTING", "vedge-ISR-4221",
+    "vedge-ISR-4221-SD-ROUTING", "vedge-ISR-4221X", "vedge-ISR-4221X-SD-ROUTING", "vedge-ISR-4321",
+    "vedge-ISR-4321-SD-ROUTING", "vedge-ISR-4331", "vedge-ISR-4331-SD-ROUTING", "vedge-ISR-4351",
+    "vedge-ISR-4351-SD-ROUTING", "vedge-ISR-4431", "vedge-ISR-4431-SD-ROUTING", "vedge-ISR-4451-X",
+    "vedge-ISR-4451-X-SD-ROUTING", "vedge-ISR-4461", "vedge-ISR-4461-SD-ROUTING", "vedge-ISR1100-4G-XE",
+    "vedge-ISR1100-4GLTEGB-XE", "vedge-ISR1100-4GLTENA-XE", "vedge-ISR1100-6G-XE", "vedge-ISR1100X-4G-XE",
+    "vedge-ISR1100X-6G-XE", "vedge-ISRv", "vedge-nfvis-C8200-UCPE", "vedge-nfvis-C8200-UCPEVM",
+    "vedge-nfvis-C8300-UCPE-1N20", "vedge-nfvis-CSP-5216", "vedge-nfvis-CSP-5228", "vedge-nfvis-CSP-5436",
+    "vedge-nfvis-ENCS5400", "vedge-nfvis-UCSC-C220-M6N", "vedge-nfvis-UCSC-C220-M6S", "vedge-nfvis-UCSC-C240-M6N",
+    "vedge-nfvis-UCSC-C240-M6S", "vedge-nfvis-UCSC-C240-M6SN", "vedge-nfvis-UCSC-C240-M6SX"
 }
-# Software devices. Updated as of vManage 20.10.0
-SOFT_EDGE_SET = {"vedge-CSR-1000v", "vedge-C8000V", "vedge-cloud", "vmanage", "vsmart"}
+# Software devices. Updated as of vManage 20.12
+SOFT_EDGE_SET = {"vedge-CSR-1000v", "vedge-C8000V", "vedge-C8000V-SD-ROUTING", "vedge-cloud", "vmanage", "vsmart",
+                 "vedge-ISRv"}
 
 
 # This is a special case handled under DeviceTemplate
@@ -662,7 +711,8 @@ class ConfigGroupValues(Config2Item):
     def put_raise(self, api: Rest, **path_vars: str) -> Sequence[str]:
         result = api.put(self.put_data(), ConfigGroupValues.api_path.resolve(**path_vars).put)
 
-        return [entry.get('device-id') for entry in result]
+        # Prior to 20.12, this api call returned a list of dicts. Since 20.12, it now returns a list of strings.
+        return result if any(isinstance(dvc, str) for dvc in result) else [dvc.get('device-id') for dvc in result]
 
 
 class AssociatedDeviceModel(ConfigRequestModel):
@@ -702,8 +752,8 @@ class ConfigGroupAssociated(Config2Item):
         new_payload['devices'] = [
             entry for entry in new_payload.get('devices', [])
             if (
-                (allowed_uuid_set is None or entry.get('id') in allowed_uuid_set) and
-                (not not_by_rule or not entry.get('addedByRule', False))
+                    (allowed_uuid_set is None or entry.get('id') in allowed_uuid_set) and
+                    (not not_by_rule or not entry.get('addedByRule', False))
             )
         ]
         return ConfigGroupAssociated(new_payload)
@@ -730,7 +780,7 @@ class ConfigGroupRules(IndexConfigItem):
     store_path = ('config_groups', 'tag_rules')
     store_file = '{item_name}.json'
     id_tag = 'tagId'
-    iter_fields = ('tagId', )
+    iter_fields = ('tagId',)
 
     @staticmethod
     def delete_raise(api: Rest, config_group_id: str, rule_id: str) -> None:
@@ -789,8 +839,10 @@ class ProfileSdwanSystem(FeatureProfile):
         "ntp": ApiPath("v1/feature-profile/sdwan/system/{systemId}/ntp"),
         "omp": ApiPath("v1/feature-profile/sdwan/system/{systemId}/omp"),
         "snmp": ApiPath("v1/feature-profile/sdwan/system/{systemId}/snmp"),
-        "perfmonitor": ApiPath("v1/feature-profile/sdwan/system/{systemId}/perfmonitor")
-     })
+        "perfmonitor": ApiPath("v1/feature-profile/sdwan/system/{systemId}/perfmonitor"),
+        "mrf": ApiPath("/v1/feature-profile/sdwan/system/{systemId}/mrf"),
+        "security": ApiPath("/v1/feature-profile/sdwan/system/{systemId}/security")
+    })
 
 
 @register('feature_profile', 'SDWAN system profile', ProfileSdwanSystem, min_version='20.8')
@@ -806,6 +858,9 @@ class ProfileSdwanService(FeatureProfile):
         "dhcp-server": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/dhcp-server"),
         "routing/bgp": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/routing/bgp"),
         "routing/ospf": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/routing/ospf"),
+        "routing/multicast": ApiPath("/v1/feature-profile/sdwan/service/{serviceId}/routing/multicast"),
+        "tracker": ApiPath("/v1/feature-profile/sdwan/service/{serviceId}/tracker"),
+        "trackergroup": ApiPath("/v1/feature-profile/sdwan/service/{serviceId}/trackergroup"),
         "lan/vpn": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/lan/vpn"),
         "lan/vpn/interface/ethernet": ApiPath(
             "v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/interface/ethernet"),
@@ -813,7 +868,8 @@ class ProfileSdwanService(FeatureProfile):
         "lan/vpn/interface/ipsec": ApiPath(
             "v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/interface/ipsec"),
         "switchport": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/switchport"),
-        "wirelesslan": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/wirelesslan")
+        "wirelesslan": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/wirelesslan"),
+        "appqoe": ApiPath("/v1/feature-profile/sdwan/service/{serviceId}/appqoe")
     }, parcel_reference_path_map={
         PathKey("dhcp-server", "lan/vpn/interface/ethernet"): ApiPath(
             "v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/interface/ethernet/{ethId}/dhcp-server"),
@@ -825,6 +881,12 @@ class ProfileSdwanService(FeatureProfile):
             "v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/routing/bgp"),
         PathKey("routing/ospf", "lan/vpn"): ApiPath(
             "v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/routing/ospf"),
+        PathKey("routing/multicast", "lan/vpn"): ApiPath(
+            "/v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/routing/multicast"),
+        PathKey("tracker", "lan/vpn/interface/ethernet"): ApiPath(
+            "/v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/interface/ethernet/{ethId}/tracker"),
+        PathKey("trackergroup", "lan/vpn/interface/ethernet"): ApiPath(
+            "/v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/interface/ethernet/{ethId}/trackergroup")
     })
 
 
@@ -839,31 +901,59 @@ class ProfileSdwanTransport(FeatureProfile):
     store_path = ('feature_profiles', 'sdwan', 'transport')
     parcel_api_paths = ApiPathGroup({
         "routing/bgp": ApiPath("v1/feature-profile/sdwan/transport/{transportId}/routing/bgp"),
+        "routing/ospf": ApiPath("v1/feature-profile/sdwan/transport/{transportId}/routing/ospf"),
         "tracker": ApiPath("v1/feature-profile/sdwan/transport/{transportId}/tracker"),
+        "trackergroup": ApiPath("v1/feature-profile/sdwan/transport/{transportId}/trackergroup"),
+        "ipv6-tracker": ApiPath("v1/feature-profile/sdwan/transport/{transportId}/ipv6-tracker"),
+        "ipv6-trackergroup": ApiPath("v1/feature-profile/sdwan/transport/{transportId}/ipv6-trackergroup"),
         "cellular-profile": ApiPath("v1/feature-profile/sdwan/transport/{transportId}/cellular-profile"),
         "wan/vpn": ApiPath("v1/feature-profile/sdwan/transport/{transportId}/wan/vpn"),
         "wan/vpn/interface/ethernet": ApiPath(
             "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/interface/ethernet"),
         "wan/vpn/interface/ipsec": ApiPath(
             "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/interface/ipsec"),
+        "wan/vpn/interface/gre": ApiPath(
+            "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/interface/gre"),
         "wan/vpn/interface/cellular": ApiPath(
             "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/interface/cellular"),
         "management/vpn": ApiPath("v1/feature-profile/sdwan/transport/{transportId}/management/vpn"),
         "management/vpn/interface/ethernet": ApiPath(
             "v1/feature-profile/sdwan/transport/{transportId}/management/vpn/{vpnId}/interface/ethernet"),
         "cellular-controller": ApiPath("v1/feature-profile/sdwan/transport/{transportId}/cellular-controller"),
+        "gps": ApiPath("v1/feature-profile/sdwan/transport/{transportId}/gps")
     }, parcel_reference_path_map={
         PathKey("routing/bgp", "wan/vpn"): ApiPath(
             "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/routing/bgp"),
+        PathKey("routing/ospf", "wan/vpn"): ApiPath(
+            "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/routing/ospf"),
         PathKey("tracker", "wan/vpn/interface/ethernet"): ApiPath(
             "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/interface/ethernet/{ethernetId}/tracker"),
         PathKey("tracker", "wan/vpn/interface/ipsec"): ApiPath(
             "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/interface/ipsec/{ipsecId}/tracker"),
+        PathKey("tracker", "wan/vpn/interface/gre"): ApiPath(
+            "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/interface/gre/{greId}/tracker"),
         PathKey("tracker", "wan/vpn/interface/cellular"): ApiPath(
             "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/interface/cellular/{cellularId}/tracker"),
+        PathKey("trackergroup", "wan/vpn/interface/ethernet"): ApiPath(
+            "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/interface/ethernet/"
+            "{ethernetId}/trackergroup"),
+        PathKey("ipv6-tracker", "wan/vpn/interface/ethernet"): ApiPath(
+            "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/interface/ethernet/"
+            "{ethernetId}/ipv6-tracker"),
+        PathKey("ipv6-tracker", "wan/vpn/interface/cellular"): ApiPath(
+            "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/interface/cellular/"
+            "{cellularId}/ipv6-tracker"),
+        PathKey("ipv6-trackergroup", "wan/vpn/interface/ethernet"): ApiPath(
+            "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/interface/ethernet/"
+            "{ethernetId}/ipv6-trackergroup"),
+        PathKey("ipv6-trackergroup", "wan/vpn/interface/cellular"): ApiPath(
+            "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/interface/cellular/"
+            "{cellularId}/ipv6-trackergroup"),
         PathKey("cellular-profile", "cellular-controller"): ApiPath(
             "v1/feature-profile/sdwan/transport/{transportId}/cellular-controller/"
             "{cellularControllerId}/cellular-profile"),
+        PathKey("gps", "cellular-controller"): ApiPath(
+            "v1/feature-profile/sdwan/transport/{transportId}/cellular-controller/{cellularControllerId}/gps")
     })
 
 
@@ -891,7 +981,8 @@ class ProfileSdwanOther(FeatureProfile):
     api_path = ApiPath('v1/feature-profile/sdwan/other')
     store_path = ('feature_profiles', 'sdwan', 'other')
     parcel_api_paths = ApiPathGroup({
-        "thousandeyes": ApiPath("v1/feature-profile/sdwan/other/{otherId}/thousandeyes")
+        "thousandeyes": ApiPath("v1/feature-profile/sdwan/other/{otherId}/thousandeyes"),
+        "ucse": ApiPath("/v1/feature-profile/sdwan/other/{otherId}/ucse")
     })
 
 
