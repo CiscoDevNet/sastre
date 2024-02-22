@@ -11,10 +11,12 @@ Some use-cases include:
 
 Sastre can also be used as an SDK to other applications, further information is available on [DevNet Sastre SDK](https://developer.cisco.com/docs/sdwan/#!sastre-sdk-overview).
 
+[Sastre-Ansible](https://github.com/CiscoDevNet/sastre-ansible) is an Ansible Collection that exposes Sastre commands to Ansible Playbooks as a set of tasks and lookup plugins. Allowing users to build-up on Sastre functionality to create larger automation workflows.
+
 Support enquires can be sent to sastre-support@cisco.com.
 
 Note on vManage release support:
-- Sastre 1.22 officially supports up to vManage 20.10. Newer vManage releases normally work without problems, just lacking support to the newer features added to that particular vManage release.
+- Sastre 1.23 officially supports up to vManage 20.11. Newer vManage releases normally work without problems, just lacking support to the newer features added to that particular vManage release.
 
 ## Sastre and Sastre-Pro
 
