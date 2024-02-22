@@ -82,7 +82,7 @@ def validate_ext_template(template_str: str) -> str:
 
 
 def validate_version(version_str: str) -> str:
-    # Development versions may follow this format: '20.1.999-98'
+    # Development versions may follow this format: 20.1.999-98
     if re.match(r'\d+([.-]\d+){1,3}$', version_str) is None:
         raise ValueError(f'"{version_str}" is not a valid version identifier.')
 

@@ -2,19 +2,20 @@ import argparse
 from uuid import uuid4
 from copy import deepcopy
 from contextlib import suppress
-from typing import Union, Optional, Tuple, List, Dict, Type, Callable, Any
-from pydantic import BaseModel, validator, ValidationError, Extra, root_validator
+from typing import Union, Optional, Tuple, List, Dict, Type, Callable, NamedTuple
+from typing_extensions import Annotated
+from pydantic import model_validator, BaseModel, field_validator, ValidationError, Field, ValidationInfo, ConfigDict
 import yaml
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest
 from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL, ordered_tags
-from cisco_sdwan.base.models_base import update_ids, ServerInfo, ConfigItem, ExtendedTemplate
+from cisco_sdwan.base.models_base import update_ids, update_crypts, ServerInfo, ConfigItem, ExtendedTemplate
 from cisco_sdwan.base.models_vmanage import DeviceTemplate, DeviceTemplateAttached, DeviceTemplateValues
 from cisco_sdwan.base.processor import StopProcessorException, ProcessorException
 from cisco_sdwan.tasks.utils import (TaskOptions, TagOptions, existing_workdir_type, filename_type, ext_template_type,
                                      regex_type, existing_file_type)
 from cisco_sdwan.tasks.common import clean_dir, Task, TaskException, regex_search
-from cisco_sdwan.tasks.models import const, TaskArgs, validate_catalog_tag
+from cisco_sdwan.tasks.models import const, TaskArgs, CatalogTag
 from cisco_sdwan.tasks.validators import (validate_workdir, validate_ext_template, validate_filename, validate_regex,
                                           validate_existing_file, validate_json)
 
@@ -24,33 +25,43 @@ class RecipeException(Exception):
     pass
 
 
-class TransformRecipeNameTemplate(BaseModel, extra=Extra.forbid):
+class TransformRecipeNameTemplate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     regex: Optional[str] = None
     not_regex: Optional[str] = None
     name_regex: str
 
-    _validate_regex = validator('regex', 'not_regex', allow_reuse=True)(validate_regex)
-    _validate_name_regex = validator('name_regex', allow_reuse=True)(validate_ext_template)
+    _validate_regex = field_validator('regex', 'not_regex')(validate_regex)
+    _validate_name_regex = field_validator('name_regex')(validate_ext_template)
 
 
-class TransformRecipe(BaseModel, extra=Extra.forbid):
-    tag: str
+class ValueMap(BaseModel):
+    from_value: str
+    to_value: str
+
+
+class CryptResourceUpdate(BaseModel):
+    resource_name: str
+    replacements: List[ValueMap]
+
+
+class TransformRecipe(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    tag: CatalogTag
     name_template: Optional[TransformRecipeNameTemplate] = None
-    name_map: Optional[Dict[str, str]] = None
+    name_map: Annotated[Optional[Dict[str, str]], Field(validate_default=True)] = None
+    crypt_updates:  Optional[List[CryptResourceUpdate]] = None
     replace_source: bool = True
 
     # Validators
-    _validate_tag = validator('tag', allow_reuse=True)(validate_catalog_tag)
-
-    @validator('name_map',  always=True)
-    def validate_name_map(cls, v, values):
-        if v is None and values.get('name_template') is None:
+    @field_validator('name_map')
+    @classmethod
+    def validate_name_map(cls, v, info: ValidationInfo):
+        if v is None and info.data.get('name_template') is None and info.data.get('crypt_updates') is not None:
             raise ValueError('At least one of "name_map" or "name_template" needs to be provided')
         return v
-
-    def __init__(self, **kwargs):
-        # Dummy init used so PyCharm type checker can recognize parameters
-        super().__init__(**kwargs)
 
     @classmethod
     def parse_yaml(cls, filename: str):
@@ -64,30 +75,46 @@ class TransformRecipe(BaseModel, extra=Extra.forbid):
             raise RecipeException(f'Recipe file YAML syntax error: {ex}') from None
 
 
+class ProcessorMatch(NamedTuple):
+    matched: bool
+    new_name: Optional[str] = None
+
+
 class Processor:
     def __init__(self, name: str, recipe: TransformRecipe):
         self.name = name
         self.recipe = recipe
 
-    def match(self, name: str, tag: str) -> Union[str, None]:
+    def match(self, name: str, tag: str) -> ProcessorMatch:
         """
-        Create a new name. If name_map is defined in the recipe and there is mapping for the current name, then use it.
-        Otherwise, if name_regex is defined in the recipe, then use it to build the new name.
+        Checks whether the config item matches this processor, that is, if item name and tag matches any recipe rule.
+        In case of a match, a new name may be provided (based on recipe rules):
+        - If name_map is defined in the recipe and there is mapping for the current name, then use it.
+        - If name_regex is defined in the recipe, then use it to build the new name.
+
+        @param name: The name of the config item to match
+        @param tag: Tag associated with the config item to match
+        @return: A ProcessorMatch object indicating whether the config item matched and if a new name should be used.
         """
         # Match tag
         if self.recipe.tag != CATALOG_TAG_ALL and self.recipe.tag != tag:
-            return None
+            return ProcessorMatch(False)
 
         # Match name_map
-        new_name = self.recipe.name_map.get(name) if self.recipe.name_map is not None else None
+        if self.recipe.name_map is not None and name in self.recipe.name_map:
+            return ProcessorMatch(True, self.recipe.name_map[name])
 
         # Match regex / name_regex
-        if new_name is None and self.recipe.name_template is not None:
+        if self.recipe.name_template is not None:
             regex = self.recipe.name_template.regex or self.recipe.name_template.not_regex
             if regex is None or regex_search(regex, name, inverse=self.recipe.name_template.regex is None):
-                new_name = ExtendedTemplate(self.recipe.name_template.name_regex)(name)
+                return ProcessorMatch(True, ExtendedTemplate(self.recipe.name_template.name_regex)(name))
 
-        return new_name
+        # Match crypt_updates
+        if self.recipe.crypt_updates is not None and name in {rsc.resource_name for rsc in self.recipe.crypt_updates}:
+            return ProcessorMatch(True)
+
+        return ProcessorMatch(False)
 
     def eval(self, config_obj: ConfigItem, new_name: str, new_id: str) -> Tuple[dict, List[str]]:
         new_payload = deepcopy(config_obj.data)
@@ -104,6 +131,13 @@ class Processor:
             if new_payload.get(ro_tag, False):
                 new_payload[ro_tag] = False
                 trace_log.append(f'Resetting "{ro_tag}" flag to "False"')
+
+        # Process crypt updates
+        if self.recipe.crypt_updates:
+            for matched_resource in (rsc for rsc in self.recipe.crypt_updates if rsc.resource_name == new_name):
+                trace_log.append(f'Applying crypt updates')
+                replacements_map = {entry.from_value: entry.to_value for entry in matched_resource.replacements}
+                new_payload = update_crypts(replacements_map, new_payload)
 
         return new_payload, trace_log
 
@@ -140,18 +174,27 @@ class TaskTransform(Task):
         sub_tasks.required = True
 
         rename_parser = sub_tasks.add_parser('rename', help='rename configuration items')
-        rename_parser.set_defaults(recipe_handler=TaskTransform.rename_recipe)
+        rename_parser.set_defaults(subtask_handler=TaskTransform.transform,
+                                   recipe_handler=TaskTransform.rename_recipe)
 
         copy_parser = sub_tasks.add_parser('copy', help='copy configuration items')
-        copy_parser.set_defaults(recipe_handler=TaskTransform.copy_recipe)
+        copy_parser.set_defaults(subtask_handler=TaskTransform.transform,
+                                 recipe_handler=TaskTransform.copy_recipe)
 
         recipe_parser = sub_tasks.add_parser('recipe', help='transform using custom recipe')
-        recipe_parser.set_defaults(recipe_handler=TaskTransform.load_recipe)
+        recipe_parser.set_defaults(subtask_handler=TaskTransform.transform,
+                                   recipe_handler=TaskTransform.load_recipe)
         recipe_mutex = recipe_parser.add_mutually_exclusive_group(required=True)
         recipe_mutex.add_argument('--from-file', metavar='<filename>', type=existing_file_type,
                                   help='load recipe from YAML file')
         recipe_mutex.add_argument('--from-json', metavar='<json>',
                                   help='load recipe from JSON-formatted string')
+
+        build_parser = sub_tasks.add_parser('build-recipe',
+                                            help='generate recipe file for updating vManage-encrypted fields')
+        build_parser.set_defaults(subtask_handler=TaskTransform.build_recipe)
+        build_parser.add_argument('recipe_file', metavar='<filename>', type=filename_type,
+                                  help='name for generated recipe file')
 
         for sub_task in (rename_parser, copy_parser):
             sub_task.add_argument('tag', metavar='<tag>', type=TagOptions.tag,
@@ -175,6 +218,8 @@ class TaskTransform(Task):
             sub_task.add_argument('--no-rollover', action='store_true',
                                   help='by default, if the output directory already exists it is renamed using a '
                                        'rolling naming scheme. This option disables this automatic rollover.')
+
+        for sub_task in (rename_parser, copy_parser, recipe_parser, build_parser):
             sub_task.add_argument('--workdir', metavar='<directory>', type=existing_workdir_type,
                                   help='transform will read from the specified directory instead of target vManage')
 
@@ -216,9 +261,27 @@ class TaskTransform(Task):
             return TransformRecipe.parse_raw(parsed_args.from_json)
 
     def runner(self, parsed_args, api: Optional[Rest] = None) -> Union[None, list]:
-        source_info = f'Local workdir: "{parsed_args.workdir}"' if api is None else f'vManage URL: "{api.base_url}"'
-        self.log_info(f'Transform task: {source_info} -> Local output dir: "{parsed_args.output}"')
+        if parsed_args.workdir is not None:
+            source_info = f'Local workdir: "{parsed_args.workdir}"'
+        else:
+            source_info = f'vManage URL: "{api.base_url}"'
 
+        if hasattr(parsed_args, 'output'):
+            self.log_info(f'Transform task: {source_info} -> Local output dir: "{parsed_args.output}"')
+        else:
+            self.log_info(f'Transform build-recipe task: {source_info} -> Recipe file: "{parsed_args.recipe_file}"')
+
+        if api is None:
+            backend = parsed_args.workdir
+            local_info = ServerInfo.load(backend)
+            server_version = local_info.server_version if local_info is not None else None
+        else:
+            backend = api
+            server_version = backend.server_version
+
+        return parsed_args.subtask_handler(self, parsed_args, backend, server_version)
+
+    def transform(self, parsed_args, backend: Union[Rest, str], server_version: Optional[str]) -> Union[None, list]:
         # Load processors
         try:
             recipe = parsed_args.recipe_handler(parsed_args)
@@ -234,15 +297,6 @@ class TaskTransform(Task):
         saved_output = clean_dir(parsed_args.output, max_saved=0 if parsed_args.no_rollover else 99)
         if saved_output:
             self.log_info(f'Previous output under "{parsed_args.output}" was saved as "{saved_output}"')
-
-        # Identify backend and server version
-        if api is None:
-            backend = parsed_args.workdir
-            local_info = ServerInfo.load(backend)
-            server_version = local_info.server_version if local_info is not None else None
-        else:
-            backend = api
-            server_version = backend.server_version
 
         if server_version is not None:
             if ServerInfo(server_version=server_version).save(parsed_args.output):
@@ -274,21 +328,28 @@ class TaskTransform(Task):
 
                         self.log_debug(f'Evaluating {info} {item_name} with {processor.name} processor')
                         with suppress(StopProcessorException):
-                            new_name = processor.match(item_name, tag)
-                            if new_name is None:
+                            match_result = processor.match(item_name, tag)
+                            if not match_result.matched:
                                 raise StopProcessorException()
 
                             self.log_info(f'Matched {info} {item_name}')
-                            if not item_cls.is_name_valid(new_name):
-                                self.log_error(f'New {info} name is not valid: {new_name}')
-                                is_bad_name = True
-                                raise StopProcessorException()
-                            if new_name in name_set:
-                                self.log_error(f'New {info} name already exists: {new_name}')
-                                is_bad_name = True
-                                raise StopProcessorException()
+                            if match_result.new_name is not None:
+                                new_name = match_result.new_name
 
-                            new_id = item_id if processor.replace_source else str(uuid4())
+                                if not item_cls.is_name_valid(new_name):
+                                    self.log_error(f'New {info} name is not valid: {new_name}')
+                                    is_bad_name = True
+                                    raise StopProcessorException()
+
+                                if new_name in name_set:
+                                    self.log_error(f'New {info} name already exists: {new_name}')
+                                    is_bad_name = True
+                                    raise StopProcessorException()
+
+                            else:
+                                new_name = item_name
+
+                            new_id = item_id if processor.replace_source or match_result.new_name is None else str(uuid4())
                             new_payload = self.processor_eval(processor, item, new_name, new_id)
                             new_item = item_cls(update_ids(id_mapping, new_payload))
 
@@ -304,7 +365,8 @@ class TaskTransform(Task):
                                         self.processor_eval(b_processor, item.attach_values, new_name, new_id)
                                     )
 
-                            if processor.replace_source:
+                            # When item name is unchanged, always replace source
+                            if processor.replace_source or match_result.new_name is None:
                                 self.log_info(f'Replacing {info}: {item_name} -> {new_name}')
                                 item = new_item
                             else:
@@ -342,6 +404,58 @@ class TaskTransform(Task):
 
         except ProcessorException as ex:
             raise TaskException(f'Transform aborted: {ex}') from None
+
+        return
+
+    def build_recipe(self, parsed_args, backend: Union[Rest, str], server_version: Optional[str]) -> Union[None, list]:
+        try:
+            tag_set = set()
+            resources = []
+            for tag in ordered_tags(CATALOG_TAG_ALL, reverse=True):
+                self.log_info(f'Inspecting {tag} items')
+                for _, info, index_cls, item_cls in catalog_iter(tag, version=server_version):
+                    item_index = self.index_get(index_cls, backend)
+                    if item_index is None:
+                        self.log_debug(f'Skipped {info}, none found')
+                        continue
+
+                    for item_id, item_name in item_index:
+                        item = self.retrieve(item_cls, backend, item_id, item_name, item_index.need_extended_name)
+                        if item is None:
+                            self.log_error(f'Failed loading {info} {item_name}')
+                            continue
+                        self.log_debug(f'Evaluating {info} {item_name}')
+
+                        crypt_values_set = set(item.crypt_cluster_values)
+
+                        if isinstance(item, DeviceTemplate):
+                            if item.devices_attached is not None:
+                                crypt_values_set.update(item.devices_attached.crypt_cluster_values)
+
+                            if item.attach_values is not None:
+                                crypt_values_set.update(item.attach_values.crypt_cluster_values)
+
+                        if crypt_values_set:
+                            self.log_info(f'Found {len(crypt_values_set)} crypt value{"s"[:len(crypt_values_set) ^ 1]} '
+                                          f'in {info} {item_name}')
+                            replacements = [
+                                ValueMap(from_value=value, to_value='< CHANGE ME >') for value in crypt_values_set
+                            ]
+                            resources.append(CryptResourceUpdate(resource_name=item_name, replacements=replacements))
+                            tag_set.add(tag)
+
+            if resources:
+                update_recipe = TransformRecipe(tag=next(iter(tag_set)) if len(tag_set) == 1 else CATALOG_TAG_ALL,
+                                                crypt_updates=resources)
+                with open(parsed_args.recipe_file, 'w') as file:
+                    yaml.dump(update_recipe.dict(exclude_none=True, exclude={'replace_source'}),
+                              sort_keys=False, indent=2, stream=file)
+                self.log_info(f'Recipe file saved as "{parsed_args.recipe_file}"')
+            else:
+                self.log_warning(f'No encrypted passwords found!')
+
+        except ProcessorException as ex:
+            raise TaskException(f'Transform build-recipe aborted: {ex}') from None
 
         return
 
@@ -384,51 +498,61 @@ class TaskTransform(Task):
 
 
 class TransformArgs(TaskArgs):
+    subtask_handler: const(Callable, TaskTransform.transform)
     output: str
     workdir: Optional[str] = None
     no_rollover: bool = False
 
     # Validators
-    _validate_filename = validator('output', allow_reuse=True)(validate_filename)
-    _validate_workdir = validator('workdir', allow_reuse=True)(validate_workdir)
+    _validate_filename = field_validator('output')(validate_filename)
+    _validate_workdir = field_validator('workdir')(validate_workdir)
 
 
 class TransformCopyArgs(TransformArgs):
-    recipe_handler: Callable = const(TaskTransform.copy_recipe)
-    tag: str
+    recipe_handler: const(Callable, TaskTransform.copy_recipe)
+    tag: CatalogTag
     regex: Optional[str] = None
     not_regex: Optional[str] = None
     name_regex: str
 
     # Validators
-    _validate_tag = validator('tag', allow_reuse=True)(validate_catalog_tag)
-    _validate_regex = validator('regex', 'not_regex', allow_reuse=True)(validate_regex)
-    _validate_name = validator('name_regex', allow_reuse=True)(validate_ext_template)
+    _validate_regex = field_validator('regex', 'not_regex')(validate_regex)
+    _validate_name = field_validator('name_regex')(validate_ext_template)
 
-    @root_validator(skip_on_failure=True)
-    def mutex_validations(cls, values: Dict[str, Any]) -> Dict[str, Any]:
-        if values.get('regex') is not None and values.get('not_regex') is not None:
+    @model_validator(mode='after')
+    def mutex_validations(self) -> 'TransformCopyArgs':
+        if self.regex is not None and self.not_regex is not None:
             raise ValueError('Argument "not_regex" not allowed with "regex"')
 
-        return values
+        return self
 
 
 class TransformRenameArgs(TransformCopyArgs):
-    recipe_handler: Callable = const(TaskTransform.rename_recipe)
+    recipe_handler: const(Callable, TaskTransform.rename_recipe)
 
 
 class TransformRecipeArgs(TransformArgs):
-    recipe_handler: Callable = const(TaskTransform.load_recipe)
+    recipe_handler: const(Callable, TaskTransform.load_recipe)
     from_file: Optional[str] = None
     from_json: Optional[str] = None
 
     # Validators
-    _validate_existing_file = validator('from_file', allow_reuse=True)(validate_existing_file)
-    _validate_json = validator('from_json', allow_reuse=True)(validate_json)
+    _validate_existing_file = field_validator('from_file')(validate_existing_file)
+    _validate_json = field_validator('from_json')(validate_json)
 
-    @root_validator(skip_on_failure=True)
-    def mutex_validations(cls, values: Dict[str, Any]) -> Dict[str, Any]:
-        if values.get('from_file') is not None and values.get('from_json') is not None:
+    @model_validator(mode='after')
+    def mutex_validations(self) -> 'TransformRecipeArgs':
+        if self.from_file is not None and self.from_json is not None:
             raise ValueError('Argument "from_file" not allowed with "from_json"')
 
-        return values
+        return self
+
+
+class TransformBuildRecipeArgs(TaskArgs):
+    subtask_handler: const(Callable, TaskTransform.build_recipe)
+    workdir: Optional[str] = None
+    recipe_file: str
+
+    # Validators
+    _validate_filename = field_validator('recipe_file')(validate_filename)
+    _validate_workdir = field_validator('workdir')(validate_workdir)

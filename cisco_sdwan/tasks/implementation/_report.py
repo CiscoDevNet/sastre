@@ -5,7 +5,8 @@ import yaml
 from datetime import date
 from difflib import unified_diff, HtmlDiff
 from typing import Union, Optional, Iterator, List, Dict, Any, NamedTuple, Type, Tuple, Callable, Set
-from pydantic import BaseModel, ValidationError, validator, Extra, root_validator
+from typing_extensions import Annotated
+from pydantic import field_validator, model_validator, BaseModel, ValidationError, Field, ConfigDict
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest
 from cisco_sdwan.base.catalog import CATALOG_TAG_ALL, ordered_tags
@@ -19,15 +20,18 @@ from ._show import TaskShow, ShowDevicesArgs, ShowRealtimeArgs, ShowStateArgs, S
 
 
 # Models for the report specification
-class SectionModel(BaseModel, extra=Extra.forbid):
+class SectionModel(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
     name: str
     task: str
     args: Optional[Dict[str, Any]] = None
     inherit_globals: bool = True
     skip_diff: bool = False
 
-    @validator('task')
-    def validate_task(cls, v):
+    @field_validator('task')
+    @classmethod
+    def validate_task(cls, v: str) -> str:
         if tuple(v.split()) not in section_catalog:
             raise ValueError(f"'{v}' is not a valid section task")
         return v
@@ -268,6 +272,7 @@ class TaskReport(Task):
 
         return result
 
+    # noinspection PyUnusedLocal
     def subtask_diff(self, parsed_args, api: Optional[Rest]) -> Union[None, list]:
         self.log_info(f'Report diff task: "{parsed_args.report_a}" <-> "{parsed_args.report_b}"')
         report_a = Report.load(parsed_args.report_a)
@@ -403,33 +408,34 @@ def diff_txt_iter(a: Report, b: Report) -> Iterator[str]:
 
 
 class ReportCreateArgs(TaskArgs):
-    subtask_handler: Callable = const(TaskReport.subtask_create)
-    file: Optional[str] = None
+    subtask_handler: const(Callable, TaskReport.subtask_create)
+    file: Annotated[str, Field(validate_default=True)] = None
     workdir: Optional[str] = None
     diff: Optional[str] = None
     spec_file: Optional[str] = None
     spec_json: Optional[str] = None
 
     # Validators
-    _validate_workdir = validator('workdir', allow_reuse=True)(validate_workdir)
-    _validate_existing_file = validator('spec_file', 'diff', allow_reuse=True)(validate_existing_file)
-    _validate_json = validator('spec_json', allow_reuse=True)(validate_json)
+    _validate_workdir = field_validator('workdir')(validate_workdir)
+    _validate_existing_file = field_validator('spec_file', 'diff')(validate_existing_file)
+    _validate_json = field_validator('spec_json')(validate_json)
 
-    @validator('file', pre=True, always=True)
+    @field_validator('file', mode='before')
+    @classmethod
     def validate_report_file(cls, v):
-        filename = v or f'report_{date.today():%Y%m%d}.txt'
+        filename = (isinstance(v, str) and v) or f'report_{date.today():%Y%m%d}.txt'
         return validate_filename(filename)
 
-    @root_validator(skip_on_failure=True)
-    def mutex_validations(cls, values: Dict[str, Any]) -> Dict[str, Any]:
-        if values.get('spec_file') is not None and values.get('spec_json') is not None:
+    @model_validator(mode='after')
+    def mutex_validations(self) -> 'ReportCreateArgs':
+        if self.spec_file is not None and self.spec_json is not None:
             raise ValueError('Argument "spec_file" not allowed with "spec_json"')
 
-        return values
+        return self
 
 
 class ReportDiffArgs(TaskArgs):
-    subtask_handler: Callable = const(TaskReport.subtask_diff)
+    subtask_handler: const(Callable, TaskReport.subtask_diff)
     report_a: Optional[str] = None
     report_b: Optional[str] = None
     save_html: Optional[str] = None
@@ -438,13 +444,13 @@ class ReportDiffArgs(TaskArgs):
     spec_json: Optional[str] = None
 
     # Validators
-    _validate_existing_file = validator('report_a', 'report_b', 'spec_file', allow_reuse=True)(validate_existing_file)
-    _validate_json = validator('spec_json', allow_reuse=True)(validate_json)
-    _validate_filename = validator('save_html', 'save_txt', allow_reuse=True)(validate_filename)
+    _validate_existing_file = field_validator('report_a', 'report_b', 'spec_file')(validate_existing_file)
+    _validate_json = field_validator('spec_json')(validate_json)
+    _validate_filename = field_validator('save_html', 'save_txt')(validate_filename)
 
-    @root_validator(skip_on_failure=True)
-    def mutex_validations(cls, values: Dict[str, Any]) -> Dict[str, Any]:
-        if values.get('spec_file') is not None and values.get('spec_json') is not None:
+    @model_validator(mode='after')
+    def mutex_validations(self) -> 'ReportDiffArgs':
+        if self.spec_file is not None and self.spec_json is not None:
             raise ValueError('Argument "spec_file" not allowed with "spec_json"')
 
-        return values
+        return self
