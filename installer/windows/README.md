@@ -1,8 +1,10 @@
 # Sastre-Pro - windows installer builder steps
 
+NOTE: Installer supports both Podman and Docker. So, use either Podman or Docker to build sastre-pro image.</br>
+
 1. Go to root directory of Sastre-Pro and run below command to generate Application image
 ```
-docker build --no-cache -t sastre-pro:latest .
+docker build --no-cache -t localhost/sastre-pro:latest .
 ```
 2. Verify docker image is created
 ```
@@ -10,13 +12,13 @@ docker images
 ```
 3. Save Sastre-Pro docker image as tar file
 ```
-docker save -o sastre-pro.tar sastre-pro:latest
+docker save -o sastre-pro.tar localhost/sastre-pro:latest
 ```
 
-## Login to Windows machine and copy "windows" folder and files to ${LOCATION}
+## Login to Windows machine (X64 and ARM64 architecture)  and copy "windows" folder and files to ${LOCATION} and follow below steps
 
 ### Pre-requisite
-Download [NSIS](https://nsis.sourceforge.io/Download) for compiling and generating insaller for windows
+Download [NSIS](https://nsis.sourceforge.io/Download) in Windows machine for compiling and generating insaller for windows
 
 
 4. Modify windows installer files if needed
@@ -44,5 +46,8 @@ main.bat Sastre-Pro {VERSION}
 
 7. Open NSIS tool and select "sastre-pro.nsi" file located at "${LOCATION}\windows\target\" for compiling and generating Sastre-Pro installer
 
+8. After the successful compilation by NSIS tool, the windows installer .exe fle is created for Sastre-Pro application at the following location : "${LOCATION}\windows\target\sastre-pro.exe"
 
-#### After the successful compilation by NSIS tool, the windows installer .exe fle is created for Sastre-Pro application at the following location : "${LOCATION}\windows\target\sastre-pro.exe"
+9. Run sastre-pro.exe to verify installation, running and uninstallation of Sastre-Pro using both Podman and Docker container engines
+
+10. Follow Cisco SWIMS process to sign the Sastre-Pro installer (i.e sastre-pro.exe) for both Windows X64 and Windows ARM64
