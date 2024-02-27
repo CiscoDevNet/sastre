@@ -26,7 +26,6 @@ function printUsage() {
   echo
   echo -e "\033[1mExample::\033[0m"
   echo "$0 wso2am 2.6.0"
-
 }
 
 #Start the generator
@@ -98,6 +97,7 @@ copyBuildDirectory() {
     sed -i '' -e 's/__VERSION__/'${VERSION}'/g' "${TARGET_DIRECTORY}/darwin/scripts/postinstall"
     sed -i '' -e 's/__PRODUCT__/'${PRODUCT}'/g' "${TARGET_DIRECTORY}/darwin/scripts/postinstall"
     chmod -R 755 "${TARGET_DIRECTORY}/darwin/scripts/postinstall"
+    cp -a "$SCRIPTPATH"/application/container_engine.sh "${TARGET_DIRECTORY}/darwin/scripts/"
 
     sed -i '' -e 's/__VERSION__/'${VERSION}'/g' "${TARGET_DIRECTORY}/darwin/Distribution"
     sed -i '' -e 's/__PRODUCT__/'${PRODUCT}'/g' "${TARGET_DIRECTORY}/darwin/Distribution"
@@ -114,8 +114,6 @@ copyBuildDirectory() {
     mkdir -p "${TARGET_DIRECTORY}"/darwinpkg/"${PWD_HOME}"/${PRODUCT}
     cp -a "$SCRIPTPATH"/application/. "${TARGET_DIRECTORY}"/darwinpkg/"${PWD_HOME}"/${PRODUCT}
     chmod -R 755 "${TARGET_DIRECTORY}"/darwinpkg/"${PWD_HOME}"/${PRODUCT}
-    sed -i '' -e "s/__VERSION__/${VERSION}/g" "${TARGET_DIRECTORY}/darwinpkg/${PWD_HOME}/${PRODUCT}/sastre.sh"
-    sed -i '' -e "s/__PRODUCT__/${PRODUCT}/g" "${TARGET_DIRECTORY}/darwinpkg/${PWD_HOME}/${PRODUCT}/sastre.sh"
 
     rm -rf "${TARGET_DIRECTORY}/package"
     mkdir -p "${TARGET_DIRECTORY}/package"
@@ -128,7 +126,6 @@ copyBuildDirectory() {
 
 function buildPackage() {
     log_info "Application installer package building started.(1/3)"
-   #pkgbuild --identifier "org.${PRODUCT}.${VERSION}" \
     pkgbuild --identifier "sastre-pro" \
     --version "${VERSION}" \
     --scripts "${TARGET_DIRECTORY}/darwin/scripts" \
@@ -173,6 +170,9 @@ function createInstaller() {
 }
 
 function createUninstaller(){
+    cp -r "$SCRIPTPATH/darwin/Resources/uninstall.app" "${TARGET_DIRECTORY}/darwinpkg/${PWD_HOME}/${PRODUCT}"
+    cp -r "$SCRIPTPATH/darwin/Resources/caution.png" "${TARGET_DIRECTORY}/darwinpkg/${PWD_HOME}/${PRODUCT}"
+    cp -r "$SCRIPTPATH/darwin/Resources/sastre.icns" "${TARGET_DIRECTORY}/darwinpkg/${PWD_HOME}/${PRODUCT}"
     cp "$SCRIPTPATH/darwin/Resources/uninstall.sh" "${TARGET_DIRECTORY}/darwinpkg/${PWD_HOME}/${PRODUCT}"
     sed -i '' -e "s/__VERSION__/${VERSION}/g" "${TARGET_DIRECTORY}/darwinpkg/${PWD_HOME}/${PRODUCT}/uninstall.sh"
     sed -i '' -e "s/__PRODUCT__/${PRODUCT}/g" "${TARGET_DIRECTORY}/darwinpkg/${PWD_HOME}/${PRODUCT}/uninstall.sh"
