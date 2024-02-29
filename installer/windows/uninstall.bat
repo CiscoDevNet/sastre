@@ -1,7 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
 
-call "C:\sastre-pro\container_engine.bat"
+call "%USERPROFILE%\sastre-pro\container_engine.bat"
 if %errorlevel% neq 0 (
     exit /b 1
 )
@@ -52,6 +52,6 @@ if %images_removed_count% neq 0 (
 )
 
 echo =============Sastre-Pro application uninstall process finished=============
-echo NOTE: Please delete C:\sastre-pro\sastre-volume folder manually (if you choose so)
+echo NOTE: Please delete %USERPROFILE%\sastre-pro\sastre-volume folder manually (if you choose so)
 echo The Sastre-Pro image has been successfully unloaded from the %CONTAINER_EXE% container engine.
 exit /b 0
