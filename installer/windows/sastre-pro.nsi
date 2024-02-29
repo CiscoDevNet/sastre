@@ -41,7 +41,7 @@ Outfile "${APPNAME}.exe"
 RequestExecutionLevel admin ; Ensure administrator privileges for installation
 
 ; The default installation directory
-InstallDir "C:\${APPNAME}"
+InstallDir "$PROFILE\${APPNAME}"
 
 Var OUTPUT_FILE
 
