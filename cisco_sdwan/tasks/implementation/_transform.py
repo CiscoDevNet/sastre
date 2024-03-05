@@ -36,6 +36,9 @@ class TransformRecipeNameTemplate(BaseModel):
     _validate_name_regex = field_validator('name_regex')(validate_ext_template)
 
 
+RECIPE_VALUE_CHANGE_ME: str = '< CHANGE ME >'
+
+
 class ValueMap(BaseModel):
     from_value: str
     to_value: str
@@ -439,7 +442,7 @@ class TaskTransform(Task):
                             self.log_info(f'Found {len(crypt_values_set)} crypt value{"s"[:len(crypt_values_set) ^ 1]} '
                                           f'in {info} {item_name}')
                             replacements = [
-                                ValueMap(from_value=value, to_value='< CHANGE ME >') for value in crypt_values_set
+                                ValueMap(from_value=value, to_value=RECIPE_VALUE_CHANGE_ME) for value in crypt_values_set
                             ]
                             resources.append(CryptResourceUpdate(resource_name=item_name, replacements=replacements))
                             tag_set.add(tag)
@@ -448,7 +451,7 @@ class TaskTransform(Task):
                 update_recipe = TransformRecipe(tag=next(iter(tag_set)) if len(tag_set) == 1 else CATALOG_TAG_ALL,
                                                 crypt_updates=resources)
                 with open(parsed_args.recipe_file, 'w') as file:
-                    yaml.dump(update_recipe.dict(exclude_none=True, exclude={'replace_source'}),
+                    yaml.dump(update_recipe.model_dump(exclude_none=True, exclude_defaults=True),
                               sort_keys=False, indent=2, stream=file)
                 self.log_info(f'Recipe file saved as "{parsed_args.recipe_file}"')
             else:
