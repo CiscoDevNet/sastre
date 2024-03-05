@@ -12,6 +12,7 @@ Sastre 1.23 [February x, 2024]
   - New SDWAN service profile parcels: routing multicast, tracker, trackergroup, appqoe
   - New SDWAN transport profile parcels: routing ospf, trackergroup, ipv6-tracker, ipv6-trackergroup, interface gre, gps
   - New SDWAN other profile parcels: ucse
+- Installation options expanded to include installers for Mac and Windows, with compatibility for both Podman and Docker.
 
 #### Fixes:
 - [#16] Fixed config group attachment error with vManage 20.12

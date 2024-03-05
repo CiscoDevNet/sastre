@@ -1022,8 +1022,8 @@ The first step is to find out the vManage-encrypted values present on vManage or
 
 Generate a recipe skeleton for the transform task:
 ```
-% sdwan --verbose transform build-recipe --workdir dcloud-clean dcloud-clean-pwd.yml
-INFO: Transform build-recipe task: Local workdir: "dcloud-clean" -> Recipe file: "dcloud-clean-pwd.yml"
+% sdwan --verbose transform build-recipe --workdir dcloud-clean-mar4 recipe.yml
+INFO: Transform build-recipe task: Local workdir: "dcloud-clean-mar4" -> Recipe file: "recipe.yml"
 INFO: Inspecting policy_customapp items
 INFO: Inspecting policy_list items
 INFO: Inspecting policy_definition items
@@ -1033,194 +1033,200 @@ INFO: Inspecting policy_security items
 INFO: Inspecting policy_vedge items
 INFO: Inspecting policy_vsmart items
 INFO: Inspecting template_feature items
-INFO: Found 2 crypt values in feature template AAA_CISCO_Template_v1
-INFO: Found 1 crypt value in feature template All-SNMP-Basic_cEdge
-INFO: Found 2 crypt values in feature template SNMP-dCloud-Feature
+INFO: Found 1 crypt value in feature template VIP23-SIG-Credentials
+INFO: Found 1 crypt value in feature template SNMP-Basic_cEdge_v5
+INFO: Found 1 crypt value in feature template AddOnFeature_v1
 INFO: Inspecting template_device items
+INFO: Found 2 crypt values in device template test-cli-template
 INFO: Inspecting feature_profile items
 INFO: Inspecting config_group items
-INFO: Recipe file saved as "dcloud-clean-pwd.yml"
+INFO: Recipe file saved as "recipe.yml"
 INFO: Task completed successfully
 ```
 
 The generated recipe file contains all the current vManage-encrypted values found:
 ```                                                        
-% cat dcloud-clean-pwd.yml 
-tag: template_feature
+% cat recipe.yml 
+tag: all
 crypt_updates:
-- resource_name: AAA_CISCO_Template_v1
+- resource_name: VIP23-SIG-Credentials
   replacements:
-  - from_value: $CRYPT_CLUSTER$U3EZmWrJkb9ppJUL74sfiQ==$w874yYHyGxWkeA6Gr296ZQ==
+  - from_value: $CRYPT_CLUSTER$ToFuObeWUxN4nDPeds7FYA==$7Pzo514ANxdOCusPP+ZDth43Pp9S57xtjR1ofNjcszoKHhZ+zgAVbxUoN5rC7Pcz
     to_value: < CHANGE ME >
-  - from_value: $CRYPT_CLUSTER$9TtNiBCZtu4F+1GF/mFZNg==$ORI8eQXNMKTVYqk86XRcTg==
-    to_value: < CHANGE ME >
-- resource_name: All-SNMP-Basic_cEdge
+- resource_name: SNMP-Basic_cEdge_v5
   replacements:
-  - from_value: $CRYPT_CLUSTER$lpkx7wdnLPHHJ8M+0hEngQ==$sKYrCKjl7JCdHGPaFWX5UQ==
+  - from_value: $CRYPT_CLUSTER$yGGUchXoTPJxctd+VFSYlw==$rv5ExxoXKv4Jm5lTiVGE/w==
     to_value: < CHANGE ME >
-- resource_name: SNMP-dCloud-Feature
+- resource_name: AddOnFeature_v1
   replacements:
-  - from_value: $CRYPT_CLUSTER$ik9ahDk0PSw+rp7LSU8ssg==$dxdNLoJy0Pk2Bnw4ee+tJw==
+  - from_value: $CRYPT_CLUSTER$BJdUV6XNOPOiwv+51QU73A==$fs+9bcddKYs4uJn0TbpgRA==
     to_value: < CHANGE ME >
-  - from_value: $CRYPT_CLUSTER$lpkx7wdnLPHHJ8M+0hEngQ==$sKYrCKjl7JCdHGPaFWX5UQ==
+- resource_name: test-cli-template
+  replacements:
+  - from_value: $CRYPT_CLUSTER$E/HhaXuj1/AzVLJgpbB0CA==$CbBdt/32vEqxpfhB+DShww==
+    to_value: < CHANGE ME >
+  - from_value: $CRYPT_CLUSTER$sVhKHHjEsFNv4TwqWBgK4g==$cA2R+9ozdQWlgnCwjXWB3A==
     to_value: < CHANGE ME >
 ```
 
 Entries with a '< CHANGE ME >' placeholder need to be replaced with new values encrypted by the target vManage where you need to restore this backup to. This is done using the encrypt task.
 
-From the recipe file above, note that there are 5 encrypted values that need to be updated (i.e. < CHANGE ME > entries).
+Using the encrypt recipe task, Sastre will update the recipe file by requesting a new clear text value for each '< CHANGE ME >' entry, requesting the target vManage to encrypt it and update the corresponding to_value field with the new encrypted value.
 
-Generate new vManage-encrypted values:
+Update '< CHANGE ME >' entries in the recipe file:
 ```
-% sdwan --verbose encrypt secret1 secret2 secret3 secret4 secret5 
-INFO: Encrypt task: vManage URL: "https://198.18.1.10"
-+================================================================================+
-| Input Value | Encrypted Value                                                  |
-+================================================================================+
-| secret1     | $CRYPT_CLUSTER$8WjsVKdbe4PXcpiCbOBuDw==$ndJr/aGd/cC1fWhYoLm0Uw== |
-| secret2     | $CRYPT_CLUSTER$JTyv90yMT4LcDTT1fNYxCQ==$L5Zl6AjEVzKiOTtwv1/9kw== |
-| secret3     | $CRYPT_CLUSTER$K/TWR/MPNMQNVUqgTq5r1w==$NDN5+mN45Vez2g/49AivEA== |
-| secret4     | $CRYPT_CLUSTER$LGxPhLzRfk8/CeyEF+4YRQ==$PFI5mWtQSIjoUyacwJ6bGQ== |
-| secret5     | $CRYPT_CLUSTER$aFO6pUo+gzczZO95mWy/Tg==$i8w9HFBlHMR97lLoiASLtw== |
-+-------------+------------------------------------------------------------------+
+% sdwan --verbose encrypt recipe recipe.yml 
+INFO: Encrypt task: vManage URL: "https://198.18.133.200:8443"
+Interactive update of recipe file "recipe.yml", press <ENTER> on empty value or ^C to abort without saving.
+
+Resource VIP23-SIG-Credentials, from_value: $CRYPT_CLUSTER$ToFuObeWUxN4nDPeds7FYA==$7Pzo514ANxdOCusPP+ZDth43Pp9S57xtjR1ofNjcszoKHhZ+zgAVbxUoN5rC7Pcz
+Value to encrypt: 
+Encrypted to_value: $CRYPT_CLUSTER$1JePUtTFGJuRf7PjK7IPIg==$VewhaXqfRvD/OUM7L9GqXg==
+
+Resource SNMP-Basic_cEdge_v5, from_value: $CRYPT_CLUSTER$yGGUchXoTPJxctd+VFSYlw==$rv5ExxoXKv4Jm5lTiVGE/w==
+Value to encrypt: 
+Encrypted to_value: $CRYPT_CLUSTER$IqogLSUdq/7X3ydwTgvYwg==$3m0OXrYsYBJ2yFHBAK9acw==
+
+Resource AddOnFeature_v1, from_value: $CRYPT_CLUSTER$BJdUV6XNOPOiwv+51QU73A==$fs+9bcddKYs4uJn0TbpgRA==
+Value to encrypt: 
+Encrypted to_value: $CRYPT_CLUSTER$epLo7ASRew0KNnHAq04h8A==$bU2mGCvHP3ajiBzTAHzhmw==
+
+Resource test-cli-template, from_value: $CRYPT_CLUSTER$E/HhaXuj1/AzVLJgpbB0CA==$CbBdt/32vEqxpfhB+DShww==
+Value to encrypt: 
+Encrypted to_value: $CRYPT_CLUSTER$DwZgpdH/23nINU7Wyg20QA==$ns4BwWhn9J6P9kOhJ+C6VA==
+
+Resource test-cli-template, from_value: $CRYPT_CLUSTER$sVhKHHjEsFNv4TwqWBgK4g==$cA2R+9ozdQWlgnCwjXWB3A==
+Value to encrypt: 
+Encrypted to_value: $CRYPT_CLUSTER$Li8Rp7YiBfuGMjx2wXw+LQ==$WduQWN+mBUF58U2QH2vdLA==
+
+INFO: Recipe file "recipe.yml" updated
 INFO: Task completed successfully
 ```
 
-Update the recipe file with the new vManage-encrypted values:
+The recipe file is updated with the newly encrypted values:
 ```
-% cat dcloud-clean-pwd.yml                                       
-tag: template_feature
+% cat recipe.yml 
+tag: all
 crypt_updates:
-- resource_name: AAA_CISCO_Template_v1
+- resource_name: VIP23-SIG-Credentials
   replacements:
-  - from_value: $CRYPT_CLUSTER$U3EZmWrJkb9ppJUL74sfiQ==$w874yYHyGxWkeA6Gr296ZQ==
-    to_value: $CRYPT_CLUSTER$8WjsVKdbe4PXcpiCbOBuDw==$ndJr/aGd/cC1fWhYoLm0Uw==
-  - from_value: $CRYPT_CLUSTER$9TtNiBCZtu4F+1GF/mFZNg==$ORI8eQXNMKTVYqk86XRcTg==
-    to_value: $CRYPT_CLUSTER$JTyv90yMT4LcDTT1fNYxCQ==$L5Zl6AjEVzKiOTtwv1/9kw==
-- resource_name: All-SNMP-Basic_cEdge
+  - from_value: $CRYPT_CLUSTER$ToFuObeWUxN4nDPeds7FYA==$7Pzo514ANxdOCusPP+ZDth43Pp9S57xtjR1ofNjcszoKHhZ+zgAVbxUoN5rC7Pcz
+    to_value: $CRYPT_CLUSTER$1JePUtTFGJuRf7PjK7IPIg==$VewhaXqfRvD/OUM7L9GqXg==
+- resource_name: SNMP-Basic_cEdge_v5
   replacements:
-  - from_value: $CRYPT_CLUSTER$lpkx7wdnLPHHJ8M+0hEngQ==$sKYrCKjl7JCdHGPaFWX5UQ==
-    to_value: $CRYPT_CLUSTER$K/TWR/MPNMQNVUqgTq5r1w==$NDN5+mN45Vez2g/49AivEA==
-- resource_name: SNMP-dCloud-Feature
+  - from_value: $CRYPT_CLUSTER$yGGUchXoTPJxctd+VFSYlw==$rv5ExxoXKv4Jm5lTiVGE/w==
+    to_value: $CRYPT_CLUSTER$IqogLSUdq/7X3ydwTgvYwg==$3m0OXrYsYBJ2yFHBAK9acw==
+- resource_name: AddOnFeature_v1
   replacements:
-  - from_value: $CRYPT_CLUSTER$ik9ahDk0PSw+rp7LSU8ssg==$dxdNLoJy0Pk2Bnw4ee+tJw==
-    to_value: $CRYPT_CLUSTER$LGxPhLzRfk8/CeyEF+4YRQ==$PFI5mWtQSIjoUyacwJ6bGQ==
-  - from_value: $CRYPT_CLUSTER$lpkx7wdnLPHHJ8M+0hEngQ==$sKYrCKjl7JCdHGPaFWX5UQ==
-    to_value: $CRYPT_CLUSTER$aFO6pUo+gzczZO95mWy/Tg==$i8w9HFBlHMR97lLoiASLtw==
+  - from_value: $CRYPT_CLUSTER$BJdUV6XNOPOiwv+51QU73A==$fs+9bcddKYs4uJn0TbpgRA==
+    to_value: $CRYPT_CLUSTER$epLo7ASRew0KNnHAq04h8A==$bU2mGCvHP3ajiBzTAHzhmw==
+- resource_name: test-cli-template
+  replacements:
+  - from_value: $CRYPT_CLUSTER$E/HhaXuj1/AzVLJgpbB0CA==$CbBdt/32vEqxpfhB+DShww==
+    to_value: $CRYPT_CLUSTER$DwZgpdH/23nINU7Wyg20QA==$ns4BwWhn9J6P9kOhJ+C6VA==
+  - from_value: $CRYPT_CLUSTER$sVhKHHjEsFNv4TwqWBgK4g==$cA2R+9ozdQWlgnCwjXWB3A==
+    to_value: $CRYPT_CLUSTER$Li8Rp7YiBfuGMjx2wXw+LQ==$WduQWN+mBUF58U2QH2vdLA==
 ```
 
-Note that the 'dcloud-clean-pwd.yml' recipe file can also include name_template and/or name_map statements. This allows configuration items to be renamed or copied from, in addition to the crypt_updates.
+Note that the 'recipe.yml' recipe file can also include name_template and/or name_map statements. This allows configuration items to be renamed or copied from, in addition to the crypt_updates.
 
 Processing of crypt_updates happen after name_map and name_template. This means that resource_name entries under crypt_update match on the new names, post name_map and name_template processing. 
 
-As an example, this is a new version of 'dcloud-clean-pwd.yml' that also rename templates in the process:
+As an example, this is a new version of 'recipe.yml' that also rename templates in the process:
 ```
-tag: template_feature
+tag: all
 
 name_template:
   regex: '^All-'
   name_regex: '{name ^All-(.+)}'
 
 name_map:
-  AAA_CISCO_Template_v1: AAA_CISCO_Template_v2
+   SNMP-Basic_cEdge_v5: SNMP-Basic_cEdge_v6
 
 crypt_updates:
-- resource_name: AAA_CISCO_Template_v2
+- resource_name: VIP23-SIG-Credentials
   replacements:
-  - from_value: $CRYPT_CLUSTER$U3EZmWrJkb9ppJUL74sfiQ==$w874yYHyGxWkeA6Gr296ZQ==
-    to_value: $CRYPT_CLUSTER$8WjsVKdbe4PXcpiCbOBuDw==$ndJr/aGd/cC1fWhYoLm0Uw==
-  - from_value: $CRYPT_CLUSTER$9TtNiBCZtu4F+1GF/mFZNg==$ORI8eQXNMKTVYqk86XRcTg==
-    to_value: $CRYPT_CLUSTER$JTyv90yMT4LcDTT1fNYxCQ==$L5Zl6AjEVzKiOTtwv1/9kw==
-- resource_name: SNMP-Basic_cEdge
+  - from_value: $CRYPT_CLUSTER$ToFuObeWUxN4nDPeds7FYA==$7Pzo514ANxdOCusPP+ZDth43Pp9S57xtjR1ofNjcszoKHhZ+zgAVbxUoN5rC7Pcz
+    to_value: $CRYPT_CLUSTER$1JePUtTFGJuRf7PjK7IPIg==$VewhaXqfRvD/OUM7L9GqXg==
+- resource_name: SNMP-Basic_cEdge_v6
   replacements:
-  - from_value: $CRYPT_CLUSTER$lpkx7wdnLPHHJ8M+0hEngQ==$sKYrCKjl7JCdHGPaFWX5UQ==
-    to_value: $CRYPT_CLUSTER$K/TWR/MPNMQNVUqgTq5r1w==$NDN5+mN45Vez2g/49AivEA==
-- resource_name: SNMP-dCloud-Feature
+  - from_value: $CRYPT_CLUSTER$yGGUchXoTPJxctd+VFSYlw==$rv5ExxoXKv4Jm5lTiVGE/w==
+    to_value: $CRYPT_CLUSTER$IqogLSUdq/7X3ydwTgvYwg==$3m0OXrYsYBJ2yFHBAK9acw==
+- resource_name: AddOnFeature_v1
   replacements:
-  - from_value: $CRYPT_CLUSTER$ik9ahDk0PSw+rp7LSU8ssg==$dxdNLoJy0Pk2Bnw4ee+tJw==
-    to_value: $CRYPT_CLUSTER$LGxPhLzRfk8/CeyEF+4YRQ==$PFI5mWtQSIjoUyacwJ6bGQ==
-  - from_value: $CRYPT_CLUSTER$lpkx7wdnLPHHJ8M+0hEngQ==$sKYrCKjl7JCdHGPaFWX5UQ==
-    to_value: $CRYPT_CLUSTER$aFO6pUo+gzczZO95mWy/Tg==$i8w9HFBlHMR97lLoiASLtw==
+  - from_value: $CRYPT_CLUSTER$BJdUV6XNOPOiwv+51QU73A==$fs+9bcddKYs4uJn0TbpgRA==
+    to_value: $CRYPT_CLUSTER$epLo7ASRew0KNnHAq04h8A==$bU2mGCvHP3ajiBzTAHzhmw==
+- resource_name: test-cli-template
+  replacements:
+  - from_value: $CRYPT_CLUSTER$E/HhaXuj1/AzVLJgpbB0CA==$CbBdt/32vEqxpfhB+DShww==
+    to_value: $CRYPT_CLUSTER$DwZgpdH/23nINU7Wyg20QA==$ns4BwWhn9J6P9kOhJ+C6VA==
+  - from_value: $CRYPT_CLUSTER$sVhKHHjEsFNv4TwqWBgK4g==$cA2R+9ozdQWlgnCwjXWB3A==
+    to_value: $CRYPT_CLUSTER$Li8Rp7YiBfuGMjx2wXw+LQ==$WduQWN+mBUF58U2QH2vdLA==
 ```
 
-Note that crypt_update resource_name AAA_CISCO_Template_v2 is matching the new name post name_map update. And SNMP-Basic_cEdge is matching the new name post name_template processing.
+Note that crypt_update resource_name SNMP-Basic_cEdge_v6 is matching the new name post name_map update.
 
 With the new recipe file prepared, the next step is to execute the transform recipe command.
 
 Transform backup using the recipe file:
 ```
-% sdwan --verbose transform recipe --from-file dcloud-clean-pwd.yml --workdir dcloud-clean dcloud-clean-transformed
-INFO: Transform task: Local workdir: "dcloud-clean" -> Local output dir: "dcloud-clean-transformed"
+% sdwan --verbose transform recipe --from-file recipe.yml --workdir dcloud-clean-mar4 dcloud-clean-mar4-transformed
+INFO: Transform task: Local workdir: "dcloud-clean-mar4" -> Local output dir: "dcloud-clean-mar4-transformed"
 <snip>
 INFO: Inspecting template_feature items
-INFO: Matched feature template All-SNMP-Basic
-INFO: Replacing feature template: All-SNMP-Basic -> SNMP-Basic
-INFO: Matched feature template All-BFDTemplate
-INFO: Replacing feature template: All-BFDTemplate -> BFDTemplate
-INFO: Matched feature template All-Banner-dCloud
-INFO: Replacing feature template: All-Banner-dCloud -> Banner-dCloud
-INFO: Matched feature template All-System-Template_cEdge
-INFO: Replacing feature template: All-System-Template_cEdge -> System-Template_cEdge
-INFO: Matched feature template All-Banner-dCloud_cEdge
-INFO: Replacing feature template: All-Banner-dCloud_cEdge -> Banner-dCloud_cEdge
-INFO: Matched feature template AAA_CISCO_Template_v1
-INFO: Replacing feature template: AAA_CISCO_Template_v1 -> AAA_CISCO_Template_v2
-INFO: Matched feature template All-System-Template
-INFO: Replacing feature template: All-System-Template -> System-Template
-INFO: Matched feature template All-OMP-Basic
-INFO: Replacing feature template: All-OMP-Basic -> OMP-Basic
-INFO: Matched feature template All-OMP-Basic_cEdge
-INFO: Replacing feature template: All-OMP-Basic_cEdge -> OMP-Basic_cEdge
-INFO: Matched feature template All-VPN0-TEMPLATE
-INFO: Replacing feature template: All-VPN0-TEMPLATE -> VPN0-TEMPLATE
+INFO: Matched feature template VIP23-SIG-Credentials
+INFO: Replacing feature template: VIP23-SIG-Credentials -> VIP23-SIG-Credentials
 INFO: Matched feature template All-VPN0-TEMPLATE_cEdge
 INFO: Replacing feature template: All-VPN0-TEMPLATE_cEdge -> VPN0-TEMPLATE_cEdge
+INFO: Matched feature template All-Banner-dCloud_cEdge
+INFO: Replacing feature template: All-Banner-dCloud_cEdge -> Banner-dCloud_cEdge
 INFO: Matched feature template All-SNMP-Basic_cEdge
 INFO: Replacing feature template: All-SNMP-Basic_cEdge -> SNMP-Basic_cEdge
-INFO: Matched feature template SNMP-dCloud-Feature
-INFO: Replacing feature template: SNMP-dCloud-Feature -> SNMP-dCloud-Feature
+INFO: Matched feature template All-OMP-Basic_cEdge
+INFO: Replacing feature template: All-OMP-Basic_cEdge -> OMP-Basic_cEdge
+INFO: Matched feature template All-System-Template_cEdge
+INFO: Replacing feature template: All-System-Template_cEdge -> System-Template_cEdge
 INFO: Matched feature template All-BFDTemplate_cEdge
 INFO: Replacing feature template: All-BFDTemplate_cEdge -> BFDTemplate_cEdge
+INFO: Matched feature template All-SNMP-Basic
+INFO: Replacing feature template: All-SNMP-Basic -> SNMP-Basic
+INFO: Matched feature template SNMP-Basic_cEdge_v5
+INFO: Replacing feature template: SNMP-Basic_cEdge_v5 -> SNMP-Basic_cEdge_v6
+INFO: Matched feature template AddOnFeature_v1
+INFO: Replacing feature template: AddOnFeature_v1 -> AddOnFeature_v1
 INFO: Inspecting template_device items
+INFO: Matched device template test-cli-template
+INFO: Replacing device template: test-cli-template -> test-cli-template
 INFO: Inspecting feature_profile items
 INFO: Inspecting config_group items
 INFO: Task completed successfully
 ```
 
-The final step is to restore 'dcloud-clean-transformed' to vManage:
+The final step is to restore 'dcloud-clean-mar4-transformed' to vManage:
 ```
-% sdwan --verbose restore all --workdir dcloud-clean-transformed --update
-INFO: Restore task: Local workdir: "dcloud-clean-transformed" -> vManage URL: "https://198.18.1.10"
+% sdwan --verbose restore all --workdir dcloud-clean-mar4-transformed --update
+INFO: Restore task: Local workdir: "dcloud-clean-mar4-transformed" -> vManage URL: "https://198.18.133.200:8443"
 <snip>
 INFO: Pushing items to vManage
-INFO: Done: Create feature template SNMP-Basic
-INFO: Done: Create feature template BFDTemplate
-INFO: Done: Create feature template Banner-dCloud
-INFO: Done: Create feature template System-Template_cEdge
-INFO: Done: Create feature template Banner-dCloud_cEdge
-INFO: Done: Create feature template AAA_CISCO_Template_v2
-INFO: Done: Create feature template System-Template
-INFO: Done: Create feature template OMP-Basic
-INFO: Done: Create feature template OMP-Basic_cEdge
-INFO: Done: Create feature template VPN0-TEMPLATE
+INFO: Done: Update feature template VIP23-SIG-Credentials
 INFO: Done: Create feature template VPN0-TEMPLATE_cEdge
+INFO: Done: Create feature template Banner-dCloud_cEdge
 INFO: Done: Create feature template SNMP-Basic_cEdge
-INFO: Updating feature template SNMP-dCloud-Feature requires reattach of affected templates
-INFO: Template attach: DC-vEdges (DC1-VEDGE1, DC1-VEDGE2)
-INFO: Reattaching templates
-INFO: Waiting...
-INFO: Completed DC-vEdges
-INFO: Completed reattaching templates
-INFO: Done: Update feature template SNMP-dCloud-Feature
+INFO: Done: Create feature template OMP-Basic_cEdge
+INFO: Done: Create feature template System-Template_cEdge
 INFO: Done: Create feature template BFDTemplate_cEdge
-INFO: Done: Update device template BranchType2Template-vEdge
-INFO: Updating device template BranchType1Template-cEdge requires reattach
-INFO: Template attach: BranchType1Template-cEdge (BR1-CEDGE2, BR1-CEDGE1)
+INFO: Done: Create feature template SNMP-Basic
+INFO: Done: Create feature template SNMP-Basic_cEdge_v6
+INFO: Done: Update feature template AddOnFeature_v1
+INFO: Updating device template test-cli-template requires reattach
+INFO: Template attach: test-cli-template (Site100-cE1)
 INFO: Reattaching templates
 INFO: Waiting...
 INFO: Waiting...
-INFO: Completed BranchType1Template-cEdge
+INFO: Waiting...
+INFO: Completed test-cli-template
 INFO: Completed reattaching templates
+INFO: Done: Update device template test-cli-template
 INFO: Done: Update device template BranchType1Template-cEdge
 INFO: Task completed successfully
 ```
