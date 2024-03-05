@@ -18,7 +18,7 @@
 !define MUI_ABORTWARNING
 
 # Set the custom installer window title
-BrandingText "Cisco CX Sastre Installer"
+BrandingText "Cisco CX Sastre-Pro Installer"
 
 ; Initialize MUI
 ;MUI_Init
@@ -29,7 +29,7 @@ Var TEXT
 ;!insertmacro MUI_PAGE_WELCOME
 Page custom WelcomePage
 !insertmacro MUI_PAGE_LICENSE "LICENSE.txt"
-Page directory
+;Page directory - not to allow user from selecting custom directory installation
 !insertmacro MUI_PAGE_INSTFILES
 Page custom RunSastrePage
 Page custom UninstallSastrePage
@@ -41,36 +41,72 @@ Outfile "${APPNAME}.exe"
 RequestExecutionLevel admin ; Ensure administrator privileges for installation
 
 ; The default installation directory
-InstallDir "C:\${APPNAME}"
+InstallDir "$PROFILE\${APPNAME}"
+
+Var OUTPUT_FILE
+
+!macro SharedOutputFunction functionName
+    Function ${functionName}
+        FileOpen $2 "$OUTPUT_FILE" r
+
+        loopRead:
+            ClearErrors
+            FileRead $2 $3
+            IfErrors doneReading
+            StrCmp $3 "" loopRead
+            DetailPrint $3
+            StrCpy $1 $3
+            Goto loopRead
+
+        doneReading:
+        FileClose $2
+    FunctionEnd
+!macroend
+
+!insertmacro SharedOutputFunction "ReadOutput"
+!insertmacro SharedOutputFunction "un.ReadOutput"
 
 Section "install"
-    SetOutPath "$InstDir" ; Specify the installation directory
+    SetOutPath "$InstDir" 
 
     ; Copy the files
-    File "sastre-pro.bat"
-    File "uninstall.bat"
+    File "container_engine.bat"
     File "install.bat"
     File "sastre-pro.tar"
-    File "sastre-pro.ico"
+    
+    StrCpy $OUTPUT_FILE "$TEMP\sastre-pro_install.log"
 
-    ; Execute the batch file from the temporary directory
-    ExecWait "install.bat"
+    ExecWait '"install.bat" > "$OUTPUT_FILE"' $0
+    IntCmp $0 0 noError
+    call ReadOutput
 
-    ; Delete installer files after installation
+    ; Display the error message from the output file
+    MessageBox MB_ICONSTOP "$1Installation will now exit." /SD IDOK
+    Delete "container_engine.bat"
     Delete "install.bat"
     Delete "sastre-pro.tar"
+    Abort ;
 
-    StrCpy $0 "$EXEDIR\sastre-pro.ico"
+    noError:
+        ; Delete installer files after installation
+        Delete "install.bat"
+        Delete "sastre-pro.tar"
 
-    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ImageMaker" \
-                    "DisplayName" "Sastre-Pro"
-    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ImageMaker" \
-                    "UninstallString" "$\"$InstDir\uninstaller.exe$\""
-    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ImageMaker" \
-                    "DisplayIcon" "$\"$InstDir\sastre-pro.ico$\""
+        File "sastre-pro.bat"
+        File "uninstall.bat"
+        File "sastre-pro.ico"
+        
+        WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ImageMaker" \
+                        "DisplayName" "Sastre-Pro"
+        WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ImageMaker" \
+                        "UninstallString" "$\"$InstDir\uninstaller.exe$\""
+        WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ImageMaker" \
+                        "DisplayIcon" "$\"$InstDir\sastre-pro.ico$\""
 
-    ; Create the uninstaller
-    WriteUninstaller "uninstaller.exe"
+        ; Create the uninstaller
+        WriteUninstaller "uninstaller.exe"
+        call ReadOutput
+        Messagebox MB_OK "$1"
 SectionEnd
 
 Function WelcomePage
@@ -125,12 +161,23 @@ Function UninstallSastrePage
 FunctionEnd
 
 Section Uninstall ; Section for uninstallation
-    ExecWait '"$InstDir\uninstall.bat"'
+    StrCpy $OUTPUT_FILE "$TEMP\sastre-pro_uninstall.log"
+    ExecWait '"$InstDir\uninstall.bat" > "$OUTPUT_FILE"' $0
+    IntCmp $0 0 noError
+    
+    call un.ReadOutput
+    
+    MessageBox MB_ICONSTOP "$1Uninstallation will now exit." /SD IDOK
+    Abort ;
 
-    DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ImageMaker"
+    noError:
+        DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ImageMaker"
 
-    Delete /REBOOTOK  "$InstDir\sastre-pro.bat"
-    Delete /REBOOTOK  "$InstDir\uninstall.bat"
-    Delete /REBOOTOK  "$InstDir\uninstaller.exe"
-    Delete /REBOOTOK  "$InstDir\sastre-pro.ico"
+        Delete /REBOOTOK  "$InstDir\sastre-pro.bat"
+        Delete /REBOOTOK  "$InstDir\sastre-pro.ico"
+        Delete /REBOOTOK  "$InstDir\uninstall.bat"
+        Delete /REBOOTOK  "$InstDir\container_engine.bat"
+        Delete /REBOOTOK  "$InstDir\uninstaller.exe"
+        call un.ReadOutput
+        Messagebox MB_OK "$1"
 SectionEnd

@@ -14,6 +14,7 @@ copy /Y "sastre-pro.nsi" "%TARGET_FOLDER%"
 copy /Y "LICENSE.txt" "%TARGET_FOLDER%"
 copy /Y "sastre-pro.ico" "%TARGET_FOLDER%"
 copy /Y "sastre-pro.bat" "%TARGET_FOLDER%"
+copy /Y "container_engine.bat" "%TARGET_FOLDER%"
 copy /Y "install.bat" "%TARGET_FOLDER%"
 copy /Y "uninstall.bat" "%TARGET_FOLDER%"
 

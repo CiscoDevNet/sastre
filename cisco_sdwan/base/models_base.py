@@ -781,7 +781,7 @@ class ConfigItem(ApiItem):
         """
         Extracts values that were encrypted by vManage. That is, with $CRYPT_CLUSTER$ prefix.
         """
-        yield from re.findall(r'"(\$CRYPT_CLUSTER\$[^"]+)"', json.dumps(self.data))
+        yield from re.findall(r'\$CRYPT_CLUSTER\$.+?(?=["\s\\])', json.dumps(self.data))
 
     @classmethod
     def is_name_valid(cls, proposed_name: Optional[str]) -> bool:
@@ -922,7 +922,7 @@ class Config2Item(ConfigItem):
         exclude_set = self.skip_cmp_tag_set | {self.id_tag}
         put_model = self.put_model or self.post_model
 
-        local_cmp_dict = put_model(**self.data).dict(by_alias=True, exclude=exclude_set)
+        local_cmp_dict = put_model(**self.data).model_dump(by_alias=True, exclude=exclude_set)
         other_cmp_dict = {k: v for k, v in other.items() if k not in exclude_set}
 
         return sorted(json.dumps(local_cmp_dict)) == sorted(json.dumps(other_cmp_dict))
@@ -964,9 +964,9 @@ class Config2Item(ConfigItem):
         payload = op_model(**self.data)
 
         if id_mapping_dict is None:
-            return payload.dict(by_alias=True)
+            return payload.model_dump(by_alias=True)
 
-        return update_ids(id_mapping_dict, payload.dict(by_alias=True))
+        return update_ids(id_mapping_dict, payload.model_dump(by_alias=True))
 
 
 class FeatureProfile(Config2Item):
@@ -1023,7 +1023,7 @@ class FeatureProfile(Config2Item):
             parcel_info = parcel.payload.name
             parcel_payload = parcel.payload
 
-        new_element_id = yield api_path.resolve(*element_ids), parcel_info, parcel_payload.dict(by_alias=True)
+        new_element_id = yield api_path.resolve(*element_ids), parcel_info, parcel_payload.model_dump(by_alias=True)
 
         self.id_mapping[parcel.parcelId] = new_element_id
         new_element_ids = element_ids + (new_element_id,)
@@ -1132,10 +1132,10 @@ def update_ids(id_map: Mapping[str, str], item_data: Dict[str, Any]) -> Dict[str
 
 def update_crypts(crypt_map: Mapping[str, str], item_data: Dict[str, Any]) -> Dict[str, Any]:
     def replace_crypt(match):
-        matched_crypt = match.group(1)
-        return f'"{crypt_map.get(matched_crypt, matched_crypt)}"'
+        matched_crypt = match.group(0)
+        return crypt_map.get(matched_crypt, matched_crypt)
 
-    dict_json = re.sub(r'"(\$CRYPT_CLUSTER\$[^"]+)"', replace_crypt, json.dumps(item_data))
+    dict_json = re.sub(r'\$CRYPT_CLUSTER\$.+?(?=["\s\\])', replace_crypt, json.dumps(item_data))
 
     return json.loads(dict_json)
 
