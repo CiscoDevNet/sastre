@@ -148,13 +148,13 @@ class ApiPathGroup:
     references are registered using the optional parcel_reference_path_map.
     """
     def __init__(self, path_map: Mapping[str, ApiPath],
-                 parcel_reference_path_map: Optional[Mapping[PathKey, Union[ApiPath, ...]]] = None) -> None:
+                 parcel_reference_path_map: Optional[Mapping[PathKey, ApiPath]] = None) -> None:
         """
         @param path_map: Register parcel ApiPaths to a feature profile. Mapping of {<parcelType>: ApiPath, ... }
         @param parcel_reference_path_map: Register parcel reference ApiPaths to a feature profile. Mapping of
                                           {PathKey(<ParcelType>, <parent ParcelType>): ApiPath, ...}
                                           If ... is used instead of an ApiPath it means that this reference parcel
-                                          doesn't need to be explicitly created.
+                                          doesn't need to be explicitly created (thus no ApiPath is provided).
         """
         self._path_map = dict(path_map)
         self._parcel_ref_map = dict(parcel_reference_path_map) if parcel_reference_path_map is not None else {}
@@ -162,15 +162,16 @@ class ApiPathGroup:
         self._parent_types = {path_key.parent_parcel_type
                               for path_key in self._parcel_ref_map if path_key.parent_parcel_type is not None}
 
-    def api_path(self, key: PathKey) -> Tuple[Union[ApiPath, None, ...], bool]:
+    def api_path(self, key: PathKey) -> Tuple[Union[ApiPath, None], bool]:
         """
         Returns the api path associated with the provided key, along with whether this is a parcel reference or an
         actual parcel.
         @param key: A PathKey to find the api path
-        @return: (<parcel api path>, <is reference>) tuple
+        @return: (<parcel api path>, <is reference>) tuple.
         """
         parcel_reference_path = self._parcel_ref_map.get(key)
         if parcel_reference_path is not None:
+            # parcel_reference_path can be an ApiPath or ...
             return parcel_reference_path, True
 
         return self._path_map.get(key.parcel_type), False
