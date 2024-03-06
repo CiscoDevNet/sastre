@@ -883,6 +883,7 @@ class ProfileSdwanService(FeatureProfile):
             "v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/routing/ospf"),
         PathKey("routing/multicast", "lan/vpn"): ApiPath(
             "/v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/routing/multicast"),
+        PathKey("tracker", "trackergroup"): ...,
         PathKey("tracker", "lan/vpn/interface/ethernet"): ApiPath(
             "/v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/interface/ethernet/{ethId}/tracker"),
         PathKey("trackergroup", "lan/vpn/interface/ethernet"): ApiPath(
@@ -926,6 +927,7 @@ class ProfileSdwanTransport(FeatureProfile):
             "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/routing/bgp"),
         PathKey("routing/ospf", "wan/vpn"): ApiPath(
             "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/routing/ospf"),
+        PathKey("tracker", "trackergroup"): ...,
         PathKey("tracker", "wan/vpn/interface/ethernet"): ApiPath(
             "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/interface/ethernet/{ethernetId}/tracker"),
         PathKey("tracker", "wan/vpn/interface/ipsec"): ApiPath(
@@ -937,6 +939,7 @@ class ProfileSdwanTransport(FeatureProfile):
         PathKey("trackergroup", "wan/vpn/interface/ethernet"): ApiPath(
             "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/interface/ethernet/"
             "{ethernetId}/trackergroup"),
+        PathKey("ipv6-tracker", "ipv6-trackergroup"): ...,
         PathKey("ipv6-tracker", "wan/vpn/interface/ethernet"): ApiPath(
             "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/interface/ethernet/"
             "{ethernetId}/ipv6-tracker"),
