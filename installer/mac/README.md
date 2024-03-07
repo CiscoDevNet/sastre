@@ -22,7 +22,9 @@ gzip sastre-pro.tar
 ```
 5. copy the sastre-pro.tar.gz file generated in previous step to {SASTRE-PRO_HOME}/installer/mac/application/
 
-6. Modify macOS installer files
+6. Create "uninstall.app" by following steps in below section - Steps to create or update Sastre-Pro uninstall application
+
+7. Modify macOS installer files
 
 Name | Description
 --- | ---
@@ -34,7 +36,7 @@ Name | Description
 [Sastre-Pro icon](darwin/Resources/sastre.icns)|Update Sastre-Pro icon
 [Post install script](darwin/scripts/postinstall)|Update Post install script
 [Uninstall script](darwin/Resources/uninstall.sh)|Update uninstall script
-[Uninstall app](darwin/Resources/uninstall.app)|Update uninstall sastre-pro application (Follow "Steps to update Sastre-Pro uninstall Application" section below)
+[Uninstall app](darwin/Resources/uninstall.app)|Update uninstall sastre-pro application (Follow "Steps to create or update Sastre-Pro uninstall Application" section below)
 
 7. Go to {SASTRE-PRO_HOME}/installer/mac and run below command to generate Sastre-Pro installer (replace VERSION placeholder with actual value) 
 ```
@@ -64,7 +66,7 @@ pkgutil --check-signature <SIGNED_INSTALLER_NAME>.pkg
 You will see an output with SHA1 fingerprint after the above command if the .pkg file’s sign validation is successful.
 
 
-# Steps to update Sastre-Pro uninstall application
+# Steps to create or update Sastre-Pro uninstall application
 
 1. Open and update [sastre-pro](uninstall.applescript) applescript source
 2. Save the [sastre-pro](uninstall.applescript) applescript as application to "darwin/Resources/" as "uninstall.app" application file
