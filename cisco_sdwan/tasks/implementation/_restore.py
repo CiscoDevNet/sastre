@@ -1,6 +1,6 @@
 import argparse
-from typing import Union, Optional, Sequence, Dict, Set, Any
-from pydantic import validator, root_validator
+from typing import Union, Optional, Sequence, Dict, Set
+from pydantic import model_validator, field_validator
 from uuid import uuid4
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest, RestAPIException, is_version_newer, response_id
@@ -11,7 +11,7 @@ from cisco_sdwan.base.models_vmanage import (DeviceTemplateIndex, PolicyVsmartIn
 from cisco_sdwan.tasks.utils import (TaskOptions, TagOptions, regex_type, default_workdir, existing_workdir_type,
                                      TrackedValidator, ConditionalValidator, zip_file_type)
 from cisco_sdwan.tasks.common import regex_search, Task, WaitActionsException, clean_dir, archive_extract
-from cisco_sdwan.tasks.models import TaskArgs, validate_catalog_tag, validate_workdir_conditional
+from cisco_sdwan.tasks.models import TaskArgs, CatalogTag, validate_workdir_conditional
 from cisco_sdwan.tasks.validators import validate_regex, validate_zip_file
 
 
@@ -365,20 +365,19 @@ class RestoreArgs(TaskArgs):
     dryrun: bool = False
     attach: bool = False
     update: bool = False
-    tag: str
+    tag: CatalogTag
 
     # Validators
-    _validate_archive = validator('archive', allow_reuse=True)(validate_zip_file)
-    _validate_workdir = validator('workdir', allow_reuse=True)(validate_workdir_conditional)
-    _validate_regex = validator('regex', 'not_regex', allow_reuse=True)(validate_regex)
-    _validate_tag = validator('tag', allow_reuse=True)(validate_catalog_tag)
+    _validate_archive = field_validator('archive')(validate_zip_file)
+    _validate_workdir = field_validator('workdir')(validate_workdir_conditional)
+    _validate_regex = field_validator('regex', 'not_regex')(validate_regex)
 
-    @root_validator(skip_on_failure=True)
-    def mutex_validations(cls, values: Dict[str, Any]) -> Dict[str, Any]:
-        if bool(values.get('archive')) == bool(values.get('workdir')):
+    @model_validator(mode='after')
+    def mutex_validations(self) -> 'RestoreArgs':
+        if bool(self.archive) == bool(self.workdir):
             raise ValueError('Either "archive" or "workdir" must to be provided')
 
-        if values.get('regex') is not None and values.get('not_regex') is not None:
+        if self.regex is not None and self.not_regex is not None:
             raise ValueError('Argument "not_regex" not allowed with "regex"')
 
-        return values
+        return self

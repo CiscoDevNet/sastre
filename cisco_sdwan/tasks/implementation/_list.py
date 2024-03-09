@@ -1,13 +1,13 @@
 import argparse
-from typing import Union, Optional, List, Callable, Dict, Any
+from typing import Union, Optional, List, Callable
 from operator import itemgetter
-from pydantic import validator, root_validator
+from pydantic import model_validator, field_validator
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest
 from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL
 from cisco_sdwan.base.models_base import ExtendedTemplate
 from cisco_sdwan.base.models_vmanage import EdgeCertificate
-from cisco_sdwan.tasks.models import TableTaskArgs, validate_catalog_tag, const
+from cisco_sdwan.tasks.models import TableTaskArgs, CatalogTag, const
 from cisco_sdwan.tasks.utils import (TaskOptions, TagOptions, existing_workdir_type, filename_type, regex_type,
                                      ext_template_type)
 from cisco_sdwan.tasks.common import regex_search, Task, Table, get_table_filters, export_json
@@ -165,39 +165,35 @@ class ListArgs(TableTaskArgs):
     workdir: Optional[str] = None
 
     # Validators
-    _validate_workdir = validator('workdir', allow_reuse=True)(validate_workdir)
+    _validate_workdir = field_validator('workdir')(validate_workdir)
 
 
 class ListConfigArgs(ListArgs):
-    subtask_info: str = const('configuration')
-    subtask_handler: Callable = const(TaskList.config_table)
-    tags: List[str]
-
-    # Validators
-    _validate_tags = validator('tags', each_item=True, allow_reuse=True)(validate_catalog_tag)
+    subtask_info: const(str, 'configuration')
+    subtask_handler: const(Callable, TaskList.config_table)
+    tags: List[CatalogTag]
 
 
 class ListCertificateArgs(ListArgs):
-    subtask_info: str = const('certificate')
-    subtask_handler: Callable = const(TaskList.cert_table)
+    subtask_info: const(str, 'certificate')
+    subtask_handler: const(Callable, TaskList.cert_table)
 
 
 class ListTransformArgs(ListArgs):
-    subtask_info: str = const('transform')
-    subtask_handler: Callable = const(TaskList.xform_table)
-    tags: List[str]
+    subtask_info: const(str, 'transform')
+    subtask_handler: const(Callable, TaskList.xform_table)
+    tags: List[CatalogTag]
     regex: Optional[str] = None
     not_regex: Optional[str] = None
     name_regex: str
 
     # Validators
-    _validate_tags = validator('tags', each_item=True, allow_reuse=True)(validate_catalog_tag)
-    _validate_regex = validator('regex', 'not_regex', allow_reuse=True)(validate_regex)
-    _validate_name_regex = validator('name_regex', allow_reuse=True)(validate_ext_template)
+    _validate_regex = field_validator('regex', 'not_regex')(validate_regex)
+    _validate_name_regex = field_validator('name_regex')(validate_ext_template)
 
-    @root_validator(skip_on_failure=True)
-    def mutex_validations(cls, values: Dict[str, Any]) -> Dict[str, Any]:
-        if values.get('regex') is not None and values.get('not_regex') is not None:
+    @model_validator(mode='after')
+    def mutex_validations(self) -> 'ListTransformArgs':
+        if self.regex is not None and self.not_regex is not None:
             raise ValueError('Argument "not_regex" not allowed with "regex"')
 
-        return values
+        return self

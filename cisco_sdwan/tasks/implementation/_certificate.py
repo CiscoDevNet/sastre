@@ -1,6 +1,6 @@
 import argparse
-from typing import Union, Optional, Callable, Dict, Any
-from pydantic import validator, root_validator
+from typing import Union, Optional, Callable
+from pydantic import field_validator, model_validator
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest, RestAPIException
 from cisco_sdwan.base.models_vmanage import EdgeCertificate, EdgeCertificateSync
@@ -120,30 +120,31 @@ class CertificateArgs(TaskArgs):
     dryrun: bool = False
 
     # Validators
-    _validate_regex = validator('regex', 'not_regex', allow_reuse=True)(validate_regex)
+    _validate_regex = field_validator('regex', 'not_regex')(validate_regex)
 
-    @root_validator(skip_on_failure=True)
-    def mutex_validations(cls, values: Dict[str, Any]) -> Dict[str, Any]:
-        if values.get('regex') is not None and values.get('not_regex') is not None:
+    @model_validator(mode='after')
+    def mutex_validations(self) -> 'CertificateArgs':
+        if self.regex is not None and self.not_regex is not None:
             raise ValueError('Argument "not_regex" not allowed with "regex"')
 
-        return values
+        return self
 
 
 class CertificateRestoreArgs(CertificateArgs):
-    source_iter: Callable = const(TaskCertificate.restore_iter)
+    source_iter: const(Callable, TaskCertificate.restore_iter)
     workdir: str
 
     # Validators
-    _validate_workdir = validator('workdir', allow_reuse=True)(validate_workdir)
+    _validate_workdir = field_validator('workdir')(validate_workdir)
 
 
 class CertificateSetArgs(CertificateArgs):
-    source_iter: Callable = const(TaskCertificate.set_iter)
+    source_iter: const(Callable, TaskCertificate.set_iter)
     status: str
 
-    @validator('status')
-    def validate_status(cls, v):
+    @field_validator('status')
+    @classmethod
+    def validate_status(cls, v: str) -> str:
         status_options = ('invalid', 'staging', 'valid')
         if v not in status_options:
             raise ValueError(f'"{v}" is not a valid certificate status. Options are: {", ".join(status_options)}.')
