@@ -840,8 +840,8 @@ class ProfileSdwanSystem(FeatureProfile):
         "omp": ApiPath("v1/feature-profile/sdwan/system/{systemId}/omp"),
         "snmp": ApiPath("v1/feature-profile/sdwan/system/{systemId}/snmp"),
         "perfmonitor": ApiPath("v1/feature-profile/sdwan/system/{systemId}/perfmonitor"),
-        "mrf": ApiPath("/v1/feature-profile/sdwan/system/{systemId}/mrf"),
-        "security": ApiPath("/v1/feature-profile/sdwan/system/{systemId}/security")
+        "mrf": ApiPath("v1/feature-profile/sdwan/system/{systemId}/mrf"),
+        "security": ApiPath("v1/feature-profile/sdwan/system/{systemId}/security")
     })
 
 
@@ -858,9 +858,9 @@ class ProfileSdwanService(FeatureProfile):
         "dhcp-server": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/dhcp-server"),
         "routing/bgp": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/routing/bgp"),
         "routing/ospf": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/routing/ospf"),
-        "routing/multicast": ApiPath("/v1/feature-profile/sdwan/service/{serviceId}/routing/multicast"),
-        "tracker": ApiPath("/v1/feature-profile/sdwan/service/{serviceId}/tracker"),
-        "trackergroup": ApiPath("/v1/feature-profile/sdwan/service/{serviceId}/trackergroup"),
+        "routing/multicast": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/routing/multicast"),
+        "tracker": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/tracker"),
+        "trackergroup": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/trackergroup"),
         "lan/vpn": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/lan/vpn"),
         "lan/vpn/interface/ethernet": ApiPath(
             "v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/interface/ethernet"),
@@ -869,7 +869,7 @@ class ProfileSdwanService(FeatureProfile):
             "v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/interface/ipsec"),
         "switchport": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/switchport"),
         "wirelesslan": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/wirelesslan"),
-        "appqoe": ApiPath("/v1/feature-profile/sdwan/service/{serviceId}/appqoe")
+        "appqoe": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/appqoe")
     }, parcel_reference_path_map={
         PathKey("dhcp-server", "lan/vpn/interface/ethernet"): ApiPath(
             "v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/interface/ethernet/{ethId}/dhcp-server"),
@@ -882,12 +882,14 @@ class ProfileSdwanService(FeatureProfile):
         PathKey("routing/ospf", "lan/vpn"): ApiPath(
             "v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/routing/ospf"),
         PathKey("routing/multicast", "lan/vpn"): ApiPath(
-            "/v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/routing/multicast"),
+            "v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/routing/multicast"),
         PathKey("tracker", "trackergroup"): ...,
+        PathKey("tracker", "lan/vpn"): ...,
         PathKey("tracker", "lan/vpn/interface/ethernet"): ApiPath(
-            "/v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/interface/ethernet/{ethId}/tracker"),
+            "v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/interface/ethernet/{ethId}/tracker"),
+        PathKey("trackergroup", "lan/vpn"): ...,
         PathKey("trackergroup", "lan/vpn/interface/ethernet"): ApiPath(
-            "/v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/interface/ethernet/{ethId}/trackergroup")
+            "v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/interface/ethernet/{ethId}/trackergroup")
     })
 
 
@@ -985,7 +987,7 @@ class ProfileSdwanOther(FeatureProfile):
     store_path = ('feature_profiles', 'sdwan', 'other')
     parcel_api_paths = ApiPathGroup({
         "thousandeyes": ApiPath("v1/feature-profile/sdwan/other/{otherId}/thousandeyes"),
-        "ucse": ApiPath("/v1/feature-profile/sdwan/other/{otherId}/ucse")
+        "ucse": ApiPath("v1/feature-profile/sdwan/other/{otherId}/ucse")
     })
 
 
