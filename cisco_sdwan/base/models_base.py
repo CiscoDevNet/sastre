@@ -14,7 +14,7 @@ from typing import Sequence, Tuple, Union, Iterator, Callable, Mapping, Any, Opt
 from operator import attrgetter
 from datetime import datetime, timezone
 from urllib.parse import quote_plus
-from pydantic import BaseModel, Extra
+from pydantic import ConfigDict, BaseModel
 from requests.exceptions import Timeout
 from .rest_api import RestAPIException, Rest
 
@@ -153,20 +153,25 @@ class ApiPathGroup:
         @param path_map: Register parcel ApiPaths to a feature profile. Mapping of {<parcelType>: ApiPath, ... }
         @param parcel_reference_path_map: Register parcel reference ApiPaths to a feature profile. Mapping of
                                           {PathKey(<ParcelType>, <parent ParcelType>): ApiPath, ...}
+                                          If ... is used instead of an ApiPath it means that this reference parcel
+                                          doesn't need to be explicitly created (thus no ApiPath is provided).
         """
         self._path_map = dict(path_map)
         self._parcel_ref_map = dict(parcel_reference_path_map) if parcel_reference_path_map is not None else {}
-        self._referenced_types = set(path_key.parcel_type for path_key in self._parcel_ref_map)
+        self._referenced_types = {path_key.parcel_type for path_key in self._parcel_ref_map}
+        self._parent_types = {path_key.parent_parcel_type
+                              for path_key in self._parcel_ref_map if path_key.parent_parcel_type is not None}
 
     def api_path(self, key: PathKey) -> Tuple[Union[ApiPath, None], bool]:
         """
         Returns the api path associated with the provided key, along with whether this is a parcel reference or an
         actual parcel.
         @param key: A PathKey to find the api path
-        @return: (<parcel api path>, <is reference>) tuple
+        @return: (<parcel api path>, <is reference>) tuple.
         """
         parcel_reference_path = self._parcel_ref_map.get(key)
         if parcel_reference_path is not None:
+            # parcel_reference_path can be an ApiPath or ...
             return parcel_reference_path, True
 
         return self._path_map.get(key.parcel_type), False
@@ -178,6 +183,14 @@ class ApiPathGroup:
         @return: True if this parcel type is one that can be referenced, False otherwise
         """
         return parcel_type in self._referenced_types
+
+    def is_parent_type(self, parcel_type: str) -> bool:
+        """
+        Indicates whether the provided parcel_type is a parent of a type that can be referenced
+        @param parcel_type: Parcel type
+        @return: True if this parcel type is parent of one that can be referenced, False otherwise
+        """
+        return parcel_type in self._parent_types
 
 
 class OperationalItem:
@@ -776,6 +789,13 @@ class ConfigItem(ApiItem):
         return set(re.findall(r'[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}',
                               json.dumps(filtered_data)))
 
+    @property
+    def crypt_cluster_values(self) -> Iterator[str]:
+        """
+        Extracts values that were encrypted by vManage. That is, with $CRYPT_CLUSTER$ prefix.
+        """
+        yield from re.findall(r'\$CRYPT_CLUSTER\$.+?(?=["\s\\])', json.dumps(self.data))
+
     @classmethod
     def is_name_valid(cls, proposed_name: Optional[str]) -> bool:
         return proposed_name is not None and cls.name_check_regex.search(proposed_name) is not None
@@ -870,8 +890,7 @@ class IndexConfigItem(ConfigItem):
 
 
 class ConfigRequestModel(BaseModel):
-    class Config:
-        extra = Extra.ignore
+    model_config = ConfigDict(extra="ignore")
 
 
 class FeatureProfileModel(ConfigRequestModel):
@@ -916,7 +935,7 @@ class Config2Item(ConfigItem):
         exclude_set = self.skip_cmp_tag_set | {self.id_tag}
         put_model = self.put_model or self.post_model
 
-        local_cmp_dict = put_model(**self.data).dict(by_alias=True, exclude=exclude_set)
+        local_cmp_dict = put_model(**self.data).model_dump(by_alias=True, exclude=exclude_set)
         other_cmp_dict = {k: v for k, v in other.items() if k not in exclude_set}
 
         return sorted(json.dumps(local_cmp_dict)) == sorted(json.dumps(other_cmp_dict))
@@ -958,9 +977,9 @@ class Config2Item(ConfigItem):
         payload = op_model(**self.data)
 
         if id_mapping_dict is None:
-            return payload.dict(by_alias=True)
+            return payload.model_dump(by_alias=True)
 
-        return update_ids(id_mapping_dict, payload.dict(by_alias=True))
+        return update_ids(id_mapping_dict, payload.model_dump(by_alias=True))
 
 
 class FeatureProfile(Config2Item):
@@ -980,11 +999,14 @@ class FeatureProfile(Config2Item):
         self.id_mapping: Dict[str, str] = {}
 
     def associated_parcels(self, new_profile_id: str) -> Generator[Tuple[ApiPath, str, Dict[str, Any]], str, None]:
-        def referenced_parcels_first(parcel_obj):
-            return not self.parcel_api_paths.is_referenced_type(parcel_obj.parcelType)
+        def parcel_ordering(parcel_obj):
+            if self.parcel_api_paths.is_referenced_type(parcel_obj.parcelType):
+                return 0 if not self.parcel_api_paths.is_parent_type(parcel_obj.parcelType) else 1
+
+            return 2
 
         root_parcels = (ProfileParcelModel(**raw_parcel) for raw_parcel in self.data.get(self.parcels_tag, []))
-        for root_parcel in sorted(root_parcels, key=referenced_parcels_first):
+        for root_parcel in sorted(root_parcels, key=parcel_ordering):
             # Traverse parcel tree under this root parcel
             yield from self.profile_parcel_coro(root_parcel, new_profile_id)
 
@@ -1004,6 +1026,9 @@ class FeatureProfile(Config2Item):
         api_path, is_reference = self.parcel_api_paths.api_path(PathKey(parcel.parcelType, parent_parcel_type))
         if api_path is None:
             raise ModelException(f"Parcel type {parcel.parcelType} is not supported")
+        if api_path is ...:
+            # This is a parcel reference that doesn't need to be explicitly created, so no further processing is needed
+            return
 
         if is_reference:
             parcel_info = f'{parcel.payload.name} (parcel reference)'
@@ -1017,7 +1042,9 @@ class FeatureProfile(Config2Item):
             parcel_info = parcel.payload.name
             parcel_payload = parcel.payload
 
-        new_element_id = yield api_path.resolve(*element_ids), parcel_info, parcel_payload.dict(by_alias=True)
+        new_element_id = yield (api_path.resolve(*element_ids),
+                                parcel_info,
+                                update_ids(self.id_mapping, parcel_payload.model_dump(by_alias=True)))
 
         self.id_mapping[parcel.parcelId] = new_element_id
         new_element_ids = element_ids + (new_element_id,)
@@ -1114,12 +1141,22 @@ def filename_safe(name: str, lower: bool = False) -> str:
     return cleaned.lower() if lower else cleaned
 
 
-def update_ids(id_mapping_dict: Mapping[str, str], item_data: Dict[str, Any]) -> Dict[str, Any]:
+def update_ids(id_map: Mapping[str, str], item_data: Dict[str, Any]) -> Dict[str, Any]:
     def replace_id(match):
         matched_id = match.group(0)
-        return id_mapping_dict.get(matched_id, matched_id)
+        return id_map.get(matched_id, matched_id)
 
     dict_json = re.sub(r'[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}', replace_id, json.dumps(item_data))
+
+    return json.loads(dict_json)
+
+
+def update_crypts(crypt_map: Mapping[str, str], item_data: Dict[str, Any]) -> Dict[str, Any]:
+    def replace_crypt(match):
+        matched_crypt = match.group(0)
+        return crypt_map.get(matched_crypt, matched_crypt)
+
+    dict_json = re.sub(r'\$CRYPT_CLUSTER\$.+?(?=["\s\\])', replace_crypt, json.dumps(item_data))
 
     return json.loads(dict_json)
 

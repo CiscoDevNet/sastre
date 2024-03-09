@@ -1,13 +1,13 @@
 import argparse
-from typing import Union, Optional, Dict, Any
-from pydantic import validator, root_validator
+from typing import Union, Optional
+from pydantic import model_validator, field_validator
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest, RestAPIException
 from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL, ordered_tags, is_index_supported
 from cisco_sdwan.base.models_vmanage import DeviceTemplateIndex, ConfigGroupIndex
 from cisco_sdwan.tasks.utils import TaskOptions, TagOptions, regex_type
 from cisco_sdwan.tasks.common import regex_search, Task, WaitActionsException
-from cisco_sdwan.tasks.models import TaskArgs, validate_catalog_tag
+from cisco_sdwan.tasks.models import TaskArgs, CatalogTag
 from cisco_sdwan.tasks.validators import validate_regex
 
 
@@ -124,15 +124,14 @@ class DeleteArgs(TaskArgs):
     not_regex: Optional[str] = None
     dryrun: bool = False
     detach: bool = False
-    tag: str
+    tag: CatalogTag
 
     # Validators
-    _validate_regex = validator('regex', 'not_regex', allow_reuse=True)(validate_regex)
-    _validate_tag = validator('tag', allow_reuse=True)(validate_catalog_tag)
+    _validate_regex = field_validator('regex', 'not_regex')(validate_regex)
 
-    @root_validator(skip_on_failure=True)
-    def mutex_validations(cls, values: Dict[str, Any]) -> Dict[str, Any]:
-        if values.get('regex') is not None and values.get('not_regex') is not None:
+    @model_validator(mode='after')
+    def mutex_validations(self) -> 'DeleteArgs':
+        if self.regex is not None and self.not_regex is not None:
             raise ValueError('Argument "not_regex" not allowed with "regex"')
 
-        return values
+        return self
