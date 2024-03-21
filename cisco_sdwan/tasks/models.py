@@ -46,7 +46,7 @@ def validate_workdir_conditional(workdir: str, info: ValidationInfo) -> str:
     return workdir
 
 
-def const(field_type: type[Any], default_value: Any) -> Annotated[type[Any], ...]:
+def const(field_type: Any, default_value: Any) -> Annotated[Any, ...]:
     """
     Defines a model field as constant. That is, it cannot be set to any value other than the default value.
     """
