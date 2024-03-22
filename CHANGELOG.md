@@ -1,7 +1,7 @@
 Sastre 1.23.1 [March 22, 2024]
 ================================
 
-- Bumped up minimal Python version requirement to 3.9. As Python 3.8 is going end-of-support in October-2024.
+- Bumped up minimum Python version requirement to 3.9. As Python 3.8 is going end-of-support in October-2024.
 
 Sastre 1.23 [March 8, 2024]
 ================================
