@@ -1316,7 +1316,7 @@ A WARNING message is displayed when this condition happens. The user may want to
 
 Sastre requires Python 3.8 or newer. This can be verified by pasting the following to a terminal window:
 ```
-% python3 -c "import sys;assert sys.version_info>(3,8)" && echo "ALL GOOD"
+% python3 -c "import sys;assert sys.version_info>(3,9)" && echo "ALL GOOD"
 ```
 
 If 'ALL GOOD' is printed it means Python requirements are met. If not, download and install the latest 3.x version at Python.org (https://www.python.org/downloads/).
