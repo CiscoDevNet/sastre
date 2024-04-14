@@ -5,7 +5,7 @@ from uuid import uuid4
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest, RestAPIException
 from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL
-from cisco_sdwan.base.models_base import ServerInfo
+from cisco_sdwan.base.models_base import ServerInfo, ModelException
 from cisco_sdwan.base.models_vmanage import (DeviceConfig, DeviceConfigRFS, DeviceTemplate, DeviceTemplateAttached,
                                              DeviceTemplateValues, EdgeInventory, ControlInventory, EdgeCertificate,
                                              ConfigGroup, ConfigGroupValues, ConfigGroupAssociated, ConfigGroupRules)
@@ -91,12 +91,13 @@ class TaskBackup(Task):
                 if regex is None or regex_search(regex, item_name, inverse=parsed_args.regex is None)
             )
             for item_id, item_name in matched_item_iter:
-                item = item_cls.get(api, item_id)
-                if item is None:
-                    self.log_error(f'Failed backup {info} {item_name}')
+                try:
+                    item = item_cls.get_raise(api, item_id)
+                    if item.save(parsed_args.workdir, item_index.need_extended_name, item_name, item_id):
+                        self.log_info(f'Done {info} {item_name}')
+                except (RestAPIException, ModelException) as ex:
+                    self.log_error(f'Failed backup {info} {item_name}: {ex}')
                     continue
-                if item.save(parsed_args.workdir, item_index.need_extended_name, item_name, item_id):
-                    self.log_info(f'Done {info} {item_name}')
 
                 # Special case for DeviceTemplate, handle DeviceTemplateAttached and DeviceTemplateValues
                 if isinstance(item, DeviceTemplate):

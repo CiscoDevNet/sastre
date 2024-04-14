@@ -1314,7 +1314,7 @@ A WARNING message is displayed when this condition happens. The user may want to
 
 ## Installing
 
-Sastre requires Python 3.8 or newer. This can be verified by pasting the following to a terminal window:
+Sastre requires Python 3.9 or newer. This can be verified by pasting the following to a terminal window:
 ```
 % python3 -c "import sys;assert sys.version_info>(3,9)" && echo "ALL GOOD"
 ```

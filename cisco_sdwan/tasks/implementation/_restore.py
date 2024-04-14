@@ -2,6 +2,7 @@ import argparse
 from typing import Union, Optional, Sequence, Dict, Set
 from pydantic import model_validator, field_validator
 from uuid import uuid4
+from contextlib import suppress
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest, RestAPIException, is_version_newer, response_id
 from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL, ordered_tags, is_index_supported
@@ -202,7 +203,7 @@ class TaskRestore(Task):
                         # Special case for FeatureProfiles, creating linked parcels
                         if isinstance(item, FeatureProfile):
                             parcel_coro = item.associated_parcels(response_id(response))
-                            try:
+                            with suppress(StopIteration):
                                 new_parcel_id = None
                                 while True:
                                     try:
@@ -216,9 +217,6 @@ class TaskRestore(Task):
                                         self.log_error(f'Failed: {op_info} {info} {item.name} parcel{reason}: {ex}')
                                     else:
                                         self.log_info(f'Done: {op_info} {info} {item.name} parcel {p_info}{reason}')
-                            except StopIteration:
-                                pass
-
                     else:
                         # Update existing item
                         if item.is_readonly:
