@@ -1,12 +1,20 @@
+Sastre 1.24_dev1 [April xx, 2024]
+================================
+
+### Improvements:
+- [#12] Starting on vManage 20.12, feature profile api get requests return parcels without data, parcels need to be retrieved individually.
+
+
 Sastre 1.23.1 [March 22, 2024]
 ================================
 
 - Bumped up minimum Python version requirement to 3.9. As Python 3.8 is going end-of-support in October-2024.
 
+
 Sastre 1.23 [March 8, 2024]
 ================================
 
-### Improvements
+### Improvements:
 - Handling of templates with encrypted fields (e.g. SNMP feature template community value)
   - New encrypt values and encrypt recipe tasks.
   - New transform build-recipe task.
@@ -26,7 +34,7 @@ Sastre 1.23 [March 8, 2024]
 Sastre 1.22 [November 27, 2023]
 ================================
 
-### Improvements
+### Improvements:
 - Sastre and Sastre-Pro now contain the same tasks. There is no functional differences between the two.
 
 
