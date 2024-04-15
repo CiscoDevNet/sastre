@@ -1,8 +1,19 @@
 Sastre 1.24_dev1 [April xx, 2024]
 ================================
 
-### Improvements:
+#### Improvements:
 - [#12] Starting on vManage 20.12, feature profile api get requests return parcels without data, parcels need to be retrieved individually.
+- 20.12 vManage support, included support for the following API endpoints:
+  - New SDWAN service profile parcels: routing ospfv3 ipv4/ipv6, routing eigrp, interface gre
+  - New SDWAN transport profile parcels: routing ospfv3 ipv4/ipv6, esimcellular-controller, esimcellular-profile, t1-e1-controller, interface serial
+  - New SDWAN other profile parcels: cybervision.
+  - SDWAN dns-security profile and dns parcel.
+  - SDWAN sig-security profile and sig parcel.
+  - Topology groups
+  - Policy groups
+
+#### Changes:
+- Disabled automated tag rules processing until vManage apis for config-association via tag rules become stable and are documented.
 
 
 Sastre 1.23.1 [March 22, 2024]
@@ -14,7 +25,7 @@ Sastre 1.23.1 [March 22, 2024]
 Sastre 1.23 [March 8, 2024]
 ================================
 
-### Improvements:
+#### Improvements:
 - Handling of templates with encrypted fields (e.g. SNMP feature template community value)
   - New encrypt values and encrypt recipe tasks.
   - New transform build-recipe task.
@@ -34,14 +45,14 @@ Sastre 1.23 [March 8, 2024]
 Sastre 1.22 [November 27, 2023]
 ================================
 
-### Improvements:
+#### Improvements:
 - Sastre and Sastre-Pro now contain the same tasks. There is no functional differences between the two.
 
 
 Sastre 1.21.3 [July 27, 2023]
 ================================
 
-### Fixes:
+#### Fixes:
 - Fixed pydantic.errors.PydanticUserError traceback errors found with new installations. This was due to incompatible changes on new pydantic 2.x release.
 
 

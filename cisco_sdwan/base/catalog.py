@@ -52,6 +52,8 @@ _op_catalog = dict()  # {<OpType>: [(<tag>, <selector>, <info>, <op_cls>, <min_v
 # their high-level dependencies.
 _tag_dependency_list = [
     'config_group',
+    'topology_group',
+    'policy_group',
     'feature_profile',
     'template_device',
     'template_feature',

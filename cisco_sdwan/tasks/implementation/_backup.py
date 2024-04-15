@@ -8,7 +8,7 @@ from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL
 from cisco_sdwan.base.models_base import ServerInfo, ModelException
 from cisco_sdwan.base.models_vmanage import (DeviceConfig, DeviceConfigRFS, DeviceTemplate, DeviceTemplateAttached,
                                              DeviceTemplateValues, EdgeInventory, ControlInventory, EdgeCertificate,
-                                             ConfigGroup, ConfigGroupValues, ConfigGroupAssociated, ConfigGroupRules)
+                                             ConfigGroup, ConfigGroupValues, ConfigGroupAssociated)
 from cisco_sdwan.tasks.utils import TaskOptions, TagOptions, filename_type, regex_type, default_workdir
 from cisco_sdwan.tasks.common import regex_search, clean_dir, Task, archive_create
 from cisco_sdwan.tasks.models import TaskArgs, CatalogTag
@@ -121,9 +121,10 @@ class TaskBackup(Task):
                         self.log_error(f'Failed backup {info} {item_name} values: {ex}')
 
                 # Special case for ConfigGroup, handle ConfigGroupAssociated, ConfigGroupValues, ConfigGroupRules
+                # TODO: Review post 20.13
                 if isinstance(item, ConfigGroup) and item.devices_associated:
                     for sub_item_info, sub_item_cls in (('associated devices', ConfigGroupAssociated),
-                                                        ('automated rules', ConfigGroupRules),
+                                                        # ('automated rules', ConfigGroupRules),
                                                         ('values', ConfigGroupValues)):
                         sub_item = sub_item_cls.get(api, configGroupId=item_id)
                         if sub_item is None:
