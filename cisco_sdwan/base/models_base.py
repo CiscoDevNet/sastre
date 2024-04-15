@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from urllib.parse import quote_plus
 from pydantic import ConfigDict, BaseModel
 from requests.exceptions import Timeout
-from .rest_api import RestAPIException, Rest
+from .rest_api import RestAPIException, Rest, is_version_newer
 
 # Top-level directory for local data store
 SASTRE_ROOT_DIR = Path(environ.get('SASTRE_ROOT_DIR', Path.cwd()))
@@ -908,7 +908,7 @@ class FeatureProfileModel(ConfigRequestModel):
 class ProfileParcelPayloadModel(ConfigRequestModel):
     name: str
     description: str = ''
-    data: Dict[str, Any]
+    data: Optional[Dict[str, Any]] = None
 
 
 class ProfileParcelModel(ConfigRequestModel):
@@ -916,6 +916,14 @@ class ProfileParcelModel(ConfigRequestModel):
     parcelType: str
     payload: ProfileParcelPayloadModel
     subparcels: List['ProfileParcelModel']
+
+
+class SingleProfileParcelModel(ConfigRequestModel):
+    # When profile parcels are retrieved directly (instead of along with its parent feature profile), subparcels
+    # are not present
+    parcelId: str
+    parcelType: str
+    payload: ProfileParcelPayloadModel
 
 
 class ProfileParcelReferenceModel(ConfigRequestModel):
@@ -998,6 +1006,34 @@ class FeatureProfile(Config2Item):
         # {<old parcel id>: <new parcel id>} map used to update parcel references with the new parcel ids
         self.id_mapping: Dict[str, str] = {}
 
+    def update_parcels_data(self, api: Rest, profile_id: str) -> None:
+        def eval_parcel(parcel: ProfileParcelModel, *element_ids: str, parent_parcel_type: Optional[str] = None):
+            api_path, _ = self.parcel_api_paths.api_path(PathKey(parcel.parcelType, parent_parcel_type))
+            if api_path is None:
+                raise ModelException(f"Parcel type {parcel.parcelType} is not supported")
+            if api_path is ...:
+                # This is a parcel reference no further processing is needed
+                return
+
+            if parcel.payload.data is None:
+                raw_single_parcel = api.get(api_path.resolve(*element_ids).get, parcel.parcelId)
+                parcel.payload.data = SingleProfileParcelModel(**raw_single_parcel).payload.data
+
+            new_element_ids = element_ids + (parcel.parcelId,)
+
+            for sub_parcel in parcel.subparcels:
+                eval_parcel(sub_parcel, *new_element_ids, parent_parcel_type=parcel.parcelType)
+
+        def eval_root_parcel(raw_parcel: Dict[str, Any]) -> Dict[str, Any]:
+            root_parcel = ProfileParcelModel(**raw_parcel)
+            eval_parcel(root_parcel, profile_id)
+
+            return root_parcel.model_dump(by_alias=True)
+
+        self.data[self.parcels_tag] = [
+            eval_root_parcel(raw_parcel) for raw_parcel in self.data.get(self.parcels_tag, [])
+        ]
+
     def associated_parcels(self, new_profile_id: str) -> Generator[Tuple[ApiPath, str, Dict[str, Any]], str, None]:
         def parcel_ordering(parcel_obj):
             if self.parcel_api_paths.is_referenced_type(parcel_obj.parcelType):
@@ -1051,6 +1087,24 @@ class FeatureProfile(Config2Item):
 
         for sub_parcel in parcel.subparcels:
             yield from self.profile_parcel_coro(sub_parcel, *new_element_ids, parent_parcel_type=parcel.parcelType)
+
+    @classmethod
+    def get_raise(cls, api: Rest, *args, **kwargs):
+        # Extract path vars from kwargs, what is left becomes query vars
+        path_vars_map = {}
+        if cls.api_path.path_vars is not None:
+            for path_var in cls.api_path.path_vars:
+                path_var_value = kwargs.pop(path_var, None)
+                if path_var_value is not None:
+                    path_vars_map[path_var] = path_var_value
+
+        fp_obj = cls(api.get(cls.api_path.resolve(**path_vars_map).get, *args, **kwargs))
+
+        # Special case for FeatureProfiles on 20.12 or newer, need to retrieve parcel data fields
+        if is_version_newer('20.11', api.server_version):
+            fp_obj.update_parcels_data(api, fp_obj.uuid)
+
+        return fp_obj
 
 
 class FeatureProfileIndex(IndexConfigItem):
