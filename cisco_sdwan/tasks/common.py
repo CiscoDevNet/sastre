@@ -21,8 +21,7 @@ from cisco_sdwan.base.models_vmanage import (DeviceTemplate, DeviceTemplateValue
                                              DeviceTemplateAttach, DeviceTemplateCLIAttach, DeviceModeCli,
                                              ActionStatus, PolicyVsmartStatus, PolicyVsmartStatusException,
                                              PolicyVsmartActivate, PolicyVsmartIndex, PolicyVsmartDeactivate,
-                                             Device, ConfigGroupDeploy, ConfigGroupAssociated, ConfigGroupValues,
-                                             ConfigGroupRules)
+                                             Device, ConfigGroupDeploy, ConfigGroupAssociated, ConfigGroupValues)
 
 T = TypeVar('T')
 
@@ -527,21 +526,24 @@ class Task:
             return True
 
         def restore_rules(config_grp_name: str, config_grp_saved_id: str, config_grp_target_id: str) -> bool:
-            saved_rules = ConfigGroupRules.load(workdir, ext_name, config_grp_name, config_grp_saved_id)
-            if saved_rules is None:
-                self.log_debug(f"Skip config-group {config_grp_name} restore rules, no ConfigGroupRules file")
-                return False
+            # saved_rules = ConfigGroupRules.load(workdir, ext_name, config_grp_name, config_grp_saved_id)
+            # if saved_rules is None:
+            #     self.log_debug(f"Skip config-group {config_grp_name} restore rules, no ConfigGroupRules file")
+            #     return False
+            #
+            # if self.is_dryrun:
+            #     self.log_info(f"Config-group {config_grp_name}, associate (via automated rules): "
+            #                   "device list is unknown during dry-run")
+            #     return True
+            #
+            # matched_uuids = saved_rules.post_raise(api, config_grp_target_id)
+            # self.log_info(f"Config-group {config_grp_name}, associate (via automated rules): "
+            #               f"{', '.join(devices_map.get(uuid) or uuid for uuid in matched_uuids)}")
+            #
+            # return len(matched_uuids) > 0
 
-            if self.is_dryrun:
-                self.log_info(f"Config-group {config_grp_name}, associate (via automated rules): "
-                              "device list is unknown during dry-run")
-                return True
-
-            matched_uuids = saved_rules.post_raise(api, config_grp_target_id)
-            self.log_info(f"Config-group {config_grp_name}, associate (via automated rules): "
-                          f"{', '.join(devices_map.get(uuid) or uuid for uuid in matched_uuids)}")
-
-            return len(matched_uuids) > 0
+            # TODO: Review post 20.13
+            return False
 
         def restore_values(config_grp_name: str, config_grp_saved_id: str, config_grp_target_id: str):
             saved_values = ConfigGroupValues.load(workdir, ext_name, config_grp_name, config_grp_saved_id)
@@ -763,23 +765,24 @@ class Task:
         @return: Number of automated rules delete requests processed
         """
         delete_req_count = 0
-        for config_grp_id, config_grp_name in cfg_group_iter:
-            rules = ConfigGroupRules.get(api, configGroupId=config_grp_id)
-            if rules is None:
-                self.log_warning(f'Failed to retrieve {config_grp_name} automated rules from vManage')
-                continue
-            for rule_id in rules:
-                delete_req_count += 1
-                self.log_info(f'Config-group {config_grp_name} delete automated rule: {rule_id}')
+        # for config_grp_id, config_grp_name in cfg_group_iter:
+        #     rules = ConfigGroupRules.get(api, configGroupId=config_grp_id)
+        #     if rules is None:
+        #         self.log_warning(f'Failed to retrieve {config_grp_name} automated rules from vManage')
+        #         continue
+        #     for rule_id in rules:
+        #         delete_req_count += 1
+        #         self.log_info(f'Config-group {config_grp_name} delete automated rule: {rule_id}')
+        #
+        #         if self.is_dryrun:
+        #             continue
+        #
+        #         try:
+        #             ConfigGroupRules.delete_raise(api, config_grp_id, rule_id)
+        #         except RestAPIException as ex:
+        #             self.log_error(f'Failed to delete config-group {config_grp_name} automated rule {rule_id}: {ex}')
 
-                if self.is_dryrun:
-                    continue
-
-                try:
-                    ConfigGroupRules.delete_raise(api, config_grp_id, rule_id)
-                except RestAPIException as ex:
-                    self.log_error(f'Failed to delete config-group {config_grp_name} automated rule {rule_id}: {ex}')
-
+        # TODO: Review post 20.13
         return delete_req_count
 
     def policy_activate(self, api: Rest, policy_id: Optional[str], policy_name: Optional[str], *,
