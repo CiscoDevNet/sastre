@@ -66,8 +66,6 @@ class Rest:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self.session is not None:
-            # In 19.3, logging out actually de-authorize all sessions a user may have from the same IP address. For
-            # instance browser windows open from the same laptop. This is fixed in 20.1.
             self.logout()
             self.session.close()
 
@@ -121,7 +119,12 @@ class Rest:
         return True
 
     def logout(self) -> bool:
-        response = self.session.get(f'{self.base_url}/logout', params={'nocache': str(int(time()))})
+        if is_version_newer('20.11', self.server_version):
+            response = self.session.post(f'{self.base_url}/logout', allow_redirects=False)
+        else:
+            response = self.session.get(f'{self.base_url}/logout', params={'nocache': str(int(time()))},
+                                        allow_redirects=False)
+
         return response.status_code == requests.codes.ok
 
     @property
