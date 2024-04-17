@@ -1,4 +1,4 @@
-Sastre 1.24_dev1 [April xx, 2024]
+Sastre 1.24_dev4 [April xx, 2024]
 ================================
 
 #### Improvements:
@@ -7,10 +7,15 @@ Sastre 1.24_dev1 [April xx, 2024]
   - New SDWAN service profile parcels: routing ospfv3 ipv4/ipv6, routing eigrp, interface gre
   - New SDWAN transport profile parcels: routing ospfv3 ipv4/ipv6, esimcellular-controller, esimcellular-profile, t1-e1-controller, interface serial
   - New SDWAN other profile parcels: cybervision.
+  - New SDWAN policy-object profile parcels: security-data-ip-prefix, security-fqdn, security-port, security-localapp, security-localdomain, security-ipssignature, 
+                                             security-urllist, security-protocolname, security-geolocation, security-identity, security-scalablegrouptag, security-zone, 
+                                             app-list, sla-class, as-path, class, data-ipv6-prefix, data-prefix, expanded-community, ext-community, ipv6-prefix, mirror, 
+                                             policer, prefix, standard-community, vpn-group, app-probe, tloc, color, preferred-color-group.
   - SDWAN dns-security profile and dns parcel.
   - SDWAN sig-security profile and sig parcel.
   - Topology groups
   - Policy groups
+- 20.12 vManage support, updated rest api logout to use POST with 20.12+ releases.
 
 #### Changes:
 - Disabled automated tag rules processing until vManage apis for config-association via tag rules become stable and are documented.
