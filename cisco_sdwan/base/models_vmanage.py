@@ -1020,23 +1020,41 @@ class ProfileSdwanOtherIndex(FeatureProfileIndex):
     store_file = 'feature_profiles_sdwan_other.json'
 
 
-# Policy-object profiles show up in 20.10, but there is no documentation in the apidocs
 class ProfileSdwanPolicy(FeatureProfile):
     api_path = ApiPath('v1/feature-profile/sdwan/policy-object')
     store_path = ('feature_profiles', 'sdwan', 'policy_object')
     parcel_api_paths = ApiPathGroup({
+        "app-list": ApiPath("v1/feature-profile/sdwan/policy-object/{policyId}/app-list"),
+        "app-probe": ApiPath("v1/feature-profile/sdwan/policy-object/{policyId}/app-probe"),
         "as-path": ApiPath("v1/feature-profile/sdwan/policy-object/{policyId}/as-path"),
         "class": ApiPath("v1/feature-profile/sdwan/policy-object/{policyId}/class"),
-        "standard-community": ApiPath("v1/feature-profile/sdwan/policy-object/{policyId}/standard-community"),
-        "expanded-community": ApiPath("v1/feature-profile/sdwan/policy-object/{policyId}/expanded-community"),
+        "color": ApiPath("v1/feature-profile/sdwan/policy-object/{policyId}/color"),
         "data-prefix": ApiPath("v1/feature-profile/sdwan/policy-object/{policyId}/data-prefix"),
         "data-ipv6-prefix": ApiPath("v1/feature-profile/sdwan/policy-object/{policyId}/data-ipv6-prefix"),
-        "ipv6-prefix": ApiPath("v1/feature-profile/sdwan/policy-object/{policyId}/ipv6-prefix"),
-        "prefix": ApiPath("v1/feature-profile/sdwan/policy-object/{policyId}/prefix"),
         "ext-community": ApiPath("v1/feature-profile/sdwan/policy-object/{policyId}/ext-community"),
+        "standard-community": ApiPath("v1/feature-profile/sdwan/policy-object/{policyId}/standard-community"),
+        "expanded-community": ApiPath("v1/feature-profile/sdwan/policy-object/{policyId}/expanded-community"),
+        "ipv6-prefix": ApiPath("v1/feature-profile/sdwan/policy-object/{policyId}/ipv6-prefix"),
         "mirror": ApiPath("v1/feature-profile/sdwan/policy-object/{policyId}/mirror"),
         "policer": ApiPath("v1/feature-profile/sdwan/policy-object/{policyId}/policer"),
-        "vpn-group": ApiPath("v1/feature-profile/sdwan/policy-object/{policyId}/vpn-group")
+        "preferred-color-group": ApiPath("v1/feature-profile/sdwan/policy-object/{policyId}/preferred-color-group"),
+        "prefix": ApiPath("v1/feature-profile/sdwan/policy-object/{policyId}/prefix"),
+        "security-zone": ApiPath("v1/feature-profile/sdwan/policy-object/{policyId}/security-zone"),
+        "security-scalablegrouptag": ApiPath(
+            "v1/feature-profile/sdwan/policy-object/{policyId}/security-scalablegrouptag"),
+        "security-identity": ApiPath("v1/feature-profile/sdwan/policy-object/{policyId}/security-identity"),
+        "security-geolocation": ApiPath("v1/feature-profile/sdwan/policy-object/{policyId}/security-geolocation"),
+        "security-protocolname": ApiPath("v1/feature-profile/sdwan/policy-object/{policyId}/security-protocolname"),
+        "security-urllist": ApiPath("v1/feature-profile/sdwan/policy-object/{policyId}/security-urllist"),
+        "security-ipssignature": ApiPath("v1/feature-profile/sdwan/policy-object/{policyId}/security-ipssignature"),
+        "security-localdomain": ApiPath("v1/feature-profile/sdwan/policy-object/{policyId}/security-localdomain"),
+        "security-localapp": ApiPath("v1/feature-profile/sdwan/policy-object/{policyId}/security-localapp"),
+        "security-port": ApiPath("v1/feature-profile/sdwan/policy-object/{policyId}/security-port"),
+        "security-fqdn": ApiPath("v1/feature-profile/sdwan/policy-object/{policyId}/security-fqdn"),
+        "security-data-ip-prefix": ApiPath("v1/feature-profile/sdwan/policy-object/{policyId}/security-data-ip-prefix"),
+        "sla-class": ApiPath("v1/feature-profile/sdwan/policy-object/{policyId}/sla-class"),
+        "tloc": ApiPath("v1/feature-profile/sdwan/policy-object/{policyId}/tloc"),
+        "vpn-group": ApiPath("v1/feature-profile/sdwan/policy-object/{policyId}/vpn-group"),
     })
 
 
