@@ -4,15 +4,19 @@ Sastre 1.24_dev4 [April xx, 2024]
 #### Improvements:
 - [#12] Starting on vManage 20.12, feature profile api get requests return parcels without data, parcels need to be retrieved individually.
 - 20.12 vManage support, included support for the following API endpoints:
-  - New SDWAN service profile parcels: routing ospfv3 ipv4/ipv6, routing eigrp, interface gre
-  - New SDWAN transport profile parcels: routing ospfv3 ipv4/ipv6, esimcellular-controller, esimcellular-profile, t1-e1-controller, interface serial
+  - New SDWAN service profile parcels: routing ospfv3 ipv4/ipv6, routing eigrp, interface gre, route-policy.
+  - New SDWAN transport profile parcels: routing ospfv3 ipv4/ipv6, esimcellular-controller, esimcellular-profile, t1-e1-controller, interface serial, route-policy.
   - New SDWAN other profile parcels: cybervision.
+  - New SDWAN system profile parcels: remote-access, ipv4-device-access-policy, ipv6-device-access-policy
   - New SDWAN policy-object profile parcels: security-data-ip-prefix, security-fqdn, security-port, security-localapp, security-localdomain, security-ipssignature, 
                                              security-urllist, security-protocolname, security-geolocation, security-identity, security-scalablegrouptag, security-zone, 
                                              app-list, sla-class, as-path, class, data-ipv6-prefix, data-prefix, expanded-community, ext-community, ipv6-prefix, mirror, 
-                                             policer, prefix, standard-community, vpn-group, app-probe, tloc, color, preferred-color-group.
+                                             policer, prefix, standard-community, vpn-group, app-probe, tloc, color, preferred-color-group, unified/advanced-inspection-profile, 
+                                             unified/intrusion-prevention, unified/url-filtering, unified/advanced-malware-protection, unified/ssl-decryption-profile, unified/ssl-decryption
   - SDWAN dns-security profile and dns parcel.
   - SDWAN sig-security profile and sig parcel.
+  - SDWAN application-priority profile and qos-policy, traffic-policy parcels.
+  - SDWAN embedded-security profile and policy, unified/ngfirewall parcels.
   - Topology groups
   - Policy groups
 - 20.12 vManage support, updated rest api logout to use POST with 20.12+ releases.
