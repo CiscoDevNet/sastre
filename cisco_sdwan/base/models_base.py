@@ -935,7 +935,7 @@ class Config2Item(ConfigItem):
         exclude_set = self.skip_cmp_tag_set | {self.id_tag}
         put_model = self.put_model or self.post_model
 
-        local_cmp_dict = put_model(**self.data).model_dump(by_alias=True, exclude=exclude_set, exclude_unset=True)
+        local_cmp_dict = put_model(**self.data).model_dump(by_alias=True, exclude=exclude_set, exclude_defaults=True)
         other_cmp_dict = {k: v for k, v in other.items() if k not in exclude_set}
 
         return sorted(json.dumps(local_cmp_dict)) == sorted(json.dumps(other_cmp_dict))
@@ -977,9 +977,9 @@ class Config2Item(ConfigItem):
         payload = op_model(**self.data)
 
         if id_mapping_dict is None:
-            return payload.model_dump(by_alias=True, exclude_unset=True)
+            return payload.model_dump(by_alias=True, exclude_defaults=True)
 
-        return update_ids(id_mapping_dict, payload.model_dump(by_alias=True, exclude_unset=True))
+        return update_ids(id_mapping_dict, payload.model_dump(by_alias=True, exclude_defaults=True))
 
 
 class FeatureProfile(Config2Item):
@@ -1020,7 +1020,7 @@ class FeatureProfile(Config2Item):
             root_parcel = ProfileParcelModel(**raw_parcel)
             eval_parcel(root_parcel, profile_id)
 
-            return root_parcel.model_dump(by_alias=True, exclude_unset=True)
+            return root_parcel.model_dump(by_alias=True, exclude_defaults=True)
 
         self.data[self.parcels_tag] = [
             eval_root_parcel(raw_parcel) for raw_parcel in self.data.get(self.parcels_tag, [])
@@ -1073,7 +1073,7 @@ class FeatureProfile(Config2Item):
         new_element_id = yield (
             api_path.resolve(*element_ids),
             parcel_info,
-            update_ids(self.id_mapping, parcel_payload.model_dump(by_alias=True, exclude_unset=True))
+            update_ids(self.id_mapping, parcel_payload.model_dump(by_alias=True, exclude_defaults=True))
         )
 
         self.id_mapping[parcel.parcelId] = new_element_id
