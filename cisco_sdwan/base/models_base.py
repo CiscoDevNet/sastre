@@ -10,7 +10,8 @@ from os import environ
 from pathlib import Path
 from itertools import zip_longest
 from collections import namedtuple
-from typing import Sequence, Tuple, Union, Iterator, Callable, Mapping, Any, Optional, Dict, List, Generator, NamedTuple
+from typing import (Sequence, Tuple, Union, Iterator, Callable, Mapping, Any, Optional, Dict, List, Generator,
+                    NamedTuple, Iterable)
 from operator import attrgetter
 from datetime import datetime, timezone
 from urllib.parse import quote_plus
@@ -996,7 +997,10 @@ class FeatureProfile(Config2Item):
         super().__init__(data)
 
         # {<old parcel id>: <new parcel id>} map used to update parcel references with the new parcel ids
-        self.id_mapping: Dict[str, str] = {}
+        self._id_mapping: Dict[str, str] = {}
+
+    def parcel_id_mapping(self) -> Iterator[tuple[str, str]]:
+        return ((old_parcel_id, new_parcel_id) for old_parcel_id, new_parcel_id in self._id_mapping.items())
 
     def update_parcels_data(self, api: Rest, profile_id: str) -> None:
         def eval_parcel(parcel: ProfileParcelModel, *element_ids: str, parent_parcel_type: Optional[str] = None):
@@ -1061,7 +1065,7 @@ class FeatureProfile(Config2Item):
         if is_reference:
             parcel_info = f'{parcel.payload.name} (parcel reference)'
 
-            new_parcel_id = self.id_mapping.get(parcel.parcelId)
+            new_parcel_id = self._id_mapping.get(parcel.parcelId)
             if new_parcel_id is None:
                 raise ModelException(f"{parcel_info}: Referenced parcel ID not found")
 
@@ -1073,10 +1077,10 @@ class FeatureProfile(Config2Item):
         new_element_id = yield (
             api_path.resolve(*element_ids),
             parcel_info,
-            update_ids(self.id_mapping, parcel_payload.model_dump(by_alias=True, exclude_defaults=True))
+            update_ids(self._id_mapping, parcel_payload.model_dump(by_alias=True, exclude_defaults=True))
         )
 
-        self.id_mapping[parcel.parcelId] = new_element_id
+        self._id_mapping[parcel.parcelId] = new_element_id
         new_element_ids = element_ids + (new_element_id,)
 
         for sub_parcel in parcel.subparcels:

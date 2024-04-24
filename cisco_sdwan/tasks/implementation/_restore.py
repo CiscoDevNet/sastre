@@ -182,6 +182,7 @@ class TaskRestore(Task):
         # level items). The reverse order needs to be followed on restore.
         for info, index, restore_item_list in reversed(restore_list):
             pushed_item_dict = {}
+            parcel_id_mapping = {}
             for item_id, item, target_id in restore_item_list:
                 op_info = 'Create' if target_id is None else 'Update'
                 reason = ' (dependency)' if item_id in dependency_set - match_set else ''
@@ -217,6 +218,10 @@ class TaskRestore(Task):
                                         self.log_error(f'Failed: {op_info} {info} {item.name} parcel{reason}: {ex}')
                                     else:
                                         self.log_info(f'Done: {op_info} {info} {item.name} parcel {p_info}{reason}')
+
+                            # Retrieve id mapping for parcels in this feature profile
+                            # noinspection PyUnreachableCode
+                            parcel_id_mapping.update(item.parcel_id_mapping())
                     else:
                         # Update existing item
                         if item.is_readonly:
@@ -270,6 +275,8 @@ class TaskRestore(Task):
             except RestAPIException as ex:
                 self.log_critical(f'Failed retrieving {info}: {ex}')
                 break
+            else:
+                id_mapping.update(parcel_id_mapping)
 
     def restore_deployments(self, api: Rest, workdir: str) -> None:
         saved_groups_index = ConfigGroupIndex.load(workdir)
