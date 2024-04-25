@@ -5,7 +5,8 @@
  This module implements vManage API models
 """
 import re
-from typing import Iterable, Set, Optional, Sequence, Mapping, List, Any, Callable, Tuple, Dict, Union
+from typing import Optional, Any, Union
+from collections.abc import Mapping, Sequence, Callable, Iterable
 from pathlib import Path
 from collections import namedtuple
 from copy import deepcopy
@@ -521,7 +522,7 @@ class DeviceTemplate(ConfigItem):
         return template_type in self.find_key('templateType')
 
     @property
-    def feature_templates(self) -> Set[str]:
+    def feature_templates(self) -> set[str]:
         return set(self.find_key('templateId', from_key='generalTemplates'))
 
 
@@ -549,7 +550,7 @@ class DeviceTemplateIndex(IndexConfigItem):
     def is_cedge(iterator_entry: FilteredIterEntry) -> bool:
         return iterator_entry.device_type is not None and iterator_entry.device_type in CEDGE_SET
 
-    def filtered_iter(self, *filter_fns: Callable) -> Iterable[Tuple[str, str]]:
+    def filtered_iter(self, *filter_fns: Callable) -> Iterable[tuple[str, str]]:
         # The contract for filtered_iter is that it should return an iterable of iter_fields tuples.
         # If no filter_fns is provided, no filtering is done and iterate over all entries
         return (
@@ -592,7 +593,7 @@ class FeatureTemplate(ConfigItem):
                         'devicesAttached', 'attachedMastersCount', 'gTemplateClass'}
 
     @property
-    def device_types(self) -> Set[str]:
+    def device_types(self) -> set[str]:
         return set(self.data.get('deviceType', []))
 
     @device_types.setter
@@ -633,8 +634,8 @@ class ConfigGroupModel(ConfigRequestModel):
     name: str
     description: str
     solution: str
-    profiles: Optional[List[ConfigGroupProfileModel]] = None
-    topology: Optional[Dict[str, Any]] = None
+    profiles: Optional[list[ConfigGroupProfileModel]] = None
+    topology: Optional[dict[str, Any]] = None
 
 
 class ConfigGroup(Config2Item):
@@ -665,12 +666,12 @@ class NameValuePair(ConfigRequestModel):
 
 class DeviceValuesModel(ConfigRequestModel):
     device_id: str = Field(..., alias='device-id')
-    variables: List[NameValuePair]
+    variables: list[NameValuePair]
 
 
 class ConfigGroupValuesModel(ConfigRequestModel):
     solution: str
-    devices: List[DeviceValuesModel]
+    devices: list[DeviceValuesModel]
 
     # In 20.8.1 get values contains 'family' key while put request requires 'solution' instead
     def __init__(self, **kwargs):
@@ -696,7 +697,7 @@ class ConfigGroupValues(Config2Item):
     def is_empty(self) -> bool:
         return self.data is None or len(self.data.get('devices', [])) == 0
 
-    def filter(self, allowed_uuid_set: Set[str]) -> 'ConfigGroupValues':
+    def filter(self, allowed_uuid_set: set[str]) -> 'ConfigGroupValues':
         """
         Return a new instance of ConfigGroupValues containing only device entries with an id that is present in
         allowed_uuid_set.
@@ -721,7 +722,7 @@ class AssociatedDeviceModel(ConfigRequestModel):
 
 
 class ConfigGroupAssociatedModel(ConfigRequestModel):
-    devices: List[AssociatedDeviceModel]
+    devices: list[AssociatedDeviceModel]
 
 
 class ConfigGroupAssociated(Config2Item):
@@ -741,7 +742,7 @@ class ConfigGroupAssociated(Config2Item):
     def is_empty(self) -> bool:
         return self.data is None or len(self.data.get('devices', [])) == 0
 
-    def filter(self, allowed_uuid_set: Optional[Set[str]] = None, not_by_rule: bool = False) -> 'ConfigGroupAssociated':
+    def filter(self, allowed_uuid_set: Optional[set[str]] = None, not_by_rule: bool = False) -> 'ConfigGroupAssociated':
         """
         Return a new instance of ConfigGroupAssociated containing only device entries with an id that is present in
         allowed_uuid_set.
@@ -791,7 +792,7 @@ class ConfigGroupRules(IndexConfigItem):
         api.delete(ConfigGroupRules.api_path.resolve(configGroupId=config_group_id).delete, rule_id,
                    configGroupId=config_group_id)
 
-    def post_raise(self, api: Rest, config_group_id: str) -> List[str]:
+    def post_raise(self, api: Rest, config_group_id: str) -> list[str]:
         filtered_keys = {
             self.id_tag,
         }
@@ -812,7 +813,7 @@ class ConfigGroupDeploy(ApiItem):
     id_tag = 'parentTaskId'
 
     @staticmethod
-    def api_params(uuids: Iterable[str]) -> Dict[str, Any]:
+    def api_params(uuids: Iterable[str]) -> dict[str, Any]:
         """
         Build dictionary used to provide input parameters for api POST call
         @param uuids: An iterable of device UUIDs to deploy
@@ -1112,7 +1113,7 @@ class TopologyGroupModel(ConfigRequestModel):
     name: str
     description: str
     solution: str
-    profiles: Optional[List[TopologyGroupProfileModel]] = None
+    profiles: Optional[list[TopologyGroupProfileModel]] = None
 
 
 class TopologyGroup(Config2Item):
@@ -1144,7 +1145,7 @@ class PolicyGroupModel(ConfigRequestModel):
     name: str
     description: str
     solution: str
-    profiles: Optional[List[PolicyGroupProfileModel]] = None
+    profiles: Optional[list[PolicyGroupProfileModel]] = None
 
 
 class PolicyGroup(Config2Item):

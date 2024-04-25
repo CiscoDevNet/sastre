@@ -4,7 +4,8 @@ import re
 import yaml
 from datetime import date
 from difflib import unified_diff, HtmlDiff
-from typing import Union, Optional, Iterator, List, Dict, Any, NamedTuple, Type, Tuple, Callable, Set
+from typing import Union, Optional, Any, NamedTuple
+from collections.abc import Iterator, Callable
 from typing_extensions import Annotated
 from pydantic import field_validator, model_validator, BaseModel, ValidationError, Field, ConfigDict
 from cisco_sdwan.__version__ import __doc__ as title
@@ -25,7 +26,7 @@ class SectionModel(BaseModel):
 
     name: str
     task: str
-    args: Optional[Dict[str, Any]] = None
+    args: Optional[dict[str, Any]] = None
     inherit_globals: bool = True
     skip_diff: bool = False
 
@@ -37,21 +38,21 @@ class SectionModel(BaseModel):
         return v
 
     @property
-    def task_label(self) -> Tuple[str, ...]:
+    def task_label(self) -> tuple[str, ...]:
         return tuple(self.task.split())
 
 
 class ReportContentModel(BaseModel):
-    globals: Optional[Dict[str, Any]] = None
-    sections: List[SectionModel]
+    globals: Optional[dict[str, Any]] = None
+    sections: list[SectionModel]
 
     @property
-    def skip_section_set(self) -> Set[str]:
+    def skip_section_set(self) -> set[str]:
         return {section.name for section in self.sections if section.skip_diff}
 
 
 # Report specification used as default if user did not provide a custom one
-DEFAULT_SECTIONS_1: List[Dict[str, Any]] = [
+DEFAULT_SECTIONS_1: list[dict[str, Any]] = [
     {'name': f'List configuration {tag}', 'task': 'list configuration', 'args': {'tags': [tag]}}
     for tag in ordered_tags(CATALOG_TAG_ALL)
 ]
@@ -68,11 +69,11 @@ DEFAULT_CONTENT_SPEC = {
 
 # Metadata about tasks that can be included in a report
 class TaskMeta(NamedTuple):
-    task_cls: Type[Task]
-    task_args_cls: Type[TaskArgs]
+    task_cls: type[Task]
+    task_args_cls: type[TaskArgs]
 
 
-section_catalog: Dict[Tuple[str, ...], TaskMeta] = {
+section_catalog: dict[tuple[str, ...], TaskMeta] = {
     ('show', 'devices'): TaskMeta(TaskShow, ShowDevicesArgs),
     ('show', 'realtime'): TaskMeta(TaskShow, ShowRealtimeArgs),
     ('show', 'state'): TaskMeta(TaskShow, ShowStateArgs),
@@ -304,7 +305,7 @@ class TaskReport(Task):
 
     def section_iter(self, report_spec: ReportContentModel,
                      has_api_session: bool,
-                     workdir: Optional[str]) -> Iterator[Tuple[str, Type[Task], TaskArgs]]:
+                     workdir: Optional[str]) -> Iterator[tuple[str, type[Task], TaskArgs]]:
         """
         An iterator over the different sections of the report, including task and arguments for the task.
         @param report_spec: report specification to use for generating this report
@@ -360,7 +361,7 @@ def diff_txt_iter(a: Report, b: Report) -> Iterator[str]:
         yield ""
         yield line
 
-    def subsection_lines(subsection_iter: Iterator[str]) -> List[str]:
+    def subsection_lines(subsection_iter: Iterator[str]) -> list[str]:
         lines = []
         for subsection in subsection_iter:
             lines.extend(subsection.splitlines())

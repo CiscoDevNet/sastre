@@ -1,5 +1,6 @@
 import argparse
-from typing import Tuple, List, Any, NamedTuple, Type, Union, Optional, Sequence, Callable
+from typing import Any, NamedTuple, Union, Optional
+from collections.abc import Callable, Sequence
 from typing_extensions import Annotated
 from pathlib import Path
 from functools import partial
@@ -32,11 +33,11 @@ class DeviceInfo(NamedTuple):
     model: str
 
 
-def retrieve_rt_task(api_obj: Rest, rt_cls: Type[RealtimeItem], device: DeviceInfo) -> Tuple[DeviceInfo, Any]:
+def retrieve_rt_task(api_obj: Rest, rt_cls: type[RealtimeItem], device: DeviceInfo) -> tuple[DeviceInfo, Any]:
     return device, rt_cls.get(api_obj, device.system_ip)
 
 
-def table_fields(op_cls: Type[OperationalItem], detail: bool, simple: bool) -> tuple:
+def table_fields(op_cls: type[OperationalItem], detail: bool, simple: bool) -> tuple:
     if detail and op_cls.fields_ext is not None:
         return op_cls.fields_std + op_cls.fields_ext
 
@@ -163,7 +164,7 @@ class TaskShow(Task):
 
         return result_tables if (parsed_args.save_csv is None and parsed_args.save_json is None) else None
 
-    def realtime(self, parsed_args, api: Rest) -> List[Table]:
+    def realtime(self, parsed_args, api: Rest) -> list[Table]:
         devices = self.selected_devices(parsed_args, api)
         pool_size = max(min(len(devices), THREAD_POOL_SIZE), 1)
 
@@ -199,7 +200,7 @@ class TaskShow(Task):
 
         return result_tables
 
-    def bulk_state(self, parsed_args, api: Rest) -> List[Table]:
+    def bulk_state(self, parsed_args, api: Rest) -> list[Table]:
         devices = self.selected_devices(parsed_args, api)
 
         result_tables = []
@@ -223,7 +224,7 @@ class TaskShow(Task):
 
         return result_tables
 
-    def bulk_stats(self, parsed_args, api: Rest) -> List[Table]:
+    def bulk_stats(self, parsed_args, api: Rest) -> list[Table]:
         devices = self.selected_devices(parsed_args, api)
         end_time = datetime.now(tz=timezone.utc) - timedelta(days=parsed_args.days, hours=parsed_args.hours)
         start_time = end_time - timedelta(minutes=self.STATS_QUERY_RANGE_MINS)
@@ -256,7 +257,7 @@ class TaskShow(Task):
 
         return result_tables
 
-    def devices(self, parsed_args, api: Rest) -> List[Table]:
+    def devices(self, parsed_args, api: Rest) -> list[Table]:
         devices = self.selected_devices(parsed_args, api)
 
         result_tables = []
@@ -267,7 +268,7 @@ class TaskShow(Task):
 
         return result_tables
 
-    def selected_devices(self, parsed_args, api: Rest) -> List[DeviceInfo]:
+    def selected_devices(self, parsed_args, api: Rest) -> list[DeviceInfo]:
         regex = parsed_args.regex or parsed_args.not_regex
         matched_items = [
             DeviceInfo(name, system_ip, site_id, state, d_type, model)
@@ -299,7 +300,7 @@ class TaskShow(Task):
 
         return table
 
-    def records(self, parsed_args, api: Rest) -> List[Table]:
+    def records(self, parsed_args, api: Rest) -> list[Table]:
         device_map = {system_ip: name for _, name, system_ip, *_ in Device.get_raise(api).extended_iter(default='-')}
 
         def device_names(devices_field):
@@ -360,35 +361,35 @@ class ShowDevicesArgs(ShowArgs):
 class ShowRealtimeArgs(ShowArgs):
     subtask_info: const(str, 'realtime')
     subtask_handler: const(Callable, TaskShow.realtime)
-    cmd: List[str]
+    cmd: list[str]
     detail: bool = False
     simple: bool = False
 
     # Validators
     @field_validator('cmd')
     @classmethod
-    def validate_cmd(cls, cmd_list: List[str]) -> List[str]:
+    def validate_cmd(cls, cmd_list: list[str]) -> list[str]:
         return validate_op_cmd(OpType.RT, cmd_list)
 
 
 class ShowStateArgs(ShowArgs):
     subtask_info: const(str, 'state')
     subtask_handler: const(Callable, TaskShow.bulk_state)
-    cmd: List[str]
+    cmd: list[str]
     detail: bool = False
     simple: bool = False
 
     # Validators
     @field_validator('cmd')
     @classmethod
-    def validate_cmd(cls, cmd_list: List[str]) -> List[str]:
+    def validate_cmd(cls, cmd_list: list[str]) -> list[str]:
         return validate_op_cmd(OpType.STATE, cmd_list)
 
 
 class ShowStatisticsArgs(ShowArgs):
     subtask_info: const(str, 'statistics')
     subtask_handler: const(Callable, TaskShow.bulk_stats)
-    cmd: List[str]
+    cmd: list[str]
     detail: bool = False
     simple: bool = False
     days: Annotated[int, Field(ge=0, lt=10000)] = 0
@@ -397,7 +398,7 @@ class ShowStatisticsArgs(ShowArgs):
     # Validators
     @field_validator('cmd')
     @classmethod
-    def validate_cmd(cls, cmd_list: List[str]) -> List[str]:
+    def validate_cmd(cls, cmd_list: list[str]) -> list[str]:
         return validate_op_cmd(OpType.STATS, cmd_list)
 
 

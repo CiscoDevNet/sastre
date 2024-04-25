@@ -1,5 +1,5 @@
 import argparse
-from typing import Union, Optional, List
+from typing import Union, Optional
 from pydantic import model_validator, field_validator
 from uuid import uuid4
 from cisco_sdwan.__version__ import __doc__ as title
@@ -172,7 +172,7 @@ class BackupArgs(TaskArgs):
     not_regex: Optional[str] = None
     no_rollover: bool = False
     save_running: bool = False
-    tags: List[CatalogTag]
+    tags: list[CatalogTag]
 
     # Validators
     _validate_filename = field_validator('workdir', 'archive')(validate_filename)
