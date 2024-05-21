@@ -11,7 +11,7 @@ pipeline {
         ECH_CREDENTIALS = '70d73668-c133-45cc-9943-cc32f1830945'
     }
     agent {
-        label "AMER-REGION"
+        label "sastre-pro-node"
     }
     stages {
         stage("Build") {
