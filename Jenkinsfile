@@ -1,14 +1,14 @@
 pipeline {
     environment {
-        GIT_CREDS = credentials('345c79bc-9def-4981-94b5-d8190fdd2304') // as-ci-user.gen
         WEBEX_ROOM = 'Y2lzY29zcGFyazovL3VzL1JPT00vZTMxNTUzZjAtZDNiMS0xMWViLWJjNzktMTUxMzcwZjZlOTYz' // Sastre - CICD Notifications
         WEBEX_CREDS = '16fdd237-afe3-4d7f-9fe5-7bde6d1275e0'    // sastre-cicd@webex.bot
         REGISTRY = 'containers.cisco.com'
         REGISTRY_URL = "https://$REGISTRY"
         ECH_ORG = 'maestro-org'
         ECH_REPO = 'sastre-pro'
+        GEN_USER = "cx-sastre-user.gen"
         ECH_PATH = "${REGISTRY}/${ECH_ORG}/${ECH_REPO}"
-        ECH_CREDENTIALS = 'ech-token'
+        ECH_CREDENTIALS = 'sastre-ech-token'
     }
     agent {
         label "sastre-pro-node"
@@ -59,15 +59,17 @@ pipeline {
         stage("Publish") {
             options { skipDefaultCheckout true }
             steps {
-                withDockerRegistry([ credentialsId: "$ECH_CREDENTIALS", url: "$REGISTRY_URL" ]) {
-                    sh """
-                        docker tag $ECH_PATH:$BRANCH_NAME $ECH_PATH:$BRANCH_NAME
-                        docker push $ECH_PATH:$BRANCH_NAME
-                    """
+                    withCredentials([conjurSecretCredential(credentialsId: "$ECH_CREDENTIALS", variable: "ECH_TOKEN")]) {
+                        sh """
+                            echo $ECH_TOKEN | docker login --username $GEN_USER --password-stdin containers.cisco.com
+                            docker tag $ECH_PATH:$BRANCH_NAME $ECH_PATH:latest
+                            docker push $ECH_PATH:latest
+                        """
+                    }
                 }
                 echo "Generated Artifact Info:"
                 echo "Image name and version: $ECH_PATH:latest"
-                sh "docker inspect --format '{{.Digest}}' $ECH_PATH:$BRANCH_NAME"
+                sh "docker inspect --format '{{.Digest}}' $ECH_PATH:latest"
                 echo "Stored in: $REGISTRY_URL"
             }
             when {
