@@ -5,10 +5,10 @@ pipeline {
         WEBEX_CREDS = '16fdd237-afe3-4d7f-9fe5-7bde6d1275e0'    // sastre-cicd@webex.bot
         REGISTRY = 'containers.cisco.com'
         REGISTRY_URL = "https://$REGISTRY"
-        ECH_ORG = 'aide'
+        ECH_ORG = 'maestro-org'
         ECH_REPO = 'sastre-pro'
         ECH_PATH = "${REGISTRY}/${ECH_ORG}/${ECH_REPO}"
-        ECH_CREDENTIALS = '70d73668-c133-45cc-9943-cc32f1830945'
+        ECH_CREDENTIALS = 'ech-token'
     }
     agent {
         label "sastre-pro-node"
@@ -61,13 +61,13 @@ pipeline {
             steps {
                 withDockerRegistry([ credentialsId: "$ECH_CREDENTIALS", url: "$REGISTRY_URL" ]) {
                     sh """
-                        docker tag $ECH_PATH:$BRANCH_NAME $ECH_PATH:latest
-                        docker push $ECH_PATH:latest
+                        docker tag $ECH_PATH:$BRANCH_NAME $ECH_PATH:$BRANCH_NAME
+                        docker push $ECH_PATH:$BRANCH_NAME
                     """
                 }
                 echo "Generated Artifact Info:"
                 echo "Image name and version: $ECH_PATH:latest"
-                sh "docker inspect --format '{{.Digest}}' $ECH_PATH:latest"
+                sh "docker inspect --format '{{.Digest}}' $ECH_PATH:$BRANCH_NAME"
                 echo "Stored in: $REGISTRY_URL"
             }
             when {
