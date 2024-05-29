@@ -66,7 +66,6 @@ pipeline {
                             docker push $ECH_PATH:latest
                         """
                     }
-                }
                 echo "Generated Artifact Info:"
                 echo "Image name and version: $ECH_PATH:latest"
                 sh "docker inspect --format '{{.Digest}}' $ECH_PATH:latest"
