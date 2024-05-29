@@ -21,13 +21,11 @@ pipeline {
                 script {
                     def hostname = sh(script: 'hostname', returnStdout: true).trim()
                     def ip = sh(script: 'hostname -I', returnStdout: true).trim()
-                    def buildCause = env.BUILD_CAUSE ?: 'Manual'
                     def buildTriggerBy = currentBuild.getBuildCauses()[0].shortDescription
 
                     echo "Hostname: ${hostname}"
                     echo "IP: ${ip}"
-                    echo "${buildTriggerBy}"
-                    echo "Build cause: ${buildCause}"
+                    echo "Build cause: ${buildTriggerBy}"
                     echo "Build number: ${env.BUILD_NUMBER}"
                     echo "Build URL: ${env.BUILD_URL}"
 
@@ -59,17 +57,18 @@ pipeline {
         stage("Publish") {
             options { skipDefaultCheckout true }
             steps {
-                    withCredentials([conjurSecretCredential(credentialsId: "$ECH_CREDENTIALS", variable: "ECH_TOKEN")]) {
-                        sh """
-                            echo $ECH_TOKEN | docker login --username $GEN_USER --password-stdin containers.cisco.com
-                            docker tag $ECH_PATH:$BRANCH_NAME $ECH_PATH:latest
-                            docker push $ECH_PATH:latest
-                        """
-                    }
+                withCredentials([conjurSecretCredential(credentialsId: "$ECH_CREDENTIALS", variable: "ECH_TOKEN")]) {
+                    sh """
+                        echo $ECH_TOKEN | docker login --username $GEN_USER --password-stdin containers.cisco.com
+                        docker tag $ECH_PATH:$BRANCH_NAME $ECH_PATH:latest
+                        docker push $ECH_PATH:latest
+                    """
+                }
                 echo "Generated Artifact Info:"
                 echo "Image name and version: $ECH_PATH:latest"
                 sh "docker inspect --format '{{.Digest}}' $ECH_PATH:latest"
                 echo "Stored in: $REGISTRY_URL"
+                sh "docker rmi $ECH_PATH:latest"
             }
             when {
                 anyOf {
