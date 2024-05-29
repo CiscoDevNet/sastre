@@ -121,7 +121,7 @@ class Rest:
         return True
 
     def logout(self) -> bool:
-        response = self.session.get(f'{self.base_url}/logout', params={'nocache': str(int(time()))})
+        response = self.session.get(f'{self.base_url}/logout', params={'nocache': str(int(time()))}, verify=self.verify)
         return response.status_code == requests.codes.ok
 
     @property
