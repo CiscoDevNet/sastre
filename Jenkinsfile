@@ -68,7 +68,7 @@ pipeline {
                 echo "Image name and version: $ECH_PATH:latest"
                 sh "docker inspect --format '{{.Digest}}' $ECH_PATH:latest"
                 echo "Stored in: $REGISTRY_URL"
-                sh "docker rmi $ECH_PATH:latest"
+                sh "docker rmi $ECH_PATH:$BRANCH_NAME $ECH_PATH:latest"
             }
             when {
                 anyOf {
