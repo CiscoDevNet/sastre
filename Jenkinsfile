@@ -73,7 +73,7 @@ pipeline {
             when {
                 anyOf {
                     buildingTag()
-                    branch pattern: "master|dev*", comparator: "REGEXP"
+                    branch pattern: "master|dev-.*", comparator: "REGEXP"
                 }
                 beforeAgent true
             }
