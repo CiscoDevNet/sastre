@@ -628,7 +628,7 @@ class ConfigItem(ApiItem):
     ConfigItem is an ApiItem that can be backed up and restored
     """
     store_path = None
-    store_file = None
+    store_file = '{item_name}.txt'
     root_dir = DATA_DIR
     factory_default_tag = 'factoryDefault'
     readonly_tag = 'readOnly'
@@ -832,7 +832,6 @@ class IndexConfigItem(ConfigItem):
     """
     IndexConfigItem is an index-type ConfigItem that can be iterated over, returning iter_fields
     """
-
     def __init__(self, data):
         """
         @param data: dict containing the information to be associated with this configuration item.
@@ -856,6 +855,7 @@ class IndexConfigItem(ConfigItem):
     extended_iter_fields = None
 
     store_path = ('inventory',)
+    store_file = None
 
     @classmethod
     def create(cls, item_list: Sequence[ConfigItem], id_hint_dict: Mapping[str, str]):
@@ -984,7 +984,6 @@ class Config2Item(ConfigItem):
 
 
 class FeatureProfile(Config2Item):
-    store_file = '{item_name}.json'
     id_tag = 'profileId'
     name_tag = 'profileName'
     type_tag = 'profileType'

@@ -310,7 +310,6 @@ class ControlInventory(Inventory):
 class DeviceConfig(ConfigItem):
     api_path = ApiPath('template/config/attached', None, None, None)
     store_path = ('device_configs',)
-    store_file = '{item_name}.txt'
 
     def save(self, node_dir, ext_name=False, item_name=None, item_id=None):
         """
@@ -434,7 +433,6 @@ class DeviceTemplateAttached(IndexConfigItem):
 class DeviceTemplateValues(ConfigItem):
     api_path = ApiPath(None, 'template/device/config/input', None, None)
     store_path = ('device_templates', 'values')
-    store_file = '{item_name}.json'
 
     @staticmethod
     def api_params(template_id: str, device_uuids: Iterable[str]) -> dict:
@@ -491,7 +489,6 @@ class DeviceTemplate(ConfigItem):
         ApiPath('template/device/object', 'template/device/cli', 'template/device')
     )
     store_path = ('device_templates', 'template')
-    store_file = '{item_name}.json'
     name_tag = 'templateName'
     id_tag = 'templateId'
     post_filtered_tags = ('feature',)
@@ -583,7 +580,6 @@ class DeviceTemplateIndex(IndexConfigItem):
 class FeatureTemplate(ConfigItem):
     api_path = ApiPath('template/feature/object', 'template/feature')
     store_path = ('feature_templates',)
-    store_file = '{item_name}.json'
     id_tag = 'templateId'
     name_tag = 'templateName'
     type_tag = 'templateType'
@@ -641,7 +637,6 @@ class ConfigGroupModel(ConfigRequestModel):
 class ConfigGroup(Config2Item):
     api_path = ApiPath('v1/config-group')
     store_path = ('config_groups', 'group')
-    store_file = '{item_name}.json'
     id_tag = 'id'
     name_tag = 'name'
 
@@ -685,7 +680,6 @@ class ConfigGroupValues(Config2Item):
     api_path = ApiPath('v1/config-group/{configGroupId}/device/variables', None,
                        'v1/config-group/{configGroupId}/device/variables', None)
     store_path = ('config_groups', 'values')
-    store_file = '{item_name}.json'
 
     post_model = ConfigGroupValuesModel
 
@@ -728,7 +722,6 @@ class ConfigGroupAssociatedModel(ConfigRequestModel):
 class ConfigGroupAssociated(Config2Item):
     api_path = ApiPath('v1/config-group/{configGroupId}/device/associate')
     store_path = ('config_groups', 'associated')
-    store_file = '{item_name}.json'
 
     post_model = ConfigGroupAssociatedModel
 
@@ -1143,7 +1136,6 @@ class TopologyGroupModel(ConfigRequestModel):
 class TopologyGroup(Config2Item):
     api_path = ApiPath('v1/topology-group')
     store_path = ('topology_groups', 'group')
-    store_file = '{item_name}.json'
     id_tag = 'id'
     name_tag = 'name'
 
@@ -1175,7 +1167,6 @@ class PolicyGroupModel(ConfigRequestModel):
 class PolicyGroup(Config2Item):
     api_path = ApiPath('v1/policy-group')
     store_path = ('policy_groups', 'group')
-    store_file = '{item_name}.json'
     id_tag = 'id'
     name_tag = 'name'
 
@@ -1196,7 +1187,6 @@ class PolicyGroupIndex(IndexConfigItem):
 class PolicyVsmart(ConfigItem):
     api_path = ApiPath('template/policy/vsmart/definition', 'template/policy/vsmart')
     store_path = ('policy_templates', 'vSmart')
-    store_file = '{item_name}.json'
     name_tag = 'policyName'
     type_tag = 'policyType'
     skip_cmp_tag_set = {'isPolicyActivated', }
@@ -1227,7 +1217,6 @@ class PolicyVsmartIndex(IndexConfigItem):
 class PolicyVedge(ConfigItem):
     api_path = ApiPath('template/policy/vedge/definition', 'template/policy/vedge')
     store_path = ('policy_templates', 'vEdge')
-    store_file = '{item_name}.json'
     name_tag = 'policyName'
     type_tag = 'policyType'
 
@@ -1246,7 +1235,6 @@ class PolicyVedgeIndex(IndexConfigItem):
 class PolicySecurity(ConfigItem):
     api_path = ApiPath('template/policy/security/definition', 'template/policy/security')
     store_path = ('policy_templates', 'Security')
-    store_file = '{item_name}.json'
     name_tag = 'policyName'
     type_tag = 'policyType'
     # policyUseCase, policyMode are new tags in 20.x+, adding to skip diff to not trigger updates when restore --update
@@ -1268,7 +1256,6 @@ class PolicySecurityIndex(IndexConfigItem):
 class PolicyVoice(ConfigItem):
     api_path = ApiPath('template/policy/voice/definition', 'template/policy/voice')
     store_path = ('policy_templates', 'Voice')
-    store_file = '{item_name}.json'
     name_tag = 'policyName'
     type_tag = 'policyType'
 
@@ -1287,7 +1274,6 @@ class PolicyVoiceIndex(IndexConfigItem):
 class PolicyCustomApp(ConfigItem):
     api_path = ApiPath('template/policy/customapp')
     store_path = ('policy_templates', 'CustomApp')
-    store_file = '{item_name}.json'
     name_tag = 'appName'
     id_tag = 'appId'
     skip_cmp_tag_set = {'lastUpdated', 'referenceCount', 'references', 'activatedId', 'isActivatedByVsmart', 'owner'}
@@ -1316,7 +1302,6 @@ class PolicyCustomAppIndex(IndexConfigItem):
 
 # Policy definition base class
 class PolicyDef(ConfigItem):
-    store_file = '{item_name}.json'
     id_tag = 'definitionId'
     name_tag = 'name'
     type_tag = 'type'
@@ -1680,7 +1665,6 @@ class SecurityGroupIndex(PolicyDefIndex):
 
 # Policy list base class
 class PolicyList(ConfigItem):
-    store_file = '{item_name}.json'
     id_tag = 'listId'
     name_tag = 'name'
     type_tag = 'type'
