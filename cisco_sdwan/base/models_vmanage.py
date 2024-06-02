@@ -830,6 +830,30 @@ class ConfigGroupDeploy(ApiItem):
 # Feature Profiles
 #
 
+class ProfileSdwanPolicy(FeatureProfile):
+    api_path = ApiPath('v1/feature-profile/sdwan/policy-object')
+    store_path = ('feature_profiles', 'sdwan', 'policy_object')
+
+    parcel_names = (
+        "app-list", "app-probe", "as-path", "class", "color", "data-prefix", "data-ipv6-prefix", "ext-community",
+        "standard-community", "expanded-community", "ipv6-prefix", "mirror", "policer", "preferred-color-group",
+        "prefix", "security-zone", "security-scalablegrouptag", "security-identity", "security-geolocation",
+        "security-protocolname", "security-urllist", "security-ipssignature", "security-localdomain",
+        "security-localapp", "security-port", "security-fqdn", "security-data-ip-prefix", "sla-class", "tloc",
+        "vpn-group", "unified/advanced-inspection-profile", "unified/intrusion-prevention", "unified/url-filtering",
+        "unified/advanced-malware-protection", "unified/ssl-decryption-profile", "unified/ssl-decryption"
+    )
+    parcel_api_paths = ApiPathGroup({
+        name: ApiPath(f"v1/feature-profile/sdwan/policy-object/{{policyId}}/{name}") for name in parcel_names
+    })
+
+
+@register('policy_object', 'SDWAN policy object', ProfileSdwanPolicy, min_version='20.10')
+class ProfileSdwanPolicyIndex(FeatureProfileIndex):
+    api_path = ApiPath('v1/feature-profile/sdwan/policy-object', None, None, None)
+    store_file = 'feature_profiles_sdwan_policy_object.json'
+
+
 class ProfileSdwanSystem(FeatureProfile):
     api_path = ApiPath('v1/feature-profile/sdwan/system')
     store_path = ('feature_profiles', 'sdwan', 'system')
@@ -898,8 +922,14 @@ class ProfileSdwanService(FeatureProfile):
             "v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/interface/ethernet/{ethId}/tracker"),
         PathKey("trackergroup", "lan/vpn"): ...,
         PathKey("trackergroup", "lan/vpn/interface/ethernet"): ApiPath(
-            "v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/interface/ethernet/{ethId}/trackergroup")
-    })
+            "v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/interface/ethernet/{ethId}/trackergroup"),
+        PathKey("route-policy", "routing/bgp"): ...,
+        PathKey("route-policy", "routing/ospf"): ...,
+        PathKey("route-policy", "routing/eigrp"): ...,
+        PathKey("route-policy", "routing/ospfv3/ipv4"): ...,
+        PathKey("route-policy", "routing/ospfv3/ipv6"): ...,
+        PathKey("route-policy", "lan/vpn"): ...,
+    } | {PathKey(policy_obj_parcel, "route-policy"): ... for policy_obj_parcel in ProfileSdwanPolicy.parcel_names})
 
 
 @register('feature_profile', 'SDWAN service profile', ProfileSdwanService, min_version='20.8')
@@ -979,8 +1009,13 @@ class ProfileSdwanTransport(FeatureProfile):
             "v1/feature-profile/sdwan/transport/{transportId}/cellular-controller/"
             "{cellularControllerId}/cellular-profile"),
         PathKey("gps", "cellular-controller"): ApiPath(
-            "v1/feature-profile/sdwan/transport/{transportId}/cellular-controller/{cellularControllerId}/gps")
-    })
+            "v1/feature-profile/sdwan/transport/{transportId}/cellular-controller/{cellularControllerId}/gps"),
+        PathKey("route-policy", "routing/bgp"): ...,
+        PathKey("route-policy", "routing/ospf"): ...,
+        PathKey("route-policy", "routing/ospfv3/ipv4"): ...,
+        PathKey("route-policy", "routing/ospfv3/ipv6"): ...,
+        PathKey("route-policy", "wan/vpn"): ...,
+    } | {PathKey(policy_obj_parcel, "route-policy"): ... for policy_obj_parcel in ProfileSdwanPolicy.parcel_names})
 
 
 @register('feature_profile', 'SDWAN transport profile', ProfileSdwanTransport, min_version='20.8')
@@ -1019,30 +1054,6 @@ class ProfileSdwanOtherIndex(FeatureProfileIndex):
     store_file = 'feature_profiles_sdwan_other.json'
 
 
-class ProfileSdwanPolicy(FeatureProfile):
-    api_path = ApiPath('v1/feature-profile/sdwan/policy-object')
-    store_path = ('feature_profiles', 'sdwan', 'policy_object')
-
-    parcel_names = (
-        "app-list", "app-probe", "as-path", "class", "color", "data-prefix", "data-ipv6-prefix", "ext-community",
-        "standard-community", "expanded-community", "ipv6-prefix", "mirror", "policer", "preferred-color-group",
-        "prefix", "security-zone", "security-scalablegrouptag", "security-identity", "security-geolocation",
-        "security-protocolname", "security-urllist", "security-ipssignature", "security-localdomain",
-        "security-localapp", "security-port", "security-fqdn", "security-data-ip-prefix", "sla-class", "tloc",
-        "vpn-group", "unified/advanced-inspection-profile", "unified/intrusion-prevention", "unified/url-filtering",
-        "unified/advanced-malware-protection", "unified/ssl-decryption-profile", "unified/ssl-decryption"
-    )
-    parcel_api_paths = ApiPathGroup({
-        name: ApiPath(f"v1/feature-profile/sdwan/policy-object/{{policyId}}/{name}") for name in parcel_names
-    })
-
-
-@register('feature_profile', 'SDWAN policy object', ProfileSdwanPolicy, min_version='20.10')
-class ProfileSdwanPolicyIndex(FeatureProfileIndex):
-    api_path = ApiPath('v1/feature-profile/sdwan/policy-object', None, None, None)
-    store_file = 'feature_profiles_sdwan_policy_object.json'
-
-
 class ProfileSdwanDnsSecurity(FeatureProfile):
     api_path = ApiPath('v1/feature-profile/sdwan/dns-security')
     store_path = ('feature_profiles', 'sdwan', 'dns_security')
@@ -1076,7 +1087,11 @@ class ProfileSdwanApplicationPriority(FeatureProfile):
     store_path = ('feature_profiles', 'sdwan', 'application_priority')
     parcel_api_paths = ApiPathGroup({
         "qos-policy": ApiPath("v1/feature-profile/sdwan/application-priority/{appPriorityId}/qos-policy"),
-        "traffic-policy": ApiPath("v1/feature-profile/sdwan/application-priority/{appPriorityId}/traffic-policy")
+        "traffic-policy": ApiPath("v1/feature-profile/sdwan/application-priority/{appPriorityId}/traffic-policy"),
+        "policy-settings": ApiPath("v1/feature-profile/sdwan/application-priority/{appPriorityId}/policy-settings")
+    }, parcel_reference_path_map={
+        PathKey(policy_object_parcel, parcel): ...
+        for parcel in ('qos-policy', 'traffic-policy') for policy_object_parcel in ProfileSdwanPolicy.parcel_names
     })
 
 
@@ -1091,7 +1106,16 @@ class ProfileSdwanEmbeddedSecurity(FeatureProfile):
     store_path = ('feature_profiles', 'sdwan', 'embedded_security')
     parcel_api_paths = ApiPathGroup({
         "policy": ApiPath("v1/feature-profile/sdwan/embedded-security/{securityId}/policy"),
-        "ngfirewall": ApiPath("v1/feature-profile/sdwan/embedded-security/{securityId}/unified/ngfirewall")
+        "unified/ngfirewall": ApiPath("v1/feature-profile/sdwan/embedded-security/{securityId}/unified/ngfirewall"),
+    }, parcel_reference_path_map={
+        PathKey("ngfirewall", "policy"): ...,
+        # TODO: Validate referenced items
+        PathKey("unified/advanced-inspection-profile", "unified/ngfirewall"): ...,
+        PathKey("unified/url-filtering", "unified/advanced-inspection-profile"): ...,
+        PathKey("unified/intrusion-prevention", "unified/ngfirewall"): ...,
+        PathKey("security-zone", "policy"): ...,
+        PathKey("unified/ngfirewall", "policy"): ...,
+        PathKey("unified/intrusion-prevention", "unified/advanced-inspection-profile"): ...,
     })
 
 
