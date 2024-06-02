@@ -56,6 +56,7 @@ _tag_dependency_list = [
     'topology_group',
     'policy_group',
     'feature_profile',
+    'policy_object',
     'template_device',
     'template_feature',
     'policy_vsmart',

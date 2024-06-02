@@ -95,7 +95,7 @@ class TaskBackup(Task):
                     item = item_cls.get_raise(api, item_id)
                     if item.save(parsed_args.workdir, item_index.need_extended_name, item_name, item_id):
                         self.log_info(f'Done {info} {item_name}')
-                except (RestAPIException, ModelException) as ex:
+                except (RestAPIException, ModelException, ValueError) as ex:
                     self.log_error(f'Failed backup {info} {item_name}: {ex}')
                     continue
 
