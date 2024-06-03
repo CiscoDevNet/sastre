@@ -310,6 +310,7 @@ class ControlInventory(Inventory):
 class DeviceConfig(ConfigItem):
     api_path = ApiPath('template/config/attached', None, None, None)
     store_path = ('device_configs',)
+    store_file = '{item_name}.txt'
 
     def save(self, node_dir, ext_name=False, item_name=None, item_id=None):
         """
