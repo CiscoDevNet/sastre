@@ -628,7 +628,7 @@ class ConfigItem(ApiItem):
     ConfigItem is an ApiItem that can be backed up and restored
     """
     store_path = None
-    store_file = '{item_name}.txt'
+    store_file = '{item_name}.json'
     root_dir = DATA_DIR
     factory_default_tag = 'factoryDefault'
     readonly_tag = 'readOnly'
