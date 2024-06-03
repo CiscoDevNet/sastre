@@ -9,7 +9,7 @@ Some use-cases include:
 - Backup, restore and delete configuration items. Tags and regular expressions can be used to select all or a subset of items.
 - Visualize operational data across multiple devices. For instance, display status of control connections from multiple devices in a single table.
 
-Sastre can also be used as an SDK to other applications, further information is available on [DevNet Sastre SDK](https://developer.cisco.com/docs/sdwan/#!sastre-sdk-overview).
+Sastre can also be used as an SDK to other applications, further information is available on [DevNet Sastre SDK](https://github.com/CiscoDevNet/sastre/wiki/4.-Sastre-SDK).
 
 [Sastre-Ansible](https://github.com/CiscoDevNet/sastre-ansible) is an Ansible Collection that exposes Sastre commands to Ansible Playbooks as a set of tasks and lookup plugins. Allowing users to build-up on Sastre functionality to create larger automation workflows.
 
