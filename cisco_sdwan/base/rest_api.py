@@ -121,10 +121,10 @@ class Rest:
 
     def logout(self) -> bool:
         if is_version_newer('20.11', self.server_version):
-            response = self.session.post(f'{self.base_url}/logout', allow_redirects=False)
+            response = self.session.post(f'{self.base_url}/logout', verify=self.verify, allow_redirects=False)
         else:
             response = self.session.get(f'{self.base_url}/logout', params={'nocache': str(int(time()))},
-                                        allow_redirects=False)
+                                        verify=self.verify, allow_redirects=False)
 
         return response.status_code == requests.codes.ok
 
