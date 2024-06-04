@@ -1002,8 +1002,6 @@ def archive_create(archive_filename: str, workdir: str) -> None:
         for member_path in source_dir.rglob("*"):
             archive_file.write(member_path, arcname=member_path.relative_to(source_dir))
 
-    return
-
 
 def archive_extract(archive_filename: str, workdir: str) -> None:
     """
@@ -1014,5 +1012,3 @@ def archive_extract(archive_filename: str, workdir: str) -> None:
     destination_dir = Path(DATA_DIR, workdir)
     with ZipFile(archive_filename, mode='r') as archive_file:
         archive_file.extractall(destination_dir)
-
-    return

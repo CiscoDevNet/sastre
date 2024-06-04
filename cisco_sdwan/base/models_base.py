@@ -988,7 +988,7 @@ class FeatureProfile(Config2Item):
     name_tag = 'profileName'
     type_tag = 'profileType'
     parcels_tag = 'associatedProfileParcels'
-    parcel_api_paths: ApiPathGroup = None
+    parcel_api_paths: Optional[ApiPathGroup] = None
 
     post_model = FeatureProfileModel
 
