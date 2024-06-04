@@ -1,4 +1,5 @@
 import unittest
+from typing import Optional
 from cisco_sdwan.base.rest_api import Rest
 
 
@@ -6,7 +7,7 @@ VMANAGE_INFO = ("https:/198.18.1.10:443", "admin", "admin")
 
 
 class TestTasks(unittest.TestCase):
-    api: Rest = None
+    api: Optional[Rest] = None
 
     @classmethod
     def setUpClass(cls) -> None:

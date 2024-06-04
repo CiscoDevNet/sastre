@@ -757,8 +757,6 @@ class ConfigGroupAssociated(Config2Item):
     def put_raise(self, api: Rest, **path_vars: str) -> None:
         api.put(self.put_data(), ConfigGroupAssociated.api_path.resolve(**path_vars).put)
 
-        return
-
     @staticmethod
     def delete_raise(api: Rest, uuids: Iterable[str], **path_vars: str) -> ActionWorker:
         payload = {

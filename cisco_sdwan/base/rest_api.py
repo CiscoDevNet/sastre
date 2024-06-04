@@ -12,7 +12,7 @@ from urllib3 import disable_warnings
 from urllib3.exceptions import InsecureRequestWarning
 from time import time, sleep
 from typing import Optional, Any, Union
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from random import uniform
 
 
@@ -40,8 +40,8 @@ def backoff_retry(fn):
                 wait_secs = backoff_wait_secs(retry)
                 logging.getLogger(__name__).debug(f'{ex}: Retry {retry+1}/{MAX_RETRIES}, backoff {wait_secs:.3}s')
                 sleep(wait_secs)
-        else:
-            raise RestAPIException(f'Maximum retries exceeded ({MAX_RETRIES})')
+
+        raise RestAPIException(f'Maximum retries exceeded ({MAX_RETRIES})')
 
     return retry_fn
 
@@ -216,7 +216,7 @@ def is_version_newer(version_1: str, version_2: str) -> bool:
     @param version_2: String containing second version
     @return: True if version_2 is newer than version_1.
     """
-    def parse(version_string: str) -> Sequence[int]:
+    def parse(version_string: str) -> list[int]:
         # Development versions may follow this format: '20.1.999-98' or '20.9.0.02-li'
         return [int(v) for v in f"{version_string}.0".split('.')[:2]]
 
