@@ -125,7 +125,7 @@ class Rest:
             response = self.session.get(f'{self.base_url}/logout', params={'nocache': str(int(time()))},
                                         allow_redirects=False)
 
-        return response.status_code == requests.codes.ok
+        return response.status_code == requests.codes.found
 
     @property
     def server_version(self) -> str:
