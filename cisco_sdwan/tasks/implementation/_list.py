@@ -1,5 +1,6 @@
 import argparse
-from typing import Union, Optional, List, Callable
+from typing import Union, Optional
+from collections.abc import Callable
 from operator import itemgetter
 from pydantic import model_validator, field_validator
 from cisco_sdwan.__version__ import __doc__ as title
@@ -171,7 +172,7 @@ class ListArgs(TableTaskArgs):
 class ListConfigArgs(ListArgs):
     subtask_info: const(str, 'configuration')
     subtask_handler: const(Callable, TaskList.config_table)
-    tags: List[CatalogTag]
+    tags: list[CatalogTag]
 
 
 class ListCertificateArgs(ListArgs):
@@ -182,7 +183,7 @@ class ListCertificateArgs(ListArgs):
 class ListTransformArgs(ListArgs):
     subtask_info: const(str, 'transform')
     subtask_handler: const(Callable, TaskList.xform_table)
-    tags: List[CatalogTag]
+    tags: list[CatalogTag]
     regex: Optional[str] = None
     not_regex: Optional[str] = None
     name_regex: str

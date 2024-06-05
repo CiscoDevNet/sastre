@@ -11,7 +11,8 @@ import logging
 from urllib3 import disable_warnings
 from urllib3.exceptions import InsecureRequestWarning
 from time import time, sleep
-from typing import Optional, Dict, Sequence, Any, Union
+from typing import Optional, Any, Union
+from collections.abc import Mapping
 from random import uniform
 
 
@@ -39,8 +40,8 @@ def backoff_retry(fn):
                 wait_secs = backoff_wait_secs(retry)
                 logging.getLogger(__name__).debug(f'{ex}: Retry {retry+1}/{MAX_RETRIES}, backoff {wait_secs:.3}s')
                 sleep(wait_secs)
-        else:
-            raise RestAPIException(f'Maximum retries exceeded ({MAX_RETRIES})')
+
+        raise RestAPIException(f'Maximum retries exceeded ({MAX_RETRIES})')
 
     return retry_fn
 
@@ -120,10 +121,10 @@ class Rest:
 
     def logout(self) -> bool:
         if is_version_newer('20.11', self.server_version):
-            response = self.session.post(f'{self.base_url}/logout', allow_redirects=False)
+            response = self.session.post(f'{self.base_url}/logout', verify=self.verify, allow_redirects=False)
         else:
             response = self.session.get(f'{self.base_url}/logout', params={'nocache': str(int(time()))},
-                                        allow_redirects=False)
+                                        verify=self.verify, allow_redirects=False)
 
         return response.status_code == requests.codes.found
 
@@ -140,7 +141,7 @@ class Rest:
         return self.server_facts.get('userMode', '') == 'provider'
 
     @backoff_retry
-    def get(self, *path_entries: str, **params: Union[str, int]) -> Dict[str, Any]:
+    def get(self, *path_entries: str, **params: Union[str, int]) -> dict[str, Any]:
         response = self.session.get(self._url(*path_entries),
                                     params=params if params else None,
                                     timeout=self.timeout, verify=self.verify)
@@ -148,7 +149,7 @@ class Rest:
         return response.json()
 
     @backoff_retry
-    def post(self, input_data: Dict[str, Any], *path_entries: str) -> Union[Dict[str, Any], None]:
+    def post(self, input_data: Mapping[str, Any], *path_entries: str) -> Union[dict[str, Any], None]:
         # With large input_data, vManage fails the post request if payload is encoded in compact form. Thus encoding
         # with indent=1.
         response = self.session.post(self._url(*path_entries), data=json.dumps(input_data, indent=1),
@@ -159,7 +160,7 @@ class Rest:
         return response.json() if response.text else None
 
     @backoff_retry
-    def put(self, input_data: Dict[str, Any], *path_entries: str) -> Union[Dict[str, Any], None]:
+    def put(self, input_data: Mapping[str, Any], *path_entries: str) -> Union[dict[str, Any], None]:
         # With large input_data, vManage fails the put request if payload is encoded in compact form. Thus encoding
         # with indent=1.
         response = self.session.put(self._url(*path_entries), data=json.dumps(input_data, indent=1),
@@ -170,8 +171,8 @@ class Rest:
         return response.json() if response.text else None
 
     @backoff_retry
-    def delete(self, *path_entries: str, input_data: Optional[Dict[str, Any]] = None,
-               **params: str) -> Union[Dict[str, Any], None]:
+    def delete(self, *path_entries: str, input_data: Optional[Mapping[str, Any]] = None,
+               **params: str) -> Union[dict[str, Any], None]:
         response = self.session.delete(self._url(*path_entries),
                                        data=json.dumps(input_data, indent=1) if input_data is not None else None,
                                        params=params if params else None,
@@ -215,14 +216,14 @@ def is_version_newer(version_1: str, version_2: str) -> bool:
     @param version_2: String containing second version
     @return: True if version_2 is newer than version_1.
     """
-    def parse(version_string: str) -> Sequence[int]:
+    def parse(version_string: str) -> list[int]:
         # Development versions may follow this format: '20.1.999-98' or '20.9.0.02-li'
         return [int(v) for v in f"{version_string}.0".split('.')[:2]]
 
     return parse(version_2) > parse(version_1)
 
 
-def response_id(response_payload: Dict[str, str]) -> str:
+def response_id(response_payload: Mapping[str, str]) -> str:
     """
     Extracts the first value in a response payload. Assumes that this first value contains the ID of the object
     just created by the post request.

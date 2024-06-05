@@ -1,5 +1,6 @@
 import argparse
-from typing import Union, Optional, Sequence, Dict, Set
+from typing import Union, Optional
+from collections.abc import Sequence
 from pydantic import model_validator, field_validator
 from uuid import uuid4
 from contextlib import suppress
@@ -176,8 +177,8 @@ class TaskRestore(Task):
 
         return check_vbond.is_configured
 
-    def restore_config_items(self, api: Rest, restore_list: Sequence[tuple], id_mapping: Dict[str, str],
-                             dependency_set: Set[str], match_set: Set[str]) -> None:
+    def restore_config_items(self, api: Rest, restore_list: Sequence[tuple], id_mapping: dict[str, str],
+                             dependency_set: set[str], match_set: set[str]) -> None:
         # Items were added to restore_list following ordered_tags() order (i.e. higher level items before lower
         # level items). The reverse order needs to be followed on restore.
         for info, index, restore_item_list in reversed(restore_list):

@@ -1,4 +1,4 @@
-from typing import Optional, List, Any, Dict
+from typing import Optional, Any
 from typing_extensions import Annotated
 from pydantic import BaseModel, field_validator, Field, AfterValidator, ConfigDict, ValidationInfo
 from cisco_sdwan.base.catalog import OpType, CATALOG_TAG_ALL, op_catalog_tags, op_catalog_commands, catalog_tags
@@ -7,7 +7,7 @@ from cisco_sdwan.tasks.validators import validate_regex, validate_filename, vali
 
 
 # Model field validators
-def validate_op_cmd(op_type: OpType, cmd_list: List[str]) -> List[str]:
+def validate_op_cmd(op_type: OpType, cmd_list: list[str]) -> list[str]:
     full_command = ' '.join(cmd_list)
     pass_options = [
         len(cmd_list) == 1 and CATALOG_TAG_ALL in cmd_list,

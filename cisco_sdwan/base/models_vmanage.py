@@ -5,7 +5,8 @@
  This module implements vManage API models
 """
 import re
-from typing import Iterable, Set, Optional, Sequence, Mapping, List, Any, Callable, Tuple, Dict, Union
+from typing import Optional, Any, Union
+from collections.abc import Mapping, Sequence, Callable, Iterable
 from pathlib import Path
 from collections import namedtuple
 from copy import deepcopy
@@ -433,7 +434,6 @@ class DeviceTemplateAttached(IndexConfigItem):
 class DeviceTemplateValues(ConfigItem):
     api_path = ApiPath(None, 'template/device/config/input', None, None)
     store_path = ('device_templates', 'values')
-    store_file = '{item_name}.json'
 
     @staticmethod
     def api_params(template_id: str, device_uuids: Iterable[str]) -> dict:
@@ -490,7 +490,6 @@ class DeviceTemplate(ConfigItem):
         ApiPath('template/device/object', 'template/device/cli', 'template/device')
     )
     store_path = ('device_templates', 'template')
-    store_file = '{item_name}.json'
     name_tag = 'templateName'
     id_tag = 'templateId'
     post_filtered_tags = ('feature',)
@@ -521,7 +520,7 @@ class DeviceTemplate(ConfigItem):
         return template_type in self.find_key('templateType')
 
     @property
-    def feature_templates(self) -> Set[str]:
+    def feature_templates(self) -> set[str]:
         return set(self.find_key('templateId', from_key='generalTemplates'))
 
 
@@ -549,7 +548,7 @@ class DeviceTemplateIndex(IndexConfigItem):
     def is_cedge(iterator_entry: FilteredIterEntry) -> bool:
         return iterator_entry.device_type is not None and iterator_entry.device_type in CEDGE_SET
 
-    def filtered_iter(self, *filter_fns: Callable) -> Iterable[Tuple[str, str]]:
+    def filtered_iter(self, *filter_fns: Callable) -> Iterable[tuple[str, str]]:
         # The contract for filtered_iter is that it should return an iterable of iter_fields tuples.
         # If no filter_fns is provided, no filtering is done and iterate over all entries
         return (
@@ -582,7 +581,6 @@ class DeviceTemplateIndex(IndexConfigItem):
 class FeatureTemplate(ConfigItem):
     api_path = ApiPath('template/feature/object', 'template/feature')
     store_path = ('feature_templates',)
-    store_file = '{item_name}.json'
     id_tag = 'templateId'
     name_tag = 'templateName'
     type_tag = 'templateType'
@@ -592,7 +590,7 @@ class FeatureTemplate(ConfigItem):
                         'devicesAttached', 'attachedMastersCount', 'gTemplateClass'}
 
     @property
-    def device_types(self) -> Set[str]:
+    def device_types(self) -> set[str]:
         return set(self.data.get('deviceType', []))
 
     @device_types.setter
@@ -633,14 +631,13 @@ class ConfigGroupModel(ConfigRequestModel):
     name: str
     description: str
     solution: str
-    profiles: Optional[List[ConfigGroupProfileModel]] = None
-    topology: Optional[Dict[str, Any]] = None
+    profiles: Optional[list[ConfigGroupProfileModel]] = None
+    topology: Optional[dict[str, Any]] = None
 
 
 class ConfigGroup(Config2Item):
     api_path = ApiPath('v1/config-group')
     store_path = ('config_groups', 'group')
-    store_file = '{item_name}.json'
     id_tag = 'id'
     name_tag = 'name'
 
@@ -665,12 +662,12 @@ class NameValuePair(ConfigRequestModel):
 
 class DeviceValuesModel(ConfigRequestModel):
     device_id: str = Field(..., alias='device-id')
-    variables: List[NameValuePair]
+    variables: list[NameValuePair]
 
 
 class ConfigGroupValuesModel(ConfigRequestModel):
     solution: str
-    devices: List[DeviceValuesModel]
+    devices: list[DeviceValuesModel]
 
     # In 20.8.1 get values contains 'family' key while put request requires 'solution' instead
     def __init__(self, **kwargs):
@@ -684,7 +681,6 @@ class ConfigGroupValues(Config2Item):
     api_path = ApiPath('v1/config-group/{configGroupId}/device/variables', None,
                        'v1/config-group/{configGroupId}/device/variables', None)
     store_path = ('config_groups', 'values')
-    store_file = '{item_name}.json'
 
     post_model = ConfigGroupValuesModel
 
@@ -696,7 +692,7 @@ class ConfigGroupValues(Config2Item):
     def is_empty(self) -> bool:
         return self.data is None or len(self.data.get('devices', [])) == 0
 
-    def filter(self, allowed_uuid_set: Set[str]) -> 'ConfigGroupValues':
+    def filter(self, allowed_uuid_set: set[str]) -> 'ConfigGroupValues':
         """
         Return a new instance of ConfigGroupValues containing only device entries with an id that is present in
         allowed_uuid_set.
@@ -721,13 +717,12 @@ class AssociatedDeviceModel(ConfigRequestModel):
 
 
 class ConfigGroupAssociatedModel(ConfigRequestModel):
-    devices: List[AssociatedDeviceModel]
+    devices: list[AssociatedDeviceModel]
 
 
 class ConfigGroupAssociated(Config2Item):
     api_path = ApiPath('v1/config-group/{configGroupId}/device/associate')
     store_path = ('config_groups', 'associated')
-    store_file = '{item_name}.json'
 
     post_model = ConfigGroupAssociatedModel
 
@@ -741,7 +736,7 @@ class ConfigGroupAssociated(Config2Item):
     def is_empty(self) -> bool:
         return self.data is None or len(self.data.get('devices', [])) == 0
 
-    def filter(self, allowed_uuid_set: Optional[Set[str]] = None, not_by_rule: bool = False) -> 'ConfigGroupAssociated':
+    def filter(self, allowed_uuid_set: Optional[set[str]] = None, not_by_rule: bool = False) -> 'ConfigGroupAssociated':
         """
         Return a new instance of ConfigGroupAssociated containing only device entries with an id that is present in
         allowed_uuid_set.
@@ -761,8 +756,6 @@ class ConfigGroupAssociated(Config2Item):
 
     def put_raise(self, api: Rest, **path_vars: str) -> None:
         api.put(self.put_data(), ConfigGroupAssociated.api_path.resolve(**path_vars).put)
-
-        return
 
     @staticmethod
     def delete_raise(api: Rest, uuids: Iterable[str], **path_vars: str) -> ActionWorker:
@@ -791,7 +784,7 @@ class ConfigGroupRules(IndexConfigItem):
         api.delete(ConfigGroupRules.api_path.resolve(configGroupId=config_group_id).delete, rule_id,
                    configGroupId=config_group_id)
 
-    def post_raise(self, api: Rest, config_group_id: str) -> List[str]:
+    def post_raise(self, api: Rest, config_group_id: str) -> list[str]:
         filtered_keys = {
             self.id_tag,
         }
@@ -812,7 +805,7 @@ class ConfigGroupDeploy(ApiItem):
     id_tag = 'parentTaskId'
 
     @staticmethod
-    def api_params(uuids: Iterable[str]) -> Dict[str, Any]:
+    def api_params(uuids: Iterable[str]) -> dict[str, Any]:
         """
         Build dictionary used to provide input parameters for api POST call
         @param uuids: An iterable of device UUIDs to deploy
@@ -828,6 +821,30 @@ class ConfigGroupDeploy(ApiItem):
 #
 # Feature Profiles
 #
+
+class ProfileSdwanPolicy(FeatureProfile):
+    api_path = ApiPath('v1/feature-profile/sdwan/policy-object')
+    store_path = ('feature_profiles', 'sdwan', 'policy_object')
+
+    parcel_names = (
+        "app-list", "app-probe", "as-path", "class", "color", "data-prefix", "data-ipv6-prefix", "ext-community",
+        "standard-community", "expanded-community", "ipv6-prefix", "mirror", "policer", "preferred-color-group",
+        "prefix", "security-zone", "security-scalablegrouptag", "security-identity", "security-geolocation",
+        "security-protocolname", "security-urllist", "security-ipssignature", "security-localdomain",
+        "security-localapp", "security-port", "security-fqdn", "security-data-ip-prefix", "sla-class", "tloc",
+        "vpn-group", "unified/advanced-inspection-profile", "unified/intrusion-prevention", "unified/url-filtering",
+        "unified/advanced-malware-protection", "unified/ssl-decryption-profile", "unified/ssl-decryption"
+    )
+    parcel_api_paths = ApiPathGroup({
+        name: ApiPath(f"v1/feature-profile/sdwan/policy-object/{{policyId}}/{name}") for name in parcel_names
+    })
+
+
+@register('policy_object', 'SDWAN policy object', ProfileSdwanPolicy, min_version='20.10')
+class ProfileSdwanPolicyIndex(FeatureProfileIndex):
+    api_path = ApiPath('v1/feature-profile/sdwan/policy-object', None, None, None)
+    store_file = 'feature_profiles_sdwan_policy_object.json'
+
 
 class ProfileSdwanSystem(FeatureProfile):
     api_path = ApiPath('v1/feature-profile/sdwan/system')
@@ -897,8 +914,14 @@ class ProfileSdwanService(FeatureProfile):
             "v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/interface/ethernet/{ethId}/tracker"),
         PathKey("trackergroup", "lan/vpn"): ...,
         PathKey("trackergroup", "lan/vpn/interface/ethernet"): ApiPath(
-            "v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/interface/ethernet/{ethId}/trackergroup")
-    })
+            "v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/interface/ethernet/{ethId}/trackergroup"),
+        PathKey("route-policy", "routing/bgp"): ...,
+        PathKey("route-policy", "routing/ospf"): ...,
+        PathKey("route-policy", "routing/eigrp"): ...,
+        PathKey("route-policy", "routing/ospfv3/ipv4"): ...,
+        PathKey("route-policy", "routing/ospfv3/ipv6"): ...,
+        PathKey("route-policy", "lan/vpn"): ...,
+    } | {PathKey(policy_obj_parcel, "route-policy"): ... for policy_obj_parcel in ProfileSdwanPolicy.parcel_names})
 
 
 @register('feature_profile', 'SDWAN service profile', ProfileSdwanService, min_version='20.8')
@@ -978,8 +1001,13 @@ class ProfileSdwanTransport(FeatureProfile):
             "v1/feature-profile/sdwan/transport/{transportId}/cellular-controller/"
             "{cellularControllerId}/cellular-profile"),
         PathKey("gps", "cellular-controller"): ApiPath(
-            "v1/feature-profile/sdwan/transport/{transportId}/cellular-controller/{cellularControllerId}/gps")
-    })
+            "v1/feature-profile/sdwan/transport/{transportId}/cellular-controller/{cellularControllerId}/gps"),
+        PathKey("route-policy", "routing/bgp"): ...,
+        PathKey("route-policy", "routing/ospf"): ...,
+        PathKey("route-policy", "routing/ospfv3/ipv4"): ...,
+        PathKey("route-policy", "routing/ospfv3/ipv6"): ...,
+        PathKey("route-policy", "wan/vpn"): ...,
+    } | {PathKey(policy_obj_parcel, "route-policy"): ... for policy_obj_parcel in ProfileSdwanPolicy.parcel_names})
 
 
 @register('feature_profile', 'SDWAN transport profile', ProfileSdwanTransport, min_version='20.8')
@@ -1018,30 +1046,6 @@ class ProfileSdwanOtherIndex(FeatureProfileIndex):
     store_file = 'feature_profiles_sdwan_other.json'
 
 
-class ProfileSdwanPolicy(FeatureProfile):
-    api_path = ApiPath('v1/feature-profile/sdwan/policy-object')
-    store_path = ('feature_profiles', 'sdwan', 'policy_object')
-
-    parcel_names = (
-        "app-list", "app-probe", "as-path", "class", "color", "data-prefix", "data-ipv6-prefix", "ext-community",
-        "standard-community", "expanded-community", "ipv6-prefix", "mirror", "policer", "preferred-color-group",
-        "prefix", "security-zone", "security-scalablegrouptag", "security-identity", "security-geolocation",
-        "security-protocolname", "security-urllist", "security-ipssignature", "security-localdomain",
-        "security-localapp", "security-port", "security-fqdn", "security-data-ip-prefix", "sla-class", "tloc",
-        "vpn-group", "unified/advanced-inspection-profile", "unified/intrusion-prevention", "unified/url-filtering",
-        "unified/advanced-malware-protection", "unified/ssl-decryption-profile", "unified/ssl-decryption"
-    )
-    parcel_api_paths = ApiPathGroup({
-        name: ApiPath(f"v1/feature-profile/sdwan/policy-object/{{policyId}}/{name}") for name in parcel_names
-    })
-
-
-@register('feature_profile', 'SDWAN policy object', ProfileSdwanPolicy, min_version='20.10')
-class ProfileSdwanPolicyIndex(FeatureProfileIndex):
-    api_path = ApiPath('v1/feature-profile/sdwan/policy-object', None, None, None)
-    store_file = 'feature_profiles_sdwan_policy_object.json'
-
-
 class ProfileSdwanDnsSecurity(FeatureProfile):
     api_path = ApiPath('v1/feature-profile/sdwan/dns-security')
     store_path = ('feature_profiles', 'sdwan', 'dns_security')
@@ -1075,7 +1079,11 @@ class ProfileSdwanApplicationPriority(FeatureProfile):
     store_path = ('feature_profiles', 'sdwan', 'application_priority')
     parcel_api_paths = ApiPathGroup({
         "qos-policy": ApiPath("v1/feature-profile/sdwan/application-priority/{appPriorityId}/qos-policy"),
-        "traffic-policy": ApiPath("v1/feature-profile/sdwan/application-priority/{appPriorityId}/traffic-policy")
+        "traffic-policy": ApiPath("v1/feature-profile/sdwan/application-priority/{appPriorityId}/traffic-policy"),
+        "policy-settings": ApiPath("v1/feature-profile/sdwan/application-priority/{appPriorityId}/policy-settings")
+    }, parcel_reference_path_map={
+        PathKey(policy_object_parcel, parcel): ...
+        for parcel in ('qos-policy', 'traffic-policy') for policy_object_parcel in ProfileSdwanPolicy.parcel_names
     })
 
 
@@ -1090,7 +1098,16 @@ class ProfileSdwanEmbeddedSecurity(FeatureProfile):
     store_path = ('feature_profiles', 'sdwan', 'embedded_security')
     parcel_api_paths = ApiPathGroup({
         "policy": ApiPath("v1/feature-profile/sdwan/embedded-security/{securityId}/policy"),
-        "ngfirewall": ApiPath("v1/feature-profile/sdwan/embedded-security/{securityId}/unified/ngfirewall")
+        "unified/ngfirewall": ApiPath("v1/feature-profile/sdwan/embedded-security/{securityId}/unified/ngfirewall"),
+    }, parcel_reference_path_map={
+        PathKey("ngfirewall", "policy"): ...,
+        # TODO: Validate referenced items
+        PathKey("unified/advanced-inspection-profile", "unified/ngfirewall"): ...,
+        PathKey("unified/url-filtering", "unified/advanced-inspection-profile"): ...,
+        PathKey("unified/intrusion-prevention", "unified/ngfirewall"): ...,
+        PathKey("security-zone", "policy"): ...,
+        PathKey("unified/ngfirewall", "policy"): ...,
+        PathKey("unified/intrusion-prevention", "unified/advanced-inspection-profile"): ...,
     })
 
 
@@ -1112,13 +1129,12 @@ class TopologyGroupModel(ConfigRequestModel):
     name: str
     description: str
     solution: str
-    profiles: Optional[List[TopologyGroupProfileModel]] = None
+    profiles: Optional[list[TopologyGroupProfileModel]] = None
 
 
 class TopologyGroup(Config2Item):
     api_path = ApiPath('v1/topology-group')
     store_path = ('topology_groups', 'group')
-    store_file = '{item_name}.json'
     id_tag = 'id'
     name_tag = 'name'
 
@@ -1144,13 +1160,12 @@ class PolicyGroupModel(ConfigRequestModel):
     name: str
     description: str
     solution: str
-    profiles: Optional[List[PolicyGroupProfileModel]] = None
+    profiles: Optional[list[PolicyGroupProfileModel]] = None
 
 
 class PolicyGroup(Config2Item):
     api_path = ApiPath('v1/policy-group')
     store_path = ('policy_groups', 'group')
-    store_file = '{item_name}.json'
     id_tag = 'id'
     name_tag = 'name'
 
@@ -1171,7 +1186,6 @@ class PolicyGroupIndex(IndexConfigItem):
 class PolicyVsmart(ConfigItem):
     api_path = ApiPath('template/policy/vsmart/definition', 'template/policy/vsmart')
     store_path = ('policy_templates', 'vSmart')
-    store_file = '{item_name}.json'
     name_tag = 'policyName'
     type_tag = 'policyType'
     skip_cmp_tag_set = {'isPolicyActivated', }
@@ -1202,7 +1216,6 @@ class PolicyVsmartIndex(IndexConfigItem):
 class PolicyVedge(ConfigItem):
     api_path = ApiPath('template/policy/vedge/definition', 'template/policy/vedge')
     store_path = ('policy_templates', 'vEdge')
-    store_file = '{item_name}.json'
     name_tag = 'policyName'
     type_tag = 'policyType'
 
@@ -1221,7 +1234,6 @@ class PolicyVedgeIndex(IndexConfigItem):
 class PolicySecurity(ConfigItem):
     api_path = ApiPath('template/policy/security/definition', 'template/policy/security')
     store_path = ('policy_templates', 'Security')
-    store_file = '{item_name}.json'
     name_tag = 'policyName'
     type_tag = 'policyType'
     # policyUseCase, policyMode are new tags in 20.x+, adding to skip diff to not trigger updates when restore --update
@@ -1243,7 +1255,6 @@ class PolicySecurityIndex(IndexConfigItem):
 class PolicyVoice(ConfigItem):
     api_path = ApiPath('template/policy/voice/definition', 'template/policy/voice')
     store_path = ('policy_templates', 'Voice')
-    store_file = '{item_name}.json'
     name_tag = 'policyName'
     type_tag = 'policyType'
 
@@ -1262,7 +1273,6 @@ class PolicyVoiceIndex(IndexConfigItem):
 class PolicyCustomApp(ConfigItem):
     api_path = ApiPath('template/policy/customapp')
     store_path = ('policy_templates', 'CustomApp')
-    store_file = '{item_name}.json'
     name_tag = 'appName'
     id_tag = 'appId'
     skip_cmp_tag_set = {'lastUpdated', 'referenceCount', 'references', 'activatedId', 'isActivatedByVsmart', 'owner'}
@@ -1291,7 +1301,6 @@ class PolicyCustomAppIndex(IndexConfigItem):
 
 # Policy definition base class
 class PolicyDef(ConfigItem):
-    store_file = '{item_name}.json'
     id_tag = 'definitionId'
     name_tag = 'name'
     type_tag = 'type'
@@ -1655,7 +1664,6 @@ class SecurityGroupIndex(PolicyDefIndex):
 
 # Policy list base class
 class PolicyList(ConfigItem):
-    store_file = '{item_name}.json'
     id_tag = 'listId'
     name_tag = 'name'
     type_tag = 'type'
