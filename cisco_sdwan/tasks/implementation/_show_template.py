@@ -1,7 +1,8 @@
 import argparse
 from pathlib import Path
 from collections import namedtuple
-from typing import List, Union, Optional, Callable
+from typing import Union, Optional
+from collections.abc import Callable
 from operator import itemgetter, attrgetter
 from pydantic import field_validator
 from cisco_sdwan.__version__ import __doc__ as title
@@ -85,7 +86,7 @@ class TaskShowTemplate(Task):
 
         return result_tables if (parsed_args.save_csv is None and parsed_args.save_json is None) else None
 
-    def values_table(self, parsed_args, api: Optional[Rest]) -> List[Table]:
+    def values_table(self, parsed_args, api: Optional[Rest]) -> list[Table]:
         def template_values(ext_name: bool, template_name: str, template_id: str) -> Union[DeviceTemplateValues, None]:
             if api is None:
                 # Load from local backup
@@ -141,7 +142,7 @@ class TaskShowTemplate(Task):
 
         return result_tables
 
-    def references_table(self, parsed_args, api: Optional[Rest]) -> List[Table]:
+    def references_table(self, parsed_args, api: Optional[Rest]) -> list[Table]:
         FeatureInfo = namedtuple('FeatureInfo', ['name', 'type', 'attached', 'device_templates'])
 
         backend = api or parsed_args.workdir

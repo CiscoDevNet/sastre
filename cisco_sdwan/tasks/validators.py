@@ -30,7 +30,7 @@ def validate_filename(filename: str) -> str:
         raise ValueError(f'Directory for "{filename}" does not exist')
 
     # Also allow . on filename, on top of what's allowed by filename_safe
-    if re.sub(r'\.', '_', file_path.name) != filename_safe(file_path.name):
+    if file_path.name.replace('.', '_') != filename_safe(file_path.name):
         raise ValueError(
             f'Invalid name "{file_path.name}". Only alphanumeric characters, "-", "_", and "." are allowed.'
         )
