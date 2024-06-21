@@ -72,7 +72,7 @@ def setup_logging(logging_config: str, is_verbose: bool = False, is_debug: bool 
     if is_verbose and console_handler is not None:
         console_handler['level'] = 'INFO'
     if is_debug:
-        logging_config_dict.setdefault('loggers',{}).setdefault('urllib3.connectionpool',{})['level'] = 'DEBUG'
+        logging_config_dict.setdefault('loggers', {}).setdefault('urllib3.connectionpool', {})['level'] = 'DEBUG'
 
     file_handler = logging_config_dict.get('handlers', {}).get('file')
     if file_handler is not None:
