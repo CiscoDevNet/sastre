@@ -12,7 +12,8 @@ import json
 from pathlib import Path
 from shutil import rmtree
 from collections import namedtuple
-from typing import List, Tuple, Iterator, Union, Optional, Any, Iterable, Type, TypeVar, Sequence, Mapping
+from typing import Union, Optional, Any, TypeVar
+from collections.abc import Sequence, Mapping, Iterator, Iterable
 from zipfile import ZipFile, ZIP_DEFLATED
 from pydantic import ValidationError
 from cisco_sdwan.base.rest_api import Rest, RestAPIException
@@ -21,8 +22,7 @@ from cisco_sdwan.base.models_vmanage import (DeviceTemplate, DeviceTemplateValue
                                              DeviceTemplateAttach, DeviceTemplateCLIAttach, DeviceModeCli,
                                              ActionStatus, PolicyVsmartStatus, PolicyVsmartStatusException,
                                              PolicyVsmartActivate, PolicyVsmartIndex, PolicyVsmartDeactivate,
-                                             Device, ConfigGroupDeploy, ConfigGroupAssociated, ConfigGroupValues,
-                                             ConfigGroupRules)
+                                             Device, ConfigGroupDeploy, ConfigGroupAssociated, ConfigGroupValues)
 
 T = TypeVar('T')
 
@@ -217,7 +217,7 @@ def filtered_tables(tables: Sequence[Table], *filter_fns: TableFilter) -> Sequen
 
 class DryRunReport:
     def __init__(self):
-        self._entries: List[str] = []
+        self._entries: list[str] = []
 
     def add(self, entry: str) -> None:
         self._entries.append(entry)
@@ -335,7 +335,7 @@ class Task:
         return ((tag, info, index, item_cls) for tag, info, index, item_cls in all_index_iter if index is not None)
 
     @staticmethod
-    def item_get(item_cls: Type[T], backend: Union[Rest, str],
+    def item_get(item_cls: type[T], backend: Union[Rest, str],
                  item_id: str, item_name: str, ext_name: bool) -> Union[T, None]:
         if isinstance(backend, Rest):
             return item_cls.get(backend, item_id)
@@ -343,11 +343,11 @@ class Task:
             return item_cls.load(backend, ext_name, item_name, item_id)
 
     @staticmethod
-    def index_get(index_cls: Type[T], backend: Union[Rest, str]) -> Union[T, None]:
+    def index_get(index_cls: type[T], backend: Union[Rest, str]) -> Union[T, None]:
         return index_cls.get(backend) if isinstance(backend, Rest) else index_cls.load(backend)
 
     def template_attach_data(self, api: Rest, workdir: str, ext_name: bool, templates_iter: Iterable[tuple],
-                             target_uuid_set: Optional[set] = None) -> Tuple[list, bool]:
+                             target_uuid_set: Optional[set] = None) -> tuple[list, bool]:
         """
         Prepare data for template attach considering local backup as the source of truth (i.e. where input values are)
         @param api: Instance of Rest API
@@ -402,7 +402,7 @@ class Task:
         return template_input_list, target_uuid_set is None
 
     @staticmethod
-    def template_reattach_data(api: Rest, templates_iter: Iterable[tuple]) -> Tuple[list, bool]:
+    def template_reattach_data(api: Rest, templates_iter: Iterable[tuple]) -> tuple[list, bool]:
         """
         Prepare data for template reattach considering vManage as the source of truth (i.e. where input values are)
         @param api: Instance of Rest API
@@ -490,8 +490,8 @@ class Task:
         return len(feature_based_reqs + cli_based_reqs)
 
     def cfg_group_deploy_data(self, api: Rest, workdir: str, ext_name: bool,
-                              cfg_group_iter: Iterable[Tuple[str, str, Union[str, None]]],
-                              devices_map: Mapping[str, str]) -> Sequence[Tuple[str, str, Sequence]]:
+                              cfg_group_iter: Iterable[tuple[str, str, Union[str, None]]],
+                              devices_map: Mapping[str, str]) -> Sequence[tuple[str, str, Sequence]]:
         """
         Prepare data for config-group deploy assuming local backup as source of truth. Associate devices and
         pushing values as needed in preparation for the deployment.
@@ -527,21 +527,24 @@ class Task:
             return True
 
         def restore_rules(config_grp_name: str, config_grp_saved_id: str, config_grp_target_id: str) -> bool:
-            saved_rules = ConfigGroupRules.load(workdir, ext_name, config_grp_name, config_grp_saved_id)
-            if saved_rules is None:
-                self.log_debug(f"Skip config-group {config_grp_name} restore rules, no ConfigGroupRules file")
-                return False
+            # saved_rules = ConfigGroupRules.load(workdir, ext_name, config_grp_name, config_grp_saved_id)
+            # if saved_rules is None:
+            #     self.log_debug(f"Skip config-group {config_grp_name} restore rules, no ConfigGroupRules file")
+            #     return False
+            #
+            # if self.is_dryrun:
+            #     self.log_info(f"Config-group {config_grp_name}, associate (via automated rules): "
+            #                   "device list is unknown during dry-run")
+            #     return True
+            #
+            # matched_uuids = saved_rules.post_raise(api, config_grp_target_id)
+            # self.log_info(f"Config-group {config_grp_name}, associate (via automated rules): "
+            #               f"{', '.join(devices_map.get(uuid) or uuid for uuid in matched_uuids)}")
+            #
+            # return len(matched_uuids) > 0
 
-            if self.is_dryrun:
-                self.log_info(f"Config-group {config_grp_name}, associate (via automated rules): "
-                              "device list is unknown during dry-run")
-                return True
-
-            matched_uuids = saved_rules.post_raise(api, config_grp_target_id)
-            self.log_info(f"Config-group {config_grp_name}, associate (via automated rules): "
-                          f"{', '.join(devices_map.get(uuid) or uuid for uuid in matched_uuids)}")
-
-            return len(matched_uuids) > 0
+            # TODO: Review post 20.13
+            return False
 
         def restore_values(config_grp_name: str, config_grp_saved_id: str, config_grp_target_id: str):
             saved_values = ConfigGroupValues.load(workdir, ext_name, config_grp_name, config_grp_saved_id)
@@ -591,7 +594,7 @@ class Task:
 
         return deploy_data
 
-    def cfg_group_deploy(self, api: Rest, deploy_data: Sequence[Tuple[str, str, Sequence]],
+    def cfg_group_deploy(self, api: Rest, deploy_data: Sequence[tuple[str, str, Sequence]],
                          devices_map: Mapping[str, str], *, chunk_size: int = 200, log_context: str,
                          raise_on_failure: bool = True) -> int:
         """
@@ -641,7 +644,7 @@ class Task:
 
         return len(deploy_reqs)
 
-    def template_detach(self, api: Rest, template_iter: Iterable[Tuple[str, str]],
+    def template_detach(self, api: Rest, template_iter: Iterable[tuple[str, str]],
                         devices_map: Optional[Mapping[str, str]] = None, *,
                         chunk_size: int = 200, log_context: str, raise_on_failure: bool = True) -> int:
         """
@@ -699,7 +702,7 @@ class Task:
 
         return len(detach_reqs)
 
-    def cfg_group_dissociate(self, api: Rest, cfg_group_iter: Iterable[Tuple[str, str]],
+    def cfg_group_dissociate(self, api: Rest, cfg_group_iter: Iterable[tuple[str, str]],
                              devices_map: Optional[Mapping[str, str]] = None, *,
                              chunk_size: int = 200, log_context: str, raise_on_failure: bool = True) -> int:
         """
@@ -755,7 +758,7 @@ class Task:
 
         return len(dissociate_reqs)
 
-    def cfg_group_rules_delete(self, api: Rest, cfg_group_iter: Iterable[Tuple[str, str]]) -> int:
+    def cfg_group_rules_delete(self, api: Rest, cfg_group_iter: Iterable[tuple[str, str]]) -> int:
         """
         Delete config-group device association automated rules
         @param api: Instance of Rest API
@@ -763,23 +766,24 @@ class Task:
         @return: Number of automated rules delete requests processed
         """
         delete_req_count = 0
-        for config_grp_id, config_grp_name in cfg_group_iter:
-            rules = ConfigGroupRules.get(api, configGroupId=config_grp_id)
-            if rules is None:
-                self.log_warning(f'Failed to retrieve {config_grp_name} automated rules from vManage')
-                continue
-            for rule_id in rules:
-                delete_req_count += 1
-                self.log_info(f'Config-group {config_grp_name} delete automated rule: {rule_id}')
+        # for config_grp_id, config_grp_name in cfg_group_iter:
+        #     rules = ConfigGroupRules.get(api, configGroupId=config_grp_id)
+        #     if rules is None:
+        #         self.log_warning(f'Failed to retrieve {config_grp_name} automated rules from vManage')
+        #         continue
+        #     for rule_id in rules:
+        #         delete_req_count += 1
+        #         self.log_info(f'Config-group {config_grp_name} delete automated rule: {rule_id}')
+        #
+        #         if self.is_dryrun:
+        #             continue
+        #
+        #         try:
+        #             ConfigGroupRules.delete_raise(api, config_grp_id, rule_id)
+        #         except RestAPIException as ex:
+        #             self.log_error(f'Failed to delete config-group {config_grp_name} automated rule {rule_id}: {ex}')
 
-                if self.is_dryrun:
-                    continue
-
-                try:
-                    ConfigGroupRules.delete_raise(api, config_grp_id, rule_id)
-                except RestAPIException as ex:
-                    self.log_error(f'Failed to delete config-group {config_grp_name} automated rule {rule_id}: {ex}')
-
+        # TODO: Review post 20.13
         return delete_req_count
 
     def policy_activate(self, api: Rest, policy_id: Optional[str], policy_name: Optional[str], *,
@@ -840,7 +844,7 @@ class Task:
 
         return len(deactivate_reqs)
 
-    def wait_actions(self, api: Rest, action_list: List[tuple], log_context: str, raise_on_failure: bool) -> bool:
+    def wait_actions(self, api: Rest, action_list: list[tuple], log_context: str, raise_on_failure: bool) -> bool:
         """
         Wait for actions in action_list to complete
         @param api: Instance of Rest API
@@ -929,7 +933,7 @@ def device_iter(api: Rest,
                 match_reachable: bool = False,
                 match_site_id: Optional[str] = None,
                 match_system_ip: Optional[str] = None,
-                default: Any = '-') -> Iterator[Tuple[str, str]]:
+                default: Any = '-') -> Iterator[tuple[str, str]]:
     """
     Return an iterator over device inventory, filtered by optional conditions.
     @param api: Instance of Rest API
@@ -998,8 +1002,6 @@ def archive_create(archive_filename: str, workdir: str) -> None:
         for member_path in source_dir.rglob("*"):
             archive_file.write(member_path, arcname=member_path.relative_to(source_dir))
 
-    return
-
 
 def archive_extract(archive_filename: str, workdir: str) -> None:
     """
@@ -1010,5 +1012,3 @@ def archive_extract(archive_filename: str, workdir: str) -> None:
     destination_dir = Path(DATA_DIR, workdir)
     with ZipFile(archive_filename, mode='r') as archive_file:
         archive_file.extractall(destination_dir)
-
-    return

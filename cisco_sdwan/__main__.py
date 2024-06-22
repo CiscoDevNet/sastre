@@ -18,8 +18,8 @@ from .base.models_base import ModelException, SASTRE_ROOT_DIR
 from .__version__ import __version__ as version
 from .__version__ import __doc__ as title
 from .tasks.utils import TaskOptions, EnvVar, non_empty_type, PromptArg
-from .tasks.common import TaskException
-from .tasks.implementation import *
+from .tasks.common import Task, TaskException
+from .tasks import implementation
 
 # vManage REST API defaults
 VMANAGE_PORT = '443'
@@ -66,6 +66,48 @@ LOGGING_CONFIG = '''
 '''
 
 
+def setup_logging(logging_config: str, is_verbose: bool = False, is_debug: bool = False) -> None:
+    logging_config_dict = json.loads(logging_config)
+    console_handler = logging_config_dict.get('handlers', {}).get('console')
+    if is_verbose and console_handler is not None:
+        console_handler['level'] = 'INFO'
+    if is_debug:
+        logging_config_dict.setdefault('loggers', {}).setdefault('urllib3.connectionpool', {})['level'] = 'DEBUG'
+
+    file_handler = logging_config_dict.get('handlers', {}).get('file')
+    if file_handler is not None:
+        file_handler['filename'] = str(Path(SASTRE_ROOT_DIR, file_handler['filename']))
+        Path(file_handler['filename']).parent.mkdir(parents=True, exist_ok=True)
+
+    logging.config.dictConfig(logging_config_dict)
+
+
+def execute_task(task_obj: Task, parsed_task_args, is_api_task: bool, base_url: str,
+                 user: str, password: str, tenant: str, timeout: int, is_verbose: bool = False) -> None:
+    try:
+        if is_api_task:
+            with Rest(base_url, user, password, tenant, timeout=timeout) as api:
+                # Dispatch to the appropriate task handler
+                task_output = task_obj.runner(parsed_task_args, api)
+        else:
+            # Dispatch to the appropriate task handler without api connection
+            task_output = task_obj.runner(parsed_task_args)
+
+        # Display task output
+        if task_output:
+            print('\n\n'.join(str(entry) for entry in task_output))
+
+        # Display dryrun report if console logging is disabled (i.e. not in verbose mode)
+        if not is_verbose and task_obj.is_dryrun:
+            print(str(task_obj.dryrun_report))
+
+        task_obj.log_info(f'Task completed {task_obj.outcome("successfully", "with caveats: {tally}")}')
+    except (RestAPIException, ConnectionError, HTTPError, FileNotFoundError, ModelException, TaskException) as ex:
+        logging.getLogger(__name__).critical(ex)
+    except KeyboardInterrupt:
+        logging.getLogger(__name__).critical('Interrupted by user')
+
+
 def main():
     # Top-level cli parser
     cli_parser = argparse.ArgumentParser(description=title)
@@ -106,20 +148,7 @@ def main():
     ])
     cli_args = cli_parser.parse_args()
 
-    # Logging setup
-    logging_config = json.loads(LOGGING_CONFIG)
-    console_handler = logging_config.get('handlers', {}).get('console')
-    if cli_args.verbose and console_handler is not None:
-        console_handler['level'] = 'INFO'
-    if cli_args.debug:
-        logging_config.setdefault('loggers',{}).setdefault('urllib3.connectionpool',{})['level'] = 'DEBUG'
-
-    file_handler = logging_config.get('handlers', {}).get('file')
-    if file_handler is not None:
-        file_handler['filename'] = str(Path(SASTRE_ROOT_DIR, file_handler['filename']))
-        Path(file_handler['filename']).parent.mkdir(parents=True, exist_ok=True)
-
-    logging.config.dictConfig(logging_config)
+    setup_logging(LOGGING_CONFIG, cli_args.verbose, cli_args.debug)
 
     # Prepare task
     task = cli_args.task()
@@ -138,34 +167,13 @@ def main():
     except KeyboardInterrupt:
         sys.exit(1)
 
-    # Dispatch task
-    try:
-        if is_api_required:
-            if target_address != cli_args.address:
-                # Target address changed, re-run parser
-                parsed_task_args = task.parser(cli_args.task_args, target_address=cli_args.address)
+    # Re-run task parser if target address changed
+    if is_api_required and target_address != cli_args.address:
+        parsed_task_args = task.parser(cli_args.task_args, target_address=cli_args.address)
 
-            base_url = f'https://{cli_args.address}{"" if cli_args.port == "443" else f":{cli_args.port}"}'
-            with Rest(base_url, cli_args.user, cli_args.password, cli_args.tenant, timeout=cli_args.timeout) as api:
-                # Dispatch to the appropriate task handler
-                task_output = task.runner(parsed_task_args, api)
-
-        else:
-            # Dispatch to the appropriate task handler without api connection
-            task_output = task.runner(parsed_task_args)
-
-        # Display task output
-        if task_output:
-            print('\n\n'.join(str(entry) for entry in task_output))
-        # Display dryrun report if console logging is disabled (i.e. not in verbose mode)
-        if not cli_args.verbose and task.is_dryrun:
-            print(str(task.dryrun_report))
-
-        task.log_info(f'Task completed {task.outcome("successfully", "with caveats: {tally}")}')
-    except (RestAPIException, ConnectionError, HTTPError, FileNotFoundError, ModelException, TaskException) as ex:
-        logging.getLogger(__name__).critical(ex)
-    except KeyboardInterrupt:
-        logging.getLogger(__name__).critical('Interrupted by user')
+    base_url = f'https://{cli_args.address}{"" if cli_args.port == "443" else f":{cli_args.port}"}'
+    execute_task(task, parsed_task_args, is_api_required, base_url, cli_args.user, cli_args.password,
+                 cli_args.tenant, cli_args.timeout, cli_args.verbose)
 
 
 if __name__ == '__main__':

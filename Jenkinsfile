@@ -1,19 +1,43 @@
 pipeline {
     environment {
-        GIT_CREDS = credentials('345c79bc-9def-4981-94b5-d8190fdd2304') // as-ci-user.gen
         WEBEX_ROOM = 'Y2lzY29zcGFyazovL3VzL1JPT00vZTMxNTUzZjAtZDNiMS0xMWViLWJjNzktMTUxMzcwZjZlOTYz' // Sastre - CICD Notifications
         WEBEX_CREDS = '16fdd237-afe3-4d7f-9fe5-7bde6d1275e0'    // sastre-cicd@webex.bot
         REGISTRY = 'containers.cisco.com'
         REGISTRY_URL = "https://$REGISTRY"
-        ECH_ORG = 'aide'
+        ECH_ORG = 'maestro-org'
         ECH_REPO = 'sastre-pro'
+        GEN_USER = "cx-sastre-user.gen"
         ECH_PATH = "${REGISTRY}/${ECH_ORG}/${ECH_REPO}"
-        ECH_CREDENTIALS = '70d73668-c133-45cc-9943-cc32f1830945'
+        ECH_CREDENTIALS = 'sastre-ech-token'
     }
     agent {
-        label "AMER-REGION"
+        label "sastre-pro-node"
     }
+    options { timestamps () }
+
     stages {
+        stage('Log Build Info') {
+            steps {
+                script {
+                    def hostname = sh(script: 'hostname', returnStdout: true).trim()
+                    def ip = sh(script: 'hostname -I', returnStdout: true).trim()
+                    def buildTriggerBy = currentBuild.getBuildCauses()[0].shortDescription
+
+                    echo "Hostname: ${hostname}"
+                    echo "IP: ${ip}"
+                    echo "Build cause: ${buildTriggerBy}"
+                    echo "Build number: ${env.BUILD_NUMBER}"
+                    echo "Build URL: ${env.BUILD_URL}"
+
+                    echo "Toolchain Information:"
+                    echo "==== podman ===="
+                    echo "podman: /usr/bin/podman"
+                    sh "podman --version"
+                    sh "sha256sum /usr/bin/podman"
+                }
+            }
+        }
+
         stage("Build") {
             agent {
                 dockerfile {
@@ -33,17 +57,23 @@ pipeline {
         stage("Publish") {
             options { skipDefaultCheckout true }
             steps {
-                withDockerRegistry([ credentialsId: "$ECH_CREDENTIALS", url: "$REGISTRY_URL" ]) {
+                withCredentials([conjurSecretCredential(credentialsId: "$ECH_CREDENTIALS", variable: "ECH_TOKEN")]) {
                     sh """
+                        echo $ECH_TOKEN | docker login --username $GEN_USER --password-stdin containers.cisco.com
                         docker tag $ECH_PATH:$BRANCH_NAME $ECH_PATH:latest
                         docker push $ECH_PATH:latest
                     """
                 }
+                echo "Generated Artifact Info:"
+                echo "Image name and version: $ECH_PATH:latest"
+                sh "docker inspect --format '{{.Digest}}' $ECH_PATH:latest"
+                echo "Stored in: $REGISTRY_URL"
+                sh "docker rmi $ECH_PATH:$BRANCH_NAME $ECH_PATH:latest"
             }
             when {
                 anyOf {
                     buildingTag()
-                    branch 'master'
+                    branch pattern: "master|dev-.*", comparator: "REGEXP"
                 }
                 beforeAgent true
             }

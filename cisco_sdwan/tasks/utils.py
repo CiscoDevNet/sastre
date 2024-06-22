@@ -9,7 +9,7 @@ import re
 import argparse
 from datetime import date
 from getpass import getpass
-from typing import Callable
+from typing import Callable, Optional
 from cisco_sdwan.base.catalog import catalog_tags, op_catalog_tags, op_catalog_commands, CATALOG_TAG_ALL, OpType
 from cisco_sdwan.tasks.common import Task
 from cisco_sdwan.tasks.validators import (validate_workdir, validate_regex, validate_existing_file, validate_zip_file,
@@ -91,7 +91,7 @@ class OpCmdOptions:
 class OpCmdSemantics(argparse.Action):
     # Using an action as opposed to a type check so that it can evaluate the full command line passed as opposed to
     # individual tokens.
-    op_type: OpType = None
+    op_type: Optional[OpType] = None
 
     def __call__(self, parser, namespace, values, option_string=None):
         full_command = ' '.join(values)

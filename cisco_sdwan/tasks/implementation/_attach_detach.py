@@ -1,6 +1,7 @@
 import argparse
 from functools import partial
-from typing import Union, Optional, Callable, Tuple, Set, Mapping, Iterable
+from typing import Union, Optional
+from collections.abc import Mapping, Callable, Iterable
 from pydantic import Field, field_validator
 from typing_extensions import Annotated
 from cisco_sdwan.__version__ import __doc__ as title
@@ -19,9 +20,9 @@ from cisco_sdwan.tasks.validators import validate_regex, validate_workdir, valid
 DEFAULT_BATCH_SIZE = 200
 
 
-def build_device_maps(selected_devices_iter: Iterable[Tuple[str, str]],
-                      template_ops_uuid_set: Set[str],
-                      cfg_group_ops_uuid_set: Set[str]) -> Tuple[Mapping[str, str], Mapping[str, str]]:
+def build_device_maps(selected_devices_iter: Iterable[tuple[str, str]],
+                      template_ops_uuid_set: set[str],
+                      cfg_group_ops_uuid_set: set[str]) -> tuple[Mapping[str, str], Mapping[str, str]]:
     selected_devices = [(uuid, name) for uuid, name in selected_devices_iter]
     return (
         {uuid: name for uuid, name in selected_devices if uuid in template_ops_uuid_set},
@@ -76,7 +77,7 @@ class TaskAttach(Task):
         return task_parser.parse_args(task_args)
 
     @staticmethod
-    def edge_sets(api: Rest) -> Tuple[Set[str], Set[str]]:
+    def edge_sets(api: Rest) -> tuple[set[str], set[str]]:
         inventory = EdgeInventory.get_raise(api)
         attach_set = {
             entry.uuid for entry in inventory.filtered_iter(EdgeInventory.is_available)
@@ -87,7 +88,7 @@ class TaskAttach(Task):
         return attach_set, deploy_set
 
     @staticmethod
-    def vsmart_sets(api: Rest) -> Tuple[Set[str], Set[str]]:
+    def vsmart_sets(api: Rest) -> tuple[set[str], set[str]]:
         inventory = ControlInventory.get_raise(api)
         attach_set = {
             entry.uuid for entry in inventory.filtered_iter(ControlInventory.is_available, ControlInventory.is_vsmart)
@@ -235,7 +236,7 @@ class TaskDetach(Task):
         return task_parser.parse_args(task_args)
 
     @staticmethod
-    def edge_sets(api: Rest) -> Tuple[Set[str], Set[str]]:
+    def edge_sets(api: Rest) -> tuple[set[str], set[str]]:
         inventory = EdgeInventory.get_raise(api)
         attached_set = {
             entry.uuid for entry in inventory.filtered_iter(EdgeInventory.is_attached)
@@ -246,7 +247,7 @@ class TaskDetach(Task):
         return attached_set, associated_set
 
     @staticmethod
-    def vsmart_sets(api: Rest) -> Tuple[Set[str], Set[str]]:
+    def vsmart_sets(api: Rest) -> tuple[set[str], set[str]]:
         inventory = ControlInventory.get_raise(api)
         attached_set = {
             entry.uuid for entry in inventory.filtered_iter(ControlInventory.is_attached, ControlInventory.is_vsmart)

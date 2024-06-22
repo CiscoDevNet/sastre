@@ -2,7 +2,8 @@ import argparse
 from uuid import uuid4
 from copy import deepcopy
 from contextlib import suppress
-from typing import Union, Optional, Tuple, List, Dict, Type, Callable, NamedTuple
+from typing import Union, Optional, NamedTuple
+from collections.abc import Callable
 from typing_extensions import Annotated
 from pydantic import model_validator, BaseModel, field_validator, ValidationError, Field, ValidationInfo, ConfigDict
 import yaml
@@ -46,7 +47,7 @@ class ValueMap(BaseModel):
 
 class CryptResourceUpdate(BaseModel):
     resource_name: str
-    replacements: List[ValueMap]
+    replacements: list[ValueMap]
 
 
 class TransformRecipe(BaseModel):
@@ -54,8 +55,8 @@ class TransformRecipe(BaseModel):
 
     tag: CatalogTag
     name_template: Optional[TransformRecipeNameTemplate] = None
-    name_map: Annotated[Optional[Dict[str, str]], Field(validate_default=True)] = None
-    crypt_updates:  Optional[List[CryptResourceUpdate]] = None
+    name_map: Annotated[Optional[dict[str, str]], Field(validate_default=True)] = None
+    crypt_updates:  Optional[list[CryptResourceUpdate]] = None
     replace_source: bool = True
 
     # Validators
@@ -119,9 +120,9 @@ class Processor:
 
         return ProcessorMatch(False)
 
-    def eval(self, config_obj: ConfigItem, new_name: str, new_id: str) -> Tuple[dict, List[str]]:
+    def eval(self, config_obj: ConfigItem, new_name: str, new_id: str) -> tuple[dict, list[str]]:
         new_payload = deepcopy(config_obj.data)
-        trace_log: List[str] = []
+        trace_log: list[str] = []
 
         if config_obj.name_tag:
             new_payload[config_obj.name_tag] = new_name
@@ -150,17 +151,17 @@ class Processor:
 
 
 class AttachedProcessor(Processor):
-    def eval(self, config_obj: ConfigItem, new_name: str, new_id: str) -> Tuple[dict, List[str]]:
+    def eval(self, config_obj: ConfigItem, new_name: str, new_id: str) -> tuple[dict, list[str]]:
         new_payload = deepcopy(config_obj.data)
-        trace_log: List[str] = []
+        trace_log: list[str] = []
 
         return new_payload, trace_log
 
 
 class ValuesProcessor(Processor):
-    def eval(self, config_obj: ConfigItem, new_name: str, new_id: str) -> Tuple[dict, List[str]]:
+    def eval(self, config_obj: ConfigItem, new_name: str, new_id: str) -> tuple[dict, list[str]]:
         new_payload = deepcopy(config_obj.data)
-        trace_log: List[str] = []
+        trace_log: list[str] = []
 
         return new_payload, trace_log
 
@@ -306,7 +307,7 @@ class TaskTransform(Task):
                 self.log_info('Saved vManage server information')
 
         # Process items
-        id_mapping: Dict[str, str] = {}  # {<old_id>: <new_id>}
+        id_mapping: dict[str, str] = {}  # {<old_id>: <new_id>}
         try:
             for tag in ordered_tags(CATALOG_TAG_ALL, reverse=True):
                 self.log_info(f'Inspecting {tag} items')
@@ -462,7 +463,7 @@ class TaskTransform(Task):
 
         return
 
-    def retrieve(self, item_cls: Type[ConfigItem], backend: Union[Rest, str],
+    def retrieve(self, item_cls: type[ConfigItem], backend: Union[Rest, str],
                  item_id: str, item_name: str, ext_name: bool) -> Union[ConfigItem, None]:
 
         item = self.item_get(item_cls, backend, item_id, item_name, ext_name)
