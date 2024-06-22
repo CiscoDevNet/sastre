@@ -1,9 +1,9 @@
-Sastre 1.24_dev4 [April xx, 2024]
+Sastre 1.24 [June 21, 2024]
 ================================
 
 #### Improvements:
 - [#12] Starting on vManage 20.12, feature profile api get requests return parcels without data, parcels need to be retrieved individually.
-- 20.12 vManage support, included support for the following API endpoints:
+- 20.12/20.13 vManage support, included support for the following API endpoints:
   - New SDWAN service profile parcels: routing ospfv3 ipv4/ipv6, routing eigrp, interface gre, route-policy.
   - New SDWAN transport profile parcels: routing ospfv3 ipv4/ipv6, esimcellular-controller, esimcellular-profile, t1-e1-controller, interface serial, route-policy.
   - New SDWAN other profile parcels: cybervision.
@@ -23,6 +23,9 @@ Sastre 1.24_dev4 [April xx, 2024]
 
 #### Changes:
 - Disabled automated tag rules processing until vManage apis for config-association via tag rules become stable and are documented.
+
+#### Known Limitations:
+- Restore of policy-object feature profile is not supported yet.
 
 
 Sastre 1.23.1 [March 22, 2024]
