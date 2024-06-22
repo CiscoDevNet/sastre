@@ -988,6 +988,7 @@ class FeatureProfile(Config2Item):
     name_tag = 'profileName'
     type_tag = 'profileType'
     parcels_tag = 'associatedProfileParcels'
+    created_by_tag = 'createdBy'
     parcel_api_paths: Optional[ApiPathGroup] = None
 
     post_model = FeatureProfileModel
@@ -997,6 +998,10 @@ class FeatureProfile(Config2Item):
 
         # {<old parcel id>: <new parcel id>} map used to update parcel references with the new parcel ids
         self._id_mapping: dict[str, str] = {}
+
+    @property
+    def is_system(self):
+        return super().is_system or self.data.get(self.created_by_tag, '') == 'system'
 
     def parcel_id_mapping(self) -> Iterator[tuple[str, str]]:
         return ((old_parcel_id, new_parcel_id) for old_parcel_id, new_parcel_id in self._id_mapping.items())
