@@ -1,14 +1,14 @@
 import argparse
-from typing import Union, Optional, List
+from typing import Union, Optional
 from pydantic import model_validator, field_validator
 from uuid import uuid4
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest, RestAPIException
 from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL
-from cisco_sdwan.base.models_base import ServerInfo
+from cisco_sdwan.base.models_base import ServerInfo, ModelException
 from cisco_sdwan.base.models_vmanage import (DeviceConfig, DeviceConfigRFS, DeviceTemplate, DeviceTemplateAttached,
                                              DeviceTemplateValues, EdgeInventory, ControlInventory, EdgeCertificate,
-                                             ConfigGroup, ConfigGroupValues, ConfigGroupAssociated, ConfigGroupRules)
+                                             ConfigGroup, ConfigGroupValues, ConfigGroupAssociated)
 from cisco_sdwan.tasks.utils import TaskOptions, TagOptions, filename_type, regex_type, default_workdir
 from cisco_sdwan.tasks.common import regex_search, clean_dir, Task, archive_create
 from cisco_sdwan.tasks.models import TaskArgs, CatalogTag
@@ -91,12 +91,13 @@ class TaskBackup(Task):
                 if regex is None or regex_search(regex, item_name, inverse=parsed_args.regex is None)
             )
             for item_id, item_name in matched_item_iter:
-                item = item_cls.get(api, item_id)
-                if item is None:
-                    self.log_error(f'Failed backup {info} {item_name}')
+                try:
+                    item = item_cls.get_raise(api, item_id)
+                    if item.save(parsed_args.workdir, item_index.need_extended_name, item_name, item_id):
+                        self.log_info(f'Done {info} {item_name}')
+                except (RestAPIException, ModelException, ValueError) as ex:
+                    self.log_error(f'Failed backup {info} {item_name}: {ex}')
                     continue
-                if item.save(parsed_args.workdir, item_index.need_extended_name, item_name, item_id):
-                    self.log_info(f'Done {info} {item_name}')
 
                 # Special case for DeviceTemplate, handle DeviceTemplateAttached and DeviceTemplateValues
                 if isinstance(item, DeviceTemplate):
@@ -120,9 +121,10 @@ class TaskBackup(Task):
                         self.log_error(f'Failed backup {info} {item_name} values: {ex}')
 
                 # Special case for ConfigGroup, handle ConfigGroupAssociated, ConfigGroupValues, ConfigGroupRules
+                # TODO: Review post 20.13
                 if isinstance(item, ConfigGroup) and item.devices_associated:
                     for sub_item_info, sub_item_cls in (('associated devices', ConfigGroupAssociated),
-                                                        ('automated rules', ConfigGroupRules),
+                                                        # ('automated rules', ConfigGroupRules),
                                                         ('values', ConfigGroupValues)):
                         sub_item = sub_item_cls.get(api, configGroupId=item_id)
                         if sub_item is None:
@@ -170,7 +172,7 @@ class BackupArgs(TaskArgs):
     not_regex: Optional[str] = None
     no_rollover: bool = False
     save_running: bool = False
-    tags: List[CatalogTag]
+    tags: list[CatalogTag]
 
     # Validators
     _validate_filename = field_validator('workdir', 'archive')(validate_filename)

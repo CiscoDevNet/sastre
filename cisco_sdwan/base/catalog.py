@@ -4,7 +4,8 @@
  cisco_sdwan.base.catalog
  This module implements vManage API Catalogs
 """
-from typing import NamedTuple, Union, Optional, Iterator, Dict, Set, Tuple, Any
+from typing import NamedTuple, Union, Optional, Any
+from collections.abc import Iterator
 from enum import Enum
 from .models_base import IndexConfigItem, ConfigItem, RealtimeItem, BulkStateItem, BulkStatsItem
 from .rest_api import is_version_newer
@@ -21,7 +22,7 @@ class CatalogItem(NamedTuple):
     min_version: Union[str, None]
 
 
-_catalog: Dict[type, CatalogItem] = dict()  # {<item_cls>: (<tag>, <info>, <index_cls>, <item_cls>, <min_version>), ...}
+_catalog: dict[type, CatalogItem] = dict()  # {<item_cls>: (<tag>, <info>, <index_cls>, <item_cls>, <min_version>), ...}
 
 
 # Catalog for operational data items
@@ -52,7 +53,10 @@ _op_catalog = dict()  # {<OpType>: [(<tag>, <selector>, <info>, <op_cls>, <min_v
 # their high-level dependencies.
 _tag_dependency_list = [
     'config_group',
+    'topology_group',
+    'policy_group',
     'feature_profile',
+    'policy_object',
     'template_device',
     'template_feature',
     'policy_vsmart',
@@ -128,7 +132,7 @@ def catalog_size() -> int:
     return len(_catalog)
 
 
-def catalog_iter(*tags: str, version: Optional[str] = None) -> Iterator[Tuple[str, str, Any, Any]]:
+def catalog_iter(*tags: str, version: Optional[str] = None) -> Iterator[tuple[str, str, Any, Any]]:
     """
     Return an iterator of (<tag>, <info>, <index_cls>, <item_cls>) tuples matching the specified tag(s) and supported
     by vManage version.
@@ -150,7 +154,7 @@ def catalog_iter(*tags: str, version: Optional[str] = None) -> Iterator[Tuple[st
     )
 
 
-def catalog_tags() -> Set[str]:
+def catalog_tags() -> set[str]:
     """
     Return unique tags used by items registered with the catalog
     @return: Set of unique tags

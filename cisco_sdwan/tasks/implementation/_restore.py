@@ -1,7 +1,9 @@
 import argparse
-from typing import Union, Optional, Sequence, Dict, Set
+from typing import Union, Optional
+from collections.abc import Sequence
 from pydantic import model_validator, field_validator
 from uuid import uuid4
+from contextlib import suppress
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest, RestAPIException, is_version_newer, response_id
 from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL, ordered_tags, is_index_supported
@@ -175,12 +177,13 @@ class TaskRestore(Task):
 
         return check_vbond.is_configured
 
-    def restore_config_items(self, api: Rest, restore_list: Sequence[tuple], id_mapping: Dict[str, str],
-                             dependency_set: Set[str], match_set: Set[str]) -> None:
+    def restore_config_items(self, api: Rest, restore_list: Sequence[tuple], id_mapping: dict[str, str],
+                             dependency_set: set[str], match_set: set[str]) -> None:
         # Items were added to restore_list following ordered_tags() order (i.e. higher level items before lower
         # level items). The reverse order needs to be followed on restore.
         for info, index, restore_item_list in reversed(restore_list):
             pushed_item_dict = {}
+            parcel_id_mapping = {}
             for item_id, item, target_id in restore_item_list:
                 op_info = 'Create' if target_id is None else 'Update'
                 reason = ' (dependency)' if item_id in dependency_set - match_set else ''
@@ -202,7 +205,7 @@ class TaskRestore(Task):
                         # Special case for FeatureProfiles, creating linked parcels
                         if isinstance(item, FeatureProfile):
                             parcel_coro = item.associated_parcels(response_id(response))
-                            try:
+                            with suppress(StopIteration):
                                 new_parcel_id = None
                                 while True:
                                     try:
@@ -216,9 +219,10 @@ class TaskRestore(Task):
                                         self.log_error(f'Failed: {op_info} {info} {item.name} parcel{reason}: {ex}')
                                     else:
                                         self.log_info(f'Done: {op_info} {info} {item.name} parcel {p_info}{reason}')
-                            except StopIteration:
-                                pass
 
+                            # Retrieve id mapping for parcels in this feature profile
+                            # noinspection PyUnreachableCode
+                            parcel_id_mapping.update(item.parcel_id_mapping())
                     else:
                         # Update existing item
                         if item.is_readonly:
@@ -272,6 +276,8 @@ class TaskRestore(Task):
             except RestAPIException as ex:
                 self.log_critical(f'Failed retrieving {info}: {ex}')
                 break
+            else:
+                id_mapping.update(parcel_id_mapping)
 
     def restore_deployments(self, api: Rest, workdir: str) -> None:
         saved_groups_index = ConfigGroupIndex.load(workdir)

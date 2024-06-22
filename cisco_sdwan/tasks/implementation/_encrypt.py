@@ -1,6 +1,7 @@
 import argparse
 from getpass import getpass
-from typing import Union, Optional, List, Callable
+from typing import Union, Optional
+from collections.abc import Callable
 from pydantic import field_validator, ValidationError
 import yaml
 from cisco_sdwan.__version__ import __doc__ as title
@@ -138,12 +139,12 @@ class TaskEncrypt(Task):
 class EncryptArgs(TaskArgs):
     # Only have TaskEncrypt.values subtask because interactive mode should not be called programmatically
     subtask_handler: const(Callable, TaskEncrypt.values)
-    values: List[str]
+    values: list[str]
 
     # Validators
     @field_validator('values')
     @classmethod
-    def validate_cmd(cls, values: List[str]) -> List[str]:
+    def validate_cmd(cls, values: list[str]) -> list[str]:
         # Zero length values indicate interactive mode, which is not allowed when encrypt is called programmatically
         if len(values) == 0:
             raise ValueError("Values must not be empty")

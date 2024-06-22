@@ -9,14 +9,14 @@ Some use-cases include:
 - Backup, restore and delete configuration items. Tags and regular expressions can be used to select all or a subset of items.
 - Visualize operational data across multiple devices. For instance, display status of control connections from multiple devices in a single table.
 
-Sastre can also be used as an SDK to other applications, further information is available on [DevNet Sastre SDK](https://github.com/CiscoDevNet/sastre/wiki/4.-Sastre-SDK).
+Sastre can also be used as an SDK to other applications, further information is available on [Sastre SDK](https://github.com/CiscoDevNet/sastre/wiki/4.-Sastre-SDK).
 
 [Sastre-Ansible](https://github.com/CiscoDevNet/sastre-ansible) is an Ansible Collection that exposes Sastre commands to Ansible Playbooks as a set of tasks and lookup plugins. Allowing users to build-up on Sastre functionality to create larger automation workflows.
 
 Support enquires can be sent to sastre-support@cisco.com.
 
 Note on vManage release support:
-- Sastre 1.23 officially supports up to vManage 20.11. Newer vManage releases normally work without problems, just lacking support to the newer features added to that particular vManage release.
+- Sastre 1.24 officially supports up to vManage 20.13. Newer vManage releases normally work without problems, just lacking support to the newer features added to that particular vManage release.
 
 ## Sastre and Sastre-Pro
 
@@ -1314,7 +1314,7 @@ A WARNING message is displayed when this condition happens. The user may want to
 
 ## Installing
 
-Sastre requires Python 3.8 or newer. This can be verified by pasting the following to a terminal window:
+Sastre requires Python 3.9 or newer. This can be verified by pasting the following to a terminal window:
 ```
 % python3 -c "import sys;assert sys.version_info>(3,9)" && echo "ALL GOOD"
 ```

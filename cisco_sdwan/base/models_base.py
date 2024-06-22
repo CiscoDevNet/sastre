@@ -10,13 +10,14 @@ from os import environ
 from pathlib import Path
 from itertools import zip_longest
 from collections import namedtuple
-from typing import Sequence, Tuple, Union, Iterator, Callable, Mapping, Any, Optional, Dict, List, Generator, NamedTuple
+from typing import Union, Any, Optional, NamedTuple
+from collections.abc import Mapping, Sequence, Iterator, Generator, Callable
 from operator import attrgetter
 from datetime import datetime, timezone
 from urllib.parse import quote_plus
-from pydantic import ConfigDict, BaseModel
+from pydantic import ConfigDict, BaseModel, Field
 from requests.exceptions import Timeout
-from .rest_api import RestAPIException, Rest
+from .rest_api import RestAPIException, Rest, is_version_newer
 
 # Top-level directory for local data store
 SASTRE_ROOT_DIR = Path(environ.get('SASTRE_ROOT_DIR', Path.cwd()))
@@ -162,7 +163,7 @@ class ApiPathGroup:
         self._parent_types = {path_key.parent_parcel_type
                               for path_key in self._parcel_ref_map if path_key.parent_parcel_type is not None}
 
-    def api_path(self, key: PathKey) -> Tuple[Union[ApiPath, None], bool]:
+    def api_path(self, key: PathKey) -> tuple[Union[ApiPath, None], bool]:
         """
         Returns the api path associated with the provided key, along with whether this is a parcel reference or an
         actual parcel.
@@ -217,7 +218,7 @@ class OperationalItem:
             field['title'] = title_dict.get(field_property, field['property'].replace('_', ' ').title())
 
     @property
-    def field_names(self) -> Tuple[str, ...]:
+    def field_names(self) -> tuple[str, ...]:
         return tuple(self._meta.keys())
 
     def field_info(self, *field_names: str, info: str = 'title', default: Union[None, str] = 'N/A') -> tuple:
@@ -466,7 +467,7 @@ class RecordItem(OperationalItem):
         self._page_info = payload['pageInfo']
 
     @staticmethod
-    def query(start_time: datetime, end_time: datetime, size: int) -> Dict[str, Any]:
+    def query(start_time: datetime, end_time: datetime, size: int) -> dict[str, Any]:
         """
         @param start_time: Starting date time for the query, i.e. oldest.
         @param end_time: End date time for the query, i.e. newest.
@@ -627,7 +628,7 @@ class ConfigItem(ApiItem):
     ConfigItem is an ApiItem that can be backed up and restored
     """
     store_path = None
-    store_file = None
+    store_file = '{item_name}.json'
     root_dir = DATA_DIR
     factory_default_tag = 'factoryDefault'
     readonly_tag = 'readOnly'
@@ -638,7 +639,7 @@ class ConfigItem(ApiItem):
     skip_cmp_tag_set = set()
     name_check_regex = re.compile(r'(?=^.{1,128}$)[^&<>! "]+$')
 
-    def is_equal(self, other_payload: Dict[str, Any]) -> bool:
+    def is_equal(self, other_payload: Mapping[str, Any]) -> bool:
         exclude_set = self.skip_cmp_tag_set | {self.id_tag}
 
         local_cmp_dict = {k: v for k, v in self.data.items() if k not in exclude_set}
@@ -721,13 +722,13 @@ class ConfigItem(ApiItem):
 
         return True
 
-    def post_data(self, id_mapping_dict: Optional[Mapping[str, str]] = None) -> Dict[str, Any]:
+    def post_data(self, id_mapping_dict: Optional[Mapping[str, str]] = None) -> dict[str, Any]:
         """
         Build payload to be used for POST requests against this config item. From "self.data", perform item id
         replacements defined in id_mapping_dict, also remove item id and rename item with new_name (if provided).
         @param id_mapping_dict: {<old item id>: <new item id>} dict. If provided, <old item id> matches are replaced
                                 with <new item id>
-        @return: Dict containing payload for POST requests
+        @return: dict containing payload for POST requests
         """
         # Delete keys that shouldn't be on post requests
         filtered_keys = {
@@ -753,13 +754,13 @@ class ConfigItem(ApiItem):
 
         return update_ids(id_mapping_dict, post_dict)
 
-    def put_data(self, id_mapping_dict: Optional[Mapping[str, str]] = None) -> Dict[str, Any]:
+    def put_data(self, id_mapping_dict: Optional[Mapping[str, str]] = None) -> dict[str, Any]:
         """
         Build payload to be used for PUT requests against this config item. From "self.data", perform item id
         replacements defined in id_mapping_dict.
         @param id_mapping_dict: {<old item id>: <new item id>} dict. If provided, <old item id> matches are replaced
                                 with <new item id>
-        @return: Dict containing payload for PUT requests
+        @return: dict containing payload for PUT requests
         """
         filtered_keys = {
             '@rid',
@@ -831,7 +832,6 @@ class IndexConfigItem(ConfigItem):
     """
     IndexConfigItem is an index-type ConfigItem that can be iterated over, returning iter_fields
     """
-
     def __init__(self, data):
         """
         @param data: dict containing the information to be associated with this configuration item.
@@ -855,6 +855,7 @@ class IndexConfigItem(ConfigItem):
     extended_iter_fields = None
 
     store_path = ('inventory',)
+    store_file = None
 
     @classmethod
     def create(cls, item_list: Sequence[ConfigItem], id_hint_dict: Mapping[str, str]):
@@ -908,14 +909,14 @@ class FeatureProfileModel(ConfigRequestModel):
 class ProfileParcelPayloadModel(ConfigRequestModel):
     name: str
     description: str = ''
-    data: Dict[str, Any]
+    data: Optional[dict[str, Any]] = None
 
 
 class ProfileParcelModel(ConfigRequestModel):
     parcelId: str
     parcelType: str
     payload: ProfileParcelPayloadModel
-    subparcels: List['ProfileParcelModel']
+    subparcels: list['ProfileParcelModel'] = Field(default_factory=list)
 
 
 class ProfileParcelReferenceModel(ConfigRequestModel):
@@ -931,64 +932,64 @@ class Config2Item(ConfigItem):
     put_model: Optional[Callable[..., ConfigRequestModel]] = None
     delete_model: Optional[Callable[..., ConfigRequestModel]] = None
 
-    def is_equal(self, other: Dict[str, Any]) -> bool:
+    def is_equal(self, other: Mapping[str, Any]) -> bool:
         exclude_set = self.skip_cmp_tag_set | {self.id_tag}
         put_model = self.put_model or self.post_model
 
-        local_cmp_dict = put_model(**self.data).model_dump(by_alias=True, exclude=exclude_set)
+        local_cmp_dict = put_model(**self.data).model_dump(by_alias=True, exclude=exclude_set, exclude_defaults=True)
         other_cmp_dict = {k: v for k, v in other.items() if k not in exclude_set}
 
         return sorted(json.dumps(local_cmp_dict)) == sorted(json.dumps(other_cmp_dict))
 
-    def post_data(self, id_mapping_dict: Optional[Mapping[str, str]] = None) -> Dict[str, Any]:
+    def post_data(self, id_mapping_dict: Optional[Mapping[str, str]] = None) -> dict[str, Any]:
         """
         Build payload to be used for POST requests against this config item. From "self.data", perform item id
         replacements defined in id_mapping_dict, also remove item id and rename item with new_name (if provided).
         @param id_mapping_dict: {<old item id>: <new item id>} dict. If provided, <old item id> matches are replaced
                                 with <new item id>
-        @return: Dict containing payload for POST requests
+        @return: dict containing payload for POST requests
         """
         return self._op_data(self.post_model, id_mapping_dict)
 
-    def put_data(self, id_mapping_dict: Optional[Mapping[str, str]] = None) -> Dict[str, Any]:
+    def put_data(self, id_mapping_dict: Optional[Mapping[str, str]] = None) -> dict[str, Any]:
         """
         Build payload to be used for PUT requests against this config item. From "self.data", perform item id
         replacements defined in id_mapping_dict.
         @param id_mapping_dict: {<old item id>: <new item id>} dict. If provided, <old item id> matches are replaced
                                 with <new item id>
-        @return: Dict containing payload for PUT requests
+        @return: dict containing payload for PUT requests
         """
         put_model = self.put_model or self.post_model
         return self._op_data(put_model, id_mapping_dict)
 
-    def delete_data(self, id_mapping_dict: Optional[Mapping[str, str]] = None) -> Dict[str, Any]:
+    def delete_data(self, id_mapping_dict: Optional[Mapping[str, str]] = None) -> dict[str, Any]:
         """
         Build payload to be used for DELETE requests against this config item. From "self.data", perform item id
         replacements defined in id_mapping_dict.
         @param id_mapping_dict: {<old item id>: <new item id>} dict. If provided, <old item id> matches are replaced
                                 with <new item id>
-        @return: Dict containing payload for DELETE requests
+        @return: dict containing payload for DELETE requests
         """
         delete_model = self.delete_model or self.put_model or self.post_model
         return self._op_data(delete_model, id_mapping_dict)
 
     def _op_data(self, op_model: Callable[..., ConfigRequestModel],
-                 id_mapping_dict: Optional[Mapping[str, str]]) -> Dict[str, Any]:
+                 id_mapping_dict: Optional[Mapping[str, str]]) -> dict[str, Any]:
         payload = op_model(**self.data)
 
         if id_mapping_dict is None:
-            return payload.model_dump(by_alias=True)
+            return payload.model_dump(by_alias=True, exclude_defaults=True)
 
-        return update_ids(id_mapping_dict, payload.model_dump(by_alias=True))
+        return update_ids(id_mapping_dict, payload.model_dump(by_alias=True, exclude_defaults=True))
 
 
 class FeatureProfile(Config2Item):
-    store_file = '{item_name}.json'
     id_tag = 'profileId'
     name_tag = 'profileName'
     type_tag = 'profileType'
     parcels_tag = 'associatedProfileParcels'
-    parcel_api_paths: ApiPathGroup = None
+    created_by_tag = 'createdBy'
+    parcel_api_paths: Optional[ApiPathGroup] = None
 
     post_model = FeatureProfileModel
 
@@ -996,9 +997,44 @@ class FeatureProfile(Config2Item):
         super().__init__(data)
 
         # {<old parcel id>: <new parcel id>} map used to update parcel references with the new parcel ids
-        self.id_mapping: Dict[str, str] = {}
+        self._id_mapping: dict[str, str] = {}
 
-    def associated_parcels(self, new_profile_id: str) -> Generator[Tuple[ApiPath, str, Dict[str, Any]], str, None]:
+    @property
+    def is_system(self):
+        return super().is_system or self.data.get(self.created_by_tag, '') == 'system'
+
+    def parcel_id_mapping(self) -> Iterator[tuple[str, str]]:
+        return ((old_parcel_id, new_parcel_id) for old_parcel_id, new_parcel_id in self._id_mapping.items())
+
+    def update_parcels_data(self, api: Rest, profile_id: str) -> None:
+        def eval_parcel(parcel: ProfileParcelModel, *element_ids: str, parent_parcel_type: Optional[str] = None):
+            api_path, _ = self.parcel_api_paths.api_path(PathKey(parcel.parcelType, parent_parcel_type))
+            if api_path is None:
+                raise ModelException(f"Parcel type {parcel.parcelType} is not supported")
+            if api_path is ...:
+                # This is a parcel reference no further processing is needed
+                return
+
+            if parcel.payload.data is None:
+                raw_single_parcel = api.get(api_path.resolve(*element_ids).get, parcel.parcelId)
+                parcel.payload.data = ProfileParcelModel(**raw_single_parcel).payload.data
+
+            new_element_ids = element_ids + (parcel.parcelId,)
+
+            for sub_parcel in parcel.subparcels:
+                eval_parcel(sub_parcel, *new_element_ids, parent_parcel_type=parcel.parcelType)
+
+        def eval_root_parcel(raw_parcel: Mapping[str, Any]) -> dict[str, Any]:
+            root_parcel = ProfileParcelModel(**raw_parcel)
+            eval_parcel(root_parcel, profile_id)
+
+            return root_parcel.model_dump(by_alias=True, exclude_defaults=True)
+
+        self.data[self.parcels_tag] = [
+            eval_root_parcel(raw_parcel) for raw_parcel in self.data.get(self.parcels_tag, [])
+        ]
+
+    def associated_parcels(self, new_profile_id: str) -> Generator[tuple[ApiPath, str, dict[str, Any]], str, None]:
         def parcel_ordering(parcel_obj):
             if self.parcel_api_paths.is_referenced_type(parcel_obj.parcelType):
                 return 0 if not self.parcel_api_paths.is_parent_type(parcel_obj.parcelType) else 1
@@ -1012,7 +1048,7 @@ class FeatureProfile(Config2Item):
 
     def profile_parcel_coro(
             self, parcel: ProfileParcelModel, *element_ids: str,
-            parent_parcel_type: Optional[str] = None) -> Generator[Tuple[ApiPath, str, Dict[str, Any]], str, None]:
+            parent_parcel_type: Optional[str] = None) -> Generator[tuple[ApiPath, str, dict[str, Any]], str, None]:
         """
         Iterate over Config 2.0 feature profile parcels, starting with the provided parcel and recursively checking
         sub-parcels it may contain.
@@ -1033,7 +1069,7 @@ class FeatureProfile(Config2Item):
         if is_reference:
             parcel_info = f'{parcel.payload.name} (parcel reference)'
 
-            new_parcel_id = self.id_mapping.get(parcel.parcelId)
+            new_parcel_id = self._id_mapping.get(parcel.parcelId)
             if new_parcel_id is None:
                 raise ModelException(f"{parcel_info}: Referenced parcel ID not found")
 
@@ -1042,15 +1078,35 @@ class FeatureProfile(Config2Item):
             parcel_info = parcel.payload.name
             parcel_payload = parcel.payload
 
-        new_element_id = yield (api_path.resolve(*element_ids),
-                                parcel_info,
-                                update_ids(self.id_mapping, parcel_payload.model_dump(by_alias=True)))
+        new_element_id = yield (
+            api_path.resolve(*element_ids),
+            parcel_info,
+            update_ids(self._id_mapping, parcel_payload.model_dump(by_alias=True, exclude_defaults=True))
+        )
 
-        self.id_mapping[parcel.parcelId] = new_element_id
+        self._id_mapping[parcel.parcelId] = new_element_id
         new_element_ids = element_ids + (new_element_id,)
 
         for sub_parcel in parcel.subparcels:
             yield from self.profile_parcel_coro(sub_parcel, *new_element_ids, parent_parcel_type=parcel.parcelType)
+
+    @classmethod
+    def get_raise(cls, api: Rest, *args, **kwargs):
+        # Extract path vars from kwargs, what is left becomes query vars
+        path_vars_map = {}
+        if cls.api_path.path_vars is not None:
+            for path_var in cls.api_path.path_vars:
+                path_var_value = kwargs.pop(path_var, None)
+                if path_var_value is not None:
+                    path_vars_map[path_var] = path_var_value
+
+        fp_obj = cls(api.get(cls.api_path.resolve(**path_vars_map).get, *args, **kwargs))
+
+        # Special case for FeatureProfiles on 20.12 or newer, need to retrieve parcel data fields
+        if is_version_newer('20.11', api.server_version):
+            fp_obj.update_parcels_data(api, fp_obj.uuid)
+
+        return fp_obj
 
 
 class FeatureProfileIndex(IndexConfigItem):
@@ -1141,7 +1197,7 @@ def filename_safe(name: str, lower: bool = False) -> str:
     return cleaned.lower() if lower else cleaned
 
 
-def update_ids(id_map: Mapping[str, str], item_data: Dict[str, Any]) -> Dict[str, Any]:
+def update_ids(id_map: Mapping[str, str], item_data: Mapping[str, Any]) -> dict[str, Any]:
     def replace_id(match):
         matched_id = match.group(0)
         return id_map.get(matched_id, matched_id)
@@ -1151,7 +1207,7 @@ def update_ids(id_map: Mapping[str, str], item_data: Dict[str, Any]) -> Dict[str
     return json.loads(dict_json)
 
 
-def update_crypts(crypt_map: Mapping[str, str], item_data: Dict[str, Any]) -> Dict[str, Any]:
+def update_crypts(crypt_map: Mapping[str, str], item_data: Mapping[str, Any]) -> dict[str, Any]:
     def replace_crypt(match):
         matched_crypt = match.group(0)
         return crypt_map.get(matched_crypt, matched_crypt)

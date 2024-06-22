@@ -1,12 +1,43 @@
+Sastre 1.24 [June 21, 2024]
+================================
+
+#### Improvements:
+- [#12] Starting on vManage 20.12, feature profile api get requests return parcels without data, parcels need to be retrieved individually.
+- 20.12/20.13 vManage support, included support for the following API endpoints:
+  - New SDWAN service profile parcels: routing ospfv3 ipv4/ipv6, routing eigrp, interface gre, route-policy.
+  - New SDWAN transport profile parcels: routing ospfv3 ipv4/ipv6, esimcellular-controller, esimcellular-profile, t1-e1-controller, interface serial, route-policy.
+  - New SDWAN other profile parcels: cybervision.
+  - New SDWAN system profile parcels: remote-access, ipv4-device-access-policy, ipv6-device-access-policy
+  - New SDWAN policy-object profile parcels: security-data-ip-prefix, security-fqdn, security-port, security-localapp, security-localdomain, security-ipssignature, 
+                                             security-urllist, security-protocolname, security-geolocation, security-identity, security-scalablegrouptag, security-zone, 
+                                             app-list, sla-class, as-path, class, data-ipv6-prefix, data-prefix, expanded-community, ext-community, ipv6-prefix, mirror, 
+                                             policer, prefix, standard-community, vpn-group, app-probe, tloc, color, preferred-color-group, unified/advanced-inspection-profile, 
+                                             unified/intrusion-prevention, unified/url-filtering, unified/advanced-malware-protection, unified/ssl-decryption-profile, unified/ssl-decryption
+  - SDWAN dns-security profile and dns parcel.
+  - SDWAN sig-security profile and sig parcel.
+  - SDWAN application-priority profile and qos-policy, traffic-policy parcels.
+  - SDWAN embedded-security profile and policy, unified/ngfirewall parcels.
+  - Topology groups
+  - Policy groups
+- 20.12 vManage support, updated rest api logout to use POST with 20.12+ releases.
+
+#### Changes:
+- Disabled automated tag rules processing until vManage apis for config-association via tag rules become stable and are documented.
+
+#### Known Limitations:
+- Restore of policy-object feature profile is not supported yet.
+
+
 Sastre 1.23.1 [March 22, 2024]
 ================================
 
 - Bumped up minimum Python version requirement to 3.9. As Python 3.8 is going end-of-support in October-2024.
 
+
 Sastre 1.23 [March 8, 2024]
 ================================
 
-### Improvements
+#### Improvements:
 - Handling of templates with encrypted fields (e.g. SNMP feature template community value)
   - New encrypt values and encrypt recipe tasks.
   - New transform build-recipe task.
@@ -26,14 +57,14 @@ Sastre 1.23 [March 8, 2024]
 Sastre 1.22 [November 27, 2023]
 ================================
 
-### Improvements
+#### Improvements:
 - Sastre and Sastre-Pro now contain the same tasks. There is no functional differences between the two.
 
 
 Sastre 1.21.3 [July 27, 2023]
 ================================
 
-### Fixes:
+#### Fixes:
 - Fixed pydantic.errors.PydanticUserError traceback errors found with new installations. This was due to incompatible changes on new pydantic 2.x release.
 
 
