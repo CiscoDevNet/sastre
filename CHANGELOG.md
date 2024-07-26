@@ -1,3 +1,10 @@
+Sastre 1.24.1 [, 2024]
+================================
+
+#### Fixes:
+- Advanced inspection profile policy definition restore was failing due to ordering of dependencies. This has been fixed.
+
+
 Sastre 1.24 [June 21, 2024]
 ================================
 
