@@ -492,6 +492,7 @@ class DeviceTemplate(ConfigItem):
     store_path = ('device_templates', 'template')
     name_tag = 'templateName'
     id_tag = 'templateId'
+    type_tag = 'deviceType'
     post_filtered_tags = ('feature',)
     # templateClass, deviceRole, draftMode, templateId and copyEdited are new tags in 20.x+, adding to skip diff to not
     # trigger updates when restore --update is done between pre 20.x workdir and post 20.x vManage.
@@ -1628,7 +1629,7 @@ class AdvancedInspectionProfile(PolicyDef):
     store_path = ('policy_definitions', 'AdvancedInspectionProfile')
 
 
-@register('policy_definition', 'advanced inspection profile policy definition', AdvancedInspectionProfile,
+@register('parent_policy_definition', 'advanced inspection profile policy definition', AdvancedInspectionProfile,
           min_version='20.6')
 class AdvancedInspectionProfileIndex(PolicyDefIndex):
     api_path = ApiPath('template/policy/definition/advancedinspectionprofile', None, None, None)
