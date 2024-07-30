@@ -1,3 +1,15 @@
+Sastre 1.24.1 [, 2024]
+================================
+
+#### Improvements:
+- [#44] Enhancements to show-template references task:
+  - In addition to the (existing) feature-template references table, a new device-template references table is output.
+  - New --filled-rows option to create tables with all row contents (even if they are the same as in previous row), which facilitates table output filtering with --include/--exclude.
+
+#### Fixes:
+- Advanced inspection profile policy definition restore was failing due to ordering of dependencies. This has been fixed.
+
+
 Sastre 1.24 [June 21, 2024]
 ================================
 
