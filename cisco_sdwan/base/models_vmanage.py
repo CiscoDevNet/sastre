@@ -492,6 +492,7 @@ class DeviceTemplate(ConfigItem):
     store_path = ('device_templates', 'template')
     name_tag = 'templateName'
     id_tag = 'templateId'
+    type_tag = 'deviceType'
     post_filtered_tags = ('feature',)
     # templateClass, deviceRole, draftMode, templateId and copyEdited are new tags in 20.x+, adding to skip diff to not
     # trigger updates when restore --update is done between pre 20.x workdir and post 20.x vManage.

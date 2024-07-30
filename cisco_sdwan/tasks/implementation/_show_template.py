@@ -4,6 +4,7 @@ from collections import namedtuple
 from typing import Union, Optional
 from collections.abc import Callable
 from operator import itemgetter, attrgetter
+from functools import partial
 from pydantic import field_validator
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import RestAPIException, Rest
@@ -12,7 +13,8 @@ from cisco_sdwan.base.models_base import filename_safe
 from cisco_sdwan.base.models_vmanage import (DeviceTemplate, DeviceTemplateAttached, DeviceTemplateValues,
                                              DeviceTemplateIndex, FeatureTemplate, FeatureTemplateIndex)
 from cisco_sdwan.tasks.utils import TaskOptions, existing_workdir_type, filename_type, regex_type
-from cisco_sdwan.tasks.common import regex_search, Task, Table, get_table_filters, filtered_tables, export_json
+from cisco_sdwan.tasks.common import (regex_search, Task, Table, get_table_filters, filtered_tables, export_json,
+                                      TaskException)
 from cisco_sdwan.tasks.models import TableTaskArgs, const
 from cisco_sdwan.tasks.validators import validate_workdir, validate_regex
 
@@ -41,8 +43,11 @@ class TaskShowTemplate(Task):
         refs_parser.set_defaults(subtask_info='references')
         refs_parser.add_argument('--with-refs', action='store_true',
                                  help='include only feature-templates with device-template references')
+        refs_parser.add_argument('--filled-rows', action='store_true',
+                                 help='do not optimize table for visualization, always print all cell columns')
         refs_parser.add_argument('--templates', metavar='<regex>', type=regex_type,
-                                 help='regular expression matching feature template names to include')
+                                 help='regular expression matching names from feature templates to include in '
+                                      'feature-template table and device templates to include in device-template table')
 
         # Parameters common to all sub-tasks
         for sub_task in (values_parser, refs_parser):
@@ -90,13 +95,11 @@ class TaskShowTemplate(Task):
         def template_values(ext_name: bool, template_name: str, template_id: str) -> Union[DeviceTemplateValues, None]:
             if api is None:
                 # Load from local backup
-                values = DeviceTemplateValues.load(parsed_args.workdir, ext_name, template_name, template_id)
-                if values is None:
+                if (values := DeviceTemplateValues.load(parsed_args.workdir, ext_name, template_name, template_id)) is None:
                     self.log_debug(f'Skipped {template_name}. No template values file found.')
             else:
                 # Load from vManage via API
-                devices_attached = DeviceTemplateAttached.get(api, template_id)
-                if devices_attached is None:
+                if (devices_attached := DeviceTemplateAttached.get(api, template_id)) is None:
                     self.log_error(f'Failed to retrieve {template_name} attached devices')
                     return None
 
@@ -112,17 +115,16 @@ class TaskShowTemplate(Task):
 
         # Templates are sorted by template name then ID. Then for each template with attachments, devices are sorted
         # by name then UUID. The values for each device are sorted by the variable name
-        result_tables = []
         backend = api or parsed_args.workdir
-        matched_templates = [
+        matched_templates = (
             (item_id, item_name, index.need_extended_name, tag, info)
             for tag, info, index, item_cls in self.index_iter(backend, catalog_iter('template_device'))
             for item_id, item_name in index
             if (issubclass(item_cls, DeviceTemplate) and
                 (parsed_args.templates is None or regex_search(parsed_args.templates, item_name, item_id)))
-        ]
-        matched_templates.sort(key=itemgetter(1, 0))
-        for item_id, item_name, use_ext_name, tag, info in matched_templates:
+        )
+        result_tables: list[Table] = []
+        for item_id, item_name, use_ext_name, tag, info in sorted(matched_templates, key=itemgetter(1, 0)):
             attached_values = template_values(use_ext_name, item_name, item_id)
             if attached_values is None:
                 continue
@@ -144,64 +146,105 @@ class TaskShowTemplate(Task):
 
     def references_table(self, parsed_args, api: Optional[Rest]) -> list[Table]:
         FeatureInfo = namedtuple('FeatureInfo', ['name', 'type', 'attached', 'device_templates'])
+        DeviceInfo = namedtuple('DeviceInfo', ['name', 'device_type', 'feature_templates'])
 
         backend = api or parsed_args.workdir
-        self.log_info('Inspecting feature templates')
-        feature_index = self.index_get(FeatureTemplateIndex, backend)
-        feature_dict = {}
-        for item_id, item_name in feature_index:
-            feature = self.item_get(FeatureTemplate, backend, item_id, item_name, feature_index.need_extended_name)
-            if feature is None:
-                self.log_error(f'Failed to load feature template {item_name}')
-                continue
 
-            feature_dict[item_id] = FeatureInfo(item_name, feature.type, feature.devices_attached, set())
-
-        self.log_info('Inspecting device templates')
-        device_index = self.index_get(DeviceTemplateIndex, backend)
-        for item_id, item_name in device_index:
-            device = self.item_get(DeviceTemplate, backend, item_id, item_name, device_index.need_extended_name)
-            if device is None:
-                self.log_error(f'Failed to load device template {item_name}')
-                continue
-            if device.is_type_cli:
-                continue
-
-            for feature_id in device.feature_templates:
-                feature_info = feature_dict.get(feature_id)
-                if feature_info is None:
-                    self.log_warning(f'Template {item_name} references a missing feature template: {feature_id}')
+        def load_templates(device_template_index: DeviceTemplateIndex,
+                           feature_template_index: FeatureTemplateIndex) -> tuple[list[DeviceInfo], list[FeatureInfo]]:
+            feature_template_dict: dict[str, FeatureInfo] = {}
+            for item_id, item_name in feature_template_index:
+                if (template := self.item_get(FeatureTemplate, backend, item_id, item_name,
+                                              feature_template_index.need_extended_name)) is None:
+                    self.log_error(f'Failed to load feature template {item_name}')
                     continue
 
-                feature_info.device_templates.add(item_name)
+                feature_template_dict[item_id] = FeatureInfo(item_name, template.type, template.devices_attached, set())
 
-        self.log_info('Creating references table')
+            device_templates: list[DeviceInfo] = []
+            for item_id, item_name in device_template_index:
+                if (template := self.item_get(DeviceTemplate, backend, item_id, item_name,
+                                              device_template_index.need_extended_name)) is None:
+                    self.log_error(f'Failed to load device template {item_name}')
+                    continue
+
+                if template.is_type_cli:
+                    # CLI templates are not applicable
+                    continue
+
+                feature_templates: list[str] = []
+                for feature_id in template.feature_templates:
+                    if (feature_info := feature_template_dict.get(feature_id)) is None:
+                        self.log_warning(
+                            f'Device template {item_name} is referencing a non-existent feature template: {feature_id}'
+                        )
+                        continue
+
+                    feature_info.device_templates.add(item_name)
+                    feature_templates.append(feature_info.name)
+
+                device_templates.append(DeviceInfo(item_name, template.type, feature_templates))
+
+            sorted_by_name = partial(sorted,  key=attrgetter('name'))
+            matched = partial(filter,
+                              lambda x: parsed_args.templates is None or regex_search(parsed_args.templates, x.name))
+
+            return sorted_by_name(matched(device_templates)), sorted_by_name(matched(feature_template_dict.values()))
+
+        self.log_info('Loading template indexes')
+        if (device_template_idx := self.index_get(DeviceTemplateIndex, backend)) is None:
+            raise TaskException('Failed to load the device template index')
+        if (feature_template_idx := self.index_get(FeatureTemplateIndex, backend)) is None:
+            raise TaskException('Failed to load the feature template index')
+
+        self.log_info('Loading templates')
+        matched_device_templates, matched_feature_templates = load_templates(device_template_idx, feature_template_idx)
+
+        result_tables: list[Table] = []
+
+        self.log_info('Creating feature-template references table')
         # Ordered by feature template name. Then device templates are sorted by template name.
-        table = Table('Feature Template', 'Type', 'Devices Attached', 'Device Templates',
-                      meta="template_references.csv")
-        matched_feature_templates = [
-            info for info in feature_dict.values()
-            if parsed_args.templates is None or regex_search(parsed_args.templates, info.name)
-        ]
-        matched_feature_templates.sort(key=attrgetter('name'))
-        for feature_info in matched_feature_templates:
-            if not parsed_args.with_refs and not feature_info.device_templates:
-                table.add_marker()
-                table.add(feature_info.name, feature_info.type, str(feature_info.attached), '')
+        table_feature = Table('Feature Template', 'Type', 'Devices Attached', 'Device Templates',
+                              name="Feature Template References", meta="feature_template_references.csv")
+        for ft_template in matched_feature_templates:
+            if not parsed_args.with_refs and not ft_template.device_templates:
+                table_feature.add_marker()
+                table_feature.add(ft_template.name, ft_template.type, str(ft_template.attached), '')
                 continue
 
-            is_first = True
-            for device_template in sorted(feature_info.device_templates):
-                if is_first:
-                    table.add_marker()
-                    table.add(feature_info.name, feature_info.type, str(feature_info.attached), device_template)
-                    is_first = False
-                else:
-                    table.add('', '', '', device_template)
+            for section_row_num, device_template in enumerate(sorted(ft_template.device_templates)):
+                if section_row_num == 0:
+                    table_feature.add_marker()
 
-        result_tables = []
-        if table:
-            result_tables.append(table)
+                if section_row_num == 0 or parsed_args.filled_rows:
+                    table_feature.add(ft_template.name, ft_template.type, str(ft_template.attached), device_template)
+                else:
+                    table_feature.add('', '', '', device_template)
+
+        if table_feature:
+            result_tables.append(table_feature)
+
+        self.log_info('Creating device-template references table')
+        # Ordered by device template name. Then feature templates are sorted by template name.
+        table_device = Table('Device Template', 'Device Type', 'Feature Templates',
+                             name="Device Template References", meta="device_template_references.csv")
+        for dv_template in matched_device_templates:
+            if not dv_template.feature_templates:
+                table_device.add_marker()
+                table_device.add(dv_template.name, dv_template.device_type, '')
+                continue
+
+            for section_row_num, feature_template in enumerate(sorted(dv_template.feature_templates)):
+                if section_row_num == 0:
+                    table_device.add_marker()
+
+                if section_row_num == 0 or parsed_args.filled_rows:
+                    table_device.add(dv_template.name, dv_template.device_type, feature_template)
+                else:
+                    table_device.add('', '', feature_template)
+
+        if table_device:
+            result_tables.append(table_device)
 
         return result_tables
 
@@ -226,3 +269,4 @@ class ShowTemplateRefArgs(ShowTemplateArgs):
     subtask_info: const(str, 'references')
     subtask_handler: const(Callable, TaskShowTemplate.references_table)
     with_refs: bool = False
+    filled_rows: bool = False
