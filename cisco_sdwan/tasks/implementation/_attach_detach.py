@@ -57,8 +57,13 @@ class AttachTemplatesModel(BaseModel):
     def get_edge_templates(self) -> List[DeviceAttachTemplateModel]:
         return self.edge_templates
 
-    def get_templates(self, func: Callable):
-        return func(self)
+    def get_templates(self, device_type: str):
+        if device_type == 'edge':
+            return self.edge_templates
+        elif device_type == 'vsmart':
+            return self.vsmart_templates
+        else:
+            return None
 
 
 class VsmartPolicyModel(BaseModel):
@@ -166,7 +171,7 @@ class TaskAttach(Task):
         task_parser.prog = f'{task_parser.prog} attach'
         task_parser.formatter_class = argparse.RawDescriptionHelpFormatter
 
-        sub_tasks = task_parser.add_subparsers(title='attach options')
+        sub_tasks = task_parser.add_subparsers(dest="sub_task", title='attach options')
         sub_tasks.required = True
 
         edge_parser = sub_tasks.add_parser('edge', help='attach/deploy WAN edges')
@@ -218,7 +223,6 @@ class TaskAttach(Task):
             sub_task.add_argument('--reachable', action='store_true', help='select reachable devices only')
             sub_task.add_argument('--site', metavar='<id>', type=site_id_type, help='select devices with site ID')
             sub_task.add_argument('--system-ip', metavar='<ipv4>', type=ipv4_type, help='select device with system IP')
-
 
         return task_parser.parse_args(task_args)
 
@@ -276,7 +280,7 @@ class TaskAttach(Task):
                 # Template attachments
                 if attach_model.attach_templates:
                     try:
-                        templates = attach_model.attach_templates.get_templates(parsed_args.device_type)
+                        templates = attach_model.attach_templates.get_templates(parsed_args.sub_task)
                         attach_data = build_template_attach_data(api, templates, parsed_args.set_title)
                     except (RestAPIException, ValueError) as ex:
                         self.log_error(f"Failed: template attachments data: {ex}")
@@ -572,10 +576,10 @@ class TaskAttach(Task):
         result = None
         if parsed_args.save_attach_file:
             with open(parsed_args.save_attach_file, 'w') as file:
-                yaml.dump(attach.dict(),sort_keys=False,indent=2, stream=file)
+                yaml.dump(attach.model_dump(), sort_keys=False,indent=2, stream=file)
             self.log_info(f'Attach file saved as "{parsed_args.save_attach_file}"')
         else:
-            result = [yaml.dump(attach.dict(), sort_keys=False,indent=2)]
+            result = [yaml.dump(attach.model_dump(), sort_keys=False,indent=2)]
 
         return result
 
