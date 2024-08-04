@@ -5,7 +5,7 @@
  This module implements vManage API models
 """
 import re
-from typing import Optional, Any, Union
+from typing import Optional, Any, Union, List
 from collections.abc import Mapping, Sequence, Callable, Iterable
 from pathlib import Path
 from collections import namedtuple
@@ -234,6 +234,13 @@ class Inventory(IndexApiItem):
         Filtered_iter filter selecting CEDGE devices
         """
         return device_entry.model is not None and device_entry.model in CEDGE_SET
+
+    @staticmethod
+    def is_not_cedge(device_entry: FilterEntry) -> bool:
+        """
+        Filtered_iter filter selecting VEDGE devices
+        """
+        return device_entry.model is not None and device_entry.model not in CEDGE_SET
 
     @staticmethod
     def is_vsmart(device_entry: FilterEntry) -> bool:
@@ -531,7 +538,7 @@ class DeviceTemplateIndex(IndexConfigItem):
     store_file = 'device_templates.json'
     iter_fields = IdName('templateId', 'templateName')
 
-    FilteredIterEntry = namedtuple('FilteredIterEntry', ['device_type', 'num_attached', 'uuid', 'name'])
+    FilteredIterEntry = namedtuple('FilteredIterEntry', ['template_class', 'device_type', 'num_attached', 'uuid', 'name'])
 
     @staticmethod
     def is_vsmart(iterator_entry: FilteredIterEntry) -> bool:
@@ -549,12 +556,20 @@ class DeviceTemplateIndex(IndexConfigItem):
     def is_cedge(iterator_entry: FilteredIterEntry) -> bool:
         return iterator_entry.device_type is not None and iterator_entry.device_type in CEDGE_SET
 
+    @staticmethod
+    def is_vedge(iterator_entry: FilteredIterEntry) -> bool:
+        return iterator_entry.template_class is not None and iterator_entry.template_class == 'vedge'
+
+    @staticmethod
+    def is_not_vedge(iterator_entry: FilteredIterEntry) -> bool:
+        return iterator_entry.template_class is not None and iterator_entry.template_class != 'vedge'
+
     def filtered_iter(self, *filter_fns: Callable) -> Iterable[tuple[str, str]]:
         # The contract for filtered_iter is that it should return an iterable of iter_fields tuples.
         # If no filter_fns is provided, no filtering is done and iterate over all entries
         return (
             (entry.uuid, entry.name) for entry in map(DeviceTemplateIndex.FilteredIterEntry._make,
-                                                      self.iter('deviceType', 'devicesAttached', *self.iter_fields))
+                                                      self.iter('templateClass', 'deviceType', 'devicesAttached', *self.iter_fields))
             if all(filter_fn(entry) for filter_fn in filter_fns)
         )
 
@@ -794,11 +809,23 @@ class ConfigGroupRules(IndexConfigItem):
             post_data = {k: v for k, v in rule.items() if k not in filtered_keys}
             post_data['configGroupId'] = config_group_id
             response = api.post(post_data, ConfigGroupRules.api_path.resolve(configGroupId=config_group_id).post)
+            if response.get('isConflict'):
+                raise ValueError(f"The rule created conflicts with another rule for config-group {config_group_id}")
             response_list.extend(
                 entry.get('chassisNumber') for entry in response.get('devices', {}).get('matchingDevices', [])
             )
 
         return response_list
+
+    def put_raise(self, api: Rest, config_group_id: str) -> List[str]:
+        for rule in self.data:
+            put_data = {k: v for k, v in rule.items()}
+            put_data['configGroupId'] = config_group_id
+            response = api.put(put_data, ConfigGroupRules.api_path.resolve(configGroupId=config_group_id).put)
+            if response.get('isConflict'):
+                raise ValueError(f"The rule created conflicts with another rule for config-group {config_group_id}")
+
+        return
 
 
 class ConfigGroupDeploy(ApiItem):
