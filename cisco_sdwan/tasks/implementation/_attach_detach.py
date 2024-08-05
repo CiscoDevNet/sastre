@@ -198,9 +198,8 @@ class TaskAttach(Task):
                                           help='save attach file as yaml file')
 
         for sub_task in (edge_parser, vsmart_parser):
-            mutex_regex = sub_task.add_mutually_exclusive_group()
+            mutex_regex = sub_task.add_mutually_exclusive_group(required=True)
             mutex_regex.add_argument('--workdir', metavar='<directory>', type=existing_workdir_type,
-                                     default=default_workdir(target_address),
                                      help='attach source (default: %(default)s)')
             mutex_regex.add_argument('--attach-file', metavar='<filename>', type=existing_file_type,
                                      help='load device templates attach and vsmart policy activate from attach YAML file')
