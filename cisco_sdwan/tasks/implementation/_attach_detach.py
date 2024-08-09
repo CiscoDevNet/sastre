@@ -11,7 +11,7 @@ from cisco_sdwan.base.rest_api import Rest, RestAPIException
 from cisco_sdwan.base.catalog import is_index_supported
 from cisco_sdwan.base.models_vmanage import (DeviceTemplateIndex, ConfigGroupIndex, EdgeInventory, ControlInventory,
                                              PolicyVsmartIndex, Device, ConfigGroupRules, ConfigGroupAssociated,
-                                             ConfigGroupValues)
+                                             ConfigGroupValues, NameValuePair)
 from cisco_sdwan.tasks.utils import (TaskOptions, existing_workdir_type, regex_type, default_workdir, ipv4_type,
                                      site_id_type, int_type, filename_type, existing_file_type)
 from cisco_sdwan.tasks.common import regex_search, Task, WaitActionsException, device_iter, TaskException
@@ -85,15 +85,9 @@ class TagRulesModel(BaseModel):
         return v
 
 
-class NameValueModel(BaseModel):
-    name: str
-    value: Optional[str] = '{PLACEHOLDER}'
-    suggestions: Optional[List[str]]
-
-
 class DeviceVariablesModel(BaseModel):
     deviceName: str
-    variables: Optional[List[NameValueModel]]
+    variables: List[NameValuePair]
 
 
 class DeviceAssociationValuesModel(BaseModel):
@@ -434,13 +428,6 @@ class TaskAttach(Task):
 
         def associate_device_variables(devices_association_values: DeviceAssociationValuesModel, cfg_grp_Id: str) -> \
         List[str]:
-            def delete_suggestions():
-                for device_data in devices_association_values.devices:
-                    if device_data.variables:
-                        for variable in device_data.variables:
-                            del variable.suggestions
-
-            delete_suggestions()
             payload = {
                 "solution": devices_association_values.family,
                 "devices": [
