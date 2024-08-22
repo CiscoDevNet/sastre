@@ -1,7 +1,7 @@
 import argparse
 from functools import partial
-from typing import Union, Optional, List, Dict, Tuple, Set, Sequence
-from collections.abc import Mapping, Callable, Iterable
+from typing import Union, Optional
+from collections.abc import Mapping, Callable, Iterable, Sequence
 
 import yaml
 from pydantic import Field, field_validator, BaseModel, validator, ValidationError
@@ -36,7 +36,7 @@ def build_device_maps(selected_devices_iter: Iterable[tuple[str, str]],
 class DeviceAttachTemplateModel(BaseModel):
     templateName: str
     isCliTemplate: bool
-    device: List[Dict[str, str]]
+    device: list[dict[str, str]]
 
     @classmethod
     def replace_empty_with_default(cls, value):
@@ -48,13 +48,13 @@ class DeviceAttachTemplateModel(BaseModel):
 
 
 class AttachTemplatesModel(BaseModel):
-    edge_templates: Optional[List[DeviceAttachTemplateModel]] = None
-    vsmart_templates: Optional[List[DeviceAttachTemplateModel]] = None
+    edge_templates: Optional[list[DeviceAttachTemplateModel]] = None
+    vsmart_templates: Optional[list[DeviceAttachTemplateModel]] = None
 
-    def get_vsmart_templates(self) -> List[DeviceAttachTemplateModel]:
+    def get_vsmart_templates(self) -> list[DeviceAttachTemplateModel]:
         return self.vsmart_templates
 
-    def get_edge_templates(self) -> List[DeviceAttachTemplateModel]:
+    def get_edge_templates(self) -> list[DeviceAttachTemplateModel]:
         return self.edge_templates
 
     def get_templates(self, device_type: str):
@@ -74,7 +74,7 @@ class VsmartPolicyModel(BaseModel):
 class TagRulesModel(BaseModel):
     deviceAttribute: str
     rule: str
-    values: List[str]
+    values: list[str]
     tagId: Optional[str]
 
     @validator('rule')
@@ -87,12 +87,12 @@ class TagRulesModel(BaseModel):
 
 class DeviceVariablesModel(BaseModel):
     deviceName: str
-    variables: List[NameValuePair]
+    variables: list[NameValuePair]
 
 
 class DeviceAssociationValuesModel(BaseModel):
     family: Optional[str]
-    devices: List[DeviceVariablesModel]
+    devices: list[DeviceVariablesModel]
 
 
 class ConfigGroupsModel(BaseModel):
@@ -103,14 +103,14 @@ class ConfigGroupsModel(BaseModel):
 
 class AttachModel(BaseModel):
     attach_templates: Optional[AttachTemplatesModel]
-    config_groups: Optional[List[ConfigGroupsModel]]
+    config_groups: Optional[list[ConfigGroupsModel]]
     vsmart_policy: Optional[VsmartPolicyModel]
 
 
-def device_maps(selected_devices_iter: Iterable[Tuple[str, str]],
-                vsmart_uuid_set: Tuple[Set[str], Set[str]],
-                cedge_uuid_set: Tuple[Set[str], Set[str]],
-                vedge_uuid_set: Tuple[Set[str], Set[str]]) -> Tuple[Mapping[str, str], Mapping[str, str], Mapping[str, str],
+def device_maps(selected_devices_iter: Iterable[tuple[str, str]],
+                vsmart_uuid_set: tuple[set[str], set[str]],
+                cedge_uuid_set: tuple[set[str], set[str]],
+                vedge_uuid_set: tuple[set[str], set[str]]) -> tuple[Mapping[str, str], Mapping[str, str], Mapping[str, str],
                                                                     Mapping[str, str], Mapping[str, str], Mapping[str, str]]:
     selected_devices = dict(selected_devices_iter)
     selected_devices_keys = selected_devices.keys()
@@ -141,7 +141,7 @@ def load_attach_data(template_file: str) -> AttachModel:
     return attach_model
 
 
-def build_template_attach_data(api: Rest, templates: List[DeviceAttachTemplateModel], title: str) -> Tuple[list, bool]:
+def build_template_attach_data(api: Rest, templates: list[DeviceAttachTemplateModel], title: str) -> tuple[list, bool]:
     def raise_value_error(msg):
         raise ValueError(msg)
 
@@ -393,10 +393,10 @@ class TaskAttach(Task):
 
         return
 
-    def config_group_device_association(self, api: Rest, config_groups: List[ConfigGroupsModel],
-                                        cfg_group_name_id: Dict[str, str],
-                                        device_name_id: Dict[str, str], title: str) -> Sequence[
-        Tuple[str, str, Sequence]]:
+    def config_group_device_association(self, api: Rest, config_groups: list[ConfigGroupsModel],
+                                        cfg_group_name_id: dict[str, str],
+                                        device_name_id: dict[str, str], title: str) -> Sequence[
+        tuple[str, str, Sequence]]:
         def raise_value_error(msg):
             raise ValueError(msg)
 
@@ -427,7 +427,7 @@ class TaskAttach(Task):
             ConfigGroupAssociated(payload).put_raise(api, configGroupId=cfg_grp_Id)
 
         def associate_device_variables(devices_association_values: DeviceAssociationValuesModel, cfg_grp_Id: str) -> \
-        List[str]:
+        list[str]:
             payload = {
                 "solution": devices_association_values.family,
                 "devices": [
