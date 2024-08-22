@@ -12,7 +12,7 @@ import json
 from pathlib import Path
 from shutil import rmtree
 from collections import namedtuple
-from typing import Union, Optional, Any, TypeVar, Tuple
+from typing import Union, Optional, Any, TypeVar
 from collections.abc import Sequence, Mapping, Iterator, Iterable
 from zipfile import ZipFile, ZIP_DEFLATED
 from pydantic import ValidationError
@@ -683,13 +683,13 @@ class Task:
         return False
 
     def get_cfg_group_deploy_data(self, api: Rest,
-                                  cfg_group_iter: Iterator[Tuple[str, str]],
+                                  cfg_group_iter: Iterator[tuple[str, str]],
                                   config_groups_filter: str,
                                   device_filter: bool,
                                   devices_set: set,
-                                  devices_attach_set: set) -> Sequence[Tuple[str, Sequence, Sequence]]:
+                                  devices_attach_set: set) -> Sequence[tuple[str, Sequence, Sequence]]:
 
-        def associate_devices(config_grp_id: str) -> Tuple[set, set]:
+        def associate_devices(config_grp_id: str) -> tuple[set, set]:
             associated_uuid_set = set(ConfigGroupAssociated.get_raise(api, configGroupId=config_grp_id).uuids)
             allowed_uuid_set, attach_uuid_set = None, None
             if config_groups_filter and device_filter:  # If config-groups and device filter are given in input, retrieve matched attach devices and unattached devices to this config-group

@@ -5,7 +5,7 @@
  This module implements vManage API models
 """
 import re
-from typing import Optional, Any, Union, List
+from typing import Optional, Any, Union
 from collections.abc import Mapping, Sequence, Callable, Iterable
 from pathlib import Path
 from collections import namedtuple
@@ -817,7 +817,7 @@ class ConfigGroupRules(IndexConfigItem):
 
         return response_list
 
-    def put_raise(self, api: Rest, config_group_id: str) -> List[str]:
+    def put_raise(self, api: Rest, config_group_id: str) -> list[str]:
         for rule in self.data:
             put_data = {k: v for k, v in rule.items()}
             put_data['configGroupId'] = config_group_id
