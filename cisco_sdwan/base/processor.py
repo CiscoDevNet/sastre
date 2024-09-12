@@ -56,7 +56,7 @@ class Processor:
         return cls(data, **kwargs)
 
     def is_in_scope(self, template_obj, **kwargs):
-        raise NotImplemented('Method not implemented')
+        raise NotImplementedError('Method not implemented')
 
     def eval(self, template_obj, new_name, new_id):
         migrated_payload = deepcopy(template_obj.data)
