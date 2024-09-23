@@ -122,6 +122,7 @@ class Report:
         # Report section_dict is {<section_name>: {<subsection_name>: [<subsection lines]}}
         self.section_dict = {} if section_dict is None else section_dict
         self.filename = filename
+        self.section_json = []
 
     def add_section(self, section_name: str, subsection_list: list) -> None:
         for subsection in subsection_list:
@@ -193,6 +194,13 @@ class Report:
         }
         return Report(self.filename, trimmed_section_dict)
 
+    def add_section_json(self, task_output: list[Table]) -> None:
+        section_json = [json.loads(subsection.json()) for subsection in task_output]
+        self.section_json.extend(section_json)
+
+    def save_json(self, report_json: str) -> None:
+        with open(report_json, "w") as file:
+            json.dump(self.section_json, file, indent=4)
 
 @TaskOptions.register('report')
 class TaskReport(Task):
@@ -214,6 +222,8 @@ class TaskReport(Task):
                                    help='report from the specified directory instead of target vManage')
         create_parser.add_argument('--diff', metavar='<filename>', type=existing_file_type,
                                    help='generate diff between the specified previous report and the current report')
+        create_parser.add_argument('--save-json', metavar='<filename>', type=filename_type,
+                              help='export results as JSON-formatted file')
 
         diff_parser = sub_tasks.add_parser('diff', help='generate diff between two reports')
         diff_parser.set_defaults(subtask_handler=TaskReport.subtask_diff)
@@ -255,6 +265,8 @@ class TaskReport(Task):
                 task_output = task_cls().runner(task_args, api)
                 if task_output:
                     report.add_section(description, task_output)
+                if task_output and parsed_args.save_json:
+                    report.add_section_json(task_output)
             except (TaskException, FileNotFoundError) as ex:
                 self.log_error(f'Task {task_cls.__name__} error: {ex}')
 
@@ -269,6 +281,8 @@ class TaskReport(Task):
 
         # Saving current report after running the diff in case the previous report had the same filename
         report.save()
+        if parsed_args.save_json:
+            report.save_json(parsed_args.save_json)
         self.log_info(f'Report saved as "{parsed_args.file}"')
 
         return result

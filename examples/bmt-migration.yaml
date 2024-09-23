@@ -1,0 +1,36 @@
+---
+globals:
+  regex: "Site100-.*"
+sections:
+  - name: 'control connections'
+    skip_diff: true
+    task: 'show realtime'
+    args:
+      cmd: ['control', 'connections']
+  - name: 'system status'
+    skip_diff: true
+    task: 'show realtime'
+    args:
+      cmd: ['system', 'status']
+  - name: 'omp summary'
+    skip_diff: true
+    task: 'show realtime'
+    args:
+      cmd: ['omp', 'summary']
+  - name: 'bfd sessions'
+    skip_diff: true
+    task: 'show realtime'
+    args:
+      cmd: ['bfd', 'sessions']
+  - name: 'control local-properties'
+    skip_diff: true
+    task: 'show realtime'
+    args:
+      cmd: ['control', 'local-properties']
+  - name: 'tunnel stats'
+    skip_diff: true
+    task: 'show realtime'
+    args:
+      cmd: ['tunnel', 'stats']
+...
+
