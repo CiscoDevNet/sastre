@@ -18,7 +18,7 @@ from cisco_sdwan.tasks.utils import (regex_type, ipv4_type, site_id_type, filena
                                      TaskOptions, RTCmdSemantics, StateCmdSemantics, StatsCmdSemantics)
 from cisco_sdwan.tasks.common import regex_search, Task, Table, get_table_filters, filtered_tables, export_json
 from cisco_sdwan.tasks.models import TableTaskArgs, validate_op_cmd, const
-from cisco_sdwan.tasks.validators import validate_site_id, validate_ipv4, validate_regex
+from cisco_sdwan.tasks.validators import validate_site_id, validate_ipv4, validate_regex, validate_ipv4_list
 
 THREAD_POOL_SIZE = 10
 TIME_FORMAT = "%Y-%m-%dT%H:%M:%S"
@@ -112,7 +112,7 @@ class TaskShow(Task):
                                help='select devices NOT matching regular expression on device name, type or model.')
             sub_task.add_argument('--reachable', action='store_true', help='select devices that are reachable')
             sub_task.add_argument('--site', metavar='<id>', type=site_id_type, help='select devices with site ID')
-            sub_task.add_argument('--system-ip', metavar='<ipv4>', type=ipv4_type, help='select device with system IP')
+            sub_task.add_argument('--system-ip',nargs='*', metavar='<ipv4>', type=ipv4_type, help='select devices with system IP')
 
         for sub_task in (alarms_parser, events_parser):
             sub_task.set_defaults(subtask_handler=TaskShow.records)
@@ -276,7 +276,7 @@ class TaskShow(Task):
             if ((regex is None or regex_search(regex, name, d_type, model, inverse=parsed_args.regex is None)) and
                 (not parsed_args.reachable or state == 'reachable') and
                 (parsed_args.site is None or site_id == parsed_args.site) and
-                (parsed_args.system_ip is None or system_ip == parsed_args.system_ip))
+                (parsed_args.system_ip is None or system_ip in parsed_args.system_ip))
         ]
         # Sort device list by hostname then system ip
         matched_items.sort(key=attrgetter('hostname', 'system_ip'))
@@ -335,12 +335,12 @@ class ShowArgs(TableTaskArgs):
     not_regex: Optional[str] = None
     reachable: bool = False
     site: Optional[str] = None
-    system_ip: Optional[str] = None
+    system_ip: Optional[list[str]] = None
 
     # Validators
     _validate_regex = field_validator('regex', 'not_regex')(validate_regex)
     _validate_site_id = field_validator('site')(validate_site_id)
-    _validate_ipv4 = field_validator('system_ip')(validate_ipv4)
+    _validate_ipv4 = field_validator('system_ip')(validate_ipv4_list)
 
     @model_validator(mode='after')
     def mutex_validations(self) -> 'ShowArgs':
