@@ -63,6 +63,12 @@ def validate_ipv4(ipv4_str: str) -> str:
 
     return ipv4_str
 
+def validate_ipv4_list(ipv4_list: str) -> str:
+    for ipv4 in ipv4_list:
+        if re.match(r'\d+(?:\.\d+){3}$', ipv4) is None:
+            raise ValueError(f'"{ipv4}" is not a valid IPv4 address.')
+
+    return ipv4_list
 
 def validate_site_id(site_id: str) -> str:
     try:

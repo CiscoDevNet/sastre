@@ -1,6 +1,9 @@
 ---
 globals:
-  regex: "Site100-.*"
+  system_ip: [
+    "1.1.10.1",
+    "1.1.10.2"
+  ]
 sections:
   - name: 'control connections'
     skip_diff: true
