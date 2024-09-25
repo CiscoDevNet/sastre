@@ -1,13 +1,16 @@
 ---
 globals:
   system_ip: [
-    "1.1.10.1",
-    "1.1.10.2"
+    "10.10.10.11",
+    "10.10.10.12",
+    "10.10.10.13",
+    "10.10.10.14",
+    "10.10.10.15"
   ]
 sections:
   - name: 'control connections'
     skip_diff: true
-    task: 'show realtime'
+    task: 'show state'
     args:
       cmd: ['control', 'connections']
   - name: 'system status'
@@ -22,12 +25,12 @@ sections:
       cmd: ['omp', 'summary']
   - name: 'bfd sessions'
     skip_diff: true
-    task: 'show realtime'
+    task: 'show state'
     args:
       cmd: ['bfd', 'sessions']
   - name: 'control local-properties'
     skip_diff: true
-    task: 'show realtime'
+    task: 'show state'
     args:
       cmd: ['control', 'local-properties']
   - name: 'tunnel stats'
@@ -35,5 +38,20 @@ sections:
     task: 'show realtime'
     args:
       cmd: ['tunnel', 'stats']
+  - name: 'software info'
+    skip_diff: true
+    task: 'show realtime'
+    args:
+      cmd: ['software', 'info']
+  - name: 'hardware environment'
+    skip_diff: true
+    task: 'show realtime'
+    args:
+      cmd: ['hardware', 'environment']
+  - name: 'hardware inventory'
+    skip_diff: true
+    task: 'show realtime'
+    args:
+      cmd: ['hardware', 'inventory']
 ...
 
