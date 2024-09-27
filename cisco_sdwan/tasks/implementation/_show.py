@@ -15,8 +15,10 @@ from cisco_sdwan.base.models_base import (OperationalItem, RealtimeItem, BulkSta
                                           filename_safe)
 from cisco_sdwan.base.models_vmanage import Device, Alarm, Event
 from cisco_sdwan.tasks.utils import (regex_type, ipv4_type, site_id_type, filename_type, int_type, OpCmdOptions,
-                                     TaskOptions, RTCmdSemantics, StateCmdSemantics, StatsCmdSemantics)
-from cisco_sdwan.tasks.common import regex_search, Task, Table, get_table_filters, filtered_tables, export_json
+                                     TaskOptions, RTCmdSemantics, StateCmdSemantics, StatsCmdSemantics,
+                                     device_type_choices)
+from cisco_sdwan.tasks.common import regex_search, Task, Table, get_table_filters, filtered_tables, export_json, \
+    device_type_filter
 from cisco_sdwan.tasks.models import TableTaskArgs, validate_op_cmd, const
 from cisco_sdwan.tasks.validators import validate_site_id, validate_ipv4, validate_regex, validate_ipv4_list
 
@@ -113,6 +115,7 @@ class TaskShow(Task):
             sub_task.add_argument('--reachable', action='store_true', help='select devices that are reachable')
             sub_task.add_argument('--site', metavar='<id>', type=site_id_type, help='select devices with site ID')
             sub_task.add_argument('--system-ip',nargs='*', metavar='<ipv4>', type=ipv4_type, help='select devices with system IP')
+            sub_task.add_argument('--device-type', metavar='<d_type>', choices=device_type_choices, help='select devices with edge type')
 
         for sub_task in (alarms_parser, events_parser):
             sub_task.set_defaults(subtask_handler=TaskShow.records)
@@ -276,13 +279,13 @@ class TaskShow(Task):
             if ((regex is None or regex_search(regex, name, d_type, model, inverse=parsed_args.regex is None)) and
                 (not parsed_args.reachable or state == 'reachable') and
                 (parsed_args.site is None or site_id == parsed_args.site) and
-                (parsed_args.system_ip is None or system_ip in parsed_args.system_ip))
+                (parsed_args.system_ip is None or system_ip in parsed_args.system_ip) and
+                (parsed_args.device_type is None or device_type_filter(d_type, model, parsed_args.device_type)))
         ]
         # Sort device list by hostname then system ip
         matched_items.sort(key=attrgetter('hostname', 'system_ip'))
 
         self.log_info(f'Device selection matched {len(matched_items)} devices')
-
         return matched_items
 
     def build_table(self, name: str, headers: Sequence[str], devices: Sequence[DeviceInfo], device_data: dict) -> Table:
@@ -336,6 +339,7 @@ class ShowArgs(TableTaskArgs):
     reachable: bool = False
     site: Optional[str] = None
     system_ip: Optional[list[str]] = None
+    device_type: Optional[str] = None
 
     # Validators
     _validate_regex = field_validator('regex', 'not_regex')(validate_regex)
