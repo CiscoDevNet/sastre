@@ -205,6 +205,7 @@ def version_type(version_str: str) -> str:
 
     return cleaned_version
 
+device_type_choices = ["vsmart","vmanage","vedge","cedge","vbond"]
 
 #
 # Argparse specific validators

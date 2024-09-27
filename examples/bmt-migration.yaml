@@ -1,12 +1,18 @@
 ---
+metadata:
+  device_mappings:
+    device1: "10.10.10.11"
+    device2: "10.10.10.12"
+    device3: "10.10.10.13"
+  device_type: "cedge"
 globals:
   system_ip: [
     "10.10.10.11",
     "10.10.10.12",
-    "10.10.10.13",
-    "10.10.10.14",
-    "10.10.10.15"
+    "10.10.10.13"
   ]
+  detail: true
+  device_type: "cedge"
 sections:
   - name: 'control connections'
     skip_diff: true

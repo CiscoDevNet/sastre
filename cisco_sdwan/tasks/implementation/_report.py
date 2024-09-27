@@ -6,6 +6,7 @@ from datetime import date
 from difflib import unified_diff, HtmlDiff
 from typing import Union, Optional, Any, NamedTuple
 from collections.abc import Iterator, Callable
+
 from typing_extensions import Annotated
 from pydantic import field_validator, model_validator, BaseModel, ValidationError, Field, ConfigDict
 from cisco_sdwan.__version__ import __doc__ as title
@@ -43,6 +44,7 @@ class SectionModel(BaseModel):
 
 
 class ReportContentModel(BaseModel):
+    metadata: Any = None
     globals: Optional[dict[str, Any]] = None
     sections: list[SectionModel]
 
@@ -118,11 +120,12 @@ def load_content_spec(spec_file: Optional[str], spec_json: Optional[str],
 class Report:
     DEFAULT_SUBSECTION_NAME = "Default"
 
-    def __init__(self, filename: str, section_dict: Optional[dict] = None) -> None:
+    def __init__(self, filename: str, section_dict: Optional[dict] = None, metadata = None) -> None:
         # Report section_dict is {<section_name>: {<subsection_name>: [<subsection lines]}}
         self.section_dict = {} if section_dict is None else section_dict
         self.filename = filename
         self.section_json = []
+        self.metadata = metadata
 
     def add_section(self, section_name: str, subsection_list: list) -> None:
         for subsection in subsection_list:
@@ -198,9 +201,10 @@ class Report:
         section_json = [json.loads(subsection.json()) for subsection in task_output]
         self.section_json.extend(section_json)
 
-    def save_json(self, report_json: str) -> None:
-        with open(report_json, "w") as file:
-            json.dump(self.section_json, file, indent=4)
+    def save_json(self, filename: str) -> None:
+        report_json = {"metadata": self.metadata, "data": self.section_json}
+        with open(filename, "w") as file:
+            json.dump(report_json, file, indent=4)
 
 @TaskOptions.register('report')
 class TaskReport(Task):
@@ -259,7 +263,7 @@ class TaskReport(Task):
         self.log_info("Loading report specification")
         content_spec = load_content_spec(parsed_args.spec_file, parsed_args.spec_json, DEFAULT_CONTENT_SPEC)
 
-        report = Report(parsed_args.file)
+        report = Report(parsed_args.file, metadata=content_spec.metadata)
         for description, task_cls, task_args in self.section_iter(content_spec, api is not None, parsed_args.workdir):
             try:
                 task_output = task_cls().runner(task_args, api)

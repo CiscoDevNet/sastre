@@ -23,7 +23,7 @@ from cisco_sdwan.base.models_vmanage import (DeviceTemplate, DeviceTemplateValue
                                              ActionStatus, PolicyVsmartStatus, PolicyVsmartStatusException,
                                              PolicyVsmartActivate, PolicyVsmartIndex, PolicyVsmartDeactivate,
                                              Device, ConfigGroupDeploy, ConfigGroupAssociated, ConfigGroupValues,
-                                             ConfigGroupRules)
+                                             ConfigGroupRules, CEDGE_SET)
 
 T = TypeVar('T')
 
@@ -41,6 +41,14 @@ def regex_search(regex: str, *fields: str, inverse: bool = False) -> bool:
     op_fn = all if inverse else any  # Logical AND across all fields, else logical OR
     return op_fn(inverse ^ bool(re.search(regex, match_field)) for match_field in fields)
 
+def device_type_filter(d_type, model, type_arg):
+    if d_type != "vedge" and d_type != "cedge":
+        return d_type == type_arg
+    if type_arg == "vedge":
+        return model not in CEDGE_SET
+    elif type_arg == "cedge":
+        return model in CEDGE_SET
+    return False
 
 class Tally:
     def __init__(self, *counters):
