@@ -1,18 +1,14 @@
 ---
 metadata:
   device_mappings:
-    device1: "10.10.10.11"
-    device2: "10.10.10.12"
-    device3: "10.10.10.13"
-  device_type: "cedge"
+    device3: "10.1.0.1"
+    device4: "10.1.0.2"
 globals:
-  system_ip: [
-    "10.10.10.11",
-    "10.10.10.12",
-    "10.10.10.13"
-  ]
+  system_ip:
+    - "10.1.0.1"
+    - "10.1.0.2"
   detail: true
-  device_type: "cedge"
+  device_type: "vedge"
 sections:
   - name: 'control connections'
     skip_diff: true
@@ -60,4 +56,5 @@ sections:
     args:
       cmd: ['hardware', 'inventory']
 ...
+
 
