@@ -41,7 +41,7 @@ def regex_search(regex: str, *fields: str, inverse: bool = False) -> bool:
     op_fn = all if inverse else any  # Logical AND across all fields, else logical OR
     return op_fn(inverse ^ bool(re.search(regex, match_field)) for match_field in fields)
 
-def device_type_filter(d_type, model, type_arg):
+def device_type_filter(d_type: str, model: str, type_arg: str) -> bool:
     if d_type != "vedge" and d_type != "cedge":
         return d_type == type_arg
     if type_arg == "vedge":
