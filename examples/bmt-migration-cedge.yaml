@@ -1,15 +1,15 @@
 ---
 metadata:
   device_mappings:
-    device1: "10.10.10.11"
-    device2: "10.10.10.12"
-    device3: "10.10.10.13"
+    device1: "1.1.10.1"
+    device2: "1.1.10.2"
+    device3: "1.1.20.1"
   device_type: "cedge"
 globals:
   system_ip: [
-    "10.10.10.11",
-    "10.10.10.12",
-    "10.10.10.13"
+    "1.1.10.1",
+    "1.1.10.2",
+    "1.1.20.1"
   ]
   detail: true
   device_type: "cedge"
