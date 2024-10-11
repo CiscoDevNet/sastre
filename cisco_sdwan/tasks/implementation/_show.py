@@ -20,7 +20,7 @@ from cisco_sdwan.tasks.utils import (regex_type, ipv4_type, site_id_type, filena
 from cisco_sdwan.tasks.common import regex_search, Task, Table, get_table_filters, filtered_tables, export_json, \
     device_type_filter
 from cisco_sdwan.tasks.models import TableTaskArgs, validate_op_cmd, const
-from cisco_sdwan.tasks.validators import validate_site_id, validate_ipv4, validate_regex, validate_ipv4_list
+from cisco_sdwan.tasks.validators import validate_site_id, validate_regex
 
 THREAD_POOL_SIZE = 10
 TIME_FORMAT = "%Y-%m-%dT%H:%M:%S"
@@ -114,7 +114,7 @@ class TaskShow(Task):
                                help='select devices NOT matching regular expression on device name, type or model.')
             sub_task.add_argument('--reachable', action='store_true', help='select devices that are reachable')
             sub_task.add_argument('--site', metavar='<id>', type=site_id_type, help='select devices with site ID')
-            sub_task.add_argument('--system-ip',nargs='*', metavar='<ipv4>', type=ipv4_type, help='select devices with system IP')
+            sub_task.add_argument('--system-ip',nargs='+', metavar='<ipv4>', type=ipv4_type, help='select devices with system IP')
             sub_task.add_argument('--device-type', metavar='<d_type>', choices=device_type_choices, help='select devices with edge type')
 
         for sub_task in (alarms_parser, events_parser):
@@ -330,7 +330,7 @@ class TaskShow(Task):
 
         return result_tables
 
-
+IPv4AddressStr = Annotated[str, Field(pattern=r'\d+(?:\.\d+){3}$')]
 class ShowArgs(TableTaskArgs):
     subtask_info: str
     subtask_handler: Callable
@@ -338,13 +338,12 @@ class ShowArgs(TableTaskArgs):
     not_regex: Optional[str] = None
     reachable: bool = False
     site: Optional[str] = None
-    system_ip: Optional[list[str]] = None
+    system_ip: Optional[list[IPv4AddressStr]] = None
     device_type: Optional[str] = None
 
     # Validators
     _validate_regex = field_validator('regex', 'not_regex')(validate_regex)
     _validate_site_id = field_validator('site')(validate_site_id)
-    _validate_ipv4 = field_validator('system_ip')(validate_ipv4_list)
 
     @model_validator(mode='after')
     def mutex_validations(self) -> 'ShowArgs':

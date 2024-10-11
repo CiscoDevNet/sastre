@@ -6,7 +6,6 @@ from datetime import date
 from difflib import unified_diff, HtmlDiff
 from typing import Union, Optional, Any, NamedTuple
 from collections.abc import Iterator, Callable
-
 from typing_extensions import Annotated
 from pydantic import field_validator, model_validator, BaseModel, ValidationError, Field, ConfigDict
 from cisco_sdwan.__version__ import __doc__ as title
@@ -44,7 +43,7 @@ class SectionModel(BaseModel):
 
 
 class ReportContentModel(BaseModel):
-    metadata: Any = None
+    metadata: Optional[dict] = None
     globals: Optional[dict[str, Any]] = None
     sections: list[SectionModel]
 
@@ -120,7 +119,7 @@ def load_content_spec(spec_file: Optional[str], spec_json: Optional[str],
 class Report:
     DEFAULT_SUBSECTION_NAME = "Default"
 
-    def __init__(self, filename: str, section_dict: Optional[dict] = None, metadata = None) -> None:
+    def __init__(self, filename: str, section_dict: Optional[dict] = None, metadata: Optional[dict] = None) -> None:
         # Report section_dict is {<section_name>: {<subsection_name>: [<subsection lines]}}
         self.section_dict = {} if section_dict is None else section_dict
         self.filename = filename
@@ -128,6 +127,8 @@ class Report:
         self.metadata = metadata
 
     def add_section(self, section_name: str, subsection_list: list) -> None:
+        section_json = [json.loads(subsection.json()) for subsection in subsection_list]
+        self.section_json.extend(section_json)
         for subsection in subsection_list:
             if isinstance(subsection, Table):
                 subsection_name = subsection.name or Report.DEFAULT_SUBSECTION_NAME
@@ -197,10 +198,6 @@ class Report:
         }
         return Report(self.filename, trimmed_section_dict)
 
-    def add_section_json(self, task_output: list[Table]) -> None:
-        section_json = [json.loads(subsection.json()) for subsection in task_output]
-        self.section_json.extend(section_json)
-
     def save_json(self, filename: str) -> None:
         report_json = {"metadata": self.metadata, "data": self.section_json}
         with open(filename, "w") as file:
@@ -269,8 +266,6 @@ class TaskReport(Task):
                 task_output = task_cls().runner(task_args, api)
                 if task_output:
                     report.add_section(description, task_output)
-                if task_output and parsed_args.save_json:
-                    report.add_section_json(task_output)
             except (TaskException, FileNotFoundError) as ex:
                 self.log_error(f'Task {task_cls.__name__} error: {ex}')
 
