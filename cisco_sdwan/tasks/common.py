@@ -46,7 +46,7 @@ def device_type_filter(d_type: str, model: str, type_arg: str) -> bool:
         return d_type == type_arg
     if type_arg == "vedge":
         return model not in CEDGE_SET
-    elif type_arg == "cedge":
+    if type_arg == "cedge":
         return model in CEDGE_SET
     return False
 
