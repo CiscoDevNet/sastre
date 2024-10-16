@@ -331,6 +331,8 @@ class TaskShow(Task):
         return result_tables
 
 IPv4AddressStr = Annotated[str, Field(pattern=r'\d+(?:\.\d+){3}$')]
+
+
 class ShowArgs(TableTaskArgs):
     subtask_info: str
     subtask_handler: Callable
