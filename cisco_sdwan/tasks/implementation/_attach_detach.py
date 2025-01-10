@@ -1,20 +1,17 @@
 import argparse
 from functools import partial
 from typing import Union, Optional
-from collections.abc import Mapping, Callable, Iterable, Sequence
-
-import yaml
-from pydantic import Field, field_validator, BaseModel, validator, ValidationError
+from collections.abc import Mapping, Callable, Iterable
+from pydantic import Field, field_validator
 from typing_extensions import Annotated
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest, RestAPIException
 from cisco_sdwan.base.catalog import is_index_supported
 from cisco_sdwan.base.models_vmanage import (DeviceTemplateIndex, ConfigGroupIndex, EdgeInventory, ControlInventory,
-                                             PolicyVsmartIndex, Device, ConfigGroupRules, ConfigGroupAssociated,
-                                             ConfigGroupValues, NameValuePair)
+                                             PolicyVsmartIndex)
 from cisco_sdwan.tasks.utils import (TaskOptions, existing_workdir_type, regex_type, default_workdir, ipv4_type,
-                                     site_id_type, int_type, filename_type, existing_file_type)
-from cisco_sdwan.tasks.common import regex_search, Task, WaitActionsException, device_iter, TaskException
+                                     site_id_type, int_type)
+from cisco_sdwan.tasks.common import regex_search, Task, WaitActionsException, device_iter
 from cisco_sdwan.tasks.models import TaskArgs, const
 from cisco_sdwan.tasks.validators import validate_regex, validate_workdir, validate_site_id, validate_ipv4
 
@@ -33,130 +30,6 @@ def build_device_maps(selected_devices_iter: Iterable[tuple[str, str]],
     )
 
 
-class DeviceAttachTemplateModel(BaseModel):
-    templateName: str
-    isCliTemplate: bool
-    device: list[dict[str, str]]
-
-    @classmethod
-    def replace_empty_with_default(cls, value):
-        return {k: '{PLACEHOLDER}' if v == '' or v is None else v for k, v in value.items()}
-
-    @validator('device', pre=True)
-    def validate_device(cls, value):
-        return [cls.replace_empty_with_default(data) for data in value]
-
-
-class AttachTemplatesModel(BaseModel):
-    edge_templates: Optional[list[DeviceAttachTemplateModel]] = None
-    vsmart_templates: Optional[list[DeviceAttachTemplateModel]] = None
-
-    def get_vsmart_templates(self) -> list[DeviceAttachTemplateModel]:
-        return self.vsmart_templates
-
-    def get_edge_templates(self) -> list[DeviceAttachTemplateModel]:
-        return self.edge_templates
-
-    def get_templates(self, device_type: str):
-        if device_type == 'edge':
-            return self.edge_templates
-        elif device_type == 'vsmart':
-            return self.vsmart_templates
-        else:
-            return None
-
-
-class VsmartPolicyModel(BaseModel):
-    name: Union[str, None] = None
-    activate: bool = False
-
-
-class TagRulesModel(BaseModel):
-    deviceAttribute: str
-    rule: str
-    values: list[str]
-    tagId: Optional[str]
-
-    @validator('rule')
-    def validate_rule(cls, v):
-        rule_options = ('equal', 'notEqual', 'contain', 'notContain')
-        if v not in rule_options:
-            raise ValueError(f'"{v}" is not a valid rule. Options are: {", ".join(rule_options)}.')
-        return v
-
-
-class DeviceVariablesModel(BaseModel):
-    deviceName: str
-    variables: list[NameValuePair]
-
-
-class DeviceAssociationValuesModel(BaseModel):
-    family: Optional[str]
-    devices: list[DeviceVariablesModel]
-
-
-class ConfigGroupsModel(BaseModel):
-    configGroupName: str
-    tag_rules: Optional[TagRulesModel]
-    devices_association_values: Optional[DeviceAssociationValuesModel]
-
-
-class AttachModel(BaseModel):
-    attach_templates: Optional[AttachTemplatesModel]
-    config_groups: Optional[list[ConfigGroupsModel]]
-    vsmart_policy: Optional[VsmartPolicyModel]
-
-
-def device_maps(selected_devices_iter: Iterable[tuple[str, str]],
-                vsmart_uuid_set: tuple[set[str], set[str]],
-                cedge_uuid_set: tuple[set[str], set[str]],
-                vedge_uuid_set: tuple[set[str], set[str]]) -> tuple[Mapping[str, str], Mapping[str, str], Mapping[str, str],
-                                                                    Mapping[str, str], Mapping[str, str], Mapping[str, str]]:
-    selected_devices = dict(selected_devices_iter)
-    selected_devices_keys = selected_devices.keys()
-    return ({uuid: selected_devices[uuid] for uuid in selected_devices_keys & vsmart_uuid_set[0]},
-            {uuid: selected_devices[uuid] for uuid in selected_devices_keys & vsmart_uuid_set[1]},
-            {uuid: selected_devices[uuid] for uuid in selected_devices_keys & cedge_uuid_set[0]},
-            {uuid: selected_devices[uuid] for uuid in selected_devices_keys & cedge_uuid_set[1]},
-            {uuid: selected_devices[uuid] for uuid in selected_devices_keys & vedge_uuid_set[0]},
-            {uuid: selected_devices[uuid] for uuid in selected_devices_keys & vedge_uuid_set[1]})
-
-
-def load_attach_data(template_file: str) -> AttachModel:
-    def load_yaml(filename):
-        try:
-            with open(filename) as yaml_file:
-                return yaml.safe_load(yaml_file)
-        except FileNotFoundError as ex:
-            raise FileNotFoundError(f'Could not load attach file: {ex}') from None
-        except yaml.YAMLError as ex:
-            raise TaskException(f'Attach YAML syntax error: {ex}') from None
-
-    attach_file_dict = load_yaml(template_file)
-    attach_model = None
-    try:
-        attach_model = AttachModel(**attach_file_dict)
-    except ValidationError as e:
-        raise TaskException(f'Invalid attach file: {e}') from None
-    return attach_model
-
-
-def build_template_attach_data(api: Rest, templates: list[DeviceAttachTemplateModel], title: str) -> tuple[list, bool]:
-    def raise_value_error(msg):
-        raise ValueError(msg)
-
-    if templates is None:
-        raise ValueError(f"no {title} templates found in YML template file") from None
-    template_name_id = {item_name: item_id for item_id, item_name in DeviceTemplateIndex.get_raise(api)}
-    attach_data = [(template.templateName, template_name_id.get(template.templateName)
-    if template_name_id.get(template.templateName) is not None
-    else raise_value_error(f"template Id for {template.templateName} not found!"),
-                    template.device, template.isCliTemplate)
-                   for _, template in enumerate(templates)
-                   ]
-    return attach_data, False
-
-
 @TaskOptions.register('attach')
 class TaskAttach(Task):
     @staticmethod
@@ -165,47 +38,25 @@ class TaskAttach(Task):
         task_parser.prog = f'{task_parser.prog} attach'
         task_parser.formatter_class = argparse.RawDescriptionHelpFormatter
 
-        sub_tasks = task_parser.add_subparsers(dest="sub_task", title='attach options')
+        sub_tasks = task_parser.add_subparsers(title='attach options')
         sub_tasks.required = True
 
         edge_parser = sub_tasks.add_parser('edge', help='attach/deploy WAN edges')
         edge_parser.set_defaults(template_filter=DeviceTemplateIndex.is_not_vsmart,
-                                 subtask_handler=TaskAttach.attach,
                                  device_sets=TaskAttach.edge_sets,
                                  set_title="WAN Edge")
 
         vsmart_parser = sub_tasks.add_parser('vsmart', help='attach/deploy vSmarts')
         vsmart_parser.set_defaults(template_filter=DeviceTemplateIndex.is_vsmart,
-                                   subtask_handler=TaskAttach.attach,
                                    device_sets=TaskAttach.vsmart_sets,
                                    set_title="vSmart")
         vsmart_parser.add_argument('--activate', action='store_true',
                                    help='activate centralized policy after vSmart template attach/deploy')
 
-        attach_create_parser = sub_tasks.add_parser('create',
-                                                    help='attach create templates and config-groups to YAML file')
-        attach_create_parser.set_defaults(subtask_handler=TaskAttach.attach_create,
-                                          set_title="create vSmart and/or WAN Edge attach data")
-        attach_create_parser.add_argument('--device-types', choices=['vsmart', 'edge', 'all'],
-                                          default='all', help='device types')
-        attach_create_parser.add_argument('--save-attach-file', metavar='<filename>', type=filename_type,
-                                          help='save attach file as yaml file')
-
-        for sub_task in (edge_parser, vsmart_parser):
-            mutex_regex = sub_task.add_mutually_exclusive_group(required=True)
-            mutex_regex.add_argument('--workdir', metavar='<directory>', type=existing_workdir_type,
-                                     help='attach source (default: %(default)s)')
-            mutex_regex.add_argument('--attach-file', metavar='<filename>', type=existing_file_type,
-                                     help='load device templates attach and vsmart policy activate from attach YAML file')
-            sub_task.add_argument('--dryrun', action='store_true',
-                                  help='dry-run mode. Attach operations are listed but not is pushed to vManage.')
-            sub_task.add_argument('--batch', metavar='<size>', type=partial(int_type, 1, 9999),
-                                  default=DEFAULT_BATCH_SIZE,
-                                  help='maximum number of devices to include per vManage attach request '
-                                       '(default: %(default)s)')
-
         # Parameters common to all sub-tasks
-        for sub_task in (edge_parser, vsmart_parser, attach_create_parser):
+        for sub_task in (edge_parser, vsmart_parser):
+            sub_task.add_argument('--workdir', metavar='<directory>', type=existing_workdir_type,
+                                  default=default_workdir(target_address), help='attach source (default: %(default)s)')
             sub_task.add_argument('--templates', metavar='<regex>', type=regex_type,
                                   help='regular expression selecting templates to attach. Match on template name.')
             sub_task.add_argument('--config-groups', metavar='<regex>', type=regex_type,
@@ -216,6 +67,12 @@ class TaskAttach(Task):
             sub_task.add_argument('--reachable', action='store_true', help='select reachable devices only')
             sub_task.add_argument('--site', metavar='<id>', type=site_id_type, help='select devices with site ID')
             sub_task.add_argument('--system-ip', metavar='<ipv4>', type=ipv4_type, help='select device with system IP')
+            sub_task.add_argument('--dryrun', action='store_true',
+                                  help='dry-run mode. Attach operations are listed but not is pushed to vManage.')
+            sub_task.add_argument('--batch', metavar='<size>', type=partial(int_type, 1, 9999),
+                                  default=DEFAULT_BATCH_SIZE,
+                                  help='maximum number of devices to include per vManage attach request '
+                                       '(default: %(default)s)')
 
         return task_parser.parse_args(task_args)
 
@@ -240,101 +97,37 @@ class TaskAttach(Task):
         return attach_set, deploy_set
 
     def runner(self, parsed_args, api: Optional[Rest] = None) -> Union[None, list]:
-        return parsed_args.subtask_handler(self, parsed_args, api)
-
-    def attach(self, parsed_args, api: Optional[Rest] = None) -> Union[None, list]:
         self.is_dryrun = parsed_args.dryrun
-        source_info = f'Local workdir: "{parsed_args.workdir}"' if parsed_args.attach_file is None else f'Attach file: "{parsed_args.attach_file}"'
-        self.log_info(f'Attach task source: {source_info} -> vManage URL: "{api.base_url}"')
+        self.log_info(f'Attach task: Local workdir: "{parsed_args.workdir}" -> vManage URL: "{api.base_url}"')
 
-        attach_map, deploy_map = None, None
-        attach_model = None
-        attach_data = None
-        deploy_data = None
-        if parsed_args.attach_file:
-            try:
-                attach_model = load_attach_data(parsed_args.attach_file)
-            except (FileNotFoundError, TaskException) as ex:
-                self.log_error(f"Failed: Loading attach file: {ex}")
-                return
-
-            if attach_model:
-                # Config-group deployments
-                if attach_model.config_groups and parsed_args.device_sets is TaskAttach.edge_sets:
-                    try:
-                        cfg_group_name_id = {item_name: item_id for item_id, item_name in ConfigGroupIndex.get_raise(api)}
-                        device_name_id = {item_name: item_id for item_id, item_name in Device.get_raise(api)}
-                        deploy_data = self.config_group_device_association(api, attach_model.config_groups, cfg_group_name_id,
-                                                                           device_name_id, parsed_args.set_title)
-                        deploy_map = {}
-                    except (RestAPIException, ValueError) as ex:
-                        self.log_error(f"Failed: config group deployments data: {ex}")
-
-                # Template attachments
-                if attach_model.attach_templates:
-                    try:
-                        templates = attach_model.attach_templates.get_templates(parsed_args.sub_task)
-                        attach_data = build_template_attach_data(api, templates, parsed_args.set_title)
-                    except (RestAPIException, ValueError) as ex:
-                        self.log_error(f"Failed: template attachments data: {ex}")
-        else:  # load from workdir
-            attach_map, deploy_map = build_device_maps(
-                device_iter(api, parsed_args.devices, parsed_args.reachable, parsed_args.site, parsed_args.system_ip,
-                            default=None),
-                *parsed_args.device_sets(api)
-            )
-            # Config-group deployments
-            if deploy_map:
-                try:
-                    saved_groups_index = ConfigGroupIndex.load(parsed_args.workdir)
-                    if saved_groups_index is None:
-                        self.log_debug("Will skip deploy, no local config-group index")
-                        raise StopIteration()
-
-                    if not is_index_supported(ConfigGroupIndex, version=api.server_version):
-                        self.log_warning("Will skip deploy, target vManage does not support config-groups")
-                        raise StopIteration()
-
-                    target_cfg_groups = {item_name: item_id for item_id, item_name in ConfigGroupIndex.get_raise(api)}
-                    selected_cfg_groups = (
-                        (saved_name, saved_id, target_cfg_groups.get(saved_name))
-                        for saved_id, saved_name in saved_groups_index
-                        if parsed_args.config_groups is None or regex_search(parsed_args.config_groups, saved_name)
-                    )
-                    deploy_data = self.cfg_group_deploy_data(api, parsed_args.workdir, saved_groups_index.need_extended_name,
-                                                             selected_cfg_groups, deploy_map)
-                except (RestAPIException, FileNotFoundError, WaitActionsException) as ex:
-                    self.log_error(f'Failed: loading Config-group deployments: {ex}')
-                except StopIteration:
-                    pass
-
-            # Template attachments
-            if attach_map:
-                try:
-                    saved_template_index = DeviceTemplateIndex.load(parsed_args.workdir)
-                    if saved_template_index is None:
-                        self.log_debug("Will skip attach, no local device template index")
-                        raise StopIteration()
-
-                    target_templates = {item_name: item_id for item_id, item_name in DeviceTemplateIndex.get_raise(api)}
-                    selected_templates = (
-                        (saved_name, saved_id, target_templates.get(saved_name))
-                        for saved_id, saved_name in saved_template_index.filtered_iter(parsed_args.template_filter,
-                                                                                    DeviceTemplateIndex.is_attached)
-                        if parsed_args.templates is None or regex_search(parsed_args.templates, saved_name)
-                    )
-                    attach_data = self.template_attach_data(api, parsed_args.workdir,
-                                                            saved_template_index.need_extended_name, selected_templates,
-                                                            target_uuid_set=set(attach_map))
-                except (RestAPIException, FileNotFoundError, WaitActionsException) as ex:
-                    self.log_error(f"Failed: loading Template attachments: {ex}")
-                except StopIteration:
-                    pass
+        attach_map, deploy_map = build_device_maps(
+            device_iter(api, parsed_args.devices, parsed_args.reachable, parsed_args.site, parsed_args.system_ip,
+                        default=None),
+            *parsed_args.device_sets(api)
+        )
 
         # Config-group deployments
         deploy_reqs = 0
-        if deploy_data:
+        if deploy_map:
             try:
+                saved_groups_index = ConfigGroupIndex.load(parsed_args.workdir)
+                if saved_groups_index is None:
+                    self.log_debug("Will skip deploy, no local config-group index")
+                    raise StopIteration()
+
+                if not is_index_supported(ConfigGroupIndex, version=api.server_version):
+                    self.log_warning("Will skip deploy, target vManage does not support config-groups")
+                    raise StopIteration()
+
+                target_cfg_groups = {item_name: item_id for item_id, item_name in ConfigGroupIndex.get_raise(api)}
+                selected_cfg_groups = (
+                    (saved_name, saved_id, target_cfg_groups.get(saved_name))
+                    for saved_id, saved_name in saved_groups_index
+                    if parsed_args.config_groups is None or regex_search(parsed_args.config_groups, saved_name)
+                )
+                deploy_data = self.cfg_group_deploy_data(api, parsed_args.workdir,
+                                                         saved_groups_index.need_extended_name, selected_cfg_groups,
+                                                         deploy_map)
                 deploy_reqs = self.cfg_group_deploy(api, deploy_data, deploy_map, chunk_size=parsed_args.batch,
                                                     log_context=f"config-group deploying {parsed_args.set_title}")
                 if deploy_reqs:
@@ -349,8 +142,23 @@ class TaskAttach(Task):
 
         # Template attachments
         attach_reqs = 0
-        if attach_data:
+        if attach_map:
             try:
+                saved_template_index = DeviceTemplateIndex.load(parsed_args.workdir)
+                if saved_template_index is None:
+                    self.log_debug("Will skip attach, no local device template index")
+                    raise StopIteration()
+
+                target_templates = {item_name: item_id for item_id, item_name in DeviceTemplateIndex.get_raise(api)}
+                selected_templates = (
+                    (saved_name, saved_id, target_templates.get(saved_name))
+                    for saved_id, saved_name in saved_template_index.filtered_iter(parsed_args.template_filter,
+                                                                                   DeviceTemplateIndex.is_attached)
+                    if parsed_args.templates is None or regex_search(parsed_args.templates, saved_name)
+                )
+                attach_data = self.template_attach_data(api, parsed_args.workdir,
+                                                        saved_template_index.need_extended_name, selected_templates,
+                                                        target_uuid_set=set(attach_map))
                 attach_reqs = self.template_attach(api, *attach_data, chunk_size=parsed_args.batch,
                                                    log_context=f"template attaching {parsed_args.set_title}")
                 if attach_reqs:
@@ -364,23 +172,13 @@ class TaskAttach(Task):
             self.log_info(f"No {parsed_args.set_title} template attachments to process")
 
         # vSmart policy activate
-        if parsed_args.device_sets is TaskAttach.vsmart_sets:
+        if parsed_args.device_sets is TaskAttach.vsmart_sets and parsed_args.activate:
             activate_reqs = 0
-            policy_name = None
             try:
-                if parsed_args.attach_file:
-                    vsmart_policy = attach_model.vsmart_policy
-                    if vsmart_policy is not None and vsmart_policy.activate and vsmart_policy.name is not None:
-                        policy_name = vsmart_policy.name if self.is_policy_name_valid(api, vsmart_policy.name) else None
-                    else:
-                        self.log_info('No vsmart policy to activate from attach file')
-                elif parsed_args.activate:
-                    _, policy_name = PolicyVsmartIndex.load(parsed_args.workdir, raise_not_found=True).active_policy
-
-                if policy_name:
-                    target_policies = {item_name: item_id for item_id, item_name in PolicyVsmartIndex.get_raise(api)}
-                    activate_reqs = self.policy_activate(api, target_policies.get(policy_name), policy_name,
-                                                         log_context="activating vSmart policy")
+                _, policy_name = PolicyVsmartIndex.load(parsed_args.workdir, raise_not_found=True).active_policy
+                target_policies = {item_name: item_id for item_id, item_name in PolicyVsmartIndex.get_raise(api)}
+                activate_reqs = self.policy_activate(api, target_policies.get(policy_name), policy_name,
+                                                     log_context="activating vSmart policy")
                 if activate_reqs:
                     self.log_debug(f'Activate requests processed: {activate_reqs}')
             except (RestAPIException, WaitActionsException) as ex:
@@ -392,182 +190,6 @@ class TaskAttach(Task):
                 self.log_info('No vSmart policy activate to process')
 
         return
-
-    def config_group_device_association(self, api: Rest, config_groups: list[ConfigGroupsModel],
-                                        cfg_group_name_id: dict[str, str],
-                                        device_name_id: dict[str, str], title: str) -> Sequence[
-        tuple[str, str, Sequence]]:
-        def raise_value_error(msg):
-            raise ValueError(msg)
-
-        def associate_tags(tag_rules: TagRulesModel, cfg_grp_Id: str):
-            payload = {
-                "data": [{
-                    "configGroupId": cfg_grp_Id,
-                    "deviceAttribute": tag_rules.deviceAttribute,
-                    "rule": tag_rules.rule,
-                    "values": tag_rules.values
-                }]
-            }
-            if tag_rules.tagId:
-                payload["data"][0]["tagId"] = tag_rules.tagId
-                ConfigGroupRules(payload).put_raise(api, config_group_id=cfg_grp_Id)
-            else:
-                ConfigGroupRules(payload).post_raise(api, config_group_id=cfg_grp_Id)
-
-        def associate_devices(devices_association_values: DeviceAssociationValuesModel, cfg_grp_Id: str):
-            payload = {
-                "devices": [
-                    {"id": device_name_id.get(device_data.deviceName) if device_name_id.get(
-                        device_data.deviceName) is not None
-                    else raise_value_error(f"device Id for {device_data.deviceName} not found!")}
-                    for device_data in devices_association_values.devices
-                ]
-            }
-            ConfigGroupAssociated(payload).put_raise(api, configGroupId=cfg_grp_Id)
-
-        def associate_device_variables(devices_association_values: DeviceAssociationValuesModel, cfg_grp_Id: str) -> \
-        list[str]:
-            payload = {
-                "solution": devices_association_values.family,
-                "devices": [
-                    {"device-id": device_name_id.get(device_data.deviceName) if device_name_id.get(
-                        device_data.deviceName) is not None
-                    else raise_value_error(f"device Id for {device_data.deviceName} not found!"),
-                     "variables": device_data.variables if device_data.variables
-                     else raise_value_error(f"device variables for {device_data.deviceName} not found!")}
-                    for device_data in devices_association_values.devices
-                ]
-            }
-            uuids = []
-            try:
-                uuids = ConfigGroupValues(payload).put_raise(api, configGroupId=cfg_grp_Id)
-            except (Exception) as ex:
-                self.log_error(f"Failed: error with device variables: {ex}")
-            return uuids
-
-        if config_groups is None:
-            raise ValueError(f"no {title} config-groups found in YML template file") from None
-
-        deploy_data = []
-        for cfg_grp in config_groups:
-            cfg_grp_Id = cfg_group_name_id.get(cfg_grp.configGroupName) if cfg_group_name_id.get(
-                cfg_grp.configGroupName) is not None else (
-                raise_value_error(f"config group Id for {cfg_grp.configGroupName} not found!"))
-            if cfg_grp.tag_rules:
-                associate_tags(cfg_grp.tag_rules, cfg_grp_Id)
-            if cfg_grp.devices_association_values and cfg_grp.devices_association_values.devices:
-                associate_devices(cfg_grp.devices_association_values, cfg_grp_Id)
-                uuids = associate_device_variables(cfg_grp.devices_association_values, cfg_grp_Id)
-                if uuids:
-                    deploy_data.append((cfg_grp_Id, cfg_grp.configGroupName, uuids))
-
-        return deploy_data
-
-    def attach_create(self, parsed_args, api: Optional[Rest] = None) -> Union[None, list]:
-        self.log_info(f'Attach create task: "{parsed_args.save_attach_file if parsed_args.save_attach_file is not None else ""}"')
-
-        control_inventory = ControlInventory.get_raise(api)
-        edge_inventory = EdgeInventory.get_raise(api)
-        is_vsmart = parsed_args.device_types in ('vsmart', 'all')
-        is_edge = parsed_args.device_types in ('edge', 'all')
-        vsmarts_map, vsmart_attach_map, cedge_map, cedge_attach_map, vedge_map, vedge_attach_map = device_maps(
-                device_iter(api, parsed_args.devices, parsed_args.reachable, parsed_args.site, parsed_args.system_ip,
-                            default=None),
-                ({entry.uuid for entry in control_inventory.filtered_iter(ControlInventory.is_vsmart)},
-                 {entry.uuid for entry in control_inventory.filtered_iter(ControlInventory.is_vsmart, ControlInventory.is_available)})
-                if is_vsmart else (set(), set()),
-                ({entry.uuid for entry in edge_inventory.filtered_iter(EdgeInventory.is_cedge)},
-                 {entry.uuid for entry in edge_inventory.filtered_iter(EdgeInventory.is_cedge, EdgeInventory.is_available)})
-                if is_edge else (set(), set()),
-                ({entry.uuid for entry in edge_inventory.filtered_iter(EdgeInventory.is_not_cedge)},
-                 {entry.uuid for entry in edge_inventory.filtered_iter(EdgeInventory.is_not_cedge, EdgeInventory.is_available)})
-                if is_edge else (set(), set())
-        )
-
-        device_filter = True if parsed_args.devices or parsed_args.site or parsed_args.system_ip else False
-        # Config Groups
-        list_of_config_groups = []
-        if cedge_map:
-            try:
-                cfg_group_index = ConfigGroupIndex.get_raise(api)
-                if not is_index_supported(ConfigGroupIndex, version=api.server_version):
-                    self.log_warning("Will skip config-groups, target vManage does not support config-groups")
-                    raise StopIteration()
-                selected_cfg_groups = (
-                    (cfg_group_name, cfg_group_id)
-                    for cfg_group_id, cfg_group_name in cfg_group_index
-                    if parsed_args.config_groups is None or regex_search(parsed_args.config_groups, cfg_group_name)
-                )
-                deploy_data = self.get_cfg_group_deploy_data(api, selected_cfg_groups, parsed_args.config_groups,
-                                                             device_filter, devices_set=set(cedge_map), devices_attach_set=set(cedge_attach_map))
-                if deploy_data:
-                    for group_name, tag_rules, saved_values in deploy_data:
-                        if saved_values:
-                            for device in saved_values["devices"]:
-                                device["deviceName"] = cedge_map.get(device["device-id"])
-                        data = [ConfigGroupsModel(configGroupName=group_name,
-                                                  tag_rules=tag_rules[0] if tag_rules and len(tag_rules)>0 else None,
-                                                  devices_association_values=saved_values)]
-                        list_of_config_groups = list_of_config_groups + data
-            except RestAPIException as ex:
-                self.log_error(f"Failed: retrieve config groups: {ex}")
-            except StopIteration:
-                pass
-
-        # Template attachments
-        data = {}
-        current_attach_templates = AttachTemplatesModel(**data)
-        try:
-            template_index = DeviceTemplateIndex.get_raise(api)
-            edge_templates_attach = []
-            for device_type, edge_type, device_map, device_attach_map in (
-                                        (DeviceTemplateIndex.is_vsmart, None, vsmarts_map, vsmart_attach_map),
-                                        (DeviceTemplateIndex.is_not_vsmart, DeviceTemplateIndex.is_not_vedge, cedge_map, cedge_attach_map),
-                                        (DeviceTemplateIndex.is_not_vsmart, DeviceTemplateIndex.is_vedge, vedge_map, vedge_attach_map)):
-                    if device_map:
-                        filter_iter = (template_index.filtered_iter(device_type, edge_type)
-                                       if edge_type is not None else template_index.filtered_iter(device_type))
-                        selected_templates = (
-                            (template_name, template_id)
-                            for template_id, template_name in filter_iter
-                            if parsed_args.templates is None or regex_search(parsed_args.templates, template_name)
-                        )
-                        attach_data = self.get_template_attach_data(api, selected_templates, parsed_args.templates, device_filter,
-                                                                    uuid_set=set(device_map), attach_uuid_set=set(device_attach_map))
-                        data = [
-                            DeviceAttachTemplateModel(templateName=item[0], isCliTemplate=item[1],
-                                                      device=item[2] if item[2] is not None else [])
-                            for item in attach_data
-                        ]
-                        if edge_type:
-                            edge_templates_attach = edge_templates_attach + data
-                            current_attach_templates.edge_templates = edge_templates_attach
-                        else:
-                            current_attach_templates.vsmart_templates = data
-        except RestAPIException as ex:
-                self.log_error(f"Failed: retrieve device templates: {ex}")
-
-        # vsmart policy
-        current_vsmart_policy = None
-        try:
-            if is_vsmart:
-                _, policy_name = PolicyVsmartIndex.get_raise(api).active_policy
-                current_vsmart_policy = VsmartPolicyModel(name=policy_name, activate=True) if policy_name else VsmartPolicyModel()
-        except RestAPIException as ex:
-            self.log_error(f"Failed: retrieve vsmart active policy: {ex}")
-
-        attach = AttachModel(attach_templates=current_attach_templates, config_groups=list_of_config_groups,
-                             vsmart_policy=current_vsmart_policy)
-        result = None
-        if parsed_args.save_attach_file:
-            with open(parsed_args.save_attach_file, 'w') as file:
-                yaml.dump(attach.model_dump(), sort_keys=False,indent=2, stream=file)
-            self.log_info(f'Attach file saved as "{parsed_args.save_attach_file}"')
-        else:
-            result = [yaml.dump(attach.model_dump(), sort_keys=False,indent=2)]
-
-        return result
 
 
 @TaskOptions.register('detach')

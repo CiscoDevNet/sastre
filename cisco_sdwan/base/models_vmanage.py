@@ -225,8 +225,9 @@ class Inventory(IndexApiItem):
     Parent class for the inventory-type classes EdgeInventory and ControlInventory.
     Not supposed to be used directly, use the corresponding child classes instead.
     """
-    FilterEntry = namedtuple('InventoryFilterEntry', ['uuid', 'cert_state', 'name', 'system_ip',
-                                                      'model', 'type', 'template', 'config_group'])
+    FilterEntry = namedtuple(
+        'FilterEntry', ['uuid', 'cert_state', 'name', 'system_ip', 'model', 'type', 'template', 'config_group']
+    )
 
     @staticmethod
     def is_cedge(device_entry: FilterEntry) -> bool:
@@ -236,11 +237,13 @@ class Inventory(IndexApiItem):
         return device_entry.model is not None and device_entry.model in CEDGE_SET
 
     @staticmethod
-    def is_not_cedge(device_entry: FilterEntry) -> bool:
+    def is_vedge(device_entry: FilterEntry) -> bool:
         """
         Filtered_iter filter selecting VEDGE devices
         """
-        return device_entry.model is not None and device_entry.model not in CEDGE_SET
+        is_controller = device_entry.type is not None and device_entry.type in {'vsmart', 'vbond', 'vmanage'}
+
+        return not is_controller and not Inventory.is_cedge(device_entry)
 
     @staticmethod
     def is_vsmart(device_entry: FilterEntry) -> bool:
@@ -484,9 +487,13 @@ class DeviceTemplateValues(ConfigItem):
         return self.values_iter()
 
     @classmethod
+    def get_values_raise(cls, api: Rest, template_id: str, device_uuids: Iterable[str]):
+        return cls(api.post(cls.api_params(template_id, device_uuids), cls.api_path.post))
+
+    @classmethod
     def get_values(cls, api: Rest, template_id: str, device_uuids: Iterable[str]):
         try:
-            return cls(api.post(cls.api_params(template_id, device_uuids), cls.api_path.post))
+            return cls.get_values_raise(api, template_id, device_uuids)
         except RestAPIException:
             return None
 
@@ -538,38 +545,42 @@ class DeviceTemplateIndex(IndexConfigItem):
     store_file = 'device_templates.json'
     iter_fields = IdName('templateId', 'templateName')
 
-    FilteredIterEntry = namedtuple('FilteredIterEntry', ['template_class', 'device_type', 'num_attached', 'uuid', 'name'])
+    FilterEntry = namedtuple('FilterEntry', ['template_class', 'device_type', 'num_attached', 'uuid', 'name'])
 
     @staticmethod
-    def is_vsmart(iterator_entry: FilteredIterEntry) -> bool:
-        return iterator_entry.device_type is not None and iterator_entry.device_type == 'vsmart'
+    def is_vsmart(entry: FilterEntry) -> bool:
+        return entry.device_type is not None and entry.device_type == 'vsmart'
 
     @staticmethod
-    def is_not_vsmart(iterator_entry: FilteredIterEntry) -> bool:
-        return iterator_entry.device_type is not None and iterator_entry.device_type != 'vsmart'
+    def is_not_vsmart(entry: FilterEntry) -> bool:
+        return entry.device_type is not None and entry.device_type != 'vsmart'
 
     @staticmethod
-    def is_attached(iterator_entry: FilteredIterEntry) -> bool:
-        return iterator_entry.num_attached is not None and iterator_entry.num_attached > 0
+    def is_attached(entry: FilterEntry) -> bool:
+        return entry.num_attached is not None and entry.num_attached > 0
 
     @staticmethod
-    def is_cedge(iterator_entry: FilteredIterEntry) -> bool:
-        return iterator_entry.device_type is not None and iterator_entry.device_type in CEDGE_SET
+    def is_cedge(entry: FilterEntry) -> bool:
+        # Before 20.1 template migration
+        if entry.template_class is None:
+            return entry.device_type is not None and entry.device_type in CEDGE_SET
+
+        # Post 20.1 template migration
+        return entry.template_class == 'cedge'
 
     @staticmethod
-    def is_vedge(iterator_entry: FilteredIterEntry) -> bool:
-        return iterator_entry.template_class is not None and iterator_entry.template_class == 'vedge'
+    def is_vedge(entry: FilterEntry) -> bool:
+        is_controller = entry.device_type is not None and entry.device_type in {'vsmart', 'vbond', 'vmanage'}
 
-    @staticmethod
-    def is_not_vedge(iterator_entry: FilteredIterEntry) -> bool:
-        return iterator_entry.template_class is not None and iterator_entry.template_class != 'vedge'
+        return not is_controller and not DeviceTemplateIndex.is_cedge(entry)
 
     def filtered_iter(self, *filter_fns: Callable) -> Iterable[tuple[str, str]]:
         # The contract for filtered_iter is that it should return an iterable of iter_fields tuples.
         # If no filter_fns is provided, no filtering is done and iterate over all entries
         return (
-            (entry.uuid, entry.name) for entry in map(DeviceTemplateIndex.FilteredIterEntry._make,
-                                                      self.iter('templateClass', 'deviceType', 'devicesAttached', *self.iter_fields))
+            (entry.uuid, entry.name)
+            for entry in map(DeviceTemplateIndex.FilterEntry._make, self.iter('templateClass', 'deviceType',
+                                                                              'devicesAttached', *self.iter_fields))
             if all(filter_fn(entry) for filter_fn in filter_fns)
         )
 
@@ -721,7 +732,7 @@ class ConfigGroupValues(Config2Item):
         ]
         return ConfigGroupValues(new_payload)
 
-    def put_raise(self, api: Rest, **path_vars: str) -> Sequence[str]:
+    def put_raise(self, api: Rest, **path_vars: str) -> list[str]:
         result = api.put(self.put_data(), ConfigGroupValues.api_path.resolve(**path_vars).put)
 
         # Prior to 20.12, this api call returned a list of dicts. Since 20.12, it now returns a list of strings.
@@ -817,15 +828,13 @@ class ConfigGroupRules(IndexConfigItem):
 
         return response_list
 
-    def put_raise(self, api: Rest, config_group_id: str) -> list[str]:
+    def put_raise(self, api: Rest, config_group_id: str) -> None:
         for rule in self.data:
             put_data = {k: v for k, v in rule.items()}
             put_data['configGroupId'] = config_group_id
             response = api.put(put_data, ConfigGroupRules.api_path.resolve(configGroupId=config_group_id).put)
             if response.get('isConflict'):
                 raise ValueError(f"The rule created conflicts with another rule for config-group {config_group_id}")
-
-        return
 
 
 class ConfigGroupDeploy(ApiItem):
