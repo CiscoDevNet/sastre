@@ -2,6 +2,7 @@ Sastre 1.24.1 [, 2024]
 ================================
 
 #### Improvements:
+- vManage 20.14 support. 
 - [#44] Enhancements to show-template references task:
   - In addition to the (existing) feature-template references table, a new device-template references table is output.
   - New --filled-rows option to create tables with all row contents (even if they are the same as in previous row), which facilitates table output filtering with --include/--exclude.

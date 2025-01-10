@@ -22,8 +22,7 @@ from cisco_sdwan.base.models_vmanage import (DeviceTemplate, DeviceTemplateValue
                                              DeviceTemplateAttach, DeviceTemplateCLIAttach, DeviceModeCli,
                                              ActionStatus, PolicyVsmartStatus, PolicyVsmartStatusException,
                                              PolicyVsmartActivate, PolicyVsmartIndex, PolicyVsmartDeactivate,
-                                             Device, ConfigGroupDeploy, ConfigGroupAssociated, ConfigGroupValues,
-                                             ConfigGroupRules, CEDGE_SET)
+                                             Device, ConfigGroupDeploy, ConfigGroupAssociated, ConfigGroupValues)
 
 T = TypeVar('T')
 
@@ -41,14 +40,6 @@ def regex_search(regex: str, *fields: str, inverse: bool = False) -> bool:
     op_fn = all if inverse else any  # Logical AND across all fields, else logical OR
     return op_fn(inverse ^ bool(re.search(regex, match_field)) for match_field in fields)
 
-def device_type_filter(d_type: str, model: str, type_arg: str) -> bool:
-    if d_type != "vedge" and d_type != "cedge":
-        return d_type == type_arg
-    if type_arg == "vedge":
-        return model not in CEDGE_SET
-    if type_arg == "cedge":
-        return model in CEDGE_SET
-    return False
 
 class Tally:
     def __init__(self, *counters):
@@ -356,7 +347,7 @@ class Task:
         return index_cls.get(backend) if isinstance(backend, Rest) else index_cls.load(backend)
 
     def template_attach_data(self, api: Rest, workdir: str, ext_name: bool, templates_iter: Iterable[tuple],
-                             target_uuid_set: Optional[set] = None) -> tuple[list, bool]:
+                             target_uuid_set: Optional[set[str]] = None) -> tuple[list, bool]:
         """
         Prepare data for template attach considering local backup as the source of truth (i.e. where input values are)
         @param api: Instance of Rest API
@@ -410,49 +401,25 @@ class Task:
         ]
         return template_input_list, target_uuid_set is None
 
-    def get_template_attach_data(self, api: Rest, templates_iter: Iterator[tuple], template_filter: str,
-                                 device_filter: bool,
-                                 uuid_set: Optional[set],
-                                 attach_uuid_set: Optional[set] = None) -> list:
-        def load_template_input(template_name: str, template_id: str) -> Union[list, None]:
-            attached_uuid_set = {uuid for uuid, _ in DeviceTemplateAttached.get_raise(api, template_id)}
-            if template_filter and device_filter:  # If templates and device filter are given in input, retrieve matched attach devices and unattached devices to this template
-                allowed_uuid_set = (uuid_set - attach_uuid_set) & attached_uuid_set | attach_uuid_set
-            elif template_filter:  # If only templates filter is given in input, retrieve only attached devices to this template
-                allowed_uuid_set = attached_uuid_set
-            else:  # In all other cases, retrieve matched attach devices and unattached devices to this template
-                allowed_uuid_set = (uuid_set - attach_uuid_set) & attached_uuid_set | attach_uuid_set
-
-            values = DeviceTemplateValues.get_values(api, template_id, allowed_uuid_set)
-            input_list = values.input_list(allowed_uuid_set)
-            if len(input_list) == 0:
-                self.log_debug(f'Skip template {template_name}, no matching devices to attach')
-                return None
-
-            return input_list
-
-        def is_template_cli(template_id: str) -> bool:
-            return DeviceTemplate.get_raise(api, template_id, raise_not_found=True).is_type_cli
-
-        template_input_list = [
-            (name, is_template_cli(template_id), load_template_input(name, template_id))
-            for name, template_id in templates_iter
-        ]
-        return template_input_list
-
     @staticmethod
-    def template_reattach_data(api: Rest, templates_iter: Iterable[tuple]) -> tuple[list, bool]:
+    def template_reattach_data(api: Rest, templates_iter: Iterable[tuple],
+                               filtered_uuid_set: Optional[set[str]] = None) -> tuple[list, bool]:
         """
         Prepare data for template reattach considering vManage as the source of truth (i.e. where input values are)
         @param api: Instance of Rest API
         @param templates_iter: Iterable of (<template_name>, <target_template_id>)
+        @param filtered_uuid_set: (optional) Set of device uuids on target node to include
+                                  When provided, attach only devices are on target node and on filtered_uuid_set.
+                                  When absent, attach all devices on target.
         @return: Tuple containing attach data (<template input list>, <isEdited>)
         """
 
         def get_template_input(template_id):
-            uuid_list = [uuid for uuid, _ in DeviceTemplateAttached.get_raise(api, template_id)]
-            values = DeviceTemplateValues(api.post(DeviceTemplateValues.api_params(template_id, uuid_list),
-                                                   DeviceTemplateValues.api_path.post))
+            uuid_list = [
+                uuid for uuid, _ in DeviceTemplateAttached.get_raise(api, template_id)
+                if filtered_uuid_set is None or uuid in filtered_uuid_set
+            ]
+            values = DeviceTemplateValues.get_values_raise(api, template_id, uuid_list)
             return values.input_list()
 
         def is_template_cli(template_id):
@@ -582,7 +549,7 @@ class Task:
             #
             # return len(matched_uuids) > 0
 
-            # TODO: Review post 20.13
+            # TODO: Review post 20.15
             return False
 
         def restore_values(config_grp_name: str, config_grp_saved_id: str, config_grp_target_id: str):
@@ -682,62 +649,6 @@ class Task:
         group.send(None)
 
         return len(deploy_reqs)
-
-    def is_policy_name_valid(self, api: Rest, policy_name: str) -> bool:
-        for _, name in PolicyVsmartIndex.get_raise(api, raise_not_found=True):
-            if name == policy_name:
-                return True
-        self.log_warning(f'Invalid vsmart policy name: {policy_name}')
-        return False
-
-    def get_cfg_group_deploy_data(self, api: Rest,
-                                  cfg_group_iter: Iterator[tuple[str, str]],
-                                  config_groups_filter: str,
-                                  device_filter: bool,
-                                  devices_set: set,
-                                  devices_attach_set: set) -> Sequence[tuple[str, Sequence, Sequence]]:
-
-        def associate_devices(config_grp_id: str) -> tuple[set, set]:
-            associated_uuid_set = set(ConfigGroupAssociated.get_raise(api, configGroupId=config_grp_id).uuids)
-            allowed_uuid_set, attach_uuid_set = None, None
-            if config_groups_filter and device_filter:  # If config-groups and device filter are given in input, retrieve matched attach devices and unattached devices to this config-group
-                allowed_uuid_set, attach_uuid_set = (
-                    devices_set - devices_attach_set) & associated_uuid_set | devices_attach_set, devices_attach_set
-            elif config_groups_filter:  # If only config-groups filter is given in input, retrieve only attached devices to this config-group
-                allowed_uuid_set = associated_uuid_set
-            else:  # In all other cases, retrieve matched attach devices and unattached devices to this config-group
-                allowed_uuid_set, attach_uuid_set = (
-                    devices_set - devices_attach_set) & associated_uuid_set | devices_attach_set, devices_attach_set
-            return allowed_uuid_set, attach_uuid_set
-
-        def restore_rules(config_grp_name: str, config_grp_id: str) -> bool:
-            saved_rules = ConfigGroupRules.get_raise(api, configGroupId=config_grp_id)
-            if saved_rules is None:
-                self.log_debug(f"Skip config-group {config_grp_name} restore rules, no ConfigGroupRules")
-                return
-            return saved_rules.data
-
-        def restore_values(config_grp_id: str, allowed_uuid_set: set):
-            saved_values = ConfigGroupValues.get_raise(api, configGroupId=config_grp_id).filter(allowed_uuid_set)
-            return saved_values.data
-
-        deploy_data = []
-        for config_grp_name, cfg_group_id in cfg_group_iter:
-            tag_rules = restore_rules(config_grp_name, cfg_group_id)
-            allowed_uuid_set, attach_uuid_set = associate_devices(cfg_group_id)
-            saved_values = None
-            if allowed_uuid_set:
-                saved_values = {'family': 'sdwan',
-                                'devices': []} if allowed_uuid_set == attach_uuid_set else restore_values(cfg_group_id,
-                                                                                                          allowed_uuid_set)
-                if attach_uuid_set:
-                    for device_id in attach_uuid_set:
-                        params = {"configGroupId": cfg_group_id, "device-id": device_id, "suggestions": 'true'}
-                        device_variables = ConfigGroupValues.get_raise(api, **params).data
-                        saved_values["devices"].append(device_variables["devices"][0])
-            deploy_data.append((config_grp_name, tag_rules, saved_values))
-
-        return deploy_data
 
     def template_detach(self, api: Rest, template_iter: Iterable[tuple[str, str]],
                         devices_map: Optional[Mapping[str, str]] = None, *,
@@ -878,7 +789,7 @@ class Task:
         #         except RestAPIException as ex:
         #             self.log_error(f'Failed to delete config-group {config_grp_name} automated rule {rule_id}: {ex}')
 
-        # TODO: Review post 20.13
+        # TODO: Review post 20.15
         return delete_req_count
 
     def policy_activate(self, api: Rest, policy_id: Optional[str], policy_name: Optional[str], *,
@@ -1082,8 +993,7 @@ def export_json(table_iter: Iterable[Table], filename: str) -> None:
     @param filename: Name for the export file
     """
     with open(filename, 'w') as export_file:
-        data = [table.dict() for table in table_iter]
-        json.dump(data, export_file, indent=2)
+        export_file.write(json.dumps([table.dict() for table in table_iter], indent=2))
 
 
 def archive_create(archive_filename: str, workdir: str) -> None:
