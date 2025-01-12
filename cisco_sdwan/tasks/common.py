@@ -176,6 +176,7 @@ class Table:
         if done_content_row:
             yield border_line
 
+    # noinspection PyProtectedMember
     def dict(self) -> dict:
         table_dict = {
             "header": {

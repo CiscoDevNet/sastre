@@ -18,6 +18,6 @@ and Scripts.
 
 Disclaimer of Warranty and Support: Your warranties for the overall Service are provided in your Master Agreement. For
 Incidental Software and Scripts, except as we otherwise expressly grant, these items are provided “AS-IS,” “With All Faults,”
-and without warranties) of any kind (whether they are express, implied, or statutory). We have no obligations with respect
+and without warranties of any kind (whether they are express, implied, or statutory). We have no obligations with respect
 to support or maintenance, including without limitation, upgrades, updates, maintenance releases, or modifications, of the
 Incidental Software and Scripts.

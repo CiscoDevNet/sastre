@@ -72,7 +72,7 @@ class TransformRecipe(BaseModel):
         try:
             with open(filename) as yaml_file:
                 recipe_dict = yaml.safe_load(yaml_file)
-                return cls.parse_obj(recipe_dict)
+                return cls.model_validate(recipe_dict)
         except FileNotFoundError as ex:
             raise RecipeException(f'Could not load recipe file: {ex}') from None
         except yaml.YAMLError as ex:
@@ -262,7 +262,7 @@ class TaskTransform(Task):
         if parsed_args.from_file:
             return TransformRecipe.parse_yaml(parsed_args.from_file)
         else:
-            return TransformRecipe.parse_raw(parsed_args.from_json)
+            return TransformRecipe.model_validate_json(parsed_args.from_json)
 
     def runner(self, parsed_args, api: Optional[Rest] = None) -> Union[None, list]:
         if parsed_args.workdir is not None:

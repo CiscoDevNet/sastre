@@ -252,6 +252,7 @@ class OperationalItem:
         conv_fn_list = [conv_fn_map.get(field_name, default_conv_fn) for field_name in field_names]
         field_properties = self.field_info(*field_names, info='property', default=None)
 
+        # noinspection PyProtectedMember
         def getter_fn(obj):
             return FieldValue._make(
                 conv_fn(obj.get(field_property)) if field_property is not None else 'N/A'
@@ -372,6 +373,7 @@ class BulkStatsItem(OperationalItem):
 
         return dict(zip(fields_to_avg, (average(field_samples) for field_samples in zip(*values_iter))))
 
+    # noinspection PyProtectedMember
     def aggregated_value_iter(self, interval_secs: int, *field_names: str,
                               **conv_fn_map: Mapping[str, Callable]) -> Iterator[namedtuple]:
         """
@@ -718,7 +720,7 @@ class ConfigItem(ApiItem):
         dir_path.mkdir(parents=True, exist_ok=True)
 
         with open(dir_path.joinpath(self.get_filename(ext_name, item_name, item_id)), 'w') as write_f:
-            json.dump(self.data, write_f, indent=2)
+            write_f.write(json.dumps(self.data, indent=2))
 
         return True
 
@@ -1179,7 +1181,7 @@ class ServerInfo:
         dir_path.mkdir(parents=True, exist_ok=True)
 
         with open(dir_path.joinpath(self.store_file), 'w') as write_f:
-            json.dump(self.data, write_f, indent=2)
+            write_f.write(json.dumps(self.data, indent=2))
 
         return True
 

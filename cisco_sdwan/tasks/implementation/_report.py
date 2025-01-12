@@ -336,7 +336,7 @@ class TaskReport(Task):
             spec_section_args = section.args or {}
             if section.inherit_globals:
                 imported_global_args = {
-                    k: v for k, v in spec_global_args.items() if k in task_meta.task_args_cls.__fields__
+                    k: v for k, v in spec_global_args.items() if k in task_meta.task_args_cls.model_fields
                 }
                 spec_args = {**imported_global_args, **spec_section_args}
             else:
