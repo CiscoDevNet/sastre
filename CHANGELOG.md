@@ -1,4 +1,4 @@
-Sastre 1.24.1 [, 2024]
+Sastre 1.25 [, 2025]
 ================================
 
 #### Improvements:
@@ -9,6 +9,7 @@ Sastre 1.24.1 [, 2024]
 
 #### Fixes:
 - Advanced inspection profile policy definition restore was failing due to ordering of dependencies. This has been fixed.
+- Vsmart policies in 20.15 were always being updated when using "restore --update" even without any diffs. This has been fixed.
 
 
 Sastre 1.24 [June 21, 2024]

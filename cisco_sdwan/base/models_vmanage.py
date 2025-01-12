@@ -1225,7 +1225,7 @@ class PolicyVsmart(ConfigItem):
     store_path = ('policy_templates', 'vSmart')
     name_tag = 'policyName'
     type_tag = 'policyType'
-    skip_cmp_tag_set = {'isPolicyActivated', }
+    skip_cmp_tag_set = {'isPolicyActivated', 'lastUpdatedOn'}
 
 
 @register('policy_vsmart', 'VSMART policy', PolicyVsmart)
