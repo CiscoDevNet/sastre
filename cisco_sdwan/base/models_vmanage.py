@@ -362,7 +362,7 @@ class DeviceConfigRFS(DeviceConfig):
 #
 # Templates
 #
-# Set of device types that use cedge template class. Updated as of vManage 20.12
+# Set of device types that use cedge template class. Updated as of vManage 20.15
 CEDGE_SET = {
     "cellular-gateway-CG113-4GW6A", "cellular-gateway-CG113-4GW6B", "cellular-gateway-CG113-4GW6E",
     "cellular-gateway-CG113-4GW6H", "cellular-gateway-CG113-4GW6Q", "cellular-gateway-CG113-4GW6Z",
@@ -424,8 +424,7 @@ CEDGE_SET = {
     "vedge-ISR1100-4GLTEGB-XE", "vedge-ISR1100-4GLTENA-XE", "vedge-ISR1100-6G-XE", "vedge-ISR1100X-4G-XE",
     "vedge-ISR1100X-6G-XE", "vedge-ISRv", "vedge-nfvis-C8200-UCPE", "vedge-nfvis-C8200-UCPEVM",
     "vedge-nfvis-C8300-UCPE-1N20", "vedge-nfvis-CSP-5216", "vedge-nfvis-CSP-5228", "vedge-nfvis-CSP-5436",
-    "vedge-nfvis-ENCS5400", "vedge-nfvis-UCSC-C220-M6N", "vedge-nfvis-UCSC-C220-M6S", "vedge-nfvis-UCSC-C240-M6N",
-    "vedge-nfvis-UCSC-C240-M6S", "vedge-nfvis-UCSC-C240-M6SN", "vedge-nfvis-UCSC-C240-M6SX"
+    "vedge-nfvis-ENCS5400"
 }
 # Software devices. Updated as of vManage 20.12
 SOFT_EDGE_SET = {"vedge-CSR-1000v", "vedge-C8000V", "vedge-C8000V-SD-ROUTING", "vedge-cloud", "vmanage", "vsmart",
@@ -1072,8 +1071,7 @@ class ProfileSdwanOther(FeatureProfile):
     store_path = ('feature_profiles', 'sdwan', 'other')
     parcel_api_paths = ApiPathGroup({
         "thousandeyes": ApiPath("v1/feature-profile/sdwan/other/{otherId}/thousandeyes"),
-        "ucse": ApiPath("v1/feature-profile/sdwan/other/{otherId}/ucse"),
-        "cybervision": ApiPath("v1/feature-profile/sdwan/other/{otherId}/cybervision")
+        "ucse": ApiPath("v1/feature-profile/sdwan/other/{otherId}/ucse")
     })
 
 
