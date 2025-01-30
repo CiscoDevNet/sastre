@@ -6,6 +6,8 @@ Sastre 1.25 [, 2025]
 - [#44] Enhancements to show-template references task:
   - In addition to the (existing) feature-template references table, a new device-template references table is output.
   - New --filled-rows option to create tables with all row contents (even if they are the same as in previous row), which facilitates table output filtering with --include/--exclude.
+- Show tasks now supports improved filtering capabilities: --device-type flag to select vedge, cedge, vsmart, vbond, vmanage. Also --system-ip option now allows for multiple IPs to be provided.
+- The show devices task output now differentiates between vedge and cedge in the Type column.
 
 #### Fixes:
 - Advanced inspection profile policy definition restore was failing due to ordering of dependencies. This has been fixed.

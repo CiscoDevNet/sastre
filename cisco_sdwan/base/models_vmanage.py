@@ -6,6 +6,7 @@
 """
 import re
 from typing import Optional, Any, Union
+from enum import Enum
 from collections.abc import Mapping, Sequence, Callable, Iterable
 from pathlib import Path
 from collections import namedtuple
@@ -359,9 +360,6 @@ class DeviceConfigRFS(DeviceConfig):
         return '{safe_device_id}?type=RFS'.format(safe_device_id=quote_plus(device_id))
 
 
-#
-# Templates
-#
 # Set of device types that use cedge template class. Updated as of vManage 20.15
 CEDGE_SET = {
     "cellular-gateway-CG113-4GW6A", "cellular-gateway-CG113-4GW6B", "cellular-gateway-CG113-4GW6E",
@@ -431,6 +429,23 @@ SOFT_EDGE_SET = {"vedge-CSR-1000v", "vedge-C8000V", "vedge-C8000V-SD-ROUTING", "
                  "vedge-ISRv"}
 
 
+class DeviceType(Enum):
+    vsmart = 'vsmart'
+    vmanage = 'vmanage'
+    vbond = 'vbond'
+    vedge = 'vedge'
+    cedge = 'cedge'
+
+
+def get_device_type(device_class: str, device_model: str) -> str:
+    if device_class == DeviceType.vedge.value:
+        return DeviceType.cedge.value if device_model in CEDGE_SET else DeviceType.vedge.value
+    return device_class
+
+
+#
+# Templates
+#
 # This is a special case handled under DeviceTemplate
 class DeviceTemplateAttached(IndexConfigItem):
     api_path = ApiPath('template/device/config/attached', None, None, None)
