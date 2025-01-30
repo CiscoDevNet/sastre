@@ -58,8 +58,11 @@ def const(field_type: type[Any], default_value: Any) -> Annotated[type[Any], ...
 
 
 # Models
+IPv4AddressStr = Annotated[str, Field(pattern=r'\d+(?:\.\d+){3}$')]
+
+
 class TaskArgs(BaseModel):
-    model_config = ConfigDict(extra='forbid')
+    model_config = ConfigDict(extra='forbid', use_enum_values=True)
 
 
 class TableTaskArgs(TaskArgs):
