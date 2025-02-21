@@ -53,7 +53,7 @@ target/pkg/
 
 8. Run sastre-pro.pkg to verify installation, running and uninstallation of Sastre-Pro using both Podman and Docker container engines
 
-9. Follow Cisco SWIMS process to sign the Sastre-Pro installer (i.e sastre-pro.pkg) for both Mac Apple chip and Mac Intel chip
+9. Follow Cisco SWIMS process to sign the Sastre-Pro installer (i.e. sastre-pro.pkg) for both Mac Apple chip and Mac Intel chip
 
 
 
@@ -73,7 +73,7 @@ You will see an output with SHA1 fingerprint after the above command if the .pkg
     1. In the Finder app, goto "{SASTRE-PRO_ROOT}/installer/mac/uninstall.applescript" 
     2. Right-click on the "uninstall.applescript" file
     3. select "Open With -> Script Editor" from the context menu
-    4. Save the script as an application (i.e uninstall.app) : 
+    4. Save the script as an application (i.e. uninstall.app) : 
         - Choose from Menu "File" > "Export" 
         - Select destination as "darwin/Resources/"
         - Select File Format as "Application" from drop-down
