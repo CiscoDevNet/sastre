@@ -127,8 +127,7 @@ class Report:
         self.metadata = metadata
 
     def add_section(self, section_name: str, subsection_list: list) -> None:
-        section_json = [json.loads(subsection.json()) for subsection in subsection_list]
-        self.section_json.extend(section_json)
+        self.section_json.extend(json.loads(subsection.json()) for subsection in subsection_list)
         for subsection in subsection_list:
             if isinstance(subsection, Table):
                 subsection_name = subsection.name or Report.DEFAULT_SUBSECTION_NAME
@@ -200,8 +199,9 @@ class Report:
 
     def save_json(self, filename: str) -> None:
         report_json = {"metadata": self.metadata, "data": self.section_json}
-        with open(filename, "w") as file:
-            json.dump(report_json, file, indent=4)
+        with open(filename, "w") as target_f:
+            target_f.write(json.dumps(report_json, indent=4))
+
 
 @TaskOptions.register('report')
 class TaskReport(Task):
@@ -224,8 +224,7 @@ class TaskReport(Task):
         create_parser.add_argument('--diff', metavar='<filename>', type=existing_file_type,
                                    help='generate diff between the specified previous report and the current report')
         create_parser.add_argument('--save-json', metavar='<filename>', type=filename_type,
-                              help='export results as JSON-formatted file')
-
+                                   help='export report as JSON-formatted file')
         diff_parser = sub_tasks.add_parser('diff', help='generate diff between two reports')
         diff_parser.set_defaults(subtask_handler=TaskReport.subtask_diff)
         diff_parser.add_argument('report_a', metavar='<report a>', type=existing_file_type,
@@ -280,9 +279,10 @@ class TaskReport(Task):
 
         # Saving current report after running the diff in case the previous report had the same filename
         report.save()
+        self.log_info(f'Report saved as "{parsed_args.file}"')
         if parsed_args.save_json:
             report.save_json(parsed_args.save_json)
-        self.log_info(f'Report saved as "{parsed_args.file}"')
+            self.log_info(f'JSON-formatted report saved as "{parsed_args.save_json}"')
 
         return result
 
@@ -426,6 +426,7 @@ class ReportCreateArgs(TaskArgs):
     file: Annotated[str, Field(validate_default=True)] = None
     workdir: Optional[str] = None
     diff: Optional[str] = None
+    save_json: Optional[str] = None
     spec_file: Optional[str] = None
     spec_json: Optional[str] = None
 
@@ -433,6 +434,7 @@ class ReportCreateArgs(TaskArgs):
     _validate_workdir = field_validator('workdir')(validate_workdir)
     _validate_existing_file = field_validator('spec_file', 'diff')(validate_existing_file)
     _validate_json = field_validator('spec_json')(validate_json)
+    _validate_filename = field_validator('save_json')(validate_filename)
 
     @field_validator('file', mode='before')
     @classmethod
