@@ -1,13 +1,15 @@
-Sastre 1.24.1 [, 2024]
+Sastre 1.25 [, 2025]
 ================================
 
 #### Improvements:
+- vManage 20.14 support. 
 - [#44] Enhancements to show-template references task:
   - In addition to the (existing) feature-template references table, a new device-template references table is output.
   - New --filled-rows option to create tables with all row contents (even if they are the same as in previous row), which facilitates table output filtering with --include/--exclude.
 
 #### Fixes:
 - Advanced inspection profile policy definition restore was failing due to ordering of dependencies. This has been fixed.
+- Vsmart policies in 20.15 were always being updated when using "restore --update" even without any diffs. This has been fixed.
 
 
 Sastre 1.24 [June 21, 2024]

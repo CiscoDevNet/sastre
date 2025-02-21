@@ -1,4 +1,4 @@
-# Sastre-Pro - windows installer builder steps
+# Sastre-Pro - Windows installer builder steps
 
 NOTE: Installer supports both Podman and Docker. So, use either Podman or Docker to build sastre-pro image.</br>
 
@@ -18,10 +18,10 @@ docker save -o sastre-pro.tar localhost/sastre-pro:latest
 ## Login to Windows machine (X64 and ARM64 architecture)  and copy "windows" folder and files to ${LOCATION} and follow below steps
 
 ### Pre-requisite
-Download [NSIS](https://nsis.sourceforge.io/Download) in Windows machine for compiling and generating insaller for windows
+Download [NSIS](https://nsis.sourceforge.io/Download) in Windows machine for compiling and generating installer for windows
 
 
-4. Modify windows installer files if needed
+4. Modify Windows installer files if needed
 
 Name | Description
 --- | ---
@@ -42,12 +42,12 @@ main.bat Sastre-Pro {VERSION}
 
 - NOTE: Above command will create target folder with required files 
 
-6. copy the sastre-pro.tar file generated in step 3 to "${LOCATION}\windows\target\" in windows machine
+6. copy the sastre-pro.tar file generated in step 3 to "${LOCATION}\windows\target\" in Windows machine
 
 7. Open NSIS tool and select "sastre-pro.nsi" file located at "${LOCATION}\windows\target\" for compiling and generating Sastre-Pro installer
 
-8. After the successful compilation by NSIS tool, the windows installer .exe fle is created for Sastre-Pro application at the following location : "${LOCATION}\windows\target\sastre-pro.exe"
+8. After the successful compilation by NSIS tool, the Windows installer .exe fle is created for Sastre-Pro application at the following location : "${LOCATION}\windows\target\sastre-pro.exe"
 
 9. Run sastre-pro.exe to verify installation, running and uninstallation of Sastre-Pro using both Podman and Docker container engines
 
-10. Follow Cisco SWIMS process to sign the Sastre-Pro installer (i.e sastre-pro.exe) for both Windows X64 and Windows ARM64
+10. Follow Cisco SWIMS process to sign the Sastre-Pro installer (i.e. sastre-pro.exe) for both Windows X64 and Windows ARM64

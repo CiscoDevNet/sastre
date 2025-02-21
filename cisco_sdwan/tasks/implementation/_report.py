@@ -43,6 +43,7 @@ class SectionModel(BaseModel):
 
 
 class ReportContentModel(BaseModel):
+    metadata: Optional[dict] = None
     globals: Optional[dict[str, Any]] = None
     sections: list[SectionModel]
 
@@ -118,12 +119,16 @@ def load_content_spec(spec_file: Optional[str], spec_json: Optional[str],
 class Report:
     DEFAULT_SUBSECTION_NAME = "Default"
 
-    def __init__(self, filename: str, section_dict: Optional[dict] = None) -> None:
+    def __init__(self, filename: str, section_dict: Optional[dict] = None, metadata: Optional[dict] = None) -> None:
         # Report section_dict is {<section_name>: {<subsection_name>: [<subsection lines]}}
         self.section_dict = {} if section_dict is None else section_dict
         self.filename = filename
+        self.section_json = []
+        self.metadata = metadata
 
     def add_section(self, section_name: str, subsection_list: list) -> None:
+        section_json = [json.loads(subsection.json()) for subsection in subsection_list]
+        self.section_json.extend(section_json)
         for subsection in subsection_list:
             if isinstance(subsection, Table):
                 subsection_name = subsection.name or Report.DEFAULT_SUBSECTION_NAME
@@ -193,6 +198,10 @@ class Report:
         }
         return Report(self.filename, trimmed_section_dict)
 
+    def save_json(self, filename: str) -> None:
+        report_json = {"metadata": self.metadata, "data": self.section_json}
+        with open(filename, "w") as file:
+            json.dump(report_json, file, indent=4)
 
 @TaskOptions.register('report')
 class TaskReport(Task):
@@ -214,6 +223,8 @@ class TaskReport(Task):
                                    help='report from the specified directory instead of target vManage')
         create_parser.add_argument('--diff', metavar='<filename>', type=existing_file_type,
                                    help='generate diff between the specified previous report and the current report')
+        create_parser.add_argument('--save-json', metavar='<filename>', type=filename_type,
+                              help='export results as JSON-formatted file')
 
         diff_parser = sub_tasks.add_parser('diff', help='generate diff between two reports')
         diff_parser.set_defaults(subtask_handler=TaskReport.subtask_diff)
@@ -249,7 +260,7 @@ class TaskReport(Task):
         self.log_info("Loading report specification")
         content_spec = load_content_spec(parsed_args.spec_file, parsed_args.spec_json, DEFAULT_CONTENT_SPEC)
 
-        report = Report(parsed_args.file)
+        report = Report(parsed_args.file, metadata=content_spec.metadata)
         for description, task_cls, task_args in self.section_iter(content_spec, api is not None, parsed_args.workdir):
             try:
                 task_output = task_cls().runner(task_args, api)
@@ -269,6 +280,8 @@ class TaskReport(Task):
 
         # Saving current report after running the diff in case the previous report had the same filename
         report.save()
+        if parsed_args.save_json:
+            report.save_json(parsed_args.save_json)
         self.log_info(f'Report saved as "{parsed_args.file}"')
 
         return result
@@ -323,7 +336,7 @@ class TaskReport(Task):
             spec_section_args = section.args or {}
             if section.inherit_globals:
                 imported_global_args = {
-                    k: v for k, v in spec_global_args.items() if k in task_meta.task_args_cls.__fields__
+                    k: v for k, v in spec_global_args.items() if k in task_meta.task_args_cls.model_fields
                 }
                 spec_args = {**imported_global_args, **spec_section_args}
             else:

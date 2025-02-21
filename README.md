@@ -16,7 +16,7 @@ Sastre can also be used as an SDK to other applications, further information is 
 Support enquires can be sent to sastre-support@cisco.com.
 
 Note on vManage release support:
-- Sastre 1.24 officially supports up to vManage 20.13. Newer vManage releases normally work without problems, just lacking support to the newer features added to that particular vManage release.
+- Sastre 1.25 officially supports up to vManage 20.14. Newer vManage releases normally work without problems, just lacking support to the newer features added to that particular vManage release.
 
 ## Sastre and Sastre-Pro
 
@@ -750,6 +750,142 @@ INFO: Waiting...
 INFO: Waiting...
 INFO: Completed DC-vEdges
 INFO: Completed attaching WAN Edges
+INFO: Task completed successfully
+```
+
+Selecting vsmart/edge from input yml file to attach devices to templates
+```
+% sdwan --verbose attach edge --attach-file path/to/attach_file.yml       
+INFO: Attach task source: Attach file: "path/to/attach_file.yml" -> vManage URL: "https://198.18.1.10"
+INFO: No WAN Edge config-group deployments to process
+INFO: Template attach: DC-vEdges (DC1-VEDGE2)
+INFO: Template attaching WAN Edge
+INFO: Waiting...
+INFO: Waiting...
+INFO: Completed DC-vEdges
+INFO: Completed template attaching WAN Edge
+INFO: Task completed successfully
+```
+
+### Select templates/config-groups and devices and write to YML file for use in attach task
+The attach create expose a number of knobs to select templates/config-groups and devices to be included:
+- Templates regular expression, selecting all devices attached to templates. Match on template name.
+- Config Groups regular expression, selecting all devices attached to config groups. Match on config_group name.
+- Devices regular expression, selecting devices to attach. Match on device name.
+- Reachability state
+- Site-ID
+- System-IP
+
+Selecting all config-groups and templates:
+```
+% sdwan attach create
+attach_templates:
+  edge_templates:
+  - templateName: DC-vEdges
+    isCliTemplate: false
+    device:
+    - csv-status: complete
+      csv-deviceId: ebdc8bd9-17e5-4eb3-a5e0-f438403a83de
+      csv-deviceIP: 10.1.0.1
+      csv-host-name: DC1-VEDGE1
+      //system/host-name: DC1-VEDGE1
+      //system/system-ip: 10.1.0.1
+      //system/site-id: '100'
+      //system/gps-location/latitude: '37.33'
+      //system/gps-location/longitude: '-121.88'
+      /0/vpn-instance/ip/route/0.0.0.0/0/next-hop/MPLS-GW/address: 100.64.0.1
+      /0/vpn-instance/ip/route/0.0.0.0/0/next-hop/Internet-GW/address: 100.64.2.25
+      /10//router/ospf/router-id: 10.1.0.1
+      /20/vpn20-interface-name/interface/if-name: ge0/3
+      /20/vpn20-interface-name/interface/ip/address: 10.1.20.150/24
+      /0/ge0/2/interface/ip/address: 100.64.2.26/30
+      /0/ge0/1/interface/ip/address: 100.64.0.2/30
+      /10/ge0/0/interface/ip/address: 10.1.10.150/24
+      /512/vpn-instance/ip/route/0.0.0.0/0/next-hop/VPN512_GW/address: 198.18.3.1
+      /512/VPN512_INTERFACE/interface/if-name: eth0
+      /512/VPN512_INTERFACE/interface/ip/address: 198.18.3.100/24
+      /20//router/ospf/router-id: 10.1.0.1
+      /10/vpn-instance/service/FW/address: 10.1.10.200
+      /20//router/ospf/area/0/interface/OSPF_VPN20_IF/name: ge0/3
+      /10/vpn-instance/ip/route/0.0.0.0/0/next-hop/VPN10_DEF_GW_DC/address: 10.1.10.1
+      /20/vpn-instance/ip/route/0.0.0.0/0/next-hop/VPN20_DEF_GW_DC/address: 10.1.20.1
+  vsmart_templates:
+  - templateName: VSMART-device-template
+    isCliTemplate: false
+    device:
+    - csv-status: complete
+      csv-deviceId: 10a98779-95f0-4383-871c-195d25bd9c74
+      csv-deviceIP: 12.12.12.12
+      csv-host-name: vSmart-1
+      /0/eth0/interface/ip/address: 198.18.1.12/24
+      //system/host-name: vSmart-1
+      //system/system-ip: 12.12.12.12
+      //system/site-id: '10'
+    - csv-status: complete
+      csv-deviceId: 704bbc2f-aa9a-4068-84a2-fc31602ed553
+      csv-deviceIP: 22.22.22.22
+      csv-host-name: vSmart-2
+      /0/eth0/interface/ip/address: 198.18.1.22/24
+      //system/host-name: vSmart-2
+      //system/system-ip: 22.22.22.22
+      //system/site-id: '20'
+config_groups:
+- configGroupName: test
+  tag_rules:
+    deviceAttribute: tags
+    rule: equal
+    values:
+    - cedge2
+    tagId: c8f055a9-4d20-469c-b753-7d2bbec84f34
+  devices_association_values:
+    family: sdwan
+    devices:
+    - deviceName: BR1-CEDGE2
+      variables:
+      - name: site_id
+        value: '300'
+      - name: system_ip
+        value: 10.3.0.2
+vsmart_policy:
+  name: StrictHub-n-Spoke
+  activate: true
+```
+
+Selecting only devices attached to template:
+```
+% sdwan attach create --templates 'VSMART-device-template' 
+attach_templates:
+  edge_templates: []
+  vsmart_templates:
+  - templateName: VSMART-device-template
+    isCliTemplate: false
+    device:
+    - csv-status: complete
+      csv-deviceId: 10a98779-95f0-4383-871c-195d25bd9c74
+      csv-deviceIP: 12.12.12.12
+      csv-host-name: vSmart-1
+      /0/eth0/interface/ip/address: 198.18.1.12/24
+      //system/host-name: vSmart-1
+      //system/system-ip: 12.12.12.12
+      //system/site-id: '10'
+vsmart_policy:
+  name: null
+  activate: false
+```
+
+Saving devices attached to template and write to file:
+```
+% sdwan --verbose attach create --templates 'VSMART-device-template' --save-attach-file attach_file.yml
+INFO: Attach create task: "attach_file.yml"
+INFO: Attach file saved as "attach_file.yml"
+INFO: Task completed successfully
+```
+
+Selecting only vsmart devices and write to file:
+```
+% sdwan --verbose attach create --device-types vsmart --save-attach-file attach_file.yml
+INFO: Attach create task: "attach_file.yml"
+INFO: Attach file saved as "attach_file.yml"
 INFO: Task completed successfully
 ```
 
