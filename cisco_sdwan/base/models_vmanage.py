@@ -939,7 +939,9 @@ class ProfileSdwanService(FeatureProfile):
         "switchport": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/switchport"),
         "wirelesslan": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/wirelesslan"),
         "appqoe": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/appqoe"),
-        "route-policy": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/route-policy")
+        "route-policy": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/route-policy"),
+        "ipv4-acl": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/ipv4-acl"),
+        "ipv6-acl": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/ipv6-acl")
     }, parcel_reference_path_map={
         PathKey("dhcp-server", "lan/vpn/interface/ethernet"): ApiPath(
             "v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/interface/ethernet/{ethId}/dhcp-server"),
@@ -966,6 +968,10 @@ class ProfileSdwanService(FeatureProfile):
         PathKey("trackergroup", "lan/vpn"): ...,
         PathKey("trackergroup", "lan/vpn/interface/ethernet"): ApiPath(
             "v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/interface/ethernet/{ethId}/trackergroup"),
+        PathKey("ipv4-acl", "lan/vpn/interface/ethernet"): ...,
+        PathKey("ipv4-acl", "lan/vpn/interface/svi"): ...,
+        PathKey("ipv6-acl", "lan/vpn/interface/ethernet"): ...,
+        PathKey("ipv6-acl", "lan/vpn/interface/svi"): ...,
         PathKey("route-policy", "routing/bgp"): ...,
         PathKey("route-policy", "routing/ospf"): ...,
         PathKey("route-policy", "routing/eigrp"): ...,
@@ -1013,7 +1019,9 @@ class ProfileSdwanTransport(FeatureProfile):
         "esimcellular-controller": ApiPath("v1/feature-profile/sdwan/transport/{transportId}/esimcellular-controller"),
         "t1-e1-controller": ApiPath("v1/feature-profile/sdwan/transport/{transportId}/t1-e1-controller"),
         "gps": ApiPath("v1/feature-profile/sdwan/transport/{transportId}/gps"),
-        "route-policy": ApiPath("v1/feature-profile/sdwan/transport/{transportId}/route-policy")
+        "route-policy": ApiPath("v1/feature-profile/sdwan/transport/{transportId}/route-policy"),
+        "ipv4-acl": ApiPath("v1/feature-profile/sdwan/transport/{transportId}/ipv4-acl"),
+        "ipv6-acl": ApiPath("v1/feature-profile/sdwan/transport/{transportId}/ipv6-acl")
     }, parcel_reference_path_map={
         PathKey("routing/bgp", "wan/vpn"): ApiPath(
             "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/routing/bgp"),
@@ -1058,6 +1066,10 @@ class ProfileSdwanTransport(FeatureProfile):
         PathKey("route-policy", "routing/ospfv3/ipv4"): ...,
         PathKey("route-policy", "routing/ospfv3/ipv6"): ...,
         PathKey("route-policy", "wan/vpn"): ...,
+        PathKey("ipv4-acl", "wan/vpn/interface/ethernet"): ...,
+        PathKey("ipv4-acl", "wan/vpn/interface/cellular"): ...,
+        PathKey("ipv6-acl", "wan/vpn/interface/ethernet"): ...,
+        PathKey("ipv6-acl", "wan/vpn/interface/cellular"): ...,
     } | {PathKey(policy_obj_parcel, "route-policy"): ... for policy_obj_parcel in ProfileSdwanPolicy.parcel_names})
 
 

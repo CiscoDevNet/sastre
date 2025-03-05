@@ -1,8 +1,10 @@
-Sastre 1.25 [, 2025]
+Sastre 1.25 [March 5, 2025]
 ================================
 
 #### Improvements:
-- vManage 20.14 support. 
+- vManage 20.14 support, included support for the following API endpoints:
+  - New SDWAN service profile parcels: ipv4-acl, ipv6-acl
+  - New SDWAN transport profile parcels: ipv4-acl, ipv6-acl
 - [#44] Enhancements to show-template references task:
   - In addition to the (existing) feature-template references table, a new device-template references table is output.
   - New --filled-rows option to create tables with all row contents (even if they are the same as in previous row), which facilitates table output filtering with --include/--exclude.
