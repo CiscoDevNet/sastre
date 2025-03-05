@@ -6,6 +6,7 @@
 """
 import re
 from typing import Optional, Any, Union
+from enum import Enum
 from collections.abc import Mapping, Sequence, Callable, Iterable
 from pathlib import Path
 from collections import namedtuple
@@ -225,8 +226,9 @@ class Inventory(IndexApiItem):
     Parent class for the inventory-type classes EdgeInventory and ControlInventory.
     Not supposed to be used directly, use the corresponding child classes instead.
     """
-    FilterEntry = namedtuple('InventoryFilterEntry', ['uuid', 'cert_state', 'name', 'system_ip',
-                                                      'model', 'type', 'template', 'config_group'])
+    FilterEntry = namedtuple(
+        'FilterEntry', ['uuid', 'cert_state', 'name', 'system_ip', 'model', 'type', 'template', 'config_group']
+    )
 
     @staticmethod
     def is_cedge(device_entry: FilterEntry) -> bool:
@@ -234,6 +236,15 @@ class Inventory(IndexApiItem):
         Filtered_iter filter selecting CEDGE devices
         """
         return device_entry.model is not None and device_entry.model in CEDGE_SET
+
+    @staticmethod
+    def is_vedge(device_entry: FilterEntry) -> bool:
+        """
+        Filtered_iter filter selecting VEDGE devices
+        """
+        is_controller = device_entry.type is not None and device_entry.type in {'vsmart', 'vbond', 'vmanage'}
+
+        return not is_controller and not Inventory.is_cedge(device_entry)
 
     @staticmethod
     def is_vsmart(device_entry: FilterEntry) -> bool:
@@ -349,10 +360,7 @@ class DeviceConfigRFS(DeviceConfig):
         return '{safe_device_id}?type=RFS'.format(safe_device_id=quote_plus(device_id))
 
 
-#
-# Templates
-#
-# Set of device types that use cedge template class. Updated as of vManage 20.12
+# Set of device types that use cedge template class. Updated as of vManage 20.15
 CEDGE_SET = {
     "cellular-gateway-CG113-4GW6A", "cellular-gateway-CG113-4GW6B", "cellular-gateway-CG113-4GW6E",
     "cellular-gateway-CG113-4GW6H", "cellular-gateway-CG113-4GW6Q", "cellular-gateway-CG113-4GW6Z",
@@ -414,14 +422,30 @@ CEDGE_SET = {
     "vedge-ISR1100-4GLTEGB-XE", "vedge-ISR1100-4GLTENA-XE", "vedge-ISR1100-6G-XE", "vedge-ISR1100X-4G-XE",
     "vedge-ISR1100X-6G-XE", "vedge-ISRv", "vedge-nfvis-C8200-UCPE", "vedge-nfvis-C8200-UCPEVM",
     "vedge-nfvis-C8300-UCPE-1N20", "vedge-nfvis-CSP-5216", "vedge-nfvis-CSP-5228", "vedge-nfvis-CSP-5436",
-    "vedge-nfvis-ENCS5400", "vedge-nfvis-UCSC-C220-M6N", "vedge-nfvis-UCSC-C220-M6S", "vedge-nfvis-UCSC-C240-M6N",
-    "vedge-nfvis-UCSC-C240-M6S", "vedge-nfvis-UCSC-C240-M6SN", "vedge-nfvis-UCSC-C240-M6SX"
+    "vedge-nfvis-ENCS5400"
 }
 # Software devices. Updated as of vManage 20.12
 SOFT_EDGE_SET = {"vedge-CSR-1000v", "vedge-C8000V", "vedge-C8000V-SD-ROUTING", "vedge-cloud", "vmanage", "vsmart",
                  "vedge-ISRv"}
 
 
+class DeviceType(Enum):
+    vsmart = 'vsmart'
+    vmanage = 'vmanage'
+    vbond = 'vbond'
+    vedge = 'vedge'
+    cedge = 'cedge'
+
+
+def get_device_type(device_class: str, device_model: str) -> str:
+    if device_class == DeviceType.vedge.value:
+        return DeviceType.cedge.value if device_model in CEDGE_SET else DeviceType.vedge.value
+    return device_class
+
+
+#
+# Templates
+#
 # This is a special case handled under DeviceTemplate
 class DeviceTemplateAttached(IndexConfigItem):
     api_path = ApiPath('template/device/config/attached', None, None, None)
@@ -477,9 +501,13 @@ class DeviceTemplateValues(ConfigItem):
         return self.values_iter()
 
     @classmethod
+    def get_values_raise(cls, api: Rest, template_id: str, device_uuids: Iterable[str]):
+        return cls(api.post(cls.api_params(template_id, device_uuids), cls.api_path.post))
+
+    @classmethod
     def get_values(cls, api: Rest, template_id: str, device_uuids: Iterable[str]):
         try:
-            return cls(api.post(cls.api_params(template_id, device_uuids), cls.api_path.post))
+            return cls.get_values_raise(api, template_id, device_uuids)
         except RestAPIException:
             return None
 
@@ -492,6 +520,7 @@ class DeviceTemplate(ConfigItem):
     store_path = ('device_templates', 'template')
     name_tag = 'templateName'
     id_tag = 'templateId'
+    type_tag = 'deviceType'
     post_filtered_tags = ('feature',)
     # templateClass, deviceRole, draftMode, templateId and copyEdited are new tags in 20.x+, adding to skip diff to not
     # trigger updates when restore --update is done between pre 20.x workdir and post 20.x vManage.
@@ -530,30 +559,42 @@ class DeviceTemplateIndex(IndexConfigItem):
     store_file = 'device_templates.json'
     iter_fields = IdName('templateId', 'templateName')
 
-    FilteredIterEntry = namedtuple('FilteredIterEntry', ['device_type', 'num_attached', 'uuid', 'name'])
+    FilterEntry = namedtuple('FilterEntry', ['template_class', 'device_type', 'num_attached', 'uuid', 'name'])
 
     @staticmethod
-    def is_vsmart(iterator_entry: FilteredIterEntry) -> bool:
-        return iterator_entry.device_type is not None and iterator_entry.device_type == 'vsmart'
+    def is_vsmart(entry: FilterEntry) -> bool:
+        return entry.device_type is not None and entry.device_type == 'vsmart'
 
     @staticmethod
-    def is_not_vsmart(iterator_entry: FilteredIterEntry) -> bool:
-        return iterator_entry.device_type is not None and iterator_entry.device_type != 'vsmart'
+    def is_not_vsmart(entry: FilterEntry) -> bool:
+        return entry.device_type is not None and entry.device_type != 'vsmart'
 
     @staticmethod
-    def is_attached(iterator_entry: FilteredIterEntry) -> bool:
-        return iterator_entry.num_attached is not None and iterator_entry.num_attached > 0
+    def is_attached(entry: FilterEntry) -> bool:
+        return entry.num_attached is not None and entry.num_attached > 0
 
     @staticmethod
-    def is_cedge(iterator_entry: FilteredIterEntry) -> bool:
-        return iterator_entry.device_type is not None and iterator_entry.device_type in CEDGE_SET
+    def is_cedge(entry: FilterEntry) -> bool:
+        # Before 20.1 template migration
+        if entry.template_class is None:
+            return entry.device_type is not None and entry.device_type in CEDGE_SET
+
+        # Post 20.1 template migration
+        return entry.template_class == 'cedge'
+
+    @staticmethod
+    def is_vedge(entry: FilterEntry) -> bool:
+        is_controller = entry.device_type is not None and entry.device_type in {'vsmart', 'vbond', 'vmanage'}
+
+        return not is_controller and not DeviceTemplateIndex.is_cedge(entry)
 
     def filtered_iter(self, *filter_fns: Callable) -> Iterable[tuple[str, str]]:
         # The contract for filtered_iter is that it should return an iterable of iter_fields tuples.
         # If no filter_fns is provided, no filtering is done and iterate over all entries
         return (
-            (entry.uuid, entry.name) for entry in map(DeviceTemplateIndex.FilteredIterEntry._make,
-                                                      self.iter('deviceType', 'devicesAttached', *self.iter_fields))
+            (entry.uuid, entry.name)
+            for entry in map(DeviceTemplateIndex.FilterEntry._make, self.iter('templateClass', 'deviceType',
+                                                                              'devicesAttached', *self.iter_fields))
             if all(filter_fn(entry) for filter_fn in filter_fns)
         )
 
@@ -705,7 +746,7 @@ class ConfigGroupValues(Config2Item):
         ]
         return ConfigGroupValues(new_payload)
 
-    def put_raise(self, api: Rest, **path_vars: str) -> Sequence[str]:
+    def put_raise(self, api: Rest, **path_vars: str) -> list[str]:
         result = api.put(self.put_data(), ConfigGroupValues.api_path.resolve(**path_vars).put)
 
         # Prior to 20.12, this api call returned a list of dicts. Since 20.12, it now returns a list of strings.
@@ -793,11 +834,21 @@ class ConfigGroupRules(IndexConfigItem):
             post_data = {k: v for k, v in rule.items() if k not in filtered_keys}
             post_data['configGroupId'] = config_group_id
             response = api.post(post_data, ConfigGroupRules.api_path.resolve(configGroupId=config_group_id).post)
+            if response.get('isConflict'):
+                raise ValueError(f"The rule created conflicts with another rule for config-group {config_group_id}")
             response_list.extend(
                 entry.get('chassisNumber') for entry in response.get('devices', {}).get('matchingDevices', [])
             )
 
         return response_list
+
+    def put_raise(self, api: Rest, config_group_id: str) -> None:
+        for rule in self.data:
+            put_data = {k: v for k, v in rule.items()}
+            put_data['configGroupId'] = config_group_id
+            response = api.put(put_data, ConfigGroupRules.api_path.resolve(configGroupId=config_group_id).put)
+            if response.get('isConflict'):
+                raise ValueError(f"The rule created conflicts with another rule for config-group {config_group_id}")
 
 
 class ConfigGroupDeploy(ApiItem):
@@ -888,7 +939,9 @@ class ProfileSdwanService(FeatureProfile):
         "switchport": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/switchport"),
         "wirelesslan": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/wirelesslan"),
         "appqoe": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/appqoe"),
-        "route-policy": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/route-policy")
+        "route-policy": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/route-policy"),
+        "ipv4-acl": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/ipv4-acl"),
+        "ipv6-acl": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/ipv6-acl")
     }, parcel_reference_path_map={
         PathKey("dhcp-server", "lan/vpn/interface/ethernet"): ApiPath(
             "v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/interface/ethernet/{ethId}/dhcp-server"),
@@ -915,6 +968,10 @@ class ProfileSdwanService(FeatureProfile):
         PathKey("trackergroup", "lan/vpn"): ...,
         PathKey("trackergroup", "lan/vpn/interface/ethernet"): ApiPath(
             "v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/interface/ethernet/{ethId}/trackergroup"),
+        PathKey("ipv4-acl", "lan/vpn/interface/ethernet"): ...,
+        PathKey("ipv4-acl", "lan/vpn/interface/svi"): ...,
+        PathKey("ipv6-acl", "lan/vpn/interface/ethernet"): ...,
+        PathKey("ipv6-acl", "lan/vpn/interface/svi"): ...,
         PathKey("route-policy", "routing/bgp"): ...,
         PathKey("route-policy", "routing/ospf"): ...,
         PathKey("route-policy", "routing/eigrp"): ...,
@@ -962,7 +1019,9 @@ class ProfileSdwanTransport(FeatureProfile):
         "esimcellular-controller": ApiPath("v1/feature-profile/sdwan/transport/{transportId}/esimcellular-controller"),
         "t1-e1-controller": ApiPath("v1/feature-profile/sdwan/transport/{transportId}/t1-e1-controller"),
         "gps": ApiPath("v1/feature-profile/sdwan/transport/{transportId}/gps"),
-        "route-policy": ApiPath("v1/feature-profile/sdwan/transport/{transportId}/route-policy")
+        "route-policy": ApiPath("v1/feature-profile/sdwan/transport/{transportId}/route-policy"),
+        "ipv4-acl": ApiPath("v1/feature-profile/sdwan/transport/{transportId}/ipv4-acl"),
+        "ipv6-acl": ApiPath("v1/feature-profile/sdwan/transport/{transportId}/ipv6-acl")
     }, parcel_reference_path_map={
         PathKey("routing/bgp", "wan/vpn"): ApiPath(
             "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/routing/bgp"),
@@ -1007,6 +1066,10 @@ class ProfileSdwanTransport(FeatureProfile):
         PathKey("route-policy", "routing/ospfv3/ipv4"): ...,
         PathKey("route-policy", "routing/ospfv3/ipv6"): ...,
         PathKey("route-policy", "wan/vpn"): ...,
+        PathKey("ipv4-acl", "wan/vpn/interface/ethernet"): ...,
+        PathKey("ipv4-acl", "wan/vpn/interface/cellular"): ...,
+        PathKey("ipv6-acl", "wan/vpn/interface/ethernet"): ...,
+        PathKey("ipv6-acl", "wan/vpn/interface/cellular"): ...,
     } | {PathKey(policy_obj_parcel, "route-policy"): ... for policy_obj_parcel in ProfileSdwanPolicy.parcel_names})
 
 
@@ -1035,8 +1098,7 @@ class ProfileSdwanOther(FeatureProfile):
     store_path = ('feature_profiles', 'sdwan', 'other')
     parcel_api_paths = ApiPathGroup({
         "thousandeyes": ApiPath("v1/feature-profile/sdwan/other/{otherId}/thousandeyes"),
-        "ucse": ApiPath("v1/feature-profile/sdwan/other/{otherId}/ucse"),
-        "cybervision": ApiPath("v1/feature-profile/sdwan/other/{otherId}/cybervision")
+        "ucse": ApiPath("v1/feature-profile/sdwan/other/{otherId}/ucse")
     })
 
 
@@ -1188,7 +1250,7 @@ class PolicyVsmart(ConfigItem):
     store_path = ('policy_templates', 'vSmart')
     name_tag = 'policyName'
     type_tag = 'policyType'
-    skip_cmp_tag_set = {'isPolicyActivated', }
+    skip_cmp_tag_set = {'isPolicyActivated', 'lastUpdatedOn'}
 
 
 @register('policy_vsmart', 'VSMART policy', PolicyVsmart)
@@ -1628,7 +1690,7 @@ class AdvancedInspectionProfile(PolicyDef):
     store_path = ('policy_definitions', 'AdvancedInspectionProfile')
 
 
-@register('policy_definition', 'advanced inspection profile policy definition', AdvancedInspectionProfile,
+@register('parent_policy_definition', 'advanced inspection profile policy definition', AdvancedInspectionProfile,
           min_version='20.6')
 class AdvancedInspectionProfileIndex(PolicyDefIndex):
     api_path = ApiPath('template/policy/definition/advancedinspectionprofile', None, None, None)
