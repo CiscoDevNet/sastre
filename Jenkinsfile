@@ -9,6 +9,7 @@ pipeline {
         GEN_USER = "cx-sastre-user.gen"
         ECH_PATH = "${REGISTRY}/${ECH_ORG}/${ECH_REPO}"
         ECH_CREDENTIALS = 'sastre-ech-token'
+        SONAR_TOKEN = 'sonar-token'
     }
     agent {
         label "sastre-pro-node"
@@ -51,7 +52,12 @@ pipeline {
         }
         stage("Code Quality Test") {
             steps {
-                echo "Quality test"
+                withCredentials([conjurSecretCredential(credentialsId: "$SONAR_TOKEN", variable: "SONAR_TOKEN")]) {
+                    sh """
+						docker run --rm --user root -e SONAR_LOGIN=$SONAR_TOKEN -v $PWD:/usr/src:Z \
+						sonarsource/sonar-scanner-cli -Dsonar.branch.name=$BRANCH_NAME
+                    """
+                }
             }
         }
         stage("Publish") {

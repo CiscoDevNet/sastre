@@ -176,6 +176,7 @@ class Table:
         if done_content_row:
             yield border_line
 
+    # noinspection PyProtectedMember
     def dict(self) -> dict:
         table_dict = {
             "header": {
@@ -347,7 +348,7 @@ class Task:
         return index_cls.get(backend) if isinstance(backend, Rest) else index_cls.load(backend)
 
     def template_attach_data(self, api: Rest, workdir: str, ext_name: bool, templates_iter: Iterable[tuple],
-                             target_uuid_set: Optional[set] = None) -> tuple[list, bool]:
+                             target_uuid_set: Optional[set[str]] = None) -> tuple[list, bool]:
         """
         Prepare data for template attach considering local backup as the source of truth (i.e. where input values are)
         @param api: Instance of Rest API
@@ -402,18 +403,24 @@ class Task:
         return template_input_list, target_uuid_set is None
 
     @staticmethod
-    def template_reattach_data(api: Rest, templates_iter: Iterable[tuple]) -> tuple[list, bool]:
+    def template_reattach_data(api: Rest, templates_iter: Iterable[tuple],
+                               filtered_uuid_set: Optional[set[str]] = None) -> tuple[list, bool]:
         """
         Prepare data for template reattach considering vManage as the source of truth (i.e. where input values are)
         @param api: Instance of Rest API
         @param templates_iter: Iterable of (<template_name>, <target_template_id>)
+        @param filtered_uuid_set: (optional) Set of device uuids on target node to include
+                                  When provided, attach only devices are on target node and on filtered_uuid_set.
+                                  When absent, attach all devices on target.
         @return: Tuple containing attach data (<template input list>, <isEdited>)
         """
 
         def get_template_input(template_id):
-            uuid_list = [uuid for uuid, _ in DeviceTemplateAttached.get_raise(api, template_id)]
-            values = DeviceTemplateValues(api.post(DeviceTemplateValues.api_params(template_id, uuid_list),
-                                                   DeviceTemplateValues.api_path.post))
+            uuid_list = [
+                uuid for uuid, _ in DeviceTemplateAttached.get_raise(api, template_id)
+                if filtered_uuid_set is None or uuid in filtered_uuid_set
+            ]
+            values = DeviceTemplateValues.get_values_raise(api, template_id, uuid_list)
             return values.input_list()
 
         def is_template_cli(template_id):
@@ -543,7 +550,7 @@ class Task:
             #
             # return len(matched_uuids) > 0
 
-            # TODO: Review post 20.13
+            # TODO: Review post 20.15
             return False
 
         def restore_values(config_grp_name: str, config_grp_saved_id: str, config_grp_target_id: str):
@@ -783,7 +790,7 @@ class Task:
         #         except RestAPIException as ex:
         #             self.log_error(f'Failed to delete config-group {config_grp_name} automated rule {rule_id}: {ex}')
 
-        # TODO: Review post 20.13
+        # TODO: Review post 20.15
         return delete_req_count
 
     def policy_activate(self, api: Rest, policy_id: Optional[str], policy_name: Optional[str], *,
@@ -987,8 +994,7 @@ def export_json(table_iter: Iterable[Table], filename: str) -> None:
     @param filename: Name for the export file
     """
     with open(filename, 'w') as export_file:
-        data = [table.dict() for table in table_iter]
-        json.dump(data, export_file, indent=2)
+        export_file.write(json.dumps([table.dict() for table in table_iter], indent=2))
 
 
 def archive_create(archive_filename: str, workdir: str) -> None:

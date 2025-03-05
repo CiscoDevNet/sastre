@@ -1,0 +1,60 @@
+---
+metadata:
+  device_mappings:
+    device3: "10.1.0.1"
+    device4: "10.1.0.2"
+globals:
+  system_ip:
+    - "10.1.0.1"
+    - "10.1.0.2"
+  detail: true
+  device_type: "vedge"
+sections:
+  - name: 'control connections'
+    skip_diff: true
+    task: 'show state'
+    args:
+      cmd: ['control', 'connections']
+  - name: 'system status'
+    skip_diff: true
+    task: 'show realtime'
+    args:
+      cmd: ['system', 'status']
+  - name: 'omp summary'
+    skip_diff: true
+    task: 'show realtime'
+    args:
+      cmd: ['omp', 'summary']
+  - name: 'bfd sessions'
+    skip_diff: true
+    task: 'show state'
+    args:
+      cmd: ['bfd', 'sessions']
+  - name: 'control local-properties'
+    skip_diff: true
+    task: 'show state'
+    args:
+      cmd: ['control', 'local-properties']
+  - name: 'tunnel stats'
+    skip_diff: true
+    task: 'show realtime'
+    args:
+      cmd: ['tunnel', 'stats']
+  - name: 'software info'
+    skip_diff: true
+    task: 'show realtime'
+    args:
+      cmd: ['software', 'info']
+  - name: 'hardware environment'
+    skip_diff: true
+    task: 'show realtime'
+    args:
+      cmd: ['hardware', 'environment']
+  - name: 'hardware inventory'
+    skip_diff: true
+    task: 'show realtime'
+    args:
+      cmd: ['hardware', 'inventory']
+...
+
+

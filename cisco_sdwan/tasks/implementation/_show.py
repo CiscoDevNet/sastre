@@ -13,12 +13,12 @@ from cisco_sdwan.base.rest_api import Rest
 from cisco_sdwan.base.catalog import CATALOG_TAG_ALL, op_catalog_iter, OpType
 from cisco_sdwan.base.models_base import (OperationalItem, RealtimeItem, BulkStatsItem, BulkStateItem, RecordItem,
                                           filename_safe)
-from cisco_sdwan.base.models_vmanage import Device, Alarm, Event
+from cisco_sdwan.base.models_vmanage import Device, Alarm, Event, get_device_type, DeviceType
 from cisco_sdwan.tasks.utils import (regex_type, ipv4_type, site_id_type, filename_type, int_type, OpCmdOptions,
                                      TaskOptions, RTCmdSemantics, StateCmdSemantics, StatsCmdSemantics)
 from cisco_sdwan.tasks.common import regex_search, Task, Table, get_table_filters, filtered_tables, export_json
-from cisco_sdwan.tasks.models import TableTaskArgs, validate_op_cmd, const
-from cisco_sdwan.tasks.validators import validate_site_id, validate_ipv4, validate_regex
+from cisco_sdwan.tasks.models import TableTaskArgs, validate_op_cmd, const, IPv4AddressStr
+from cisco_sdwan.tasks.validators import validate_site_id, validate_regex
 
 THREAD_POOL_SIZE = 10
 TIME_FORMAT = "%Y-%m-%dT%H:%M:%S"
@@ -107,12 +107,15 @@ class TaskShow(Task):
         for sub_task in (rt_parser, state_parser, stats_parser, dev_parser):
             mutex = sub_task.add_mutually_exclusive_group()
             mutex.add_argument('--regex', metavar='<regex>', type=regex_type,
-                               help='select devices matching regular expression on device name, type or model.')
+                               help='select devices matching regular expression on device name or model.')
             mutex.add_argument('--not-regex', metavar='<regex>', type=regex_type,
-                               help='select devices NOT matching regular expression on device name, type or model.')
+                               help='select devices NOT matching regular expression on device name or model.')
             sub_task.add_argument('--reachable', action='store_true', help='select devices that are reachable')
             sub_task.add_argument('--site', metavar='<id>', type=site_id_type, help='select devices with site ID')
-            sub_task.add_argument('--system-ip', metavar='<ipv4>', type=ipv4_type, help='select device with system IP')
+            sub_task.add_argument('--system-ip', nargs='+', metavar='<ipv4>', type=ipv4_type,
+                                  help='select devices with system IP')
+            sub_task.add_argument('--device-type', choices=[d_type.value for d_type in DeviceType],
+                                  help='select devices of specific type')
 
         for sub_task in (alarms_parser, events_parser):
             sub_task.set_defaults(subtask_handler=TaskShow.records)
@@ -271,18 +274,18 @@ class TaskShow(Task):
     def selected_devices(self, parsed_args, api: Rest) -> list[DeviceInfo]:
         regex = parsed_args.regex or parsed_args.not_regex
         matched_items = [
-            DeviceInfo(name, system_ip, site_id, state, d_type, model)
+            DeviceInfo(name, system_ip, site_id, state, get_device_type(d_type, model), model)
             for _, name, system_ip, site_id, state, d_type, model in Device.get_raise(api).extended_iter(default='-')
-            if ((regex is None or regex_search(regex, name, d_type, model, inverse=parsed_args.regex is None)) and
+            if ((regex is None or regex_search(regex, name, model, inverse=parsed_args.regex is None)) and
                 (not parsed_args.reachable or state == 'reachable') and
                 (parsed_args.site is None or site_id == parsed_args.site) and
-                (parsed_args.system_ip is None or system_ip == parsed_args.system_ip))
+                (parsed_args.system_ip is None or system_ip in parsed_args.system_ip) and
+                (parsed_args.device_type is None or get_device_type(d_type, model) == parsed_args.device_type))
         ]
         # Sort device list by hostname then system ip
         matched_items.sort(key=attrgetter('hostname', 'system_ip'))
 
         self.log_info(f'Device selection matched {len(matched_items)} devices')
-
         return matched_items
 
     def build_table(self, name: str, headers: Sequence[str], devices: Sequence[DeviceInfo], device_data: dict) -> Table:
@@ -335,12 +338,12 @@ class ShowArgs(TableTaskArgs):
     not_regex: Optional[str] = None
     reachable: bool = False
     site: Optional[str] = None
-    system_ip: Optional[str] = None
+    system_ip: Optional[list[IPv4AddressStr]] = None
+    device_type: Optional[DeviceType] = None
 
     # Validators
     _validate_regex = field_validator('regex', 'not_regex')(validate_regex)
     _validate_site_id = field_validator('site')(validate_site_id)
-    _validate_ipv4 = field_validator('system_ip')(validate_ipv4)
 
     @model_validator(mode='after')
     def mutex_validations(self) -> 'ShowArgs':
