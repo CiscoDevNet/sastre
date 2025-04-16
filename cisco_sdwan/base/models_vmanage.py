@@ -884,7 +884,8 @@ class ProfileSdwanPolicy(FeatureProfile):
         "security-protocolname", "security-urllist", "security-ipssignature", "security-localdomain",
         "security-localapp", "security-port", "security-fqdn", "security-data-ip-prefix", "sla-class", "tloc",
         "vpn-group", "unified/advanced-inspection-profile", "unified/intrusion-prevention", "unified/url-filtering",
-        "unified/advanced-malware-protection", "unified/ssl-decryption-profile", "unified/ssl-decryption"
+        "unified/advanced-malware-protection", "unified/ssl-decryption-profile", "unified/ssl-decryption",
+        "ipv4-network-object-group", "ipv4-service-object-group"
     )
     parcel_api_paths = ApiPathGroup({
         name: ApiPath(f"v1/feature-profile/sdwan/policy-object/{{policyId}}/{name}") for name in parcel_names
@@ -915,6 +916,35 @@ class ProfileSdwanSystemIndex(FeatureProfileIndex):
     api_path = ApiPath('v1/feature-profile/sdwan/system', None, None, None)
     store_file = 'feature_profiles_sdwan_system.json'
 
+class ProfileSdRoutingService(FeatureProfile):
+    api_path = ApiPath('/v1/feature-profile/sd-routing/service')
+    store_path = ('feature_profiles', 'sd-routing', 'service')
+
+    parcel_names = ("multicloud-connection")
+
+    parcel_api_paths = ApiPathGroup({
+        name: ApiPath(f"v1/feature-profile/sd-routing/service/{{systemId}}/{name}") for name in parcel_names
+    })
+
+@register('feature_profile', 'SD-Routing service profile', ProfileSdRoutingService, min_version='20.15')
+class ProfileSdRoutingServiceIndex(FeatureProfileIndex):
+    api_path = ApiPath('/v1/feature-profile/sd-routing/service', None, None, None)
+    store_file = 'feature_profiles_sd-routing_service.json'
+
+class ProfileSdRoutingTransport(FeatureProfile):
+    api_path = ApiPath('/v1/feature-profile/sd-routing/transport')
+    store_path = ('feature_profiles', 'sd-routing', 'transport')
+
+    parcel_names = ("multicloud-connection")
+
+    parcel_api_paths = ApiPathGroup({
+        name: ApiPath(f"v1/feature-profile/sd-routing/transport/{{systemId}}/{name}") for name in parcel_names
+    })
+
+@register('feature_profile', 'SD-Routing transport profile', ProfileSdRoutingTransport, min_version='20.15')
+class ProfileSdRoutingTransportIndex(FeatureProfileIndex):
+    api_path = ApiPath('/v1/feature-profile/sd-routing/transport', None, None, None)
+    store_file = 'feature_profiles_sd-routing_transport.json'
 
 class ProfileSdwanService(FeatureProfile):
     api_path = ApiPath('v1/feature-profile/sdwan/service')
