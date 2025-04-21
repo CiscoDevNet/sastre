@@ -923,7 +923,7 @@ class ProfileSdRoutingService(FeatureProfile):
     parcel_names = ("multicloud-connection")
 
     parcel_api_paths = ApiPathGroup({
-        name: ApiPath(f"v1/feature-profile/sd-routing/service/{{systemId}}/{name}") for name in parcel_names
+        name: ApiPath(f"v1/feature-profile/sd-routing/service/{{serviceId}}/{name}") for name in parcel_names
     })
 
 @register('feature_profile', 'SD-Routing service profile', ProfileSdRoutingService, min_version='20.15')
@@ -938,7 +938,7 @@ class ProfileSdRoutingTransport(FeatureProfile):
     parcel_names = ("multicloud-connection")
 
     parcel_api_paths = ApiPathGroup({
-        name: ApiPath(f"v1/feature-profile/sd-routing/transport/{{systemId}}/{name}") for name in parcel_names
+        name: ApiPath(f"v1/feature-profile/sd-routing/transport/{{transportId}}/{name}") for name in parcel_names
     })
 
 @register('feature_profile', 'SD-Routing transport profile', ProfileSdRoutingTransport, min_version='20.15')
