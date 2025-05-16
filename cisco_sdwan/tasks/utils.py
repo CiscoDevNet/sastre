@@ -9,7 +9,7 @@ import re
 import argparse
 from datetime import date
 from getpass import getpass
-from typing import Optional, Dict, List, Set, Union, Type, Any
+from typing import Optional, Union, Any
 from collections.abc import Callable, Iterable
 from cisco_sdwan.base.catalog import catalog_tags, op_catalog_tags, op_catalog_commands, CATALOG_TAG_ALL, OpType
 from cisco_sdwan.tasks.common import Task
@@ -36,10 +36,10 @@ class TaskOptions:
     Registry for task classes. Provides methods to register, retrieve and list available tasks.
     Tasks are registered using the @TaskOptions.register decorator.
     """
-    _task_options: Dict[str, Type[Task]] = {}
+    _task_options: dict[str, type[Task]] = {}
 
     @classmethod
-    def task(cls, task_str: str) -> Type[Task]:
+    def task(cls, task_str: str) -> type[Task]:
         """
         Retrieve a task class by its registered name.
         
@@ -62,7 +62,7 @@ class TaskOptions:
         return ', '.join(cls._task_options)
 
     @classmethod
-    def register(cls, task_name: str) -> Callable[[Type[Task]], Type[Task]]:
+    def register(cls, task_name: str) -> Callable[[type[Task]], type[Task]]:
         """
         Decorator used for registering tasks.
         The class being decorated needs to be a subclass of Task.
@@ -71,7 +71,7 @@ class TaskOptions:
         @return: decorator
         """
 
-        def decorator(task_cls: Type[Task]) -> Type[Task]:
+        def decorator(task_cls: type[Task]) -> type[Task]:
             if not isinstance(task_cls, type) or not issubclass(task_cls, Task):
                 raise SastreException(f'Invalid task registration attempt: {task_cls.__name__}')
 
@@ -85,7 +85,7 @@ class TagOptions:
     """
     Provides methods to validate, retrieve, and list available tags.
     """
-    tag_options: Set[str] = catalog_tags() | {CATALOG_TAG_ALL}
+    tag_options: set[str] = catalog_tags() | {CATALOG_TAG_ALL}
 
     @classmethod
     def tag(cls, tag_str: str) -> str:
@@ -102,7 +102,7 @@ class TagOptions:
         return tag_str
 
     @classmethod
-    def tag_list(cls, tag_str_list: List[str]) -> List[str]:
+    def tag_list(cls, tag_str_list: list[str]) -> list[str]:
         """
         Validate a list of tag strings against registered tags.
         
@@ -161,7 +161,7 @@ class OpCmdSemantics(argparse.Action):
     op_type: Optional[OpType] = None
 
     def __call__(self, parser: argparse.ArgumentParser, namespace: argparse.Namespace, 
-                 values: List[str], option_string: Optional[str] = None) -> None:
+                 values: list[str], option_string: Optional[str] = None) -> None:
         """
         Validate command arguments against available options for the operation type.
         
