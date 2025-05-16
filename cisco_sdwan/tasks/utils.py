@@ -22,7 +22,7 @@ DEFAULT_WORKDIR_FORMAT = 'backup_{address}_{date:%Y%m%d}'
 
 def default_workdir(address):
     """
-    Generate a default workdir name based on the provided address and current date.
+    Generate a default workdir name based on the provided vManage address and current date.
     
     @param address: vManage address to include in the workdir name. If None, 'VMANAGE-ADDRESS' is used.
     @return: Formatted workdir name string
@@ -54,7 +54,7 @@ class TaskOptions:
     @classmethod
     def options(cls):
         """
-        Get a comma-separated string of all registered task names.
+        Return a comma-separated string of all registered task names.
         
         @return: String containing all registered task names
         """
@@ -82,7 +82,7 @@ class TaskOptions:
 
 class TagOptions:
     """
-    Registry for catalog tags. Provides methods to validate, retrieve and list available tags.
+    Provides methods to validate, retrieve and list available tags.
     """
     tag_options = catalog_tags() | {CATALOG_TAG_ALL}
 
@@ -114,7 +114,7 @@ class TagOptions:
     @classmethod
     def options(cls):
         """
-        Get a comma-separated string of all registered tags.
+        Return a comma-separated string of all registered tags.
         Special tag 'all' is sorted to appear first.
         
         @return: String containing all registered tags
@@ -124,13 +124,12 @@ class TagOptions:
 
 class OpCmdOptions:
     """
-    Registry for operational command options. Provides methods to list available tags and commands
-    for different operation types.
+    Provides methods to list available tags and commands for different operation types.
     """
     @classmethod
     def tags(cls, op_type: OpType) -> str:
         """
-        Get a comma-separated string of all tags for a specific operation type.
+        Return a comma-separated string of all tags for a specific operation type.
         Special tag 'all' is sorted to appear first.
         
         @param op_type: Operation type enum value
@@ -143,7 +142,7 @@ class OpCmdOptions:
     @classmethod
     def commands(cls, op_type: OpType) -> str:
         """
-        Get a comma-separated string of all commands for a specific operation type.
+        Return a comma-separated string of all commands for a specific operation type.
         
         @param op_type: Operation type enum value
         @return: String containing all commands for the specified operation type
@@ -186,21 +185,21 @@ class OpCmdSemantics(argparse.Action):
 
 class RTCmdSemantics(OpCmdSemantics):
     """
-    Operational command semantics validation for real-time operations.
+    Operational command semantics validation for real-time commands.
     """
     op_type: OpType = OpType.RT
 
 
 class StateCmdSemantics(OpCmdSemantics):
     """
-    Operational command semantics validation for state operations.
+    Operational command semantics validation for state commands.
     """
     op_type: OpType = OpType.STATE
 
 
 class StatsCmdSemantics(OpCmdSemantics):
     """
-    Operational command semantics validation for statistics operations.
+    Operational command semantics validation for statistics commands.
     """
     op_type: OpType = OpType.STATS
 
@@ -390,7 +389,7 @@ def non_empty_type(src_str: str) -> str:
 
 def int_type(min_val: int, max_val: int, value_str: str) -> int:
     """
-    Validate an integer within a specified range for use with argparse.
+    Validate that an integer is within a specified range for use with argparse.
     
     @param min_val: Minimum allowed value (inclusive)
     @param max_val: Maximum allowed value (inclusive)
@@ -415,7 +414,7 @@ def int_type(min_val: int, max_val: int, value_str: str) -> int:
 
 class TrackedValidator:
     """
-    Wrapper for validator functions that tracks the number of times the validator is called.
+    Callable validator that wrap a validator function and tracks the number of times the validator is called.
     """
     def __init__(self, validator_fn: Callable):
         """
@@ -449,7 +448,7 @@ class TrackedValidator:
 
 class ConditionalValidator:
     """
-    Wrapper for validator functions that conditionally skips validation based on a tracked validator.
+    Callable validator that wrap a validator function and conditionally skips validation based on the call count from the tracked validator.
     """
     def __init__(self, validator_fn: Callable, tracked_validator_obj: TrackedValidator):
         """
