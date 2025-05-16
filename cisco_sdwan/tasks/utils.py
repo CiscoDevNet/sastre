@@ -66,7 +66,7 @@ class TaskOptions:
         Decorator used for registering tasks.
         The class being decorated needs to be a subclass of Task.
         
-        @param task_name: String presented to the user in order to select a task
+        @param task_name: String presented to the user to select a task
         @return: decorator
         """
 
@@ -82,7 +82,7 @@ class TaskOptions:
 
 class TagOptions:
     """
-    Provides methods to validate, retrieve and list available tags.
+    Provides methods to validate, retrieve, and list available tags.
     """
     tag_options = catalog_tags() | {CATALOG_TAG_ALL}
 
@@ -115,7 +115,7 @@ class TagOptions:
     def options(cls):
         """
         Return a comma-separated string of all registered tags.
-        Special tag 'all' is sorted to appear first.
+        The special tag 'all' always appears first.
         
         @return: String containing all registered tags
         """
@@ -130,7 +130,7 @@ class OpCmdOptions:
     def tags(cls, op_type: OpType) -> str:
         """
         Return a comma-separated string of all tags for a specific operation type.
-        Special tag 'all' is sorted to appear first.
+        The special tag 'all' always appears first.
         
         @param op_type: Operation type enum value
         @return: String containing all tags for the specified operation type
@@ -264,7 +264,7 @@ def existing_file_type(filename: str) -> str:
     
     @param filename: Filename to validate
     @return: The validated filename
-    @raises argparse.ArgumentTypeError: If file does not exist
+    @raises argparse.ArgumentTypeError: If the file does not exist
     """
     try:
         validate_existing_file(filename)
@@ -280,7 +280,7 @@ def zip_file_type(filename: str) -> str:
     
     @param filename: Filename to validate
     @return: The validated filename
-    @raises argparse.ArgumentTypeError: If file does not exist or is not a valid zip archive
+    @raises argparse.ArgumentTypeError: If the file does not exist or is not a valid zip archive
     """
     try:
         validate_zip_file(filename)
@@ -414,7 +414,7 @@ def int_type(min_val: int, max_val: int, value_str: str) -> int:
 
 class TrackedValidator:
     """
-    Callable validator that wrap a validator function and tracks the number of times the validator is called.
+    Callable class that wrap a validator function and tracks the number of times the validator is called.
     """
     def __init__(self, validator_fn: Callable):
         """
@@ -448,7 +448,8 @@ class TrackedValidator:
 
 class ConditionalValidator:
     """
-    Callable validator that wrap a validator function and conditionally skips validation based on the call count from the tracked validator.
+    Callable class that wrap a validator function and conditionally skips validation based on the call count from the
+    tracked validator.
     """
     def __init__(self, validator_fn: Callable, tracked_validator_obj: TrackedValidator):
         """
