@@ -120,7 +120,7 @@ class ApiPath:
     @staticmethod
     def discover_path_vars(path_template: str) -> tuple:
         # If no path variable is discovered an empty tuple is returned
-        return tuple(m.group(1) for m in re.finditer(r'{([^{}]+)}', path_template))
+        return tuple(m.group(1) for m in re.finditer(r'{\s*([^{}\s]+(?:\s+[^{}\s]+)*)\s*}', path_template))
 
 
 class CliOrFeatureApiPath:
