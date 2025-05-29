@@ -686,7 +686,7 @@ class ConfigGroup(Config2Item):
 
     @property
     def devices_associated(self) -> int:
-        return self.data.get('numberOfDevices')
+        return self.data.get('numberOfDevices', 0)
 
 
 @register('config_group', 'configuration group', ConfigGroup, min_version='20.8')
