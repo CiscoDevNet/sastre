@@ -9,7 +9,8 @@ import re
 import argparse
 from datetime import date
 from getpass import getpass
-from typing import Callable, Optional
+from typing import Optional, Union, Any
+from collections.abc import Callable, Iterable
 from cisco_sdwan.base.catalog import catalog_tags, op_catalog_tags, op_catalog_commands, CATALOG_TAG_ALL, OpType
 from cisco_sdwan.tasks.common import Task
 from cisco_sdwan.tasks.validators import (validate_workdir, validate_regex, validate_existing_file, validate_zip_file,
@@ -20,7 +21,7 @@ from cisco_sdwan.tasks.validators import (validate_workdir, validate_regex, vali
 DEFAULT_WORKDIR_FORMAT = 'backup_{address}_{date:%Y%m%d}'
 
 
-def default_workdir(address):
+def default_workdir(address: Optional[str]) -> str:
     """
     Generate a default workdir name based on the provided vManage address and current date.
     
@@ -35,10 +36,10 @@ class TaskOptions:
     Registry for task classes. Provides methods to register, retrieve and list available tasks.
     Tasks are registered using the @TaskOptions.register decorator.
     """
-    _task_options = {}
+    _task_options: dict[str, type[Task]] = {}
 
     @classmethod
-    def task(cls, task_str):
+    def task(cls, task_str: str) -> type[Task]:
         """
         Retrieve a task class by its registered name.
         
@@ -52,7 +53,7 @@ class TaskOptions:
         return task_cls
 
     @classmethod
-    def options(cls):
+    def options(cls) -> str:
         """
         Return a comma-separated string of all registered task names.
         
@@ -61,7 +62,7 @@ class TaskOptions:
         return ', '.join(cls._task_options)
 
     @classmethod
-    def register(cls, task_name):
+    def register(cls, task_name: str) -> Callable[[type[Task]], type[Task]]:
         """
         Decorator used for registering tasks.
         The class being decorated needs to be a subclass of Task.
@@ -70,7 +71,7 @@ class TaskOptions:
         @return: decorator
         """
 
-        def decorator(task_cls):
+        def decorator(task_cls: type[Task]) -> type[Task]:
             if not isinstance(task_cls, type) or not issubclass(task_cls, Task):
                 raise SastreException(f'Invalid task registration attempt: {task_cls.__name__}')
 
@@ -84,10 +85,10 @@ class TagOptions:
     """
     Provides methods to validate, retrieve, and list available tags.
     """
-    tag_options = catalog_tags() | {CATALOG_TAG_ALL}
+    tag_options: set[str] = catalog_tags() | {CATALOG_TAG_ALL}
 
     @classmethod
-    def tag(cls, tag_str):
+    def tag(cls, tag_str: str) -> str:
         """
         Validate a tag string against registered tags.
         
@@ -101,7 +102,7 @@ class TagOptions:
         return tag_str
 
     @classmethod
-    def tag_list(cls, tag_str_list):
+    def tag_list(cls, tag_str_list: list[str]) -> list[str]:
         """
         Validate a list of tag strings against registered tags.
         
@@ -112,7 +113,7 @@ class TagOptions:
         return [cls.tag(tag_str) for tag_str in tag_str_list]
 
     @classmethod
-    def options(cls):
+    def options(cls) -> str:
         """
         Return a comma-separated string of all registered tags.
         The special tag 'all' always appears first.
@@ -159,7 +160,8 @@ class OpCmdSemantics(argparse.Action):
     # individual tokens.
     op_type: Optional[OpType] = None
 
-    def __call__(self, parser, namespace, values, option_string=None):
+    def __call__(self, parser: argparse.ArgumentParser, namespace: argparse.Namespace, 
+                 values: list[str], option_string: Optional[str] = None) -> None:
         """
         Validate command arguments against available options for the operation type.
         
@@ -416,14 +418,14 @@ class TrackedValidator:
     """
     Callable class that wrap a validator function and tracks the number of times the validator is called.
     """
-    def __init__(self, validator_fn: Callable):
+    def __init__(self, validator_fn: Callable[..., Any]):
         """
         Initialize a TrackedValidator.
         
         @param validator_fn: Validator function to track
         """
-        self.num_calls = 0
-        self.validator_fn = validator_fn
+        self.num_calls: int = 0
+        self.validator_fn: Callable[..., Any] = validator_fn
 
     @property
     def called(self) -> bool:
@@ -434,7 +436,7 @@ class TrackedValidator:
         """
         return self.num_calls > 0
 
-    def __call__(self, *validator_fn_args):
+    def __call__(self, *validator_fn_args: Any) -> Any:
         """
         Call the validator function and increment the call counter.
         
@@ -451,17 +453,17 @@ class ConditionalValidator:
     Callable class that wrap a validator function and conditionally skips validation based on the call count from the
     tracked validator.
     """
-    def __init__(self, validator_fn: Callable, tracked_validator_obj: TrackedValidator):
+    def __init__(self, validator_fn: Callable[..., Any], tracked_validator_obj: TrackedValidator):
         """
         Initialize a ConditionalValidator.
         
         @param validator_fn: Validator function to conditionally call
         @param tracked_validator_obj: TrackedValidator instance to check for previous calls
         """
-        self.validator_fn = validator_fn
-        self.tracked_validator_obj = tracked_validator_obj
+        self.validator_fn: Callable[..., Any] = validator_fn
+        self.tracked_validator_obj: TrackedValidator = tracked_validator_obj
 
-    def __call__(self, *validator_fn_args):
+    def __call__(self, *validator_fn_args: Any) -> Any:
         """
         Call the validator function with skip_validation=True if the tracked validator has been called.
         
@@ -475,7 +477,8 @@ class EnvVar(argparse.Action):
     """
     Custom argparse action that supports environment variables as default values.
     """
-    def __init__(self, nargs=None, envvar=None, required=True, default=None, **kwargs):
+    def __init__(self, nargs: Optional[str] = None, envvar: Optional[str] = None, 
+                 required: bool = True, default: Any = None, **kwargs: Any):
         """
         Initialize an EnvVar action.
         
@@ -495,7 +498,8 @@ class EnvVar(argparse.Action):
         required = required and default is None
         super().__init__(default=default, required=required, **kwargs)
 
-    def __call__(self, parser, namespace, values, option_string=None):
+    def __call__(self, parser: argparse.ArgumentParser, namespace: argparse.Namespace, 
+                 values: Any, option_string: Optional[str] = None) -> None:
         """
         Store the argument value in the namespace.
         
@@ -511,7 +515,8 @@ class PromptArg:
     """
     Helper class for prompting the user for input with validation.
     """
-    def __init__(self, argument, prompt, secure_prompt=False, validate=non_empty_type):
+    def __init__(self, argument: str, prompt: str, secure_prompt: bool = False, 
+                 validate: Callable[[str], str] = non_empty_type):
         """
         Initialize a PromptArg.
         
@@ -520,12 +525,12 @@ class PromptArg:
         @param secure_prompt: If True, use getpass for secure input (no echo)
         @param validate: Validation function to apply to the input
         """
-        self.argument = argument
-        self.prompt = prompt
-        self.prompt_func = getpass if secure_prompt else input
-        self.validate = validate
+        self.argument: str = argument
+        self.prompt: str = prompt
+        self.prompt_func: Callable[[str], str] = getpass if secure_prompt else input
+        self.validate: Callable[[str], str] = validate
 
-    def __call__(self):
+    def __call__(self) -> str:
         """
         Prompt the user for input, validate it, and return the validated input.
         Retries until valid input is provided or the user terminates with Ctrl+C.
