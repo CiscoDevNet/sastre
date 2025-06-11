@@ -1,3 +1,13 @@
+Sastre 1.26 [, 2025]
+================================
+
+#### Improvements:
+- vManage 20.15 support, included support for the following API endpoints:
+  - New SDWAN policy-object parcels: ipv4-network-object-group, ipv4-service-object-group
+  - New SD-Routing service profile parcels: multicloud-connection
+  - New SD-Routing transport profile parcels: multicloud-connection
+
+
 Sastre 1.25 [March 5, 2025]
 ================================
 

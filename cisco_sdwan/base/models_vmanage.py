@@ -686,7 +686,7 @@ class ConfigGroup(Config2Item):
 
     @property
     def devices_associated(self) -> int:
-        return len(self.data.get('devices', []))
+        return self.data.get('numberOfDevices', 0)
 
 
 @register('config_group', 'configuration group', ConfigGroup, min_version='20.8')
@@ -870,7 +870,7 @@ class ConfigGroupDeploy(ApiItem):
 
 
 #
-# Feature Profiles
+# SDWAN Feature Profiles
 #
 
 class ProfileSdwanPolicy(FeatureProfile):
@@ -884,7 +884,8 @@ class ProfileSdwanPolicy(FeatureProfile):
         "security-protocolname", "security-urllist", "security-ipssignature", "security-localdomain",
         "security-localapp", "security-port", "security-fqdn", "security-data-ip-prefix", "sla-class", "tloc",
         "vpn-group", "unified/advanced-inspection-profile", "unified/intrusion-prevention", "unified/url-filtering",
-        "unified/advanced-malware-protection", "unified/ssl-decryption-profile", "unified/ssl-decryption"
+        "unified/advanced-malware-protection", "unified/ssl-decryption-profile", "unified/ssl-decryption",
+        "ipv4-network-object-group", "ipv4-service-object-group"
     )
     parcel_api_paths = ApiPathGroup({
         name: ApiPath(f"v1/feature-profile/sdwan/policy-object/{{policyId}}/{name}") for name in parcel_names
@@ -1177,6 +1178,44 @@ class ProfileSdwanEmbeddedSecurity(FeatureProfile):
 class ProfileSdwanEmbeddedSecurityIndex(FeatureProfileIndex):
     api_path = ApiPath('v1/feature-profile/sdwan/embedded-security', None, None, None)
     store_file = 'feature_profiles_sdwan_embedded_security.json'
+
+
+#
+# SD-Routing Feature Profiles
+#
+
+class ProfileSdRoutingService(FeatureProfile):
+    api_path = ApiPath('/v1/feature-profile/sd-routing/service')
+    store_path = ('feature_profiles', 'sd-routing', 'service')
+
+    parcel_names = ("multicloud-connection", )
+
+    parcel_api_paths = ApiPathGroup({
+        name: ApiPath(f"v1/feature-profile/sd-routing/service/{{serviceId}}/{name}") for name in parcel_names
+    })
+
+
+@register('feature_profile', 'SD-Routing service profile', ProfileSdRoutingService, min_version='20.15')
+class ProfileSdRoutingServiceIndex(FeatureProfileIndex):
+    api_path = ApiPath('/v1/feature-profile/sd-routing/service', None, None, None)
+    store_file = 'feature_profiles_sd-routing_service.json'
+
+
+class ProfileSdRoutingTransport(FeatureProfile):
+    api_path = ApiPath('/v1/feature-profile/sd-routing/transport')
+    store_path = ('feature_profiles', 'sd-routing', 'transport')
+
+    parcel_names = ("multicloud-connection", )
+
+    parcel_api_paths = ApiPathGroup({
+        name: ApiPath(f"v1/feature-profile/sd-routing/transport/{{transportId}}/{name}") for name in parcel_names
+    })
+
+
+@register('feature_profile', 'SD-Routing transport profile', ProfileSdRoutingTransport, min_version='20.15')
+class ProfileSdRoutingTransportIndex(FeatureProfileIndex):
+    api_path = ApiPath('/v1/feature-profile/sd-routing/transport', None, None, None)
+    store_file = 'feature_profiles_sd-routing_transport.json'
 
 
 #
