@@ -119,8 +119,8 @@ class ApiPath:
 
     @staticmethod
     def discover_path_vars(path_template: str) -> tuple:
-        # If no path variable is discovered an empty tuple is returned
-        return tuple(m.group(1) for m in re.finditer(r'{\s*([^}]+)\s*}', path_template))
+        # If no path variable is discovered, an empty tuple is returned
+        return tuple(m.group(1) for m in re.finditer(r'{\s*([^}\s][^}]*?)\s*}', path_template))
 
 
 class CliOrFeatureApiPath:
@@ -639,7 +639,7 @@ class ConfigItem(ApiItem):
     type_tag = None
     post_filtered_tags = None
     skip_cmp_tag_set = set()
-    name_check_regex = re.compile(r'(?=^.{1,128}$)[^&<>! "]+$')
+    name_check_regex = re.compile(r'^[^&<>! "]{1,128}$')
 
     def is_equal(self, other_payload: Mapping[str, Any]) -> bool:
         exclude_set = self.skip_cmp_tag_set | {self.id_tag}
@@ -1220,7 +1220,7 @@ def update_crypts(crypt_map: Mapping[str, str], item_data: Mapping[str, Any]) ->
 
 
 class ExtendedTemplate:
-    template_pattern = re.compile(r'{name(?:\s+(?P<regex>.*?))?}')
+    template_pattern = re.compile(r'{name(?:\s+(?P<regex>[^}]*))?}')
 
     def __init__(self, name_regex: str):
         self.src_template = name_regex
