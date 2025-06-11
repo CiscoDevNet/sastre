@@ -237,6 +237,7 @@ class DryRunReport:
         return '\n'.join(self.render())
 
 
+# noinspection PyUnusedLocal,PyMethodMayBeStatic
 class Task:
     # Configuration parameters for wait_actions
     ACTION_INTERVAL = 10  # seconds

@@ -10,7 +10,7 @@ import argparse
 from datetime import date
 from getpass import getpass
 from typing import Optional, Union, Any
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
 from cisco_sdwan.base.catalog import catalog_tags, op_catalog_tags, op_catalog_commands, CATALOG_TAG_ALL, OpType
 from cisco_sdwan.tasks.common import Task
 from cisco_sdwan.tasks.validators import (validate_workdir, validate_regex, validate_existing_file, validate_zip_file,
@@ -21,7 +21,7 @@ from cisco_sdwan.tasks.validators import (validate_workdir, validate_regex, vali
 DEFAULT_WORKDIR_FORMAT = 'backup_{address}_{date:%Y%m%d}'
 
 
-def default_workdir(address: Optional[str]) -> str:
+def default_workdir(address: Union[str, None]) -> str:
     """
     Generate a default workdir name based on the provided vManage address and current date.
     
@@ -116,7 +116,7 @@ class TagOptions:
     def options(cls) -> str:
         """
         Return a comma-separated string of all registered tags.
-        The special tag 'all' always appears first.
+        Special tag 'all' always appears first.
         
         @return: String containing all registered tags
         """
@@ -131,7 +131,7 @@ class OpCmdOptions:
     def tags(cls, op_type: OpType) -> str:
         """
         Return a comma-separated string of all tags for a specific operation type.
-        The special tag 'all' always appears first.
+        Special tag 'all' always appears first.
         
         @param op_type: Operation type enum value
         @return: String containing all tags for the specified operation type
