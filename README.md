@@ -16,7 +16,7 @@ Sastre can also be used as an SDK to other applications, further information is 
 Support enquires can be sent to sastre-support@cisco.com.
 
 Note on vManage release support:
-- Sastre 1.25 officially supports up to vManage 20.14. Newer vManage releases normally work without problems, just lacking support to the newer features added to that particular vManage release.
+- Sastre 1.26 officially supports up to vManage 20.15. Newer vManage releases normally work without problems, just lacking support to the newer features added to that particular vManage release.
 
 ## Sastre and Sastre-Pro
 
