@@ -904,10 +904,13 @@ class ProfileSdwanSystem(FeatureProfile):
 
     parcel_names = (
         "aaa", "global", "banner", "basic", "bfd", "logging", "ntp", "omp", "snmp", "perfmonitor", "mrf", "security",
-        "remote-access", "ipv4-device-access-policy", "ipv6-device-access-policy", "data-prefix"
+        "remote-access", "ipv4-device-access-policy", "ipv6-device-access-policy"
     )
     parcel_api_paths = ApiPathGroup({
         name: ApiPath(f"v1/feature-profile/sdwan/system/{{systemId}}/{name}") for name in parcel_names
+    }, parcel_reference_path_map={
+        PathKey("data-prefix", "ipv4-device-access-policy"): ...,
+        PathKey("data-ipv6-prefix", "ipv6-device-access-policy"): ...
     })
 
 
@@ -970,12 +973,13 @@ class ProfileSdwanService(FeatureProfile):
         PathKey("tracker", "lan/vpn/interface/ethernet"): ApiPath(
             "v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/interface/ethernet/{ethId}/tracker"),
         PathKey("objecttracker","objecttrackergroup"): ...,
-        PathKey("objecttracker", "lan/vpn/interface/ethernet"): ApiPath(
-            "v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/interface/ethernet/{ethId}/objecttracker"),
+        PathKey("objecttracker", "lan/vpn/interface/ethernet"): ...,
         PathKey("trackergroup", "lan/vpn"): ...,
         PathKey("trackergroup", "lan/vpn/interface/ethernet"): ApiPath(
             "v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/interface/ethernet/{ethId}/trackergroup"),
         PathKey("objecttrackergroup", "lan/vpn/interface/ethernet"): ...,
+        PathKey("lan/vpn", "dual-router-ha"): ...,
+        PathKey("lan/vpn/interface/ethernet", "lan/vpn/interface/ethernet"): ...,
         PathKey("ipv4-acl", "lan/vpn/interface/ethernet"): ...,
         PathKey("ipv4-acl", "lan/vpn/interface/svi"): ...,
         PathKey("ipv6-acl", "lan/vpn/interface/ethernet"): ...,

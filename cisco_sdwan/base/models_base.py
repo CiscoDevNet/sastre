@@ -57,8 +57,8 @@ class UpdateEval:
 
 class ApiPath:
     """
-    Groups the API path for different operations available in an API item (i.e. get, post, put, delete).
-    Each field contains a str with the API path, or None if the particular operations is not supported on this item.
+    Groups the API path for different operations available in an API item (i.e., get, post, put, delete).
+    Each field contains a str with the API path, or None if the particular operations are not supported on this item.
     """
     __slots__ = ('path_vars', 'get', 'post', 'put', 'delete')
 
@@ -66,7 +66,7 @@ class ApiPath:
                  path_vars: Optional[Sequence[str]] = None) -> None:
         """
         @param get: URL path for get operations
-        @param other_ops: URL path for post, put and delete operations, in this order. If an item is not specified
+        @param other_ops: URL path for post, put and delete operations, in this order. If an item is not specified,
                           the same URL as the last operation provided is used.
         @param path_vars: Path variable names that may be present in defined paths. It is assumed that all methods have
                           the same path variables.
@@ -92,7 +92,7 @@ class ApiPath:
         Resolve an API Path containing path variables (ex. /v1/config/{config_id}/etc) into a concrete API path with
         path variables replaced with their values, as provided via var_values or var_mappings.
         @param var_values: Values for path variables, in the same order in which they are defined.
-        @param var_mappings: Key-value pairs associating values to path variable names.
+        @param var_mappings: Key-value pairs associating values with path variable names.
         @return: A new ApiPath instance containing path variables replaced with their values.
         """
         if not self.path_vars:
@@ -137,7 +137,7 @@ class CliOrFeatureApiPath:
 
 class PathKey(NamedTuple):
     """
-    PathKey tuples are used to lookup api paths in ApiPathGroup
+    PathKey tuples are used to look up api paths in ApiPathGroup
     """
     parcel_type: str
     parent_parcel_type: Optional[str] = None
@@ -154,7 +154,7 @@ class ApiPathGroup:
         @param path_map: Register parcel ApiPaths to a feature profile. Mapping of {<parcelType>: ApiPath, ... }
         @param parcel_reference_path_map: Register parcel reference ApiPaths to a feature profile. Mapping of
                                           {PathKey(<ParcelType>, <parent ParcelType>): ApiPath, ...}
-                                          If ... is used instead of an ApiPath it means that this reference parcel
+                                          If ... is used instead of an ApiPath, it means that this reference parcel
                                           doesn't need to be explicitly created (thus no ApiPath is provided).
         """
         self._path_map = dict(path_map)
@@ -224,7 +224,7 @@ class OperationalItem:
     def field_info(self, *field_names: str, info: str = 'title', default: Union[None, str] = 'N/A') -> tuple:
         """
         Retrieve metadata about one or more fields.
-        @param field_names: One or more field name to retrieve metadata from.
+        @param field_names: One or more field names to retrieve metadata from.
         @param info: Indicate which metadata to retrieve. By default, field title is returned.
         @param default: Value to be returned when a field_name does not exist.
         @return: tuple with one or more elements representing the desired metadata for each field requested.
@@ -237,8 +237,8 @@ class OperationalItem:
     def field_value_iter(self, *field_names: str, **conv_fn_map: Mapping[str, Callable]) -> Iterator[namedtuple]:
         """
         Iterate over entries of an operational item instance. Only fields/columns defined by field_names are yield.
-        Type conversion of one or more fields is supported by passing a callable that takes one argument (i.e. the field
-        value) and returns the converted value. E.g. passing average_latency=int will convert a string average_latency
+        Type conversion of one or more fields is supported by passing a callable that takes one argument (the field
+        value) and returns the converted value. E.g., passing average_latency=int will convert a string average_latency
         field to an integer.
         @param field_names: Specify one or more field names to retrieve.
         @param conv_fn_map: Keyword arguments passed allow type conversions on fields.
@@ -301,7 +301,7 @@ class RealtimeItem(OperationalItem):
     def is_in_scope(cls, device_model: str) -> bool:
         """
         Indicates whether this RealtimeItem is applicable to a particular device model. Subclasses need to overwrite
-        this method when the realtime api endpoint that it represents is specific to certain device models. For instance
+        this method when the realtime api endpoint that it represents is specific to certain device models. For example,
         vEdge vs. cEdges.
         """
         return True
@@ -386,7 +386,7 @@ class BulkStatsItem(OperationalItem):
 
         @param interval_secs: Interval to aggregate samples.
         @param field_names: Desired field names to return on each iteration
-        @param conv_fn_map: Conversion functions to be applied on fields, before they are aggregated.
+        @param conv_fn_map: Conversion functions to be applied to fields. Before they are aggregated.
         @return: Iterator of namedtuple, each instance corresponding to a time series.
         """
         # Split bulk stats samples into different time series
@@ -471,8 +471,8 @@ class RecordItem(OperationalItem):
     @staticmethod
     def query(start_time: datetime, end_time: datetime, size: int) -> dict[str, Any]:
         """
-        @param start_time: Starting date time for the query, i.e. oldest.
-        @param end_time: End date time for the query, i.e. newest.
+        @param start_time: Starting date time for the query, i.e., oldest.
+        @param end_time: End date time for the query, i.e., newest.
         @param size: Number of records to return. Positive integer.
         @return: Query payload used to retrieve log items
         """
@@ -674,17 +674,17 @@ class ConfigItem(ApiItem):
     @classmethod
     def load(cls, node_dir, ext_name=False, item_name=None, item_id=None, raise_not_found=False, use_root_dir=True):
         """
-        Factory method that loads data from a json file and returns a ConfigItem instance with that data
+        Factory method that loads data from a JSON file and returns a ConfigItem instance with that data
 
         @param node_dir: String indicating directory under root_dir used for all files from a given vManage node.
-        @param ext_name: True indicates that item_names need to be extended (with item_id) in order to make their
+        @param ext_name: True indicates that item_names need to be extended (with item_id) to make their
                          filename safe version unique. False otherwise.
         @param item_name: (Optional) Name of the item being loaded. Variable used to build the filename.
         @param item_id: (Optional) UUID for the item being loaded. Variable used to build the filename.
-        @param raise_not_found: (Optional) If set to True, raise FileNotFoundError if file is not found.
+        @param raise_not_found: (Optional) If set to True, raise FileNotFoundError if the file is not found.
         @param use_root_dir: True indicates that node_dir is under the root_dir. When false, item should be located
                              directly under node_dir/store_path
-        @return: ConfigItem object, or None if file does not exist and raise_not_found=False
+        @return: ConfigItem object, or None if the file does not exist and raise_not_found=False
         """
         dir_path = Path(cls.root_dir, node_dir, *cls.store_path) if use_root_dir else Path(node_dir, *cls.store_path)
         file_path = dir_path.joinpath(cls.get_filename(ext_name, item_name, item_id))
@@ -704,10 +704,10 @@ class ConfigItem(ApiItem):
 
     def save(self, node_dir, ext_name=False, item_name=None, item_id=None):
         """
-        Save data (i.e. self.data) to a json file
+        Save data (i.e. self.data) to a JSON file
 
         @param node_dir: String indicating directory under root_dir used for all files from a given vManage node.
-        @param ext_name: True indicates that item_names need to be extended (with item_id) in order to make their
+        @param ext_name: True indicates that item_names need to be extended (with item_id) to make their
                          filename safe version unique. False otherwise.
         @param item_name: (Optional) Name of the item being saved. Variable used to build the filename.
         @param item_id: (Optional) UUID for the item being saved. Variable used to build the filename.
@@ -795,7 +795,7 @@ class ConfigItem(ApiItem):
     @property
     def crypt_cluster_values(self) -> Iterator[str]:
         """
-        Extracts values that were encrypted by vManage. That is, with $CRYPT_CLUSTER$ prefix.
+        Extracts values that have been encrypted by vManage. That is, with $CRYPT_CLUSTER$ prefix.
         """
         yield from re.findall(r'\$CRYPT_CLUSTER\$.+?(?=["\s\\])', json.dumps(self.data))
 
@@ -805,7 +805,7 @@ class ConfigItem(ApiItem):
 
     def find_key(self, key, from_key=None):
         """
-        Returns a list containing the values of all occurrences of key inside data. Matched values that are dict or list
+        Returns a list containing the values from all occurrences of key inside data. Matched values that are dict or list
         are not included.
         @param key: Key to search
         @param from_key: Top-level key under which to start the search
@@ -841,8 +841,8 @@ class IndexConfigItem(ConfigItem):
         super().__init__(data.get('data') if isinstance(data, dict) else data)
 
         # When iter_fields is a regular tuple, it is completely opaque. However, if it is an IdName, then it triggers
-        # an evaluation of whether there is collision amongst the filename_safe version of all names in this index.
-        # need_extended_name = True indicates that there is collision and that extended names should be used when
+        # an evaluation of whether there is a collision amongst the filename_safe version of all names in this index.
+        # Need_extended_name = True indicates that there is collision and that extended names should be used when
         # saving/loading to/from backup
         if isinstance(self.iter_fields, IdName):
             filename_safe_set = {filename_safe(item_name, lower=True) for item_name in self.iter(self.iter_fields.name)}
@@ -898,7 +898,7 @@ class ConfigRequestModel(BaseModel):
 
 class FeatureProfileModel(ConfigRequestModel):
     name: str
-    description: str
+    description: str = ''
 
     # In 20.8.1 get profile contains 'profileName', while post/put requests require 'name' instead
     def __init__(self, **kwargs):
@@ -938,7 +938,7 @@ class Config2Item(ConfigItem):
         exclude_set = self.skip_cmp_tag_set | {self.id_tag}
         put_model = self.put_model or self.post_model
 
-        local_cmp_dict = put_model(**self.data).model_dump(by_alias=True, exclude=exclude_set, exclude_defaults=True)
+        local_cmp_dict = put_model(**self.data).model_dump(by_alias=True, exclude=exclude_set, exclude_defaults=False)
         other_cmp_dict = {k: v for k, v in other.items() if k not in exclude_set}
 
         return sorted(json.dumps(local_cmp_dict)) == sorted(json.dumps(other_cmp_dict))
@@ -980,9 +980,9 @@ class Config2Item(ConfigItem):
         payload = op_model(**self.data)
 
         if id_mapping_dict is None:
-            return payload.model_dump(by_alias=True, exclude_defaults=True)
+            return payload.model_dump(by_alias=True, exclude_defaults=False)
 
-        return update_ids(id_mapping_dict, payload.model_dump(by_alias=True, exclude_defaults=True))
+        return update_ids(id_mapping_dict, payload.model_dump(by_alias=True, exclude_defaults=False))
 
 
 class FeatureProfile(Config2Item):
@@ -1055,7 +1055,7 @@ class FeatureProfile(Config2Item):
         Iterate over Config 2.0 feature profile parcels, starting with the provided parcel and recursively checking
         sub-parcels it may contain.
         @param parcel: parcel to be iterated over
-        @param element_ids: Element IDs used to resolve path variables. First one is the feature profile ID. Parcels
+        @param element_ids: Element IDs used to resolve path variables. The first one is the feature profile ID. Parcels
                             with sub-parcels have their IDs included as well.
         @param parent_parcel_type: Parcel type of the parent, or None if this is a root parcel
         @yield: (<parcel api path>, <parcel info>, <parcel payload>) tuples
@@ -1124,7 +1124,7 @@ class AdminSettingsItem(ConfigItem):
         """
         @param data: dict containing the information to be associated with this API item.
         """
-        # Get requests return a dict as {'data': [{'domainIp': 'vbond.cisco.com', 'port': '12346'}]}
+        # Get requests returns a dict as {'data': [{'domainIp': 'vbond.cisco.com', 'port': '12346'}]}
         super().__init__(data.get('data', [''])[0])
 
     @classmethod
@@ -1153,10 +1153,10 @@ class ServerInfo:
     @classmethod
     def load(cls, node_dir):
         """
-        Factory method that loads data from a json file and returns a ServerInfo instance with that data
+        Factory method that loads data from a JSON file and returns a ServerInfo instance with that data
 
         @param node_dir: String indicating directory under root_dir used for all files from a given vManage node.
-        @return: ServerInfo object, or None if file does not exist
+        @return: ServerInfo object, or None if the file does not exist
         """
         dir_path = Path(cls.root_dir, node_dir)
         file_path = dir_path.joinpath(cls.store_file)
@@ -1172,7 +1172,7 @@ class ServerInfo:
 
     def save(self, node_dir):
         """
-        Save data (i.e. self.data) to a json file
+        Save data (i.e. self.data) to a JSON file
 
         @param node_dir: String indicating directory under root_dir used for all files from a given vManage node.
         @return: True indicates data has been saved. False indicates no data to save (and no file has been created).
@@ -1189,7 +1189,7 @@ class ServerInfo:
 def filename_safe(name: str, lower: bool = False) -> str:
     """
     Perform the necessary replacements in <name> to make it filename safe.
-    Any char that is not a-z, A-Z, 0-9, '_', ' ', or '-' is replaced with '_'. Convert to lowercase, if lower=True.
+    Any char that is not a-z, A-Z, 0-9, '_', ' ', or '-' is replaced with '_'. Convert to lowercase if lower=True.
     @param lower: If True, apply str.lower() to result.
     @param name: name string to be converted
     @return: string containing the filename-save version of item_name

@@ -76,7 +76,7 @@ class TaskRestore(Task):
             self.log_info(f'Restore task: Local workdir: "{parsed_args.workdir}" -> vManage URL: "{api.base_url}"')
 
         local_info = ServerInfo.load(parsed_args.workdir)
-        # Server info file may not be present (e.g. backup from older Sastre releases)
+        # Server info file may not be present (e.g., backup from older Sastre releases)
         if local_info is not None and is_version_newer(api.server_version, local_info.server_version):
             self.log_warning(f'Target vManage release ({api.server_version}) is older than the release used in backup '
                              f'({local_info.server_version}). Items may fail to restore due to incompatibilities.')
@@ -122,7 +122,7 @@ class TaskRestore(Task):
                             id_mapping[item_id] = target_id
 
                         if not parsed_args.update:
-                            # Existing item on target vManage will be used, i.e. will not update it
+                            # Existing item on target vManage will be used, i.e., will not update it
                             self.log_debug(f'Will skip {info} {item.name}, item already on target vManage')
                             continue
 
@@ -135,8 +135,8 @@ class TaskRestore(Task):
                     if item_matches:
                         match_set.add(item_id)
                     if item_matches or item_id in dependency_set:
-                        # A target_id that is not None signals a put operation (update), as opposed to post.
-                        # target_id will be None unless --update is specified and item name is on target
+                        # When target_id is not None, it signals a put operation (update), as opposed to post.
+                        # Target_id will be None unless --update is specified and item name is on target
                         # Read-only items are added only if they are in dependency_set
                         restore_item_list.append((item_id, item, target_id))
                         dependency_set.update(item.id_references_set)
@@ -167,7 +167,7 @@ class TaskRestore(Task):
 
     def is_vbond_configured(self, api: Rest) -> bool:
         if api.is_multi_tenant and not api.is_provider:
-            # Cannot explicitly check vBond configuration with tenant account, assume it is configured
+            # Cannot explicitly check vBond configuration when using a tenant account, assume it is configured
             return True
 
         check_vbond = CheckVBond.get(api)
@@ -198,7 +198,7 @@ class TaskRestore(Task):
                         if self.is_dryrun:
                             self.log_info(f'{op_info} {info} {item.name}{reason}')
                             continue
-                        # Not using id returned from post because post can return empty (e.g. local policies)
+                        # Not using the id returned from post because post can return empty (e.g., local policies)
                         response = api.post(item.post_data(id_mapping), item.api_path.post)
                         pushed_item_dict[item.name] = item_id
 
