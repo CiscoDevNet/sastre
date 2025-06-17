@@ -805,8 +805,8 @@ class ConfigItem(ApiItem):
 
     def find_key(self, key, from_key=None):
         """
-        Returns a list containing the values from all occurrences of key inside data. Matched values that are dict or list
-        are not included.
+        Returns a list containing the values from all occurrences of key inside data. Matched values that are dict or
+        list are not included.
         @param key: Key to search
         @param from_key: Top-level key under which to start the search
         @return: List
@@ -1008,6 +1008,10 @@ class FeatureProfile(Config2Item):
     def parcel_id_mapping(self) -> Iterator[tuple[str, str]]:
         return ((old_parcel_id, new_parcel_id) for old_parcel_id, new_parcel_id in self._id_mapping.items())
 
+    @property
+    def parsed_parcels(self) -> Iterator[ProfileParcelModel]:
+        return (ProfileParcelModel(**raw_parcel) for raw_parcel in self.data.get(self.parcels_tag, []))
+
     def update_parcels_data(self, api: Rest, profile_id: str) -> None:
         def eval_parcel(parcel: ProfileParcelModel, *element_ids: str, parent_parcel_type: Optional[str] = None):
             api_path, _ = self.parcel_api_paths.api_path(PathKey(parcel.parcelType, parent_parcel_type))
@@ -1036,15 +1040,22 @@ class FeatureProfile(Config2Item):
             eval_root_parcel(raw_parcel) for raw_parcel in self.data.get(self.parcels_tag, [])
         ]
 
-    def associated_parcels(self, new_profile_id: str) -> Generator[tuple[ApiPath, str, dict[str, Any]], str, None]:
+    def associated_parcels(self, new_profile_id: str, merge_profile: Optional['FeatureProfile'] = None
+                           ) -> Generator[tuple[ApiPath, str, dict[str, Any]], str, None]:
         def parcel_ordering(parcel_obj):
             if self.parcel_api_paths.is_referenced_type(parcel_obj.parcelType):
                 return 0 if not self.parcel_api_paths.is_parent_type(parcel_obj.parcelType) else 1
 
             return 2
 
-        root_parcels = (ProfileParcelModel(**raw_parcel) for raw_parcel in self.data.get(self.parcels_tag, []))
-        for root_parcel in sorted(root_parcels, key=parcel_ordering):
+        target_parcels = {
+            parcel_obj.payload.name for parcel_obj in merge_profile.parsed_parcels
+        } if merge_profile is not None else set()
+
+        for root_parcel in sorted(self.parsed_parcels, key=parcel_ordering):
+            if root_parcel.payload.name in target_parcels:
+                continue
+
             # Traverse parcel tree under this root parcel
             yield from self.profile_parcel_coro(root_parcel, new_profile_id)
 
