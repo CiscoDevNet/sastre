@@ -9,7 +9,8 @@ from cisco_sdwan.base.rest_api import Rest, RestAPIException, is_version_newer, 
 from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL, ordered_tags, is_index_supported
 from cisco_sdwan.base.models_base import UpdateEval, ServerInfo, ModelException
 from cisco_sdwan.base.models_vmanage import (DeviceTemplateIndex, PolicyVsmartIndex, EdgeInventory, ControlInventory,
-                                             CheckVBond, FeatureProfile, ConfigGroupIndex)
+                                             CheckVBond, FeatureProfile, ConfigGroupIndex, ProfileSdwanPolicy,
+                                             ProfileSdwanPolicyIndex)
 from cisco_sdwan.tasks.utils import (TaskOptions, TagOptions, regex_type, default_workdir, existing_workdir_type,
                                      TrackedValidator, ConditionalValidator, zip_file_type)
 from cisco_sdwan.tasks.common import regex_search, Task, WaitActionsException, clean_dir, archive_extract
@@ -76,7 +77,7 @@ class TaskRestore(Task):
             self.log_info(f'Restore task: Local workdir: "{parsed_args.workdir}" -> vManage URL: "{api.base_url}"')
 
         local_info = ServerInfo.load(parsed_args.workdir)
-        # Server info file may not be present (e.g. backup from older Sastre releases)
+        # Server info file may not be present (e.g., backup from older Sastre releases)
         if local_info is not None and is_version_newer(api.server_version, local_info.server_version):
             self.log_warning(f'Target vManage release ({api.server_version}) is older than the release used in backup '
                              f'({local_info.server_version}). Items may fail to restore due to incompatibilities.')
@@ -107,22 +108,29 @@ class TaskRestore(Task):
                                                                 catalog_iter(tag, version=api.server_version))
             )
             for info, index, loaded_items_iter in tag_iter:
-                target_item_map = target_all_items_map.get(hash(type(index)))
+                target_item_map: dict[str,str] = target_all_items_map.get(hash(type(index)))
                 if target_item_map is None:
                     # Logging at warning level because the backup files did have this item
                     self.log_warning(f'Will skip {info}, item not supported by target vManage')
                     continue
 
+                # Special treatment for policy objects. Since only one policy object is allowed, policy object parcels
+                # from the backup need to be merged into the policy object in the target vManage.
+                if isinstance(index, ProfileSdwanPolicyIndex):
+                    target_policy_obj_id = next(iter(target_item_map.values()), None)
+                else:
+                    target_policy_obj_id = None
+
                 restore_item_list = []
                 for item_id, item in loaded_items_iter:
-                    target_id = target_item_map.get(item.name)
+                    target_id = target_item_map.get(item.name) if target_policy_obj_id is None else target_policy_obj_id
                     if target_id is not None:
                         # Item already exists on target vManage, record item id from target
                         if item_id != target_id:
                             id_mapping[item_id] = target_id
 
-                        if not parsed_args.update:
-                            # Existing item on target vManage will be used, i.e. will not update it
+                        if not parsed_args.update and target_policy_obj_id is None:
+                            # Existing item on target vManage will be used, i.e., will not update it
                             self.log_debug(f'Will skip {info} {item.name}, item already on target vManage')
                             continue
 
@@ -135,8 +143,8 @@ class TaskRestore(Task):
                     if item_matches:
                         match_set.add(item_id)
                     if item_matches or item_id in dependency_set:
-                        # A target_id that is not None signals a put operation (update), as opposed to post.
-                        # target_id will be None unless --update is specified and item name is on target
+                        # When target_id is not None, it signals a put operation (update), as opposed to post.
+                        # Target_id will be None unless --update is specified and item name is on target
                         # Read-only items are added only if they are in dependency_set
                         restore_item_list.append((item_id, item, target_id))
                         dependency_set.update(item.id_references_set)
@@ -167,7 +175,7 @@ class TaskRestore(Task):
 
     def is_vbond_configured(self, api: Rest) -> bool:
         if api.is_multi_tenant and not api.is_provider:
-            # Cannot explicitly check vBond configuration with tenant account, assume it is configured
+            # Cannot explicitly check vBond configuration when using a tenant account, assume it is configured
             return True
 
         check_vbond = CheckVBond.get(api)
@@ -176,6 +184,26 @@ class TaskRestore(Task):
             return False
 
         return check_vbond.is_configured
+
+    def create_linked_parcels(self, api: Rest, feature_profile: FeatureProfile, new_profile_id: str,
+                              log_info: str, restore_reason: str,
+                              merge_feature_profile: Optional[FeatureProfile] = None) -> None:
+        op_info = 'Create' if merge_feature_profile is None else 'Merge'
+        parcel_coro = feature_profile.associated_parcels(new_profile_id, merge_feature_profile)
+
+        with suppress(StopIteration):
+            new_parcel_id = None
+            while True:
+                try:
+                    if new_parcel_id is None:
+                        api_path, p_info, p_payload = next(parcel_coro)
+                    else:
+                        api_path, p_info, p_payload = parcel_coro.send(new_parcel_id)
+
+                    new_parcel_id = response_id(api.post(p_payload, api_path.post))
+                    self.log_info(f'Done: {op_info} {log_info} {feature_profile.name} parcel {p_info}{restore_reason}')
+                except (ModelException, RestAPIException) as ex:
+                    self.log_error(f'Failed: {op_info} {log_info} {feature_profile.name} parcel{restore_reason}: {ex}')
 
     def restore_config_items(self, api: Rest, restore_list: Sequence[tuple], id_mapping: dict[str, str],
                              dependency_set: set[str], match_set: set[str]) -> None:
@@ -198,31 +226,28 @@ class TaskRestore(Task):
                         if self.is_dryrun:
                             self.log_info(f'{op_info} {info} {item.name}{reason}')
                             continue
-                        # Not using id returned from post because post can return empty (e.g. local policies)
+                        # Not using the id returned from post because post can return empty (e.g., local policies)
                         response = api.post(item.post_data(id_mapping), item.api_path.post)
                         pushed_item_dict[item.name] = item_id
 
                         # Special case for FeatureProfiles, creating linked parcels
                         if isinstance(item, FeatureProfile):
-                            parcel_coro = item.associated_parcels(response_id(response))
-                            with suppress(StopIteration):
-                                new_parcel_id = None
-                                while True:
-                                    try:
-                                        if new_parcel_id is None:
-                                            api_path, p_info, p_payload = next(parcel_coro)
-                                        else:
-                                            api_path, p_info, p_payload = parcel_coro.send(new_parcel_id)
-
-                                        new_parcel_id = response_id(api.post(p_payload, api_path.post))
-                                    except ModelException as ex:
-                                        self.log_error(f'Failed: {op_info} {info} {item.name} parcel{reason}: {ex}')
-                                    else:
-                                        self.log_info(f'Done: {op_info} {info} {item.name} parcel {p_info}{reason}')
-
+                            self.create_linked_parcels(api, item, response_id(response), info, reason)
                             # Retrieve id mapping for parcels in this feature profile
-                            # noinspection PyUnreachableCode
                             parcel_id_mapping.update(item.parcel_id_mapping())
+
+                    elif isinstance(item, ProfileSdwanPolicy):
+                        # Special case for policy objects, creating linked parcels in the existing policy-object
+                        target_policy_obj = ProfileSdwanPolicy.get(api, target_id)
+                        if target_policy_obj is None:
+                            self.log_warning(f'Failed: Merge {info} {item.name}: Could not retrieve the '
+                                             'policy-object')
+                            continue
+
+                        self.create_linked_parcels(api, item, target_id, info, reason, target_policy_obj)
+                        # Retrieve id mapping for parcels in the policy-object
+                        parcel_id_mapping.update(item.parcel_id_mapping())
+
                     else:
                         # Update existing item
                         if item.is_readonly:
