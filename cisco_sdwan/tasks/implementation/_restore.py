@@ -1,6 +1,7 @@
 import argparse
 from typing import Union, Optional
 from collections.abc import Sequence
+from functools import partial
 from pydantic import model_validator, field_validator
 from uuid import uuid4
 from contextlib import suppress
@@ -13,7 +14,7 @@ from cisco_sdwan.base.models_vmanage import (DeviceTemplateIndex, PolicyVsmartIn
                                              ProfileSdwanPolicyIndex)
 from cisco_sdwan.tasks.utils import (TaskOptions, TagOptions, regex_type, default_workdir, existing_workdir_type,
                                      TrackedValidator, ConditionalValidator, zip_file_type)
-from cisco_sdwan.tasks.common import regex_search, Task, WaitActionsException, clean_dir, archive_extract
+from cisco_sdwan.tasks.common import regex_filter, Task, WaitActionsException, clean_dir, archive_extract
 from cisco_sdwan.tasks.models import TaskArgs, CatalogTag, validate_workdir_conditional
 from cisco_sdwan.tasks.validators import validate_regex, validate_zip_file
 
@@ -66,6 +67,8 @@ class TaskRestore(Task):
 
         self.is_dryrun = parsed_args.dryrun
 
+        regex_filter_fn = partial(regex_filter, parsed_args.regex, parsed_args.not_regex)
+
         if parsed_args.archive:
             self.log_info(f'Restore task: Local archive file: "{parsed_args.archive}" -> vManage URL: "{api.base_url}"')
             parsed_args.workdir = str(uuid4())
@@ -110,7 +113,7 @@ class TaskRestore(Task):
             for info, index, loaded_items_iter in tag_iter:
                 target_item_map: dict[str,str] = target_all_items_map.get(hash(type(index)))
                 if target_item_map is None:
-                    # Logging at warning level because the backup files did have this item
+                    # Logging at the warning level because the backup files did have this item
                     self.log_warning(f'Will skip {info}, item not supported by target vManage')
                     continue
 
@@ -134,17 +137,15 @@ class TaskRestore(Task):
                             self.log_debug(f'Will skip {info} {item.name}, item already on target vManage')
                             continue
 
-                    regex = parsed_args.regex or parsed_args.not_regex
-                    item_matches = (
-                            not item.is_readonly and
-                            (parsed_args.tag == CATALOG_TAG_ALL or parsed_args.tag == tag) and
-                            (regex is None or regex_search(regex, item.name, inverse=parsed_args.regex is None))
+                    item_match = (
+                            not item.is_readonly and (parsed_args.tag == CATALOG_TAG_ALL or parsed_args.tag == tag) and
+                            regex_filter_fn(item.name)
                     )
-                    if item_matches:
+                    if item_match:
                         match_set.add(item_id)
-                    if item_matches or item_id in dependency_set:
+                    if item_match or item_id in dependency_set:
                         # When target_id is not None, it signals a put operation (update), as opposed to post.
-                        # Target_id will be None unless --update is specified and item name is on target
+                        # Target_id will be None unless --update is specified and the item name is on target
                         # Read-only items are added only if they are in dependency_set
                         restore_item_list.append((item_id, item, target_id))
                         dependency_set.update(item.id_references_set)
@@ -185,25 +186,32 @@ class TaskRestore(Task):
 
         return check_vbond.is_configured
 
-    def create_linked_parcels(self, api: Rest, feature_profile: FeatureProfile, new_profile_id: str,
-                              log_info: str, restore_reason: str,
-                              merge_feature_profile: Optional[FeatureProfile] = None) -> None:
-        op_info = 'Create' if merge_feature_profile is None else 'Merge'
-        parcel_coro = feature_profile.associated_parcels(new_profile_id, merge_feature_profile)
+    def create_linked_parcels(self, api: Rest, backup_profile: FeatureProfile, new_profile_id: str, info: str,
+                              restore_reason: str, target_profile: Optional[FeatureProfile] = None) -> None:
+        common_log = f'{"Create" if target_profile is None else "Merge"} {info} {backup_profile.name} parcel'
+        parcel_coro = backup_profile.associated_parcels(new_profile_id, target_profile=target_profile)
 
         with suppress(StopIteration):
             new_parcel_id = None
             while True:
                 try:
                     if new_parcel_id is None:
-                        api_path, p_info, p_payload = next(parcel_coro)
+                        parcel_info = next(parcel_coro)
                     else:
-                        api_path, p_info, p_payload = parcel_coro.send(new_parcel_id)
+                        parcel_info = parcel_coro.send(new_parcel_id)
 
-                    new_parcel_id = response_id(api.post(p_payload, api_path.post))
-                    self.log_info(f'Done: {op_info} {log_info} {feature_profile.name} parcel {p_info}{restore_reason}')
+                    if (target_profile is not None) and (parcel_info.target_id is not None):
+                        new_parcel_id = parcel_info.target_id
+                        self.log_debug(f'Skipped: {common_log} {parcel_info.name}' 
+                                       f'{" (reference)" if parcel_info.is_reference else ""}'
+                                       f'{restore_reason}, already on target vManage')
+                        continue
+
+                    new_parcel_id = response_id(api.post(parcel_info.payload, parcel_info.api_path.post))
+                    self.log_info(f'Done: {common_log} {parcel_info.name}'
+                                  f'{" (reference)" if parcel_info.is_reference else ""}{restore_reason}')
                 except (ModelException, RestAPIException) as ex:
-                    self.log_error(f'Failed: {op_info} {log_info} {feature_profile.name} parcel{restore_reason}: {ex}')
+                    self.log_error(f'Failed: {common_log}{restore_reason}: {ex}')
 
     def restore_config_items(self, api: Rest, restore_list: Sequence[tuple], id_mapping: dict[str, str],
                              dependency_set: set[str], match_set: set[str]) -> None:
@@ -211,14 +219,13 @@ class TaskRestore(Task):
         # level items). The reverse order needs to be followed on restore.
         for info, index, restore_item_list in reversed(restore_list):
             pushed_item_dict = {}
-            parcel_id_mapping = {}
             for item_id, item, target_id in restore_item_list:
                 op_info = 'Create' if target_id is None else 'Update'
                 reason = ' (dependency)' if item_id in dependency_set - match_set else ''
 
                 try:
                     if target_id is None:
-                        # Create new item
+                        # Create a new item
                         if item.is_readonly:
                             self.log_warning(f'Factory default {info} {item.name} is a dependency that is missing '
                                              'on target vManage. Will be converted to non-default.')
@@ -232,21 +239,27 @@ class TaskRestore(Task):
 
                         # Special case for FeatureProfiles, creating linked parcels
                         if isinstance(item, FeatureProfile):
+                            item.set_global_id_mapping(id_mapping)
                             self.create_linked_parcels(api, item, response_id(response), info, reason)
                             # Retrieve id mapping for parcels in this feature profile
-                            parcel_id_mapping.update(item.parcel_id_mapping())
+                            id_mapping.update(item.parcel_id_mapping())
 
                     elif isinstance(item, ProfileSdwanPolicy):
                         # Special case for policy objects, creating linked parcels in the existing policy-object
                         target_policy_obj = ProfileSdwanPolicy.get(api, target_id)
                         if target_policy_obj is None:
-                            self.log_warning(f'Failed: Merge {info} {item.name}: Could not retrieve the '
-                                             'policy-object')
+                            self.log_warning(f'Failed: Merge {info} {item.name}: Could not read from target vManage')
+                            continue
+                        self.log_info(f'Retrieved {info} {item.name}{reason} from target vManage')
+
+                        if self.is_dryrun:
+                            self.log_info(f'Merge {info} {item.name}{reason}')
                             continue
 
+                        item.set_global_id_mapping(id_mapping)
                         self.create_linked_parcels(api, item, target_id, info, reason, target_policy_obj)
                         # Retrieve id mapping for parcels in the policy-object
-                        parcel_id_mapping.update(item.parcel_id_mapping())
+                        id_mapping.update(item.parcel_id_mapping())
 
                     else:
                         # Update existing item
@@ -301,8 +314,6 @@ class TaskRestore(Task):
             except RestAPIException as ex:
                 self.log_critical(f'Failed retrieving {info}: {ex}')
                 break
-            else:
-                id_mapping.update(parcel_id_mapping)
 
     def restore_deployments(self, api: Rest, workdir: str) -> None:
         saved_groups_index = ConfigGroupIndex.load(workdir)

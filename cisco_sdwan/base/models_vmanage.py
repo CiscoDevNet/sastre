@@ -877,8 +877,8 @@ class ProfileSdwanPolicy(FeatureProfile):
     api_path = ApiPath('v1/feature-profile/sdwan/policy-object')
     store_path = ('feature_profiles', 'sdwan', 'policy_object')
 
-    parcel_names = (
-        "app-list", "app-probe", "as-path", "class", "color", "data-prefix", "data-ipv6-prefix", "ext-community",
+    ordered_parcel_names = (
+        "app-list", "class", "app-probe", "as-path",  "color", "data-prefix", "data-ipv6-prefix", "ext-community",
         "standard-community", "expanded-community", "ipv6-prefix", "mirror", "policer", "preferred-color-group",
         "prefix", "security-zone", "security-scalablegrouptag", "security-identity", "security-geolocation",
         "security-protocolname", "security-urllist", "security-ipssignature", "security-localdomain",
@@ -888,7 +888,7 @@ class ProfileSdwanPolicy(FeatureProfile):
         "ipv4-network-object-group", "ipv4-service-object-group"
     )
     parcel_api_paths = ApiPathGroup({
-        name: ApiPath(f"v1/feature-profile/sdwan/policy-object/{{policyId}}/{name}") for name in parcel_names
+        name: ApiPath(f"v1/feature-profile/sdwan/policy-object/{{policyId}}/{name}") for name in ordered_parcel_names
     })
 
 
@@ -923,6 +923,8 @@ class ProfileSdwanSystemIndex(FeatureProfileIndex):
 class ProfileSdwanService(FeatureProfile):
     api_path = ApiPath('v1/feature-profile/sdwan/service')
     store_path = ('feature_profiles', 'sdwan', 'service')
+    ordered_parcel_names = ("route-policy", "routing/bgp", "routing/ospf", "routing/eigrp", "routing/ospfv3/ipv4",
+                            "routing/ospfv3/ipv6", "routing/multicast")
     parcel_api_paths = ApiPathGroup({
         "dhcp-server": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/dhcp-server"),
         "routing/bgp": ApiPath("v1/feature-profile/sdwan/service/{serviceId}/routing/bgp"),
@@ -990,7 +992,10 @@ class ProfileSdwanService(FeatureProfile):
         PathKey("route-policy", "routing/ospfv3/ipv4"): ...,
         PathKey("route-policy", "routing/ospfv3/ipv6"): ...,
         PathKey("route-policy", "lan/vpn"): ...,
-    } | {PathKey(policy_obj_parcel, "route-policy"): ... for policy_obj_parcel in ProfileSdwanPolicy.parcel_names})
+    } | {
+        PathKey(policy_obj_parcel, "route-policy"): ...
+        for policy_obj_parcel in ProfileSdwanPolicy.ordered_parcel_names
+    })
 
 
 @register('feature_profile', 'SDWAN service profile', ProfileSdwanService, min_version='20.8')
@@ -1100,7 +1105,10 @@ class ProfileSdwanTransport(FeatureProfile):
         PathKey("ipv6-acl", "wan/vpn/interface/dsl-pppoe"): ...,
         PathKey("ipv6-acl", "wan/vpn/interface/dsl-pppoa"): ...,
         PathKey("ipv6-acl", "wan/vpn/interface/ethpppoe"): ...,
-    } | {PathKey(policy_obj_parcel, "route-policy"): ... for policy_obj_parcel in ProfileSdwanPolicy.parcel_names})
+    } | {
+        PathKey(policy_obj_parcel, "route-policy"): ...
+        for policy_obj_parcel in ProfileSdwanPolicy.ordered_parcel_names
+    })
 
 
 @register('feature_profile', 'SDWAN transport profile', ProfileSdwanTransport, min_version='20.8')
@@ -1175,8 +1183,8 @@ class ProfileSdwanApplicationPriority(FeatureProfile):
         "policy-settings": ApiPath("v1/feature-profile/sdwan/application-priority/{appPriorityId}/policy-settings"),
         "cloud-probe": ApiPath("v1/feature-profile/sdwan/application-priority/{appPriorityId}/cloud-probe")
     }, parcel_reference_path_map={
-        PathKey(policy_object_parcel, parcel): ...
-        for parcel in ('qos-policy', 'traffic-policy') for policy_object_parcel in ProfileSdwanPolicy.parcel_names
+        PathKey(policy_obj_parcel, parcel): ...
+        for parcel in ('qos-policy', 'traffic-policy') for policy_obj_parcel in ProfileSdwanPolicy.ordered_parcel_names
     })
 
 

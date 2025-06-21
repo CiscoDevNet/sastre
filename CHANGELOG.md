@@ -13,6 +13,7 @@ Sastre 1.26 [, 2025]
   - Support for port-channel interfaces in service profiles.
   - Support for data-prefix references under SDWAN system profile ipv4-device-access-policy
   - Support for data-ipv6-prefix references under SDWAN system profile ipv6-device-access-policy
+- Restoring and deletion of policy-object feature profile parcels (items under Configuration > Policy Groups > Group of Interest) is now supported.
 
 #### Fixes:
 - Fix for security vulnerabilities identified by SonarCloud scan

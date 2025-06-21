@@ -1,6 +1,7 @@
 import argparse
 from typing import Union, Optional
 from pydantic import model_validator, field_validator
+from functools import partial
 from uuid import uuid4
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest, RestAPIException
@@ -10,7 +11,7 @@ from cisco_sdwan.base.models_vmanage import (DeviceConfig, DeviceConfigRFS, Devi
                                              DeviceTemplateValues, EdgeInventory, ControlInventory, EdgeCertificate,
                                              ConfigGroup, ConfigGroupValues, ConfigGroupAssociated)
 from cisco_sdwan.tasks.utils import TaskOptions, TagOptions, filename_type, regex_type, default_workdir
-from cisco_sdwan.tasks.common import regex_search, clean_dir, Task, archive_create
+from cisco_sdwan.tasks.common import regex_filter, clean_dir, Task, archive_create
 from cisco_sdwan.tasks.models import TaskArgs, CatalogTag
 from cisco_sdwan.tasks.validators import validate_regex, validate_filename
 
@@ -56,6 +57,8 @@ class TaskBackup(Task):
         else:
             self.log_info(f'Backup task: vManage URL: "{api.base_url}" -> Local workdir: "{parsed_args.workdir}"')
 
+        regex_filter_fn = partial(regex_filter, parsed_args.regex, parsed_args.not_regex)
+
         # Backup workdir must be empty for a new backup
         saved_workdir = clean_dir(parsed_args.workdir, max_saved=0 if parsed_args.no_rollover else 99)
         if saved_workdir:
@@ -68,7 +71,7 @@ class TaskBackup(Task):
         if parsed_args.save_running:
             self.save_running_configs(api, parsed_args.workdir)
 
-        # Backup items not registered to the catalog, but to be included when tag is 'all'
+        # Backup items not registered to the catalog, but to be included when the tag is 'all'
         if CATALOG_TAG_ALL in parsed_args.tags:
             edge_certs = EdgeCertificate.get(api)
             if edge_certs is None:
@@ -85,10 +88,8 @@ class TaskBackup(Task):
             if item_index.save(parsed_args.workdir):
                 self.log_info(f'Saved {info} index')
 
-            regex = parsed_args.regex or parsed_args.not_regex
             matched_item_iter = (
-                (item_id, item_name) for item_id, item_name in item_index
-                if regex is None or regex_search(regex, item_name, inverse=parsed_args.regex is None)
+                (item_id, item_name) for item_id, item_name in item_index if regex_filter_fn(item_name)
             )
             for item_id, item_name in matched_item_iter:
                 try:
