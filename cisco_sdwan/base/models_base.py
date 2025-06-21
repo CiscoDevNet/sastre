@@ -10,6 +10,7 @@ from os import environ
 from pathlib import Path
 from itertools import zip_longest
 from collections import namedtuple
+from dataclasses import dataclass
 from typing import Union, Any, Optional, NamedTuple
 from collections.abc import Mapping, Sequence, Iterator, Generator, Callable
 from operator import attrgetter
@@ -19,7 +20,7 @@ from pydantic import ConfigDict, BaseModel, Field
 from requests.exceptions import Timeout
 from .rest_api import RestAPIException, Rest, is_version_newer
 
-# Top-level directory for local data store
+# Top-level directory for the local data store
 SASTRE_ROOT_DIR = Path(environ.get('SASTRE_ROOT_DIR', Path.cwd()))
 DATA_DIR = str(Path(SASTRE_ROOT_DIR, 'data'))
 
@@ -31,7 +32,7 @@ IdName = namedtuple('IdName', ['id', 'name'])
 class UpdateEval:
     def __init__(self, data):
         self.is_policy = isinstance(data, list)
-        # Master template updates (PUT requests) return a dict containing 'data' key. Non-master templates don't.
+        # Master template updates (PUT requests) return a dict containing a 'data' key. Non-master templates don't.
         self.is_master = isinstance(data, dict) and 'data' in data
 
         # This is to homogenize the response payload variants
@@ -129,7 +130,7 @@ class CliOrFeatureApiPath:
         self.api_path_cli = api_path_cli
 
     def __get__(self, instance, owner):
-        # If called from class, assume it is a feature template
+        # If called from the class, assume it is a feature template
         is_cli_template = instance is not None and instance.is_type_cli
 
         return self.api_path_cli if is_cli_template else self.api_path_feature
@@ -189,7 +190,7 @@ class ApiPathGroup:
         """
         Indicates whether the provided parcel_type is a parent of a type that can be referenced
         @param parcel_type: Parcel type
-        @return: True if this parcel type is parent of one that can be referenced, False otherwise
+        @return: True if this parcel type is a parent of one that can be referenced, False otherwise
         """
         return parcel_type in self._parent_types
 
@@ -225,7 +226,7 @@ class OperationalItem:
         """
         Retrieve metadata about one or more fields.
         @param field_names: One or more field names to retrieve metadata from.
-        @param info: Indicate which metadata to retrieve. By default, field title is returned.
+        @param info: Indicate which metadata to retrieve. By default, the field title will be returned.
         @param default: Value to be returned when a field_name does not exist.
         @return: tuple with one or more elements representing the desired metadata for each field requested.
         """
@@ -236,7 +237,7 @@ class OperationalItem:
 
     def field_value_iter(self, *field_names: str, **conv_fn_map: Mapping[str, Callable]) -> Iterator[namedtuple]:
         """
-        Iterate over entries of an operational item instance. Only fields/columns defined by field_names are yield.
+        Iterate over entries of an operational item instance. Only fields/columns defined by field_names are yielded.
         Type conversion of one or more fields is supported by passing a callable that takes one argument (the field
         value) and returns the converted value. E.g., passing average_latency=int will convert a string average_latency
         field to an integer.
@@ -590,7 +591,7 @@ class ApiItem:
 
 class IndexApiItem(ApiItem):
     """
-    IndexApiItem is an index-type ApiItem that can be iterated over, returning iter_fields
+    IndexApiItem is an index-type ApiItem that can be iterated, returning iter_fields
     """
 
     def __init__(self, data):
@@ -676,13 +677,13 @@ class ConfigItem(ApiItem):
         """
         Factory method that loads data from a JSON file and returns a ConfigItem instance with that data
 
-        @param node_dir: String indicating directory under root_dir used for all files from a given vManage node.
+        @param node_dir: String indicating a directory under root_dir used for all files from a given vManage node.
         @param ext_name: True indicates that item_names need to be extended (with item_id) to make their
                          filename safe version unique. False otherwise.
         @param item_name: (Optional) Name of the item being loaded. Variable used to build the filename.
         @param item_id: (Optional) UUID for the item being loaded. Variable used to build the filename.
         @param raise_not_found: (Optional) If set to True, raise FileNotFoundError if the file is not found.
-        @param use_root_dir: True indicates that node_dir is under the root_dir. When false, item should be located
+        @param use_root_dir: True indicates that node_dir is under the root_dir. When false, the item should be located
                              directly under node_dir/store_path
         @return: ConfigItem object, or None if the file does not exist and raise_not_found=False
         """
@@ -704,9 +705,9 @@ class ConfigItem(ApiItem):
 
     def save(self, node_dir, ext_name=False, item_name=None, item_id=None):
         """
-        Save data (i.e. self.data) to a JSON file
+        Save data (i.e., self.data) to a JSON file
 
-        @param node_dir: String indicating directory under root_dir used for all files from a given vManage node.
+        @param node_dir: String indicating a directory under root_dir used for all files from a given vManage node.
         @param ext_name: True indicates that item_names need to be extended (with item_id) to make their
                          filename safe version unique. False otherwise.
         @param item_name: (Optional) Name of the item being saved. Variable used to build the filename.
@@ -727,7 +728,7 @@ class ConfigItem(ApiItem):
     def post_data(self, id_mapping_dict: Optional[Mapping[str, str]] = None) -> dict[str, Any]:
         """
         Build payload to be used for POST requests against this config item. From "self.data", perform item id
-        replacements defined in id_mapping_dict, also remove item id and rename item with new_name (if provided).
+        replacements defined in id_mapping_dict, also remove item id and rename it with new_name (if provided).
         @param id_mapping_dict: {<old item id>: <new item id>} dict. If provided, <old item id> matches are replaced
                                 with <new item id>
         @return: dict containing payload for POST requests
@@ -795,7 +796,7 @@ class ConfigItem(ApiItem):
     @property
     def crypt_cluster_values(self) -> Iterator[str]:
         """
-        Extracts values that have been encrypted by vManage. That is, with $CRYPT_CLUSTER$ prefix.
+        Extracts values that have been encrypted by vManage. That is, with a $CRYPT_CLUSTER$ prefix.
         """
         yield from re.findall(r'\$CRYPT_CLUSTER\$.+?(?=["\s\\])', json.dumps(self.data))
 
@@ -832,7 +833,7 @@ class ConfigItem(ApiItem):
 
 class IndexConfigItem(ConfigItem):
     """
-    IndexConfigItem is an index-type ConfigItem that can be iterated over, returning iter_fields
+    IndexConfigItem is an index-type ConfigItem that can be iterated, returning iter_fields
     """
     def __init__(self, data):
         """
@@ -851,7 +852,7 @@ class IndexConfigItem(ConfigItem):
             self.need_extended_name = False
 
     # Iter_fields should be defined in subclasses and needs to be a tuple subclass.
-    # When it follows the format (<item-id>, <item-name>), use an IdName namedtuple instead of regular tuple.
+    # When it follows the format (<item-id>, <item-name>), use an IdName namedtuple instead of a regular tuple.
     iter_fields = None
     # Extended_iter_fields should be defined in subclasses that use extended_iter, needs to be a tuple subclass.
     extended_iter_fields = None
@@ -917,8 +918,13 @@ class ProfileParcelPayloadModel(ConfigRequestModel):
 class ProfileParcelModel(ConfigRequestModel):
     parcelId: str
     parcelType: str
+    createdBy: str = ''
     payload: ProfileParcelPayloadModel
     subparcels: list['ProfileParcelModel'] = Field(default_factory=list)
+
+    @property
+    def is_system(self):
+        return self.createdBy == 'system'
 
 
 class ProfileParcelReferenceModel(ConfigRequestModel):
@@ -946,7 +952,7 @@ class Config2Item(ConfigItem):
     def post_data(self, id_mapping_dict: Optional[Mapping[str, str]] = None) -> dict[str, Any]:
         """
         Build payload to be used for POST requests against this config item. From "self.data", perform item id
-        replacements defined in id_mapping_dict, also remove item id and rename item with new_name (if provided).
+        replacements defined in id_mapping_dict, also remove item id and rename with new_name (if provided).
         @param id_mapping_dict: {<old item id>: <new item id>} dict. If provided, <old item id> matches are replaced
                                 with <new item id>
         @return: dict containing payload for POST requests
@@ -985,6 +991,16 @@ class Config2Item(ConfigItem):
         return update_ids(id_mapping_dict, payload.model_dump(by_alias=True, exclude_defaults=False))
 
 
+@dataclass
+class ParcelInfo:
+    api_path: ApiPath
+    name: str
+    payload: dict[str, Any]
+    target_id: Union[str, None]
+    is_system: bool
+    is_reference: bool
+
+
 class FeatureProfile(Config2Item):
     id_tag = 'profileId'
     name_tag = 'profileName'
@@ -992,6 +1008,8 @@ class FeatureProfile(Config2Item):
     parcels_tag = 'associatedProfileParcels'
     created_by_tag = 'createdBy'
     parcel_api_paths: Optional[ApiPathGroup] = None
+    # When overwritten, it specifies the order in which parcels need to be traversed during restore.
+    ordered_parcel_names: Optional[Sequence[str]] = None
 
     post_model = FeatureProfileModel
 
@@ -1000,6 +1018,11 @@ class FeatureProfile(Config2Item):
 
         # {<old parcel id>: <new parcel id>} map used to update parcel references with the new parcel ids
         self._id_mapping: dict[str, str] = {}
+        # similar to _id_mapping, but to allow id mapping across feature profiles.
+        self._global_id_mapping: dict[str, str] = {}
+
+        # Index dict used for defining traverse order. Used when ordered_parcel_names is provided
+        self._parcel_index = {parcel_name: index for index, parcel_name in enumerate(self.ordered_parcel_names or [])}
 
     @property
     def is_system(self):
@@ -1008,11 +1031,17 @@ class FeatureProfile(Config2Item):
     def parcel_id_mapping(self) -> Iterator[tuple[str, str]]:
         return ((old_parcel_id, new_parcel_id) for old_parcel_id, new_parcel_id in self._id_mapping.items())
 
+    def set_global_id_mapping(self, global_id_mapping: dict[str, str]):
+        self._global_id_mapping.update(global_id_mapping)
+
     @property
     def parsed_parcels(self) -> Iterator[ProfileParcelModel]:
         return (ProfileParcelModel(**raw_parcel) for raw_parcel in self.data.get(self.parcels_tag, []))
 
     def update_parcels_data(self, api: Rest, profile_id: str) -> None:
+        """
+        Updates feature profile internal data dictionary with parcel payload.
+        """
         def eval_parcel(parcel: ProfileParcelModel, *element_ids: str, parent_parcel_type: Optional[str] = None):
             api_path, _ = self.parcel_api_paths.api_path(PathKey(parcel.parcelType, parent_parcel_type))
             if api_path is None:
@@ -1040,28 +1069,40 @@ class FeatureProfile(Config2Item):
             eval_root_parcel(raw_parcel) for raw_parcel in self.data.get(self.parcels_tag, [])
         ]
 
-    def associated_parcels(self, new_profile_id: str, merge_profile: Optional['FeatureProfile'] = None
-                           ) -> Generator[tuple[ApiPath, str, dict[str, Any]], str, None]:
-        def parcel_ordering(parcel_obj):
-            if self.parcel_api_paths.is_referenced_type(parcel_obj.parcelType):
-                return 0 if not self.parcel_api_paths.is_parent_type(parcel_obj.parcelType) else 1
+    def parcel_sort_key(self, parcel_obj: ProfileParcelModel) -> int:
+        def parcel_order_fallback(p_obj: ProfileParcelModel) -> int:
+            if self.parcel_api_paths.is_referenced_type(p_obj.parcelType):
+                if not self.parcel_api_paths.is_parent_type(p_obj.parcelType):
+                    return len(self._parcel_index)
+                if not p_obj.subparcels:
+                    return len(self._parcel_index) + 1
+                return len(self._parcel_index) + 2
 
-            return 2
+            return len(self._parcel_index) + 3
 
-        target_parcels = {
-            parcel_obj.payload.name for parcel_obj in merge_profile.parsed_parcels
-        } if merge_profile is not None else set()
+        # Parcel ordering is defined by ordered_parcel_names. In case the parcelType is not in
+        # ordered_parcel_names, use parcel_order_fallback.
+        return self._parcel_index.get(parcel_obj.parcelType, parcel_order_fallback(parcel_obj))
 
-        for root_parcel in sorted(self.parsed_parcels, key=parcel_ordering):
-            if root_parcel.payload.name in target_parcels:
-                continue
+    def associated_parcels(self, new_profile_id: str, target_profile: Optional['FeatureProfile'] = None,
+                           delete_order: bool = False) -> Generator[ParcelInfo, str, None]:
+        target_parcels_dict: dict[str, ProfileParcelModel] = {
+            parcel_obj.payload.name: parcel_obj for parcel_obj in target_profile.parsed_parcels
+        } if target_profile is not None else {}
+
+        for root_parcel in sorted(self.parsed_parcels, key=self.parcel_sort_key, reverse=delete_order):
+            target_root_parcel = target_parcels_dict.get(root_parcel.payload.name)
+            if target_root_parcel is not None:
+                # Using the parcel with the same name on target vManage, update uuids
+                self._id_mapping[root_parcel.parcelId] = target_root_parcel.parcelId
 
             # Traverse parcel tree under this root parcel
-            yield from self.profile_parcel_coro(root_parcel, new_profile_id)
+            yield from self.profile_parcel_coro(
+                target_root_parcel or root_parcel, target_root_parcel is not None, new_profile_id
+            )
 
-    def profile_parcel_coro(
-            self, parcel: ProfileParcelModel, *element_ids: str,
-            parent_parcel_type: Optional[str] = None) -> Generator[tuple[ApiPath, str, dict[str, Any]], str, None]:
+    def profile_parcel_coro(self, parcel: ProfileParcelModel, is_target_parcel: bool, *element_ids: str,
+                            parent_parcel_type: Optional[str] = None) -> Generator[ParcelInfo, str, None]:
         """
         Iterate over Config 2.0 feature profile parcels, starting with the provided parcel and recursively checking
         sub-parcels it may contain.
@@ -1079,29 +1120,32 @@ class FeatureProfile(Config2Item):
             # This is a parcel reference that doesn't need to be explicitly created, so no further processing is needed
             return
 
+        combined_id_mapping: dict[str, str] = self._id_mapping | self._global_id_mapping
+
         if is_reference:
-            parcel_info = f'{parcel.payload.name} (parcel reference)'
+            if parcel.parcelId not in combined_id_mapping:
+                raise ModelException(f"{parcel.payload.name}: Referenced parcel ID not found: {parcel.parcelId}")
 
-            new_parcel_id = self._id_mapping.get(parcel.parcelId)
-            if new_parcel_id is None:
-                raise ModelException(f"{parcel_info}: Referenced parcel ID not found")
-
-            parcel_payload = ProfileParcelReferenceModel(parcelId=new_parcel_id)
+            parcel_payload = ProfileParcelReferenceModel(parcelId=parcel.parcelId)
         else:
-            parcel_info = parcel.payload.name
             parcel_payload = parcel.payload
 
-        new_element_id = yield (
-            api_path.resolve(*element_ids),
-            parcel_info,
-            update_ids(self._id_mapping, parcel_payload.model_dump(by_alias=True, exclude_defaults=True))
+        new_element_id = yield ParcelInfo(
+            api_path=api_path.resolve(*element_ids),
+            name=parcel.payload.name,
+            payload=update_ids(combined_id_mapping, parcel_payload.model_dump(by_alias=True, exclude_defaults=True)),
+            target_id=parcel.parcelId if is_target_parcel else None,
+            is_system=parcel.is_system,
+            is_reference=is_reference
         )
 
         self._id_mapping[parcel.parcelId] = new_element_id
         new_element_ids = element_ids + (new_element_id,)
 
-        for sub_parcel in parcel.subparcels:
-            yield from self.profile_parcel_coro(sub_parcel, *new_element_ids, parent_parcel_type=parcel.parcelType)
+        for sub_parcel in sorted(parcel.subparcels, key=self.parcel_sort_key):
+            yield from self.profile_parcel_coro(
+                sub_parcel, is_target_parcel, *new_element_ids, parent_parcel_type=parcel.parcelType
+            )
 
     @classmethod
     def get_raise(cls, api: Rest, *args, **kwargs):
@@ -1183,7 +1227,7 @@ class ServerInfo:
 
     def save(self, node_dir):
         """
-        Save data (i.e. self.data) to a JSON file
+        Save data (i.e., self.data) to a JSON file
 
         @param node_dir: String indicating directory under root_dir used for all files from a given vManage node.
         @return: True indicates data has been saved. False indicates no data to save (and no file has been created).
@@ -1201,7 +1245,7 @@ def filename_safe(name: str, lower: bool = False) -> str:
     """
     Perform the necessary replacements in <name> to make it filename safe.
     Any char that is not a-z, A-Z, 0-9, '_', ' ', or '-' is replaced with '_'. Convert to lowercase if lower=True.
-    @param lower: If True, apply str.lower() to result.
+    @param lower: If True, apply str.lower() to the result.
     @param name: name string to be converted
     @return: string containing the filename-save version of item_name
     """

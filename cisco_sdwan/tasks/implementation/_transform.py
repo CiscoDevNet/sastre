@@ -15,7 +15,7 @@ from cisco_sdwan.base.models_vmanage import DeviceTemplate, DeviceTemplateAttach
 from cisco_sdwan.base.processor import StopProcessorException, ProcessorException
 from cisco_sdwan.tasks.utils import (TaskOptions, TagOptions, existing_workdir_type, filename_type, ext_template_type,
                                      regex_type, existing_file_type)
-from cisco_sdwan.tasks.common import clean_dir, Task, TaskException, regex_search
+from cisco_sdwan.tasks.common import clean_dir, Task, TaskException, regex_filter
 from cisco_sdwan.tasks.models import const, TaskArgs, CatalogTag
 from cisco_sdwan.tasks.validators import (validate_workdir, validate_ext_template, validate_filename, validate_regex,
                                           validate_existing_file, validate_json)
@@ -91,7 +91,7 @@ class Processor:
 
     def match(self, name: str, tag: str) -> ProcessorMatch:
         """
-        Checks whether the config item matches this processor, that is, if item name and tag matches any recipe rule.
+        Checks whether the config item matches this processor, that is, if the item name and tag match any recipe rule.
         In case of a match, a new name may be provided (based on recipe rules):
         - If name_map is defined in the recipe and there is mapping for the current name, then use it.
         - If name_regex is defined in the recipe, then use it to build the new name.
@@ -109,10 +109,9 @@ class Processor:
             return ProcessorMatch(True, self.recipe.name_map[name])
 
         # Match regex / name_regex
-        if self.recipe.name_template is not None:
-            regex = self.recipe.name_template.regex or self.recipe.name_template.not_regex
-            if regex is None or regex_search(regex, name, inverse=self.recipe.name_template.regex is None):
-                return ProcessorMatch(True, ExtendedTemplate(self.recipe.name_template.name_regex)(name))
+        if self.recipe.name_template is not None and regex_filter(self.recipe.name_template.regex,
+                                                                  self.recipe.name_template.not_regex, name):
+            return ProcessorMatch(True, ExtendedTemplate(self.recipe.name_template.name_regex)(name))
 
         # Match crypt_updates
         if self.recipe.crypt_updates is not None and name in {rsc.resource_name for rsc in self.recipe.crypt_updates}:
@@ -297,7 +296,7 @@ class TaskTransform(Task):
         except (ValidationError, RecipeException) as ex:
             raise TaskException(f'Error loading transform recipe: {ex}') from None
 
-        # Output directory must be empty for a new transform
+        # The output directory must be empty for a new transform
         saved_output = clean_dir(parsed_args.output, max_saved=0 if parsed_args.no_rollover else 99)
         if saved_output:
             self.log_info(f'Previous output under "{parsed_args.output}" was saved as "{saved_output}"')
@@ -369,7 +368,7 @@ class TaskTransform(Task):
                                         self.processor_eval(b_processor, item.attach_values, new_name, new_id)
                                     )
 
-                            # When item name is unchanged, always replace source
+                            # When the item name is unchanged, always replace the source
                             if processor.replace_source or match_result.new_name is None:
                                 self.log_info(f'Replacing {info}: {item_name} -> {new_name}')
                                 item = new_item
@@ -475,7 +474,7 @@ class TaskTransform(Task):
             if is_api:
                 devices_attached = DeviceTemplateAttached.get_raise(backend, item_id)
             else:
-                # devices_attached will be None if there are no attachments (i.e. file is not present)
+                # devices_attached will be None if there are no attachments (i.e., the file is not present)
                 devices_attached = DeviceTemplateAttached.load(backend, ext_name, item_name, item_id)
 
             if devices_attached is not None and not devices_attached.is_empty:

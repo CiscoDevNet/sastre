@@ -1,12 +1,16 @@
 import argparse
 from typing import Union, Optional
+from collections.abc import Callable
+from contextlib import suppress
+from functools import partial
 from pydantic import model_validator, field_validator
 from cisco_sdwan.__version__ import __doc__ as title
+from cisco_sdwan.base.models_base import FeatureProfile, ModelException
 from cisco_sdwan.base.rest_api import Rest, RestAPIException
 from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL, ordered_tags, is_index_supported
-from cisco_sdwan.base.models_vmanage import DeviceTemplateIndex, ConfigGroupIndex
+from cisco_sdwan.base.models_vmanage import DeviceTemplateIndex, ConfigGroupIndex, ProfileSdwanPolicy
 from cisco_sdwan.tasks.utils import TaskOptions, TagOptions, regex_type
-from cisco_sdwan.tasks.common import regex_search, Task, WaitActionsException
+from cisco_sdwan.tasks.common import regex_filter, Task, WaitActionsException
 from cisco_sdwan.tasks.models import TaskArgs, CatalogTag
 from cisco_sdwan.tasks.validators import validate_regex
 
@@ -38,6 +42,8 @@ class TaskDelete(Task):
     def runner(self, parsed_args, api: Optional[Rest] = None) -> Union[None, list]:
         self.is_dryrun = parsed_args.dryrun
         self.log_info(f'Delete task: vManage URL: "{api.base_url}"')
+
+        regex_filter_fn = partial(regex_filter, parsed_args.regex, parsed_args.not_regex)
 
         if parsed_args.detach:
             try:
@@ -90,21 +96,27 @@ class TaskDelete(Task):
 
         for tag in ordered_tags(parsed_args.tag, parsed_args.tag != CATALOG_TAG_ALL):
             self.log_info(f'Inspecting {tag} items', dryrun=False)
-            regex = parsed_args.regex or parsed_args.not_regex
             matched_item_iter = (
                 (item_name, item_id, item_cls, info)
                 for _, info, index, item_cls in self.index_iter(api, catalog_iter(tag, version=api.server_version))
                 for item_id, item_name in index
-                if regex is None or regex_search(regex, item_name, inverse=parsed_args.regex is None)
+                if regex_filter_fn(item_name) or issubclass(item_cls, ProfileSdwanPolicy)
             )
             for item_name, item_id, item_cls, info in matched_item_iter:
                 item = item_cls.get(api, item_id)
                 if item is None:
                     self.log_warning(f'Failed retrieving {info} {item_name}')
                     continue
+
+                if isinstance(item, ProfileSdwanPolicy):
+                    # Special case for policy objects, which cannot be deleted, allowing deletion of its parcels only
+                    self.delete_linked_parcels(api, item, item_id, info, regex_filter_fn)
+                    continue
+
                 if item.is_readonly or item.is_system:
                     self.log_debug(f'Skipped {"read-only" if item.is_readonly else "system"} {info} {item_name}')
                     continue
+
                 if self.is_dryrun:
                     self.log_info(f'Delete {info} {item_name}')
                     continue
@@ -117,6 +129,38 @@ class TaskDelete(Task):
                     self.log_info(f'Done: Delete {info} {item_name}')
 
         return
+
+    def delete_linked_parcels(self, api: Rest, target_profile: FeatureProfile, profile_id: str,
+                              info: str, filter_fn: Callable[[str], bool]) -> None:
+        parcel_coro = target_profile.associated_parcels(profile_id, target_profile=target_profile, delete_order=True)
+
+        with suppress(StopIteration):
+            parcel_id = None
+            while True:
+                try:
+                    if parcel_id is None:
+                        parcel_info = next(parcel_coro)
+                    else:
+                        parcel_info = parcel_coro.send(parcel_id)
+
+                    parcel_id = parcel_info.target_id
+
+                    if not filter_fn(parcel_info.name):
+                        # Parcel did not match the filter
+                        continue
+
+                    if parcel_info.is_system:
+                        self.log_debug(f'Skipped system {info} {target_profile.name} parcel {parcel_info.name}')
+                        continue
+
+                    if self.is_dryrun:
+                        self.log_info(f'Delete {info} {target_profile.name} parcel {parcel_info.name}')
+                        continue
+
+                    api.delete(parcel_info.api_path.delete, parcel_info.target_id)
+                    self.log_info(f'Done: Delete {info} {target_profile.name} parcel {parcel_info.name}')
+                except (ModelException, RestAPIException) as ex:
+                    self.log_error(f'Failed: Delete {info} {target_profile.name} parcel: {ex}')
 
 
 class DeleteArgs(TaskArgs):
