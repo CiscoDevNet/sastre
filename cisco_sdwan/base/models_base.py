@@ -899,13 +899,17 @@ class ConfigRequestModel(BaseModel):
 
 class FeatureProfileModel(ConfigRequestModel):
     name: str
-    description: str = ''
+    description: Optional[str] = None
 
-    # In 20.8.1 get profile contains 'profileName', while post/put requests require 'name' instead
     def __init__(self, **kwargs):
+        # In 20.8.1 get profile contains 'profileName', while post/put requests require 'name' instead
         name = kwargs.pop('name', None) or kwargs.pop('profileName', None)
         if name is not None:
             kwargs['name'] = name
+        # In 20.15, get profile may not contain 'description', while post/put requests require a 'description' field
+        if kwargs.get('description') is None:
+            kwargs['description'] = ''
+
         super().__init__(**kwargs)
 
 
@@ -944,7 +948,7 @@ class Config2Item(ConfigItem):
         exclude_set = self.skip_cmp_tag_set | {self.id_tag}
         put_model = self.put_model or self.post_model
 
-        local_cmp_dict = put_model(**self.data).model_dump(by_alias=True, exclude=exclude_set, exclude_defaults=False)
+        local_cmp_dict = put_model(**self.data).model_dump(by_alias=True, exclude=exclude_set, exclude_defaults=True)
         other_cmp_dict = {k: v for k, v in other.items() if k not in exclude_set}
 
         return sorted(json.dumps(local_cmp_dict)) == sorted(json.dumps(other_cmp_dict))
@@ -986,9 +990,9 @@ class Config2Item(ConfigItem):
         payload = op_model(**self.data)
 
         if id_mapping_dict is None:
-            return payload.model_dump(by_alias=True, exclude_defaults=False)
+            return payload.model_dump(by_alias=True, exclude_defaults=True)
 
-        return update_ids(id_mapping_dict, payload.model_dump(by_alias=True, exclude_defaults=False))
+        return update_ids(id_mapping_dict, payload.model_dump(by_alias=True, exclude_defaults=True))
 
 
 @dataclass
