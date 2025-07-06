@@ -1,4 +1,4 @@
-Sastre 1.26 [, 2025]
+Sastre 1.26 [July 7, 2025]
 ================================
 
 #### Improvements:
@@ -16,7 +16,8 @@ Sastre 1.26 [, 2025]
 - Restoring and deletion of policy-object feature profile parcels (items under Configuration > Policy Groups > Group of Interest) is now supported.
 
 #### Fixes:
-- Fix for security vulnerabilities identified by SonarCloud scan
+- Fix for security vulnerabilities identified by SonarCloud scan.
+- Zone-based firewall policy definitions restore would sometimes fail due to missing dependencies, this is now fixed.
 
 
 Sastre 1.25 [March 5, 2025]
