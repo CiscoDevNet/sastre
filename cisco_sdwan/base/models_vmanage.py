@@ -1181,7 +1181,8 @@ class ProfileSdwanApplicationPriority(FeatureProfile):
         "qos-policy": ApiPath("v1/feature-profile/sdwan/application-priority/{appPriorityId}/qos-policy"),
         "traffic-policy": ApiPath("v1/feature-profile/sdwan/application-priority/{appPriorityId}/traffic-policy"),
         "policy-settings": ApiPath("v1/feature-profile/sdwan/application-priority/{appPriorityId}/policy-settings"),
-        "cloud-probe": ApiPath("v1/feature-profile/sdwan/application-priority/{appPriorityId}/cloud-probe")
+        # cloud-probe is a system-created profile that cannot be explicitly created
+        "cloud-probe": ...
     }, parcel_reference_path_map={
         PathKey(policy_obj_parcel, parcel): ...
         for parcel in ('qos-policy', 'traffic-policy') for policy_obj_parcel in ProfileSdwanPolicy.ordered_parcel_names
@@ -1522,13 +1523,13 @@ class PolicyDefUrlfilteringIndex(PolicyDefIndex):
     store_file = 'policy_definitions_urlfiltering.json'
 
 
-class PolicyDefZonebasedfw(PolicyDef):
+class PolicyDefZoneBasedFw(PolicyDef):
     api_path = ApiPath('template/policy/definition/zonebasedfw')
     store_path = ('policy_definitions', 'ZoneBasedFW')
 
 
-@register('policy_definition', 'zone-based FW policy definition', PolicyDefZonebasedfw)
-class PolicyDefZonebasedfwIndex(PolicyDefIndex):
+@register('zbfw_policy_definition', 'zone-based FW policy definition', PolicyDefZoneBasedFw)
+class PolicyDefZoneBasedFwIndex(PolicyDefIndex):
     api_path = ApiPath('template/policy/definition/zonebasedfw', None, None, None)
     store_file = 'policy_definitions_zonebasedfw.json'
 

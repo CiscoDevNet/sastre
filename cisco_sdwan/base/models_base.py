@@ -1012,7 +1012,7 @@ class FeatureProfile(Config2Item):
     parcels_tag = 'associatedProfileParcels'
     created_by_tag = 'createdBy'
     parcel_api_paths: Optional[ApiPathGroup] = None
-    # When overwritten, it specifies the order in which parcels need to be traversed during restore.
+    # When overwritten by subclasses, it specifies the order in which parcels need to be traversed during restore.
     ordered_parcel_names: Optional[Sequence[str]] = None
 
     post_model = FeatureProfileModel
