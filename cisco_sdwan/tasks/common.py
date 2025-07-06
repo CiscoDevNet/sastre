@@ -31,7 +31,7 @@ def regex_search(regex: str, *fields: str, inverse: bool = False) -> bool:
     """
     Execute regular expression search on provided fields. Match fields in the order provided. Behavior is determined
     by the inverse field. With inverse False (default), returns True (i.e. match) if pattern matches any field. When
-    inverse is True, returns True if pattern does not match all fields
+    inverse is True, returns True if the pattern does not match all fields
     @param regex: Pattern to match
     @param fields: One or more strings to match
     @param inverse: False (default), or True to invert the match behavior.
@@ -39,6 +39,11 @@ def regex_search(regex: str, *fields: str, inverse: bool = False) -> bool:
     """
     op_fn = all if inverse else any  # Logical AND across all fields, else logical OR
     return op_fn(inverse ^ bool(re.search(regex, match_field)) for match_field in fields)
+
+
+def regex_filter(regex: Union[str, None], not_regex: Union[str, None], node_name: str) -> bool:
+    selected_regex = regex or not_regex
+    return selected_regex is None or regex_search(selected_regex, node_name, inverse=regex is None)
 
 
 class Tally:
@@ -237,6 +242,7 @@ class DryRunReport:
         return '\n'.join(self.render())
 
 
+# noinspection PyUnusedLocal,PyMethodMayBeStatic
 class Task:
     # Configuration parameters for wait_actions
     ACTION_INTERVAL = 10  # seconds

@@ -53,7 +53,7 @@ class TaskAttach(Task):
         vsmart_parser.add_argument('--activate', action='store_true',
                                    help='activate centralized policy after vSmart template attach/deploy')
 
-        # Parameters common to all sub-tasks
+        # Parameters common to all subtasks
         for sub_task in (edge_parser, vsmart_parser):
             sub_task.add_argument('--workdir', metavar='<directory>', type=existing_workdir_type,
                                   default=default_workdir(target_address), help='attach source (default: %(default)s)')
@@ -213,7 +213,7 @@ class TaskDetach(Task):
                                    device_sets=TaskDetach.vsmart_sets,
                                    set_title="vSmart")
 
-        # Parameters common to all sub-tasks
+        # Parameters common to all subtasks
         for sub_task in (edge_parser, vsmart_parser):
             sub_task.add_argument('--templates', metavar='<regex>', type=regex_type,
                                   help='regular expression selecting templates to detach. Match on template name.')

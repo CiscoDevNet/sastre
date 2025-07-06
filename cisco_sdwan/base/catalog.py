@@ -63,6 +63,7 @@ _tag_dependency_list = [
     'policy_vedge',
     'policy_security',
     'policy_voice',
+    'zbfw_policy_definition',
     'parent_policy_definition',
     'policy_definition',
     'policy_list',

@@ -1,3 +1,25 @@
+Sastre 1.26 [July 7, 2025]
+================================
+
+#### Improvements:
+- vManage 20.15 support, included support for the following API endpoints:
+  - New SDWAN policy-object parcels: ipv4-network-object-group, ipv4-service-object-group
+  - New SDWAN service profile parcels: objecttracker, objecttrackergroup, dual-router-ha
+  - New SDWAN transport profile parcels: ethpppoe, dsl-pppoa
+  - New SDWAN application-priority profile parcels: cloud-probe
+  - New SDWAN embedded-security profile parcels: security-data-ip-prefix
+  - New SD-Routing service profile parcels: multicloud-connection
+  - New SD-Routing transport profile parcels: multicloud-connection
+  - Support for port-channel interfaces in service profiles.
+  - Support for data-prefix references under SDWAN system profile ipv4-device-access-policy
+  - Support for data-ipv6-prefix references under SDWAN system profile ipv6-device-access-policy
+- Restoring and deletion of policy-object feature profile parcels (items under Configuration > Policy Groups > Group of Interest) is now supported.
+
+#### Fixes:
+- Fix for security vulnerabilities identified by SonarCloud scan.
+- Zone-based firewall policy definitions restore would sometimes fail due to missing dependencies, this is now fixed.
+
+
 Sastre 1.25 [March 5, 2025]
 ================================
 

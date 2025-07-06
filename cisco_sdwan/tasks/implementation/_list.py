@@ -2,6 +2,7 @@ import argparse
 from typing import Union, Optional
 from collections.abc import Callable
 from operator import itemgetter
+from functools import partial
 from pydantic import model_validator, field_validator
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest
@@ -11,7 +12,7 @@ from cisco_sdwan.base.models_vmanage import EdgeCertificate
 from cisco_sdwan.tasks.models import TableTaskArgs, CatalogTag, const
 from cisco_sdwan.tasks.utils import (TaskOptions, TagOptions, existing_workdir_type, filename_type, regex_type,
                                      ext_template_type)
-from cisco_sdwan.tasks.common import regex_search, Task, Table, get_table_filters, export_json
+from cisco_sdwan.tasks.common import regex_filter, Task, Table, get_table_filters, export_json
 from cisco_sdwan.tasks.validators import validate_workdir, validate_ext_template, validate_regex
 
 
@@ -145,14 +146,15 @@ class TaskList(Task):
 
         name_regex = ExtendedTemplate(parsed_args.name_regex)
 
+        regex_filter_fn = partial(regex_filter, parsed_args.regex, parsed_args.not_regex)
+
         # Within a given tag, table entries are sorted by item_name. Tag order is defined by the catalog
         table = Table('Name', 'Transformed', 'Tag', 'Type')
-        regex = parsed_args.regex or parsed_args.not_regex
         matched_items = [
             (item_name, name_regex(item_name), tag, info)
             for tag, info, index, item_cls in self.index_iter(backend, catalog_iter(*parsed_args.tags, version=version))
             for item_id, item_name in index
-            if regex is None or regex_search(regex, item_name, inverse=parsed_args.regex is None)
+            if regex_filter_fn(item_name)
         ]
         matched_items.sort(key=itemgetter(0))
         table.extend(matched_items)
