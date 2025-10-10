@@ -8,7 +8,7 @@ from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.models_base import FeatureProfile, ModelException
 from cisco_sdwan.base.rest_api import Rest, RestAPIException
 from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL, ordered_tags, is_index_supported
-from cisco_sdwan.base.models_vmanage import DeviceTemplateIndex, ConfigGroupIndex, ProfileSdwanPolicy
+from cisco_sdwan.base.models_vmanage import DeviceTemplateIndex, ConfigGroupIndex, ProfileSdwanPolicy, Tag
 from cisco_sdwan.tasks.utils import TaskOptions, TagOptions, regex_type
 from cisco_sdwan.tasks.common import regex_filter, Task, WaitActionsException
 from cisco_sdwan.tasks.models import TaskArgs, CatalogTag
@@ -122,7 +122,11 @@ class TaskDelete(Task):
                     continue
 
                 try:
-                    api.delete(item_cls.api_path.delete, item_id)
+                    if isinstance(item, Tag):
+                        # Special case for deleting tags, item id is passed as url parameter instead of in the path
+                        api.delete(item_cls.api_path.delete, **item_cls.delete_data(item_id))
+                    else:
+                        api.delete(item_cls.api_path.delete, item_id)
                 except RestAPIException as ex:
                     self.log_warning(f'Failed: Delete {info} {item_name}: {ex}')
                 else:
