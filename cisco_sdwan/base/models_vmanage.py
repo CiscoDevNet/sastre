@@ -444,6 +444,43 @@ def get_device_type(device_class: str, device_model: str) -> str:
 
 
 #
+# Tags
+#
+class Tag(ConfigItem):
+    api_path = ApiPath('v1/tags')
+    store_path = ('tags',)
+    id_tag = 'id'
+    name_tag = 'name'
+    # Skipping compare for all keys from tag payload to prevent update operations, which is not supported by vManage.
+    skip_cmp_tag_set = {'description', 'type', 'tagAssociation'}
+
+    @staticmethod
+    def delete_params(tag_id: str) -> dict[str, str]:
+        """
+        Build dictionary used to provide url parameters for api DELETE call
+        @param tag_id: Tag ID string
+        @return: Dictionary used to provide DELETE url parameters
+        """
+        return {
+            "tagId": tag_id,
+        }
+
+    def post_data(self, id_mapping_dict: Optional[Mapping[str, str]] = None) -> dict[str, Any]:
+        # Need to include this additional structure due to differences between get data (which is what is saved in
+        # the backup) and the required post data.
+        return {
+            'data': [super().post_data(id_mapping_dict)]
+        }
+
+
+@register('tag', 'tag', Tag)
+class TagIndex(IndexConfigItem):
+    api_path = ApiPath('v1/tags', None, None, None)
+    store_file = 'tags.json'
+    iter_fields = IdName('id', 'name')
+
+
+#
 # Templates
 #
 # This is a special case handled under DeviceTemplate

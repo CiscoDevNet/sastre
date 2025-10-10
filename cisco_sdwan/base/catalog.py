@@ -67,7 +67,8 @@ _tag_dependency_list = [
     'parent_policy_definition',
     'policy_definition',
     'policy_list',
-    'policy_customapp'
+    'policy_customapp',
+    'tag'
 ]
 
 

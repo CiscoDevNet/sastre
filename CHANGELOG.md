@@ -1,3 +1,10 @@
+Sastre 1.27 [XXX, 2025]
+================================
+
+#### Improvements:
+- Added support for (device) tags.
+
+
 Sastre 1.26 [July 7, 2025]
 ================================
 
