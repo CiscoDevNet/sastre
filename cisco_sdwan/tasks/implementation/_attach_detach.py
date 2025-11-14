@@ -189,8 +189,6 @@ class TaskAttach(Task):
             if not activate_reqs:
                 self.log_info('No vSmart policy activate to process')
 
-        return
-
 
 @TaskOptions.register('detach')
 class TaskDetach(Task):
