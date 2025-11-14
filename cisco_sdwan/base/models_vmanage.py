@@ -1243,13 +1243,13 @@ class ProfileSdwanEmbeddedSecurity(FeatureProfile):
             "v1/feature-profile/sdwan/embedded-security/{securityId}/security-data-ip-prefix")
     }, parcel_reference_path_map={
         PathKey("ngfirewall", "policy"): ...,
-        # TODO: Validate referenced items
-        PathKey("unified/advanced-inspection-profile", "unified/ngfirewall"): ...,
-        PathKey("unified/url-filtering", "unified/advanced-inspection-profile"): ...,
-        PathKey("unified/intrusion-prevention", "unified/ngfirewall"): ...,
         PathKey("security-zone", "policy"): ...,
         PathKey("unified/ngfirewall", "policy"): ...,
         PathKey("unified/intrusion-prevention", "unified/advanced-inspection-profile"): ...,
+        PathKey("unified/url-filtering", "unified/advanced-inspection-profile"): ...,
+    } | {
+        PathKey(policy_obj_parcel, "unified/ngfirewall"): ...
+        for policy_obj_parcel in ProfileSdwanPolicy.ordered_parcel_names
     })
 
 
