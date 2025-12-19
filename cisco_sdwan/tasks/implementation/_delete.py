@@ -124,7 +124,7 @@ class TaskDelete(Task):
                 try:
                     if isinstance(item, Tag):
                         # Special case for deleting tags, item id is passed as url parameter instead of in the path
-                        api.delete(item_cls.api_path.delete, **item_cls.delete_data(item_id))
+                        api.delete(item_cls.api_path.delete, **Tag.delete_params(item_id))
                     else:
                         api.delete(item_cls.api_path.delete, item_id)
                 except RestAPIException as ex:
