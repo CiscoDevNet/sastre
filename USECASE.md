@@ -1,4 +1,4 @@
-# Sastre - Automation Tools for Cisco SD-WAN Powered by Viptela
+# Sastre - Cisco-SDWAN Automation Toolset
 
 Sastre provides functions to assist with managing configuration elements and visualize information from Cisco SD-WAN deployments. 
 
@@ -8,6 +8,6 @@ Some use-cases include:
 - Copy and rename configuration items. 
 - Attach, detach templates.
 
-Sastre can also be used as an SDK to other applications, further information is available on [DevNet Sastre SDK](https://developer.cisco.com/docs/sdwan/#!sastre-sdk-overview).
+Sastre can also be used as an SDK to other applications, further information is available at the [Sastre SDK wiki page](https://github.com/CiscoDevNet/sastre/wiki/4.-Sastre-SDK).
 
 Support enquires can be sent to sastre-support@cisco.com.

@@ -1450,9 +1450,9 @@ A WARNING message is displayed when this condition happens. The user may want to
 
 ## Installing
 
-Sastre requires Python 3.9 or newer. This can be verified by pasting the following to a terminal window:
+Sastre requires Python 3.10 or newer. This can be verified by pasting the following to a terminal window:
 ```
-% python3 -c "import sys;assert sys.version_info>(3,9)" && echo "ALL GOOD"
+% python3 -c "import sys;assert sys.version_info>(3,10)" && echo "ALL GOOD"
 ```
 
 If 'ALL GOOD' is printed it means Python requirements are met. If not, download and install the latest 3.x version at Python.org (https://www.python.org/downloads/).
@@ -1563,12 +1563,12 @@ Ensure you are within the directory cloned from GitHub:
 Then proceed as follows to build the docker container:
 ```
 % docker build -t sastre .
-Sending build context to Docker daemon    220MB
-Step 1/12 : ARG http_proxy
-Step 2/12 : ARG https_proxy
-Step 3/12 : ARG no_proxy
-Step 4/12 : FROM python:3.9-alpine
- ---> 77a605933afb
+[+] Building 12.7s (12/12) FINISHED                                                docker:desktop-linux
+ => [internal] load build definition from Dockerfile                               0.0s
+ => => transferring dockerfile: 970B                                               0.0s
+ => [internal] load metadata for docker.io/library/python:3.14-alpine              1.2s
+ => [internal] load .dockerignore                                                  0.0s
+ => => transferring context: 2B
 <snip>
 ```
 
