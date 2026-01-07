@@ -1,11 +1,13 @@
-Sastre 1.27 [XXX, 2025]
+Sastre 1.27 [XXX, 2026]
 ================================
 
 #### Improvements:
 - Added support for (device) tags.
+- Added new show realtime bfd summary command
 
 #### Fixes:
 - Embedded-security profiles did not support all parcels available in 20.15. This is now fixed.
+
 
 Sastre 1.26 [July 7, 2025]
 ================================

@@ -2475,11 +2475,17 @@ class BfdSessions(RealtimeItem):
     fields_std = ('system_ip', 'site_id', 'local_color', 'color', 'state')
     fields_ext = ('src_ip', 'src_port', 'dst_ip', 'dst_port')
 
+
 @op_register('bfd', 'summary', 'BFD summary')
 class BfdSummary(RealtimeItem):
     api_path = ApiPath('device/bfd/summary', None, None, None)
-    fields_std = ('vdevice_name', 'vdevice_host_name',  'bfd_sessions_total', 'bfd_sessions_up', 'bfd_sessions_max', 'bfd_sessions_flap')
+    fields_std = ('vdevice_name', 'vdevice_host_name',  'bfd_sessions_total', 'bfd_sessions_up', 'bfd_sessions_max',
+                  'bfd_sessions_flap')
     fields_ext = ('poll_interval', 'lastupdated')
+    field_conversion_fns = {
+        'lastupdated': datetime_format
+    }
+
 
 @op_register('control', 'connections', 'Control connections')
 class DeviceControlConnections(RealtimeItem):
