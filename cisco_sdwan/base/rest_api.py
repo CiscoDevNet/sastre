@@ -11,7 +11,7 @@ import logging
 from urllib3 import disable_warnings
 from urllib3.exceptions import InsecureRequestWarning
 from time import time, sleep
-from typing import Optional, Any, Union
+from typing import Any
 from collections.abc import Mapping
 from random import uniform
 
@@ -47,20 +47,24 @@ def backoff_retry(fn):
 
 
 class Rest:
-    def __init__(self, base_url: str, username: str, password: str, tenant_name: Optional[str] = None,
-                 timeout: int = 20, verify: bool = False):
+    def __init__(self, base_url: str, username: str | None, password: str | None, apikey: str | None = None,
+                 tenant_name: str | None = None, timeout: int = 20, verify: bool = False):
         self.base_url = base_url
         self.timeout = timeout
         self.verify = verify
         self.session = None
         self.server_facts = None
         self.is_tenant_scope = False
+        # If username and password are provided use standard login. Otherwise, use API key login
+        self.use_apikey = apikey and not all((username, password))
 
         if not verify:
             disable_warnings(InsecureRequestWarning)
 
-        if not self.login(username, password, tenant_name):
-            raise LoginFailedException(f'Login to {self.base_url} failed, check credentials')
+        if not self.login(username, password, apikey=apikey, tenant_name=tenant_name):
+            raise LoginFailedException(
+                f'Login to {self.base_url} failed, check {"API key" if self.use_apikey else "credentials"}'
+            )
 
     def __enter__(self):
         return self
@@ -72,32 +76,56 @@ class Rest:
 
         return False
 
-    def login(self, username: str, password: str, tenant_name: Optional[str]) -> bool:
-        data = {
+    def login_apikey(self, apikey: str) -> bool:
+        logging.getLogger(__name__).debug('Using API key to authenticate with SD-WAN Manager')
+
+        session = requests.Session()
+        session.headers.update({
+            "Authorization": f"Bearer {apikey}",
+            'Content-Type': 'application/json'
+        })
+        response = session.get(f'{self.base_url}/dataservice/client/server', timeout=self.timeout, verify=self.verify)
+        if response.status_code == 401:
+            return False
+
+        response.raise_for_status()
+
+        self.session = session
+        self.server_facts = response.json().get('data')
+
+        return True
+
+    def login_standard(self, username: str, password: str) -> bool:
+        logging.getLogger(__name__).debug('Using username/password credentials to authenticate with SD-WAN Manager')
+
+        session = requests.Session()
+        auth_data = {
             'j_username': username,
             'j_password': password
         }
-
-        session = requests.Session()
         response = session.post(f'{self.base_url}/j_security_check',
-                                data=data, timeout=self.timeout, verify=self.verify)
+                                data=auth_data, timeout=self.timeout, verify=self.verify)
         response.raise_for_status()
 
         if b'<html>' in response.content:
             return False
 
         self.session = session
-
+        self.session.headers['Content-Type'] = 'application/json'
         self.server_facts = self.get('client/server').get('data')
+
+        return True
+
+    def login(self, username: str | None, password: str | None, apikey: str | None, tenant_name: str | None) -> bool:
+        if not (self.login_apikey(apikey) if self.use_apikey else self.login_standard(username, password)):
+            return False
+
         if self.server_facts is None:
             raise RestAPIException('Could not retrieve vManage server information')
-
         # Token mechanism introduced in 19.2
         token = self.server_facts.get('CSRFToken')
         if token is not None:
             self.session.headers['X-XSRF-TOKEN'] = token
-
-        self.session.headers['Content-Type'] = 'application/json'
 
         # Multi-tenant vManage with a provider account, insert vsessionid
         if tenant_name is not None:
@@ -141,7 +169,7 @@ class Rest:
         return self.server_facts.get('userMode', '') == 'provider'
 
     @backoff_retry
-    def get(self, *path_entries: str, **params: Union[str, int]) -> dict[str, Any]:
+    def get(self, *path_entries: str, **params: str | int) -> dict[str, Any]:
         response = self.session.get(self._url(*path_entries),
                                     params=params if params else None,
                                     timeout=self.timeout, verify=self.verify)
@@ -149,7 +177,7 @@ class Rest:
         return response.json()
 
     @backoff_retry
-    def post(self, input_data: Mapping[str, Any], *path_entries: str) -> Union[dict[str, Any], None]:
+    def post(self, input_data: Mapping[str, Any], *path_entries: str) -> dict[str, Any] | None:
         # With large input_data, vManage fails the post request if payload is encoded in compact form. Thus encoding
         # with indent=1.
         response = self.session.post(self._url(*path_entries), data=json.dumps(input_data, indent=1),
@@ -160,7 +188,7 @@ class Rest:
         return response.json() if response.text else None
 
     @backoff_retry
-    def put(self, input_data: Mapping[str, Any], *path_entries: str) -> Union[dict[str, Any], None]:
+    def put(self, input_data: Mapping[str, Any], *path_entries: str) -> dict[str, Any] | None:
         # With large input_data, vManage fails the put request if payload is encoded in compact form. Thus encoding
         # with indent=1.
         response = self.session.put(self._url(*path_entries), data=json.dumps(input_data, indent=1),
@@ -171,8 +199,8 @@ class Rest:
         return response.json() if response.text else None
 
     @backoff_retry
-    def delete(self, *path_entries: str, input_data: Optional[Mapping[str, Any]] = None,
-               **params: str) -> Union[dict[str, Any], None]:
+    def delete(self, *path_entries: str, input_data: Mapping[str, Any] | None = None,
+               **params: str) -> dict[str, Any] | None:
         response = self.session.delete(self._url(*path_entries),
                                        data=json.dumps(input_data, indent=1) if input_data is not None else None,
                                        params=params if params else None,

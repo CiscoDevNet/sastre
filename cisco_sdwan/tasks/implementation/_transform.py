@@ -2,9 +2,8 @@ import argparse
 from uuid import uuid4
 from copy import deepcopy
 from contextlib import suppress
-from typing import Union, Optional, NamedTuple
+from typing import Union, Optional, NamedTuple, Annotated
 from collections.abc import Callable
-from typing_extensions import Annotated
 from pydantic import model_validator, BaseModel, field_validator, ValidationError, Field, ValidationInfo, ConfigDict
 import yaml
 from cisco_sdwan.__version__ import __doc__ as title

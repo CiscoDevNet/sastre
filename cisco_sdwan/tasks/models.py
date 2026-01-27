@@ -1,5 +1,4 @@
-from typing import Optional, Any
-from typing_extensions import Annotated
+from typing import Optional, Any, Annotated
 from pydantic import BaseModel, field_validator, Field, AfterValidator, ConfigDict, ValidationInfo
 from cisco_sdwan.base.catalog import OpType, CATALOG_TAG_ALL, op_catalog_tags, op_catalog_commands, catalog_tags
 from cisco_sdwan.tasks.utils import OpCmdOptions

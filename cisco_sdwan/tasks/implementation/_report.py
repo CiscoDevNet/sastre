@@ -4,9 +4,8 @@ import re
 import yaml
 from datetime import date
 from difflib import unified_diff, HtmlDiff
-from typing import Union, Optional, Any, NamedTuple
+from typing import Union, Optional, Any, NamedTuple, Annotated
 from collections.abc import Iterator, Callable
-from typing_extensions import Annotated
 from pydantic import field_validator, model_validator, BaseModel, ValidationError, Field, ConfigDict
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest

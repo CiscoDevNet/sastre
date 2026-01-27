@@ -1,7 +1,6 @@
 import argparse
-from typing import Any, NamedTuple, Union, Optional
+from typing import Any, NamedTuple, Union, Optional, Annotated
 from collections.abc import Callable, Sequence
-from typing_extensions import Annotated
 from pathlib import Path
 from functools import partial
 from concurrent import futures

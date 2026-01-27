@@ -1,9 +1,8 @@
 import argparse
 from functools import partial
-from typing import Union, Optional
+from typing import Union, Optional, Annotated
 from collections.abc import Mapping, Callable, Iterable
 from pydantic import Field, field_validator
-from typing_extensions import Annotated
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest, RestAPIException
 from cisco_sdwan.base.catalog import is_index_supported
