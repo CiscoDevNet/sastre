@@ -46,7 +46,7 @@ class TaskCertificate(Task):
                                     'the hostname or chassis/uuid.')
             sub_task.add_argument('--dryrun', action='store_true',
                                   help='dry-run mode. List modifications that would be performed without pushing '
-                                       'changes to vManage.')
+                                       'changes to SD-WAN Manager.')
 
         return task_parser.parse_args(task_args)
 
@@ -74,13 +74,13 @@ class TaskCertificate(Task):
     def runner(self, parsed_args, api: Optional[Rest] = None) -> Union[None, list]:
         self.is_dryrun = parsed_args.dryrun
         if parsed_args.source_iter is TaskCertificate.restore_iter:
-            start_msg = f'Restore status from workdir: "{parsed_args.workdir}" -> vManage URL: "{api.base_url}"'
+            start_msg = f'Restore status from workdir: "{parsed_args.workdir}" -> SD-WAN Manager URL: "{api.base_url}"'
         else:
-            start_msg = f'Set status to "{parsed_args.status}" -> vManage URL: "{api.base_url}"'
+            start_msg = f'Set status to "{parsed_args.status}" -> SD-WAN Manager URL: "{api.base_url}"'
         self.log_info(f'Certificate task: {start_msg}')
 
         try:
-            self.log_info('Loading WAN edge certificate list from target vManage', dryrun=False)
+            self.log_info('Loading WAN edge certificate list from target SD-WAN Manager', dryrun=False)
             target_certs = EdgeCertificate.get_raise(api)
 
             regex = parsed_args.regex or parsed_args.not_regex
@@ -100,7 +100,7 @@ class TaskCertificate(Task):
                 update_list.append((uuid, new_status))
 
             if len(update_list) > 0:
-                self.log_info('Send certificate status changes to vManage')
+                self.log_info('Send certificate status changes to SD-WAN Manager')
                 if not self.is_dryrun:
                     api.post(target_certs.status_post_data(*update_list), EdgeCertificate.api_path.post)
                     action_worker = EdgeCertificateSync(api.post({}, EdgeCertificateSync.api_path.post))

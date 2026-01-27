@@ -66,8 +66,8 @@ class TaskShow(Task):
         dev_parser.set_defaults(subtask_info='devices')
 
         rt_parser = sub_tasks.add_parser('realtime', aliases=['rt'],
-                                         help='realtime commands. Slower, but up-to-date data. vManage collect data '
-                                              'from devices in realtime.')
+                                         help='realtime commands. Slower, but up-to-date data. SD-WAN Manager collects '
+                                              'data from devices in realtime.')
         rt_parser.set_defaults(subtask_handler=TaskShow.realtime)
         rt_parser.set_defaults(subtask_info='realtime')
 
@@ -86,11 +86,11 @@ class TaskShow(Task):
         stats_parser.add_argument('--hours', metavar='<hours>', type=partial(int_type, 0, 9999), default=0,
                                   help='query statistics from <hours> ago (default: %(default)s, i.e. now)')
 
-        alarms_parser = sub_tasks.add_parser('alarms', help='display vManage alarms')
+        alarms_parser = sub_tasks.add_parser('alarms', help='display SD-WAN Manager alarms')
         alarms_parser.set_defaults(subtask_info='alarms')
         alarms_parser.set_defaults(subtask_op_cls=Alarm)
 
-        events_parser = sub_tasks.add_parser('events', help='display vManage events')
+        events_parser = sub_tasks.add_parser('events', help='display SD-WAN Manager events')
         events_parser.set_defaults(subtask_info='events')
         events_parser.set_defaults(subtask_op_cls=Event)
 
@@ -143,7 +143,7 @@ class TaskShow(Task):
         return task_parser.parse_args(task_args)
 
     def runner(self, parsed_args, api: Optional[Rest] = None) -> Union[None, list]:
-        self.log_info(f'Show {parsed_args.subtask_info} task: vManage URL: "{api.base_url}"')
+        self.log_info(f'Show {parsed_args.subtask_info} task: SD-WAN Manager URL: "{api.base_url}"')
 
         filters = get_table_filters(exclude_regex=parsed_args.exclude, include_regex=parsed_args.include)
         result_tables = filtered_tables(parsed_args.subtask_handler(self, parsed_args, api), *filters)

@@ -323,7 +323,7 @@ class Task:
     def index_iter(self, backend, catalog_entry_iter):
         """
         Return an iterator of indexes loaded from backend. If backend is a Rest API instance, indexes are loaded
-        from remote vManage via API. Otherwise, items are loaded from local backup under the backend directory.
+        from remote SD-WAN Manager via API. Otherwise, items are loaded from local backup under the backend directory.
         @param backend: Rest api instance or directory name
         @param catalog_entry_iter: An iterator of CatalogEntry
         @return: Iterator of (<tag>, <info>, <index>, <item_cls>)
@@ -412,7 +412,7 @@ class Task:
     def template_reattach_data(api: Rest, templates_iter: Iterable[tuple],
                                filtered_uuid_set: Optional[set[str]] = None) -> tuple[list, bool]:
         """
-        Prepare data for template reattach considering vManage as the source of truth (i.e. where input values are)
+        Prepare data for template reattach considering SD-WAN Manager as the source of truth (i.e. source of values)
         @param api: Instance of Rest API
         @param templates_iter: Iterable of (<template_name>, <target_template_id>)
         @param filtered_uuid_set: (optional) Set of device uuids on target node to include
@@ -576,7 +576,7 @@ class Task:
                     diff_uuids = diff_values.put_raise(api, configGroupId=config_grp_target_id)
                 except (RestAPIException, ValidationError) as ex:
                     # Pydantic validation error raised when the saved values fail local model validation.
-                    # RestAPIException when vManage validation fails.
+                    # RestAPIException when SD-WAN Manager validation fails.
                     self.log_error(f"Failed: Config-group {config_grp_name} push values: {ex}")
                     return []
             else:
@@ -706,7 +706,7 @@ class Task:
         for template_id, template_name in template_iter:
             devices_attached = DeviceTemplateAttached.get(api, template_id)
             if devices_attached is None:
-                self.log_warning(f'Failed to retrieve {template_name} attached devices from vManage')
+                self.log_warning(f'Failed to retrieve {template_name} attached devices from SD-WAN Manager')
                 continue
             for device_id, personality in devices_attached:
                 if device_id in devices_map:
@@ -762,7 +762,7 @@ class Task:
         for config_grp_id, config_grp_name in cfg_group_iter:
             devices_associated = ConfigGroupAssociated.get(api, configGroupId=config_grp_id)
             if devices_associated is None:
-                self.log_warning(f'Failed to retrieve {config_grp_name} associated devices from vManage')
+                self.log_warning(f'Failed to retrieve {config_grp_name} associated devices from SD-WAN Manager')
                 continue
             for device_id in devices_associated.filter(not_by_rule=True).uuids:
                 if device_id in devices_map:
@@ -782,7 +782,7 @@ class Task:
         # for config_grp_id, config_grp_name in cfg_group_iter:
         #     rules = ConfigGroupRules.get(api, configGroupId=config_grp_id)
         #     if rules is None:
-        #         self.log_warning(f'Failed to retrieve {config_grp_name} automated rules from vManage')
+        #         self.log_warning(f'Failed to retrieve {config_grp_name} automated rules from SD-WAN Manager')
         #         continue
         #     for rule_id in rules:
         #         delete_req_count += 1
@@ -879,7 +879,7 @@ class Task:
             while True:
                 action = ActionStatus.get(api, action_worker.uuid)
                 if action is None:
-                    self.log_warning('Failed to retrieve action status from vManage')
+                    self.log_warning('Failed to retrieve action status from SD-WAN Manager')
                     result_list.append(False)
                     break
 

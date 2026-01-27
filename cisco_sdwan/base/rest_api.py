@@ -121,7 +121,7 @@ class Rest:
             return False
 
         if self.server_facts is None:
-            raise RestAPIException('Could not retrieve vManage server information')
+            raise RestAPIException('Could not retrieve SD-WAN Manager server information')
         # Token mechanism introduced in 19.2
         token = self.server_facts.get('CSRFToken')
         if token is not None:
@@ -134,7 +134,7 @@ class Rest:
 
             tenant_list = self.get('tenant').get('data')
             if tenant_list is None:
-                raise RestAPIException('Could not retrieve vManage tenant list')
+                raise RestAPIException('Could not retrieve SD-WAN Manager tenant list')
 
             for tenant in tenant_list:
                 if tenant_name == tenant['name']:

@@ -67,10 +67,10 @@ class TaskAttach(Task):
             sub_task.add_argument('--site', metavar='<id>', type=site_id_type, help='select devices with site ID')
             sub_task.add_argument('--system-ip', metavar='<ipv4>', type=ipv4_type, help='select device with system IP')
             sub_task.add_argument('--dryrun', action='store_true',
-                                  help='dry-run mode. Attach operations are listed but not is pushed to vManage.')
+                                  help='dry-run mode. Attach operations are listed but not pushed to SD-WAN Manager.')
             sub_task.add_argument('--batch', metavar='<size>', type=partial(int_type, 1, 9999),
                                   default=DEFAULT_BATCH_SIZE,
-                                  help='maximum number of devices to include per vManage attach request '
+                                  help='maximum number of devices to include per SD-WAN Manager attach request '
                                        '(default: %(default)s)')
 
         return task_parser.parse_args(task_args)
@@ -97,7 +97,7 @@ class TaskAttach(Task):
 
     def runner(self, parsed_args, api: Optional[Rest] = None) -> Union[None, list]:
         self.is_dryrun = parsed_args.dryrun
-        self.log_info(f'Attach task: Local workdir: "{parsed_args.workdir}" -> vManage URL: "{api.base_url}"')
+        self.log_info(f'Attach task: Local workdir: "{parsed_args.workdir}" -> SD-WAN Manager URL: "{api.base_url}"')
 
         attach_map, deploy_map = build_device_maps(
             device_iter(api, parsed_args.devices, parsed_args.reachable, parsed_args.site, parsed_args.system_ip,
@@ -115,7 +115,7 @@ class TaskAttach(Task):
                     raise StopIteration()
 
                 if not is_index_supported(ConfigGroupIndex, version=api.server_version):
-                    self.log_warning("Will skip deploy, target vManage does not support config-groups")
+                    self.log_warning("Will skip deploy, target SD-WAN Manager does not support config-groups")
                     raise StopIteration()
 
                 target_cfg_groups = {item_name: item_id for item_id, item_name in ConfigGroupIndex.get_raise(api)}
@@ -224,10 +224,10 @@ class TaskDetach(Task):
             sub_task.add_argument('--site', metavar='<id>', type=site_id_type, help='select devices with site ID')
             sub_task.add_argument('--system-ip', metavar='<ipv4>', type=ipv4_type, help='select device with system IP')
             sub_task.add_argument('--dryrun', action='store_true',
-                                  help='dry-run mode. Attach operations are listed but nothing is pushed to vManage.')
+                                  help='dry-run mode. Detach operations are listed but not pushed to SD-WAN Manager.')
             sub_task.add_argument('--batch', metavar='<size>', type=partial(int_type, 1, 9999),
                                   default=DEFAULT_BATCH_SIZE,
-                                  help='maximum number of devices to include per vManage detach request '
+                                  help='maximum number of devices to include per SD-WAN Manager detach request '
                                        '(default: %(default)s)')
 
         return task_parser.parse_args(task_args)
@@ -254,7 +254,7 @@ class TaskDetach(Task):
 
     def runner(self, parsed_args, api: Optional[Rest] = None) -> Union[None, list]:
         self.is_dryrun = parsed_args.dryrun
-        self.log_info(f'Detach templates task: vManage URL: "{api.base_url}"')
+        self.log_info(f'Detach templates task: SD-WAN Manager URL: "{api.base_url}"')
 
         attached_map, associated_map = build_device_maps(
             device_iter(api, parsed_args.devices, parsed_args.reachable, parsed_args.site, parsed_args.system_ip,

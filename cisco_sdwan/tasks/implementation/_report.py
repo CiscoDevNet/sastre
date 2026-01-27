@@ -219,7 +219,7 @@ class TaskReport(Task):
                                    default=f'report_{date.today():%Y%m%d}.txt',
                                    help='report filename (default: %(default)s)')
         create_parser.add_argument('--workdir', metavar='<directory>', type=existing_workdir_type,
-                                   help='report from the specified directory instead of target vManage')
+                                   help='report from the specified directory instead of target SD-WAN Manager')
         create_parser.add_argument('--diff', metavar='<filename>', type=existing_file_type,
                                    help='generate diff between the specified previous report and the current report')
         create_parser.add_argument('--save-json', metavar='<filename>', type=filename_type,
@@ -252,7 +252,7 @@ class TaskReport(Task):
         return parsed_args.subtask_handler(self, parsed_args, api)
 
     def subtask_create(self, parsed_args, api: Optional[Rest]) -> Union[None, list]:
-        source_info = f'Local workdir: "{parsed_args.workdir}"' if api is None else f'vManage URL: "{api.base_url}"'
+        source_info = f'Local workdir: "{parsed_args.workdir}"' if api is None else f'SD-WAN Manager URL: "{api.base_url}"'
         self.log_info(f'Report create task: {source_info} -> "{parsed_args.file}"')
 
         self.log_info("Loading report specification")
@@ -321,7 +321,7 @@ class TaskReport(Task):
         """
         An iterator over the different sections of the report, including task and arguments for the task.
         @param report_spec: report specification to use for generating this report
-        @param has_api_session: whether the report is running with a vManage session or offline (i.e. off a backup)
+        @param has_api_session: whether the report is running with a SD-WAN Manager session or from a backup
         @param workdir: workdir value, if provided to the report task.
         @return: an iterator of (<description>, <task class>, <task args>)
         """

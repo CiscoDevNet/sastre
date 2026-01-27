@@ -23,9 +23,9 @@ DEFAULT_WORKDIR_FORMAT = 'backup_{address}_{date:%Y%m%d}'
 
 def default_workdir(address: Union[str, None]) -> str:
     """
-    Generate a default workdir name based on the provided vManage address and current date.
+    Generate a default workdir name based on the provided SD-WAN Manager address and current date.
     
-    @param address: vManage address to include in the workdir name. If None, 'VMANAGE-ADDRESS' is used.
+    @param address: SD-WAN Manager address to include in the workdir name. If None, 'VMANAGE-ADDRESS' is used.
     @return: Formatted workdir name string
     """
     return DEFAULT_WORKDIR_FORMAT.format(date=date.today(), address=address or 'VMANAGE-ADDRESS')

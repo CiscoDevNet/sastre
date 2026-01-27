@@ -41,11 +41,11 @@ class TaskMigrate(Task):
                                       '<regex> is a regular expression that must contain at least one capturing group. '
                                       'Capturing groups identify sections of the original name to keep.')
         task_parser.add_argument('--from', metavar='<version>', type=version_type, dest='from_version', default='18.4',
-                                 help='vManage version from source templates (default: %(default)s)')
+                                 help='SD-WAN Manager version from source templates (default: %(default)s)')
         task_parser.add_argument('--to', metavar='<version>', type=version_type, dest='to_version', default='20.1',
-                                 help='target vManage version for template migration (default: %(default)s)')
+                                 help='target SD-WAN Manager version for template migration (default: %(default)s)')
         task_parser.add_argument('--workdir', metavar='<directory>', type=existing_workdir_type,
-                                 help='migrate will read from the specified directory instead of target vManage')
+                                 help='migrate will read from the specified directory instead of target SD-WAN Manager')
 
         return task_parser.parse_args(task_args)
 
@@ -54,7 +54,7 @@ class TaskMigrate(Task):
         return parsed_args.workdir is None
 
     def runner(self, parsed_args, api: Optional[Rest] = None) -> Union[None, list]:
-        source_info = f'Local workdir: "{parsed_args.workdir}"' if api is None else f'vManage URL: "{api.base_url}"'
+        source_info = f'Local workdir: "{parsed_args.workdir}"' if api is None else f'SD-WAN Manager URL: "{api.base_url}"'
         self.log_info('Migrate task: %s %s -> %s Local output dir: "%s"', source_info, parsed_args.from_version,
                       parsed_args.to_version, parsed_args.output)
 
@@ -83,7 +83,7 @@ class TaskMigrate(Task):
 
             server_info = ServerInfo(server_version=parsed_args.to_version)
             if server_info.save(parsed_args.output):
-                self.log_info('Saved vManage server information')
+                self.log_info('Saved SD-WAN Manager server information')
 
             id_mapping = {}  # {<old_id>: <new_id>}
             for tag in ordered_tags(CATALOG_TAG_ALL, reverse=True):
