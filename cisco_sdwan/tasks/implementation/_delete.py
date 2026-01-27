@@ -41,7 +41,7 @@ class TaskDelete(Task):
 
     def runner(self, parsed_args, api: Optional[Rest] = None) -> Union[None, list]:
         self.is_dryrun = parsed_args.dryrun
-        self.log_info(f'Delete task: vManage URL: "{api.base_url}"')
+        self.log_info(f'Delete task: SD-WAN Manager URL: "{api.base_url}"')
 
         regex_filter_fn = partial(regex_filter, parsed_args.regex, parsed_args.not_regex)
 

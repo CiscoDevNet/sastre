@@ -32,8 +32,8 @@ class TaskEncrypt(Task):
         values_parser = sub_tasks.add_parser('values', help='encrypt provided list of clear text values')
         values_parser.set_defaults(subtask_handler=TaskEncrypt.values)
         values_parser.add_argument('values', metavar='<value>', nargs='*',
-                                   help='one or more clear text values to be encrypted by vManage. If no value is '
-                                        'provided, enter interactive mode.')
+                                   help='one or more clear text values to be encrypted by SD-WAN Manager. '
+                                        'If no value is provided, enter interactive mode.')
 
         recipe_parser = sub_tasks.add_parser('recipe',
                                              help='interactively encrypt based on recipe (from transform build-recipe)')
@@ -44,7 +44,7 @@ class TaskEncrypt(Task):
         return task_parser.parse_args(task_args)
 
     def runner(self, parsed_args, api: Optional[Rest] = None) -> Union[None, list]:
-        self.log_info(f'Encrypt task: vManage URL: "{api.base_url}"')
+        self.log_info(f'Encrypt task: SD-WAN Manager URL: "{api.base_url}"')
 
         return parsed_args.subtask_handler(self, parsed_args, api)
 

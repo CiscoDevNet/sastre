@@ -52,7 +52,8 @@ class TaskShowTemplate(Task):
         # Parameters common to all sub-tasks
         for sub_task in (values_parser, refs_parser):
             sub_task.add_argument('--workdir', metavar='<directory>', type=existing_workdir_type,
-                                  help='show-template will read from the specified directory instead of target vManage')
+                                  help='show-template will read from the specified directory instead of target '
+                                       'SD-WAN Manager')
             sub_task.add_argument('--exclude', metavar='<regex>', type=regex_type,
                                   help='exclude table rows matching the regular expression')
             sub_task.add_argument('--include', metavar='<regex>', type=regex_type,
@@ -69,7 +70,7 @@ class TaskShowTemplate(Task):
         return parsed_args.workdir is None
 
     def runner(self, parsed_args, api: Optional[Rest] = None) -> Union[None, list]:
-        source_info = f'Local workdir: "{parsed_args.workdir}"' if api is None else f'vManage URL: "{api.base_url}"'
+        source_info = f'Local workdir: "{parsed_args.workdir}"' if api is None else f'SD-WAN Manager URL: "{api.base_url}"'
         self.log_info(f'Show-template {parsed_args.subtask_info} task: {source_info}')
 
         filters = get_table_filters(exclude_regex=parsed_args.exclude, include_regex=parsed_args.include)

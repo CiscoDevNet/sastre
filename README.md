@@ -61,7 +61,7 @@ Notes:
 
 ```
 % sdwan --help
-usage: sdwan [-h] [-a <vmanage-ip>] [-u <user>] [-p <password>] [--tenant <tenant>] [--pid <pid>] [--port <port>] [--timeout <timeout>] [--verbose] [--debug] [--version] <task> ...
+usage: sdwan [-h] [-a <manager-ip>] [-u <user>] [-p <password>] [--apikey <api-key>] [--tenant <tenant>] [--port <port>] [--timeout <timeout>] [--verbose] [--debug] [--version] <task> ...
 
 Sastre - Cisco-SDWAN Automation Toolset
 
@@ -71,30 +71,33 @@ positional arguments:
 
 options:
   -h, --help            show this help message and exit
-  -a <vmanage-ip>, --address <vmanage-ip>
-                        vManage IP address, can also be defined via VMANAGE_IP environment variable. If neither is provided user is prompted for the address.
+  -a <manager-ip>, --address <manager-ip>
+                        SD-WAN Manager IP address, can also be defined via VMANAGE_IP environment variable. If neither is provided user is prompted for the address.
   -u <user>, --user <user>
                         username, can also be defined via VMANAGE_USER environment variable. If neither is provided user is prompted for username.
   -p <password>, --password <password>
                         password, can also be defined via VMANAGE_PASSWORD environment variable. If neither is provided user is prompted for password.
+  --apikey <api-key>    SD-WAN Manager API key, can also be defined via VMANAGE_APIKEY environment variable.
   --tenant <tenant>     tenant name, when using provider accounts in multi-tenant deployments.
-  --pid <pid>           CX project id, can also be defined via CX_PID environment variable. This is collected for AIDE reporting purposes. Use 0 if not applicable.
-  --port <port>         vManage port number, can also be defined via VMANAGE_PORT environment variable (default: 443)
-  --timeout <timeout>   REST API timeout (default: 300)
+  --port <port>         port number, can also be defined via VMANAGE_PORT environment variable (default: 443)
+  --timeout <timeout>   REST API timeout (default: 300s)
   --verbose             increase output verbosity
   --debug               include additional API call details to the log files
   --version             show program's version number and exit
 ```
 
-vManage address (-a/--address), username (-u/--user), password (-p/--password) and port (--port) can also be provided via environment variables:
+SD-WAN Manager address (-a/--address), username (-u/--user), password (-p/--password), API key (--apikey) and port (--port) can also be provided via environment variables:
 - VMANAGE_IP
 - VMANAGE_USER
 - VMANAGE_PASSWORD
+- VMANAGE_APIKEY
 - VMANAGE_PORT
 
-A good approach to reduce the number of parameters that need to be provided at execution time is to create rc text files exporting those environment variables for a particular vManage. This is demonstrated in the [Getting Started](#getting-started) section below.
+A good approach to reduce the number of parameters that need to be provided at execution time is to create rc text files exporting those environment variables for a particular SD-WAN Manager. This is demonstrated in the [Getting Started](#getting-started) section below.
 
-For any of these arguments, vManage address, user, password and CX pid; user is prompted for a value if they are not provided via the environment variables or command line arguments.
+Username/password authentication takes precedence over API key. When an API key is provided (via --apikey or VMANAGE_APIKEY), along with username and password, Sastre uses username/password authentication instead of API key.
+
+For any of these arguments, SD-WAN Manager address, username and password; user is prompted for a value if they are not provided via the environment variables or command line arguments. However, when an API key is provided the user will not be prompted for username/password.
 
 ### Task-specific parameters
 
@@ -1583,31 +1586,32 @@ docker run -it --rm --hostname sastre \
  --mount type=bind,source="$(pwd)"/sastre-volume,target=/shared-data \
  sastre:latest
 
-usage: sdwan [-h] [-a <vmanage-ip>] [-u <user>] [-p <password>] [--tenant <tenant>] [--port <port>] [--timeout <timeout>] [--verbose] [--version] <task> ...
+usage: sdwan [-h] [-a <manager-ip>] [-u <user>] [-p <password>] [--apikey <api-key>] [--tenant <tenant>] [--port <port>] [--timeout <timeout>] [--verbose] [--version] <task> ...
 
-Sastre - Automation Tools for Cisco SD-WAN Powered by Viptela
+Sastre - Cisco-SDWAN Automation Toolset
 
 positional arguments:
-  <task>                task to be performed (backup, restore, delete, migrate)
+  <task>                task to be performed (backup, restore, delete, migrate, attach, detach, certificate, transform, list, show-template, show, report, encrypt)
   <arguments>           task parameters, if any
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
-  -a <vmanage-ip>, --address <vmanage-ip>
-                        vManage IP address, can also be defined via VMANAGE_IP environment variable. If neither is provided user is prompted for the address.
+  -a <manager-ip>, --address <manager-ip>
+                        SD-WAN Manager IP address, can also be defined via VMANAGE_IP environment variable. If neither is provided user is prompted for the address.
   -u <user>, --user <user>
                         username, can also be defined via VMANAGE_USER environment variable. If neither is provided user is prompted for username.
   -p <password>, --password <password>
                         password, can also be defined via VMANAGE_PASSWORD environment variable. If neither is provided user is prompted for password.
+  --apikey <api-key>    SD-WAN Manager API key, can also be defined via VMANAGE_APIKEY environment variable.
   --tenant <tenant>     tenant name, when using provider accounts in multi-tenant deployments.
-  --port <port>         vManage port number, can also be defined via VMANAGE_PORT environment variable (default: 443)
-  --timeout <timeout>   REST API timeout (default: 300)
+  --port <port>         port number, can also be defined via VMANAGE_PORT environment variable (default: 443)
+  --timeout <timeout>   REST API timeout (default: 300s)
   --verbose             increase output verbosity
   --version             show program's version number and exit
 sastre:/shared-data#
 
 sastre:/shared-data# sdwan --version
-Sastre Version 1.11. Catalog: 63 configuration items, 12 realtime items.
+Sastre Version 1.27. Catalog: 63 configuration items, 12 realtime items.
 
 sastre:/shared-data#
 ```

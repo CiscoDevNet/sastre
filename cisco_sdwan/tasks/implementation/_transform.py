@@ -2,9 +2,8 @@ import argparse
 from uuid import uuid4
 from copy import deepcopy
 from contextlib import suppress
-from typing import Union, Optional, NamedTuple
+from typing import Union, Optional, NamedTuple, Annotated
 from collections.abc import Callable
-from typing_extensions import Annotated
 from pydantic import model_validator, BaseModel, field_validator, ValidationError, Field, ValidationInfo, ConfigDict
 import yaml
 from cisco_sdwan.__version__ import __doc__ as title
@@ -194,7 +193,7 @@ class TaskTransform(Task):
                                   help='load recipe from JSON-formatted string')
 
         build_parser = sub_tasks.add_parser('build-recipe',
-                                            help='generate recipe file for updating vManage-encrypted fields')
+                                            help='generate recipe file for updating SD-WAN Manager-encrypted fields')
         build_parser.set_defaults(subtask_handler=TaskTransform.build_recipe)
         build_parser.add_argument('recipe_file', metavar='<filename>', type=filename_type,
                                   help='name for generated recipe file')
@@ -224,7 +223,8 @@ class TaskTransform(Task):
 
         for sub_task in (rename_parser, copy_parser, recipe_parser, build_parser):
             sub_task.add_argument('--workdir', metavar='<directory>', type=existing_workdir_type,
-                                  help='transform will read from the specified directory instead of target vManage')
+                                  help='transform will read from the specified directory instead of target '
+                                       'SD-WAN Manager')
 
         return task_parser.parse_args(task_args)
 
@@ -267,7 +267,7 @@ class TaskTransform(Task):
         if parsed_args.workdir is not None:
             source_info = f'Local workdir: "{parsed_args.workdir}"'
         else:
-            source_info = f'vManage URL: "{api.base_url}"'
+            source_info = f'SD-WAN Manager URL: "{api.base_url}"'
 
         if hasattr(parsed_args, 'output'):
             self.log_info(f'Transform task: {source_info} -> Local output dir: "{parsed_args.output}"')
@@ -303,7 +303,7 @@ class TaskTransform(Task):
 
         if server_version is not None:
             if ServerInfo(server_version=server_version).save(parsed_args.output):
-                self.log_info('Saved vManage server information')
+                self.log_info('Saved SD-WAN Manager server information')
 
         # Process items
         id_mapping: dict[str, str] = {}  # {<old_id>: <new_id>}

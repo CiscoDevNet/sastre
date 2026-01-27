@@ -51,11 +51,15 @@ class TaskBackup(Task):
 
     def runner(self, parsed_args, api: Optional[Rest] = None) -> Union[None, list]:
         if parsed_args.archive:
-            self.log_info(f'Backup task: vManage URL: "{api.base_url}" -> Local archive file: "{parsed_args.archive}"')
+            self.log_info(
+                f'Backup task: SD-WAN Manager URL: "{api.base_url}" -> Local archive file: "{parsed_args.archive}"'
+            )
             parsed_args.workdir = str(uuid4())
             self.log_debug(f'Temporary workdir: {parsed_args.workdir}')
         else:
-            self.log_info(f'Backup task: vManage URL: "{api.base_url}" -> Local workdir: "{parsed_args.workdir}"')
+            self.log_info(
+                f'Backup task: SD-WAN Manager URL: "{api.base_url}" -> Local workdir: "{parsed_args.workdir}"'
+            )
 
         regex_filter_fn = partial(regex_filter, parsed_args.regex, parsed_args.not_regex)
 
@@ -66,7 +70,7 @@ class TaskBackup(Task):
 
         target_info = ServerInfo(server_version=api.server_version)
         if target_info.save(parsed_args.workdir):
-            self.log_info('Saved vManage server information')
+            self.log_info('Saved SD-WAN Manager server information')
 
         if parsed_args.save_running:
             self.save_running_configs(api, parsed_args.workdir)
@@ -83,7 +87,7 @@ class TaskBackup(Task):
         for _, info, index_cls, item_cls in catalog_iter(*parsed_args.tags, version=api.server_version):
             item_index = index_cls.get(api)
             if item_index is None:
-                self.log_debug(f'Skipped {info}, item not supported by this vManage')
+                self.log_debug(f'Skipped {info}, item not supported by this SD-WAN Manager')
                 continue
             if item_index.save(parsed_args.workdir):
                 self.log_info(f'Saved {info} index')

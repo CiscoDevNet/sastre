@@ -43,13 +43,13 @@ class TaskRestore(Task):
         mutex_regex.add_argument('--not-regex', metavar='<regex>', type=regex_type,
                                  help='regular expression matching item names NOT to restore, within selected tags.')
         task_parser.add_argument('--dryrun', action='store_true',
-                                 help='dry-run mode. Items to be restored are listed but not pushed to vManage.')
+                                 help='dry-run mode. Items to be restored are listed but not pushed to SD-WAN Manager.')
         task_parser.add_argument('--attach', action='store_true',
                                  help='attach templates, deploy config-groups and activate vSmart policy after '
                                       'restoring items.')
         task_parser.add_argument('--update', action='store_true',
-                                 help='update vManage items that have the same name but different content as the '
-                                      'corresponding item in workdir. Without this option, such items are skipped '
+                                 help='update SD-WAN Manager items that have the same name but different content as '
+                                      'the corresponding item in workdir. Without this option, such items are skipped '
                                       'from restore.')
         task_parser.add_argument('tag', metavar='<tag>', type=TagOptions.tag,
                                  help='tag for selecting items to be restored. Items that are dependencies of the '
@@ -70,24 +70,29 @@ class TaskRestore(Task):
         regex_filter_fn = partial(regex_filter, parsed_args.regex, parsed_args.not_regex)
 
         if parsed_args.archive:
-            self.log_info(f'Restore task: Local archive file: "{parsed_args.archive}" -> vManage URL: "{api.base_url}"')
+            self.log_info(
+                f'Restore task: Local archive file: "{parsed_args.archive}" -> SD-WAN Manager URL: "{api.base_url}"'
+            )
             parsed_args.workdir = str(uuid4())
             self.log_debug(f'Temporary workdir: {parsed_args.workdir}')
 
             archive_extract(parsed_args.archive, parsed_args.workdir)
             self.log_info(f'Loaded archive file "{parsed_args.archive}"')
         else:
-            self.log_info(f'Restore task: Local workdir: "{parsed_args.workdir}" -> vManage URL: "{api.base_url}"')
+            self.log_info(
+                f'Restore task: Local workdir: "{parsed_args.workdir}" -> SD-WAN Manager URL: "{api.base_url}"'
+            )
 
         local_info = ServerInfo.load(parsed_args.workdir)
         # Server info file may not be present (e.g., backup from older Sastre releases)
         if local_info is not None and is_version_newer(api.server_version, local_info.server_version):
-            self.log_warning(f'Target vManage release ({api.server_version}) is older than the release used in backup '
-                             f'({local_info.server_version}). Items may fail to restore due to incompatibilities.')
+            self.log_warning(f'Target SD-WAN Manager release ({api.server_version}) is older than the release used in '
+                             f'the backup ({local_info.server_version}). Items may fail to be restored due to '
+                             'incompatibilities.')
 
         is_vbond_set = self.is_vbond_configured(api)
 
-        self.log_info('Loading existing items from target vManage', dryrun=False)
+        self.log_info('Loading existing items from target SD-WAN Manager', dryrun=False)
         target_all_items_map = {
             hash(type(index)): {item_name: item_id for item_id, item_name in index}
             for _, _, index, item_cls in self.index_iter(api, catalog_iter(CATALOG_TAG_ALL, version=api.server_version))
@@ -101,7 +106,7 @@ class TaskRestore(Task):
         for tag in ordered_tags(parsed_args.tag):
             if tag == 'template_device' and not is_vbond_set:
                 self.log_warning(f'Will skip {tag} items because vBond is not configured. '
-                                 'On vManage, Administration > Settings > vBond.')
+                                 'On SD-WAN Manager, Administration > Settings > vBond.')
                 continue
 
             self.log_info(f'Inspecting {tag} items', dryrun=False)
@@ -111,10 +116,10 @@ class TaskRestore(Task):
                                                                 catalog_iter(tag, version=api.server_version))
             )
             for info, index, loaded_items_iter in tag_iter:
-                target_item_map: dict[str,str] = target_all_items_map.get(hash(type(index)))
+                target_item_map: dict[str, str] = target_all_items_map.get(hash(type(index)))
                 if target_item_map is None:
                     # Logging at the warning level because the backup files did have this item
-                    self.log_warning(f'Will skip {info}, item not supported by target vManage')
+                    self.log_warning(f'Will skip {info}, item not supported by target SD-WAN Manager')
                     continue
 
                 # Special treatment for policy objects. Since only one policy object is allowed, policy object parcels
@@ -128,13 +133,13 @@ class TaskRestore(Task):
                 for item_id, item in loaded_items_iter:
                     target_id = target_item_map.get(item.name) if target_policy_obj_id is None else target_policy_obj_id
                     if target_id is not None:
-                        # Item already exists on target vManage, record item id from target
+                        # Item already exists on target SD-WAN Manager, record item id from target
                         if item_id != target_id:
                             id_mapping[item_id] = target_id
 
                         if not parsed_args.update and target_policy_obj_id is None:
-                            # Existing item on target vManage will be used, i.e., will not update it
-                            self.log_debug(f'Will skip {info} {item.name}, item already on target vManage')
+                            # Existing item on target SD-WAN Manager will be used, i.e., will not update it
+                            self.log_debug(f'Will skip {info} {item.name}, item already on target SD-WAN Manager')
                             continue
 
                     item_match = (
@@ -154,7 +159,7 @@ class TaskRestore(Task):
                     restore_list.append((info, index, restore_item_list))
 
         if len(restore_list) > 0:
-            self.log_info('Pushing items to vManage', dryrun=False)
+            self.log_info('Pushing items to SD-WAN Manager', dryrun=False)
             self.restore_config_items(api, restore_list, id_mapping, dependency_set, match_set)
         else:
             self.log_info('No items to push')
@@ -204,7 +209,7 @@ class TaskRestore(Task):
                         new_parcel_id = parcel_info.target_id
                         self.log_debug(f'Skipped: {common_log} {parcel_info.name}' 
                                        f'{" (reference)" if parcel_info.is_reference else ""}'
-                                       f'{restore_reason}, already on target vManage')
+                                       f'{restore_reason}, already on target SD-WAN Manager')
                         continue
 
                     new_parcel_id = response_id(api.post(parcel_info.payload, parcel_info.api_path.post))
@@ -228,7 +233,7 @@ class TaskRestore(Task):
                         # Create a new item
                         if item.is_readonly:
                             self.log_warning(f'Factory default {info} {item.name} is a dependency that is missing '
-                                             'on target vManage. Will be converted to non-default.')
+                                             'on target SD-WAN Manager. Will be converted to non-default.')
 
                         if self.is_dryrun:
                             self.log_info(f'{op_info} {info} {item.name}{reason}')
@@ -248,9 +253,11 @@ class TaskRestore(Task):
                         # Special case for policy objects, creating linked parcels in the existing policy-object
                         target_policy_obj = ProfileSdwanPolicy.get(api, target_id)
                         if target_policy_obj is None:
-                            self.log_warning(f'Failed: Merge {info} {item.name}: Could not read from target vManage')
+                            self.log_warning(
+                                f'Failed: Merge {info} {item.name}: Could not read from target SD-WAN Manager'
+                            )
                             continue
-                        self.log_info(f'Retrieved {info} {item.name}{reason} from target vManage')
+                        self.log_info(f'Retrieved {info} {item.name}{reason} from target SD-WAN Manager')
 
                         if self.is_dryrun:
                             self.log_info(f'Merge {info} {item.name}{reason}')
@@ -322,7 +329,7 @@ class TaskRestore(Task):
             return
 
         if not is_index_supported(ConfigGroupIndex, version=api.server_version):
-            self.log_debug("Will skip deploy, target vManage does not support config-groups")
+            self.log_debug("Will skip deploy, target SD-WAN Manager does not support config-groups")
             return
 
         target_groups = {item_name: item_id for item_id, item_name in ConfigGroupIndex.get_raise(api)}
