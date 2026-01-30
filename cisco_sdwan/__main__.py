@@ -112,28 +112,28 @@ def execute_task(task_obj: Task, parsed_task_args, is_api_task: bool, base_url: 
 def main():
     # Top-level cli parser
     cli_parser = argparse.ArgumentParser(description=title)
-    cli_parser.add_argument('-a', '--address', metavar='<manager-ip>', action=EnvVar, required=False,
+    cli_parser.add_argument('-a', '--address', metavar='<address>', action=EnvVar, required=False,
                             envvar='VMANAGE_IP', type=non_empty_type,
-                            help='SD-WAN Manager IP address, can also be defined via VMANAGE_IP environment variable. '
+                            help='SD-WAN Manager address, can also be defined via VMANAGE_IP environment variable. '
                                  'If neither is provided user is prompted for the address.')
     cli_parser.add_argument('-u', '--user', metavar='<user>', action=EnvVar, required=False,
                             envvar='VMANAGE_USER', type=non_empty_type,
-                            help='username, can also be defined via VMANAGE_USER environment variable. '
-                                 'If neither is provided user is prompted for username.')
+                            help='SD-WAN Manager username, can also be defined via VMANAGE_USER environment variable. '
+                                 'If neither is provided user is prompted for the username.')
     cli_parser.add_argument('-p', '--password', metavar='<password>', action=EnvVar, required=False,
                             envvar='VMANAGE_PASSWORD', type=non_empty_type,
-                            help='password, can also be defined via VMANAGE_PASSWORD environment variable. '
-                                 ' If neither is provided user is prompted for password.')
-    cli_parser.add_argument('--apikey', metavar='<api-key>', action=EnvVar, required=False,
+                            help='SD-WAN Manager password, can also be defined via VMANAGE_PASSWORD environment '
+                                 'variable. If neither is provided user is prompted for the password.')
+    cli_parser.add_argument('-k', '--apikey', metavar='<api-key>', action=EnvVar, required=False,
                             envvar='VMANAGE_APIKEY', type=non_empty_type,
                             help='SD-WAN Manager API key, can also be defined via VMANAGE_APIKEY environment variable.')
     cli_parser.add_argument('--tenant', metavar='<tenant>', type=non_empty_type,
-                            help='tenant name, when using provider accounts in multi-tenant deployments.')
+                            help='SD-WAN Manager tenant name, for provider accounts in multi-tenant deployments.')
     cli_parser.add_argument('--port', metavar='<port>', default=VMANAGE_PORT, action=EnvVar, envvar='VMANAGE_PORT',
-                            help='port number, can also be defined via VMANAGE_PORT environment variable'
+                            help='SD-WAN Manager port number, can also be defined via VMANAGE_PORT environment variable'
                                  ' (default: %(default)s)')
     cli_parser.add_argument('--timeout', metavar='<timeout>', type=int, default=REST_TIMEOUT,
-                            help='REST API timeout (default: %(default)ss)')
+                            help='SD-WAN Manager REST API timeout (default: %(default)ss)')
     cli_parser.add_argument('--verbose', action='store_true',
                             help='increase output verbosity')
     cli_parser.add_argument('--debug', action='store_true',
