@@ -105,8 +105,8 @@ class TaskRestore(Task):
         match_set = set()  # {<item_id>, ...}
         for tag in ordered_tags(parsed_args.tag):
             if tag == 'template_device' and not is_vbond_set:
-                self.log_warning(f'Will skip {tag} items because vBond is not configured. '
-                                 'On SD-WAN Manager, Administration > Settings > vBond.')
+                self.log_warning(f'Will skip {tag} items because SD-WAN Validator is not configured. '
+                                 'Under SD-WAN Manager, Administration > Settings > System > Validator.')
                 continue
 
             self.log_info(f'Inspecting {tag} items', dryrun=False)
@@ -181,12 +181,12 @@ class TaskRestore(Task):
 
     def is_vbond_configured(self, api: Rest) -> bool:
         if api.is_multi_tenant and not api.is_provider:
-            # Cannot explicitly check vBond configuration when using a tenant account, assume it is configured
+            # Cannot check SD-WAN Validator configuration when using a tenant account, assume it is configured
             return True
 
         check_vbond = CheckVBond.get(api)
         if check_vbond is None:
-            self.log_warning('Failed retrieving vBond configuration status.')
+            self.log_warning('Failed retrieving SD-WAN Validator configuration status.')
             return False
 
         return check_vbond.is_configured

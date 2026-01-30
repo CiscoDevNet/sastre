@@ -178,6 +178,7 @@ class DeviceBootstrap(ApiItem):
 
     @property
     def vbond(self) -> str:
+        """SD-WAN Validator address from bootstrap config"""
         return self.parse(r'- vbond : ([^$]+?)$')
 
     @property
@@ -252,6 +253,7 @@ class Inventory(IndexApiItem):
 
     @staticmethod
     def is_vbond(device_entry: FilterEntry) -> bool:
+        """Filtered_iter filter selecting SD-WAN Validator devices (vbond type in API)"""
         return device_entry.type is not None and device_entry.type == 'vbond'
 
     @staticmethod
@@ -430,9 +432,9 @@ SOFT_EDGE_SET = {"vedge-CSR-1000v", "vedge-C8000V", "vedge-C8000V-SD-ROUTING", "
 
 
 class DeviceType(Enum):
-    vsmart = 'vsmart'
-    vmanage = 'vmanage'
-    vbond = 'vbond'
+    vsmart = 'vsmart'       # SD-WAN Controller
+    vmanage = 'vmanage'     # SD-WAN Manager
+    vbond = 'vbond'         # SD-WAN Validator
     vedge = 'vedge'
     cedge = 'cedge'
 
@@ -2327,6 +2329,7 @@ class PolicyListScalableGroupTagIndex(PolicyListIndex):
 # Admin Settings
 #
 class SettingsVbond(AdminSettingsItem):
+    """SD-WAN Validator settings (Administration > Settings)"""
     setting = 'device'
     store_file = 'vbond.json'
 
