@@ -45,8 +45,8 @@ class TaskRestore(Task):
         task_parser.add_argument('--dryrun', action='store_true',
                                  help='dry-run mode. Items to be restored are listed but not pushed to SD-WAN Manager.')
         task_parser.add_argument('--attach', action='store_true',
-                                 help='attach templates, deploy config-groups and activate vSmart policy after '
-                                      'restoring items.')
+                                 help='attach templates, deploy config-groups and activate SD-WAN Controller policy '
+                                      'after restoring items.')
         task_parser.add_argument('--update', action='store_true',
                                  help='update SD-WAN Manager items that have the same name but different content as '
                                       'the corresponding item in workdir. Without this option, such items are skipped '
@@ -167,7 +167,7 @@ class TaskRestore(Task):
         if parsed_args.attach:
             for attach_step_fn, info in (('restore_deployments', 'config-group deployments'),
                                          ('restore_attachments', 'template attachments'),
-                                         ('restore_active_policy', 'vSmart policy activate')):
+                                         ('restore_active_policy', 'SD-WAN Controller policy activate')):
                 try:
                     getattr(TaskRestore, attach_step_fn)(self, api, parsed_args.workdir)
                 except (RestAPIException, FileNotFoundError, WaitActionsException) as ex:
@@ -305,9 +305,9 @@ class TaskRestore(Task):
                                                         log_context='reattaching templates')
                             self.log_debug(f'Attach requests processed: {reqs}')
                         elif put_eval.need_reactivate:
-                            self.log_info(f'Updating {info} {item.name} requires vSmart policy reactivate')
+                            self.log_info(f'Updating {info} {item.name} requires SD-WAN Controller policy reactivate')
                             self.policy_activate(api, *PolicyVsmartIndex.get_raise(api).active_policy, is_edited=True,
-                                                 log_context="reactivating vSmart policy")
+                                                 log_context="reactivating SD-WAN Controller policy")
                 except (RestAPIException, WaitActionsException, ValueError) as ex:
                     self.log_error(f'Failed: {op_info} {info} {item.name}{reason}: {ex}')
                 else:
@@ -373,7 +373,7 @@ class TaskRestore(Task):
         else:
             self.log_info('No WAN Edge template attachments needed')
 
-        # Attach vSmart template
+        # Attach SD-WAN Controller (vSmart) template
         vsmart_templates_iter = (
             (saved_name, saved_id, target_templates.get(saved_name))
             for saved_id, saved_name in saved_template_index.filtered_iter(DeviceTemplateIndex.is_vsmart,
@@ -386,24 +386,24 @@ class TaskRestore(Task):
         attach_data = self.template_attach_data(
             api, workdir, saved_template_index.need_extended_name, vsmart_templates_iter, target_uuid_set=vsmart_set
         )
-        reqs = self.template_attach(api, *attach_data, log_context="template attaching vSmarts")
+        reqs = self.template_attach(api, *attach_data, log_context="template attaching SD-WAN Controllers")
         if reqs:
             self.log_debug(f'Attach requests processed: {reqs}')
         else:
-            self.log_info('No vSmart template attachments needed')
+            self.log_info('No SD-WAN Controller template attachments needed')
 
     def restore_active_policy(self, api: Rest, workdir: str) -> None:
         try:
             _, policy_name = PolicyVsmartIndex.load(workdir, raise_not_found=True).active_policy
             target_policies = {item_name: item_id for item_id, item_name in PolicyVsmartIndex.get_raise(api)}
             reqs = self.policy_activate(api, target_policies.get(policy_name), policy_name,
-                                        log_context="activating vSmart policy")
+                                        log_context="activating SD-WAN Controller policy")
             if reqs:
                 self.log_debug(f'Activate requests processed: {reqs}')
             else:
-                self.log_info('No vSmart policy activate needed')
+                self.log_info('No SD-WAN Controller policy activate needed')
         except FileNotFoundError:
-            self.log_debug("Will skip active policy restore, no local vSmart policy index")
+            self.log_debug("Will skip active policy restore, no local SD-WAN Controller policy index")
 
 
 class RestoreArgs(TaskArgs):

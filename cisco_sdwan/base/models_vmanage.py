@@ -111,7 +111,7 @@ class PolicyVsmartStatus(ApiItem):
 
 
 class PolicyVsmartStatusException(Exception):
-    """ Exception indicating Vsmart status is not ready """
+    """ Exception indicating SD-WAN Controller (vSmart) status is not ready """
     pass
 
 
@@ -249,15 +249,17 @@ class Inventory(IndexApiItem):
 
     @staticmethod
     def is_vsmart(device_entry: FilterEntry) -> bool:
+        """Filtered_iter filter selecting SD-WAN Controller devices (vsmart)"""
         return device_entry.type is not None and device_entry.type == 'vsmart'
 
     @staticmethod
     def is_vbond(device_entry: FilterEntry) -> bool:
-        """Filtered_iter filter selecting SD-WAN Validator devices (vbond type in API)"""
+        """Filtered_iter filter selecting SD-WAN Validator devices (vbond)"""
         return device_entry.type is not None and device_entry.type == 'vbond'
 
     @staticmethod
     def is_vmanage(device_entry: FilterEntry) -> bool:
+        """Filtered_iter filter selecting SD-WAN Manager devices (vmanage)"""
         return device_entry.type is not None and device_entry.type == 'vmanage'
 
     @staticmethod
@@ -602,10 +604,12 @@ class DeviceTemplateIndex(IndexConfigItem):
 
     @staticmethod
     def is_vsmart(entry: FilterEntry) -> bool:
+        """Filtered_iter filter selecting SD-WAN Controller templates (vsmart)"""
         return entry.device_type is not None and entry.device_type == 'vsmart'
 
     @staticmethod
     def is_not_vsmart(entry: FilterEntry) -> bool:
+        """Filtered_iter filter excluding SD-WAN Controller templates (vsmart)"""
         return entry.device_type is not None and entry.device_type != 'vsmart'
 
     @staticmethod
@@ -1362,7 +1366,7 @@ class PolicyGroupIndex(IndexConfigItem):
 
 
 #
-# Policy vSmart
+# Policy vSmart (SD-WAN Controller)
 #
 
 class PolicyVsmart(ConfigItem):

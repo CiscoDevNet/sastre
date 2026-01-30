@@ -818,12 +818,12 @@ class Task:
                 raise StopIteration()
             PolicyVsmartStatus.get_raise(api).raise_for_status()
         except (RestAPIException, PolicyVsmartStatusException):
-            self.log_debug('vSmarts not in vManage mode or otherwise not ready to have policy activated')
+            self.log_debug('SD-WAN Controllers not in vManage mode or otherwise not ready to have policy activated')
         except StopIteration:
             self.log_debug('No policy is active or policy not on target vManage')
         else:
             activate_reqs.append(...)
-            self.log_info(f'vSmart policy activate: {policy_name}')
+            self.log_info(f'SD-WAN Controller policy activate: {policy_name}')
 
             if not self.is_dryrun:
                 action_worker = PolicyVsmartActivate(
@@ -846,7 +846,7 @@ class Task:
         policy_id, policy_name = PolicyVsmartIndex.get_raise(api).active_policy
         if policy_id is not None and policy_name is not None:
             deactivate_reqs.append(...)
-            self.log_info(f'vSmart policy deactivate: {policy_name}')
+            self.log_info(f'SD-WAN Controller policy deactivate: {policy_name}')
 
             if not self.is_dryrun:
                 action_worker = PolicyVsmartDeactivate(
