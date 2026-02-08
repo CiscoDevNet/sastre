@@ -36,7 +36,7 @@ def retrieve_rt_task(api_obj: Rest, rt_cls: type[RealtimeItem], device: DeviceIn
     return device, rt_cls.get(api_obj, device.system_ip)
 
 
-def table_fields(op_cls: type[OperationalItem], detail: bool, simple: bool) -> tuple:
+def table_fields(op_cls: type[OperationalItem], detail: bool, simple: bool) -> tuple[str, ...]:
     if detail and op_cls.fields_ext is not None:
         return op_cls.fields_std + op_cls.fields_ext
 

@@ -120,7 +120,7 @@ class ApiPath:
         return f"{self.__class__.__name__}({self.get}, {self.post}, {self.put}, {self.delete}{path_vars})"
 
     @staticmethod
-    def discover_path_vars(path_template: str) -> tuple:
+    def discover_path_vars(path_template: str) -> tuple[str, ...]:
         # If no path variable is discovered, an empty tuple is returned
         return tuple(m.group(1) for m in re.finditer(r'{\s*([^}\s][^}]*?)\s*}', path_template))
 
@@ -223,7 +223,7 @@ class OperationalItem:
     def field_names(self) -> tuple[str, ...]:
         return tuple(self._meta.keys())
 
-    def field_info(self, *field_names: str, info: str = 'title', default: str | None = 'N/A') -> tuple:
+    def field_info(self, *field_names: str, info: str = 'title', default: str | None = 'N/A') -> tuple[Any, ...]:
         """
         Retrieve metadata about one or more fields.
         @param field_names: One or more field names to retrieve metadata from.
@@ -236,7 +236,7 @@ class OperationalItem:
 
         return tuple(entry.get(info, default) for entry in default_getter(*field_names, default={})(self._meta))
 
-    def field_value_iter(self, *field_names: str, **conv_fn_map: Mapping[str, Callable]) -> Iterator[tuple[Any, ...]]:
+    def field_value_iter(self, *field_names: str, **conv_fn_map: Mapping[str, Callable[..., Any]]) -> Iterator[tuple[Any, ...]]:
         """
         Iterate over entries of an operational item instance. Only fields/columns defined by field_names are yielded.
         Type conversion of one or more fields is supported by passing a callable that takes one argument (the field
@@ -366,7 +366,7 @@ class BulkStatsItem(OperationalItem):
             yield sample
 
     @staticmethod
-    def average_fields(sample_list: Sequence[tuple[Any, ...]], *fields_to_avg: str) -> dict:
+    def average_fields(sample_list: Sequence[tuple[Any, ...]], *fields_to_avg: str) -> dict[str, Any]:
         def average(values):
             avg = sum(values) / len(values)
             # If original values were integer, convert average back to integer
@@ -379,7 +379,7 @@ class BulkStatsItem(OperationalItem):
 
     # noinspection PyProtectedMember
     def aggregated_value_iter(self, interval_secs: int, *field_names: str,
-                              **conv_fn_map: Mapping[str, Callable]) -> Iterator[tuple[Any, ...]]:
+                              **conv_fn_map: Mapping[str, Callable[..., Any]]) -> Iterator[tuple[Any, ...]]:
         """
         Iterate over aggregated values off the different time series from this BulkStatsItem. Time series are identified
         using time_series_key.
@@ -608,7 +608,7 @@ class IndexApiItem(ApiItem):
     # Extended_iter_fields should be defined in subclasses that use extended_iter, needs to be a tuple subclass.
     extended_iter_fields = None
 
-    def iter(self, *iter_fields: str, default: Any = None) -> Iterator:
+    def iter(self, *iter_fields: str, default: Any = None) -> Iterator[Any]:
         """
         Returns an iterator where each entry is the value of the respective field in iter_fields.
         @param default: Value to return for any field missing in an entry. Default is None.
@@ -619,7 +619,7 @@ class IndexApiItem(ApiItem):
     def __iter__(self):
         return self.iter(*self.iter_fields)
 
-    def extended_iter(self, default=None) -> Iterator:
+    def extended_iter(self, default: Any = None) -> Iterator[Any]:
         """
         Returns an iterator where each entry is composed of the combined fields of iter_fields and extended_iter_fields.
         None is returned on any fields that are missing in an entry
@@ -875,7 +875,7 @@ class IndexConfigItem(ConfigItem):
         }
         return cls(index_payload)
 
-    def iter(self, *iter_fields: str, default: Any = None) -> Iterator:
+    def iter(self, *iter_fields: str, default: Any = None) -> Iterator[Any]:
         """
         Returns an iterator where each entry is the value of the respective field in iter_fields.
         @param default: Value to return for any field missing in an entry. Default is None.
@@ -886,7 +886,7 @@ class IndexConfigItem(ConfigItem):
     def __iter__(self):
         return self.iter(*self.iter_fields)
 
-    def extended_iter(self, default=None) -> Iterator:
+    def extended_iter(self, default: Any = None) -> Iterator[Any]:
         """
         Returns an iterator where each entry is composed of the combined fields of iter_fields and extended_iter_fields.
         None is returned on any fields that are missing in an entry
@@ -1328,7 +1328,7 @@ class ExtendedTemplate:
         return result_name
 
 
-def default_getter(*fields: str, default: Any = None) -> Callable:
+def default_getter(*fields: str, default: Any = None) -> Callable[[Mapping[str, Any]], Any]:
     if len(fields) == 1:
         def getter_fn(obj):
             return obj.get(fields[0], default)

@@ -501,7 +501,7 @@ class DeviceTemplateValues(ConfigItem):
     store_path = ('device_templates', 'values')
 
     @staticmethod
-    def api_params(template_id: str, device_uuids: Iterable[str]) -> dict:
+    def api_params(template_id: str, device_uuids: Iterable[str]) -> dict[str, Any]:
         """
         Build dictionary used to provide input parameters for api POST call
         @param template_id: Template ID string

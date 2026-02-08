@@ -354,7 +354,7 @@ class Task:
         return index_cls.get(backend) if isinstance(backend, Rest) else index_cls.load(backend)
 
     def template_attach_data(self, api: Rest, workdir: str, ext_name: bool, templates_iter: Iterable[tuple],
-                             target_uuid_set: Optional[set[str]] = None) -> tuple[list, bool]:
+                             target_uuid_set: Optional[set[str]] = None) -> tuple[list[Any], bool]:
         """
         Prepare data for template attach considering local backup as the source of truth (i.e. where input values are)
         @param api: Instance of Rest API
@@ -410,7 +410,7 @@ class Task:
 
     @staticmethod
     def template_reattach_data(api: Rest, templates_iter: Iterable[tuple],
-                               filtered_uuid_set: Optional[set[str]] = None) -> tuple[list, bool]:
+                               filtered_uuid_set: Optional[set[str]] = None) -> tuple[list[Any], bool]:
         """
         Prepare data for template reattach considering SD-WAN Manager as the source of truth (i.e. source of values)
         @param api: Instance of Rest API
@@ -857,7 +857,7 @@ class Task:
 
         return len(deactivate_reqs)
 
-    def wait_actions(self, api: Rest, action_list: list[tuple], log_context: str, raise_on_failure: bool) -> bool:
+    def wait_actions(self, api: Rest, action_list: list[tuple[Any, ...]], log_context: str, raise_on_failure: bool) -> bool:
         """
         Wait for actions in action_list to complete
         @param api: Instance of Rest API

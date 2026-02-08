@@ -2,7 +2,7 @@ import argparse
 from uuid import uuid4
 from copy import deepcopy
 from contextlib import suppress
-from typing import Optional, NamedTuple, Annotated
+from typing import Any, Optional, NamedTuple, Annotated
 from pydantic import model_validator, BaseModel, field_validator, ValidationError, Field, ValidationInfo, ConfigDict
 import yaml
 from cisco_sdwan.__version__ import __doc__ as title
@@ -117,7 +117,7 @@ class Processor:
 
         return ProcessorMatch(False)
 
-    def eval(self, config_obj: ConfigItem, new_name: str, new_id: str) -> tuple[dict, list[str]]:
+    def eval(self, config_obj: ConfigItem, new_name: str, new_id: str) -> tuple[dict[str, Any], list[str]]:
         new_payload = deepcopy(config_obj.data)
         trace_log: list[str] = []
 
@@ -148,7 +148,7 @@ class Processor:
 
 
 class AttachedProcessor(Processor):
-    def eval(self, config_obj: ConfigItem, new_name: str, new_id: str) -> tuple[dict, list[str]]:
+    def eval(self, config_obj: ConfigItem, new_name: str, new_id: str) -> tuple[dict[str, Any], list[str]]:
         new_payload = deepcopy(config_obj.data)
         trace_log: list[str] = []
 
@@ -156,7 +156,7 @@ class AttachedProcessor(Processor):
 
 
 class ValuesProcessor(Processor):
-    def eval(self, config_obj: ConfigItem, new_name: str, new_id: str) -> tuple[dict, list[str]]:
+    def eval(self, config_obj: ConfigItem, new_name: str, new_id: str) -> tuple[dict[str, Any], list[str]]:
         new_payload = deepcopy(config_obj.data)
         trace_log: list[str] = []
 
@@ -232,7 +232,7 @@ class TaskTransform(Task):
         return parsed_args.workdir is None
 
     @staticmethod
-    def _recipe_dict(parsed_args, replace_source: bool) -> dict:
+    def _recipe_dict(parsed_args: Any, replace_source: bool) -> dict[str, Any]:
         recipe_dict = {
             'tag': parsed_args.tag,
             'name_template': {
@@ -491,7 +491,7 @@ class TaskTransform(Task):
 
         return item
 
-    def processor_eval(self, p: Processor, config_obj: ConfigItem, new_name: str, new_id: str) -> dict:
+    def processor_eval(self, p: Processor, config_obj: ConfigItem, new_name: str, new_id: str) -> dict[str, Any]:
         new_payload, trace_log = p.eval(config_obj, new_name, new_id)
         for trace in trace_log:
             self.log_debug(f'Processor {p.name}, {new_name}: {trace}')

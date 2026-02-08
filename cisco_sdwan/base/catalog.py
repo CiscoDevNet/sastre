@@ -251,7 +251,7 @@ def op_catalog_iter(op_type: OpType, *tags: str, version: Optional[str] = None) 
     )
 
 
-def op_catalog_tags(op_type: OpType) -> set:
+def op_catalog_tags(op_type: OpType) -> set[str]:
     """
     Return unique tags used by items registered with the operational-data catalog group
     @param op_type: OpType enum indicating type of operational-data
@@ -260,7 +260,7 @@ def op_catalog_tags(op_type: OpType) -> set:
     return {entry.tag for entry in _op_catalog.get(op_type, [])}
 
 
-def op_catalog_commands(op_type: OpType) -> set:
+def op_catalog_commands(op_type: OpType) -> set[str]:
     """
     Return set of commands registered with the operational-data catalog group. These are the combination of tags and
     selectors
