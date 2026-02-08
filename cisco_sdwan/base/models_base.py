@@ -355,6 +355,8 @@ class BulkStatsItem(OperationalItem):
 
     @staticmethod
     def last_n_secs(n_secs: int, sample_list: Sequence[tuple[Any, ...]]) -> Iterator[tuple[Any, ...]]:
+        if not sample_list:
+            return
         yield sample_list[0]
 
         oldest_ts = sample_list[0].entry_time - n_secs * 1000
