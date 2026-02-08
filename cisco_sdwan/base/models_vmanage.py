@@ -5,7 +5,7 @@
  This module implements vManage API models
 """
 import re
-from typing import Optional, Any, Union
+from typing import Optional, Any
 from enum import Enum
 from collections.abc import Mapping, Sequence, Callable, Iterable
 from pathlib import Path
@@ -329,7 +329,7 @@ class DeviceConfig(ConfigItem):
 
     def save(self, node_dir, ext_name=False, item_name=None, item_id=None):
         """
-        Save data (i.e. self.data) to a json file
+        Save data (i.e. self.data) to a JSON file
 
         @param node_dir: String indicating directory under root_dir used for all files from a given vManage node.
         @param ext_name: True indicates that item_names need to be extended (with item_id) to make their filename
@@ -1017,7 +1017,7 @@ class ProfileSdwanService(FeatureProfile):
         PathKey("tracker", "lan/vpn"): ...,
         PathKey("tracker", "lan/vpn/interface/ethernet"): ApiPath(
             "v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/interface/ethernet/{ethId}/tracker"),
-        PathKey("objecttracker","objecttrackergroup"): ...,
+        PathKey("objecttracker", "objecttrackergroup"): ...,
         PathKey("objecttracker", "lan/vpn/interface/ethernet"): ...,
         PathKey("trackergroup", "lan/vpn"): ...,
         PathKey("trackergroup", "lan/vpn/interface/ethernet"): ApiPath(
@@ -2343,11 +2343,11 @@ class SettingsVbond(AdminSettingsItem):
         return len(domain_ip) > 0 and domain_ip != 'Not Configured'
 
     @property
-    def domain_ip(self) -> Union[str, None]:
+    def domain_ip(self) -> str | None:
         return self.data['domainIp'] if self.is_configured else None
 
     @property
-    def port(self) -> Union[str, None]:
+    def port(self) -> str | None:
         return self.data['port'] if self.is_configured else None
 
 
@@ -2356,7 +2356,7 @@ class SettingsOrganization(AdminSettingsItem):
     store_file = 'organization.json'
 
     @property
-    def organization(self) -> Union[str, None]:
+    def organization(self) -> str | None:
         return self.data.get('org')
 
     @property
@@ -2369,7 +2369,7 @@ class SettingsCertificate(AdminSettingsItem):
     store_file = 'certificate.json'
 
     @property
-    def signing(self) -> Union[str, None]:
+    def signing(self) -> str | None:
         return self.data.get('certificateSigning')
 
     @classmethod
@@ -2670,7 +2670,7 @@ class BulkAppRoute(BulkStatsItem):
     fields_to_avg = ('total', 'loss', 'latency', 'jitter')
 
     @staticmethod
-    def time_series_key(sample: namedtuple) -> str:
+    def time_series_key(sample: tuple[Any, ...]) -> str:
         return sample.name
 
 
@@ -2682,7 +2682,7 @@ class BulkInterfaceStats(BulkStatsItem):
     fields_to_avg = ('tx_kbps', 'rx_kbps', 'tx_pps', 'rx_pps')
 
     @staticmethod
-    def time_series_key(sample: namedtuple) -> str:
+    def time_series_key(sample: tuple[Any, ...]) -> str:
         return f"{sample.vdevice_name}_{sample.vpn_id}_{sample.interface}"
 
 

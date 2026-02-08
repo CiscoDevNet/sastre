@@ -4,7 +4,7 @@
  cisco_sdwan.base.catalog
  This module implements vManage API Catalogs
 """
-from typing import NamedTuple, Union, Optional, Any
+from typing import NamedTuple, Optional, Any
 from collections.abc import Iterator
 from enum import Enum
 from .models_base import IndexConfigItem, ConfigItem, RealtimeItem, BulkStateItem, BulkStatsItem
@@ -19,7 +19,7 @@ class CatalogItem(NamedTuple):
     info: str
     index_cls: type
     item_cls: type
-    min_version: Union[str, None]
+    min_version: str | None
 
 
 _catalog: dict[type, CatalogItem] = dict()  # {<item_cls>: (<tag>, <info>, <index_cls>, <item_cls>, <min_version>), ...}
@@ -41,7 +41,7 @@ class OpCatalogItem(NamedTuple):
     selector: str
     info: str
     op_cls: type
-    min_version: Union[str, None]
+    min_version: str | None
 
 
 _op_catalog = dict()  # {<OpType>: [(<tag>, <selector>, <info>, <op_cls>, <min_version>), ...]}

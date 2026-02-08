@@ -1,7 +1,7 @@
 import argparse
 from functools import partial
-from typing import Union, Optional, Annotated
-from collections.abc import Mapping, Callable, Iterable
+from typing import Optional, Annotated
+from collections.abc import Mapping, Iterable
 from pydantic import Field, field_validator
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest, RestAPIException
@@ -11,7 +11,7 @@ from cisco_sdwan.base.models_vmanage import (DeviceTemplateIndex, ConfigGroupInd
 from cisco_sdwan.tasks.utils import (TaskOptions, existing_workdir_type, regex_type, default_workdir, ipv4_type,
                                      site_id_type, int_type)
 from cisco_sdwan.tasks.common import regex_search, Task, WaitActionsException, device_iter
-from cisco_sdwan.tasks.models import TaskArgs, const
+from cisco_sdwan.tasks.models import TaskArgs, ConstStr, ConstCallable
 from cisco_sdwan.tasks.validators import validate_regex, validate_workdir, validate_site_id, validate_ipv4
 
 # Default number of devices to include per attach/detach request. The value of 200 was adopted because it is what was
@@ -95,7 +95,7 @@ class TaskAttach(Task):
         deploy_set = set()
         return attach_set, deploy_set
 
-    def runner(self, parsed_args, api: Optional[Rest] = None) -> Union[None, list]:
+    def runner(self, parsed_args, api: Optional[Rest] = None) -> list | None:
         self.is_dryrun = parsed_args.dryrun
         self.log_info(f'Attach task: Local workdir: "{parsed_args.workdir}" -> SD-WAN Manager URL: "{api.base_url}"')
 
@@ -252,7 +252,7 @@ class TaskDetach(Task):
         associated_set = set()
         return attached_set, associated_set
 
-    def runner(self, parsed_args, api: Optional[Rest] = None) -> Union[None, list]:
+    def runner(self, parsed_args, api: Optional[Rest] = None) -> list | None:
         self.is_dryrun = parsed_args.dryrun
         self.log_info(f'Detach templates task: SD-WAN Manager URL: "{api.base_url}"')
 
@@ -336,9 +336,9 @@ class AttachDetachArgs(TaskArgs):
 class AttachVsmartArgs(AttachDetachArgs):
     workdir: str
     activate: bool = False
-    template_filter: const(Callable, DeviceTemplateIndex.is_vsmart)
-    device_sets: const(Callable, TaskAttach.vsmart_sets)
-    set_title: const(str, 'SD-WAN Controller')
+    template_filter: ConstCallable = DeviceTemplateIndex.is_vsmart
+    device_sets: ConstCallable = TaskAttach.vsmart_sets
+    set_title: ConstStr = 'SD-WAN Controller'
 
     # Validators
     _validate_workdir = field_validator('workdir')(validate_workdir)
@@ -346,21 +346,21 @@ class AttachVsmartArgs(AttachDetachArgs):
 
 class AttachEdgeArgs(AttachDetachArgs):
     workdir: str
-    template_filter: const(Callable, DeviceTemplateIndex.is_not_vsmart)
-    device_sets: const(Callable, TaskAttach.edge_sets)
-    set_title: const(str, 'WAN Edge')
+    template_filter: ConstCallable = DeviceTemplateIndex.is_not_vsmart
+    device_sets: ConstCallable = TaskAttach.edge_sets
+    set_title: ConstStr = 'WAN Edge'
 
     # Validators
     _validate_workdir = field_validator('workdir')(validate_workdir)
 
 
 class DetachVsmartArgs(AttachDetachArgs):
-    template_filter: const(Callable, DeviceTemplateIndex.is_vsmart)
-    device_sets: const(Callable, TaskDetach.vsmart_sets)
-    set_title: const(str, 'SD-WAN Controller')
+    template_filter: ConstCallable = DeviceTemplateIndex.is_vsmart
+    device_sets: ConstCallable = TaskDetach.vsmart_sets
+    set_title: ConstStr = 'SD-WAN Controller'
 
 
 class DetachEdgeArgs(AttachDetachArgs):
-    template_filter: const(Callable, DeviceTemplateIndex.is_not_vsmart)
-    device_sets: const(Callable, TaskDetach.edge_sets)
-    set_title: const(str, 'WAN Edge')
+    template_filter: ConstCallable = DeviceTemplateIndex.is_not_vsmart
+    device_sets: ConstCallable = TaskDetach.edge_sets
+    set_title: ConstStr = 'WAN Edge'

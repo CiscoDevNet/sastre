@@ -1,7 +1,7 @@
 import argparse
 from pathlib import Path
 from collections import namedtuple
-from typing import Union, Optional
+from typing import Optional
 from collections.abc import Callable
 from operator import itemgetter, attrgetter
 from functools import partial
@@ -15,7 +15,7 @@ from cisco_sdwan.base.models_vmanage import (DeviceTemplate, DeviceTemplateAttac
 from cisco_sdwan.tasks.utils import TaskOptions, existing_workdir_type, filename_type, regex_type
 from cisco_sdwan.tasks.common import (regex_search, Task, Table, get_table_filters, filtered_tables, export_json,
                                       TaskException)
-from cisco_sdwan.tasks.models import TableTaskArgs, const
+from cisco_sdwan.tasks.models import TableTaskArgs, ConstCallable, ConstStr
 from cisco_sdwan.tasks.validators import validate_workdir, validate_regex
 
 
@@ -69,7 +69,7 @@ class TaskShowTemplate(Task):
     def is_api_required(parsed_args) -> bool:
         return parsed_args.workdir is None
 
-    def runner(self, parsed_args, api: Optional[Rest] = None) -> Union[None, list]:
+    def runner(self, parsed_args, api: Optional[Rest] = None) -> list | None:
         source_info = f'Local workdir: "{parsed_args.workdir}"' if api is None else f'SD-WAN Manager URL: "{api.base_url}"'
         self.log_info(f'Show-template {parsed_args.subtask_info} task: {source_info}')
 
@@ -93,7 +93,7 @@ class TaskShowTemplate(Task):
         return result_tables if (parsed_args.save_csv is None and parsed_args.save_json is None) else None
 
     def values_table(self, parsed_args, api: Optional[Rest]) -> list[Table]:
-        def template_values(ext_name: bool, template_name: str, template_id: str) -> Union[DeviceTemplateValues, None]:
+        def template_values(ext_name: bool, template_name: str, template_id: str) -> DeviceTemplateValues | None:
             if api is None:
                 # Load from local backup
                 if (values := DeviceTemplateValues.load(parsed_args.workdir, ext_name, template_name, template_id)) is None:
@@ -262,12 +262,12 @@ class ShowTemplateArgs(TableTaskArgs):
 
 
 class ShowTemplateValuesArgs(ShowTemplateArgs):
-    subtask_info: const(str, 'values')
-    subtask_handler: const(Callable, TaskShowTemplate.values_table)
+    subtask_info: ConstStr = 'values'
+    subtask_handler: ConstCallable = TaskShowTemplate.values_table
 
 
 class ShowTemplateRefArgs(ShowTemplateArgs):
-    subtask_info: const(str, 'references')
-    subtask_handler: const(Callable, TaskShowTemplate.references_table)
+    subtask_info: ConstStr = 'references'
+    subtask_handler: ConstCallable = TaskShowTemplate.references_table
     with_refs: bool = False
     filled_rows: bool = False

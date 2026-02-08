@@ -1,5 +1,5 @@
 import argparse
-from typing import Union, Optional
+from typing import Optional
 from collections.abc import Callable
 from contextlib import suppress
 from functools import partial
@@ -39,7 +39,7 @@ class TaskDelete(Task):
                                       f'{TagOptions.options()}. Special tag "{CATALOG_TAG_ALL}" selects all items.')
         return task_parser.parse_args(task_args)
 
-    def runner(self, parsed_args, api: Optional[Rest] = None) -> Union[None, list]:
+    def runner(self, parsed_args, api: Optional[Rest] = None) -> list | None:
         self.is_dryrun = parsed_args.dryrun
         self.log_info(f'Delete task: SD-WAN Manager URL: "{api.base_url}"')
 

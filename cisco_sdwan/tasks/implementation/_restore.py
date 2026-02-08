@@ -1,5 +1,5 @@
 import argparse
-from typing import Union, Optional
+from typing import Optional
 from collections.abc import Sequence
 from functools import partial
 from pydantic import model_validator, field_validator
@@ -57,7 +57,7 @@ class TaskRestore(Task):
                                       f'{TagOptions.options()}. Special tag "{CATALOG_TAG_ALL}" selects all items.')
         return task_parser.parse_args(task_args)
 
-    def runner(self, parsed_args, api: Optional[Rest] = None) -> Union[None, list]:
+    def runner(self, parsed_args, api: Optional[Rest] = None) -> list | None:
         def load_items(index, item_cls):
             item_iter = (
                 (item_id, item_cls.load(parsed_args.workdir, index.need_extended_name, item_name, item_id))
