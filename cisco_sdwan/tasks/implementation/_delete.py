@@ -1,5 +1,5 @@
 import argparse
-from typing import Union, Optional
+from typing import Optional
 from collections.abc import Callable
 from contextlib import suppress
 from functools import partial
@@ -32,14 +32,14 @@ class TaskDelete(Task):
                                  help='dry-run mode. Items matched for removal are listed but not deleted.')
         task_parser.add_argument('--detach', action='store_true',
                                  help='USE WITH CAUTION! Detach templates, dissociate config-groups and deactivate '
-                                      'vSmart policy before deleting items. This allows deleting items '
+                                      'SD-WAN Controller policy before deleting items. This allows deleting items '
                                       'that are associated with attachments, deployments and active policies.')
         task_parser.add_argument('tag', metavar='<tag>', type=TagOptions.tag,
                                  help='tag for selecting items to be deleted. Available tags: '
                                       f'{TagOptions.options()}. Special tag "{CATALOG_TAG_ALL}" selects all items.')
         return task_parser.parse_args(task_args)
 
-    def runner(self, parsed_args, api: Optional[Rest] = None) -> Union[None, list]:
+    def runner(self, parsed_args, api: Optional[Rest] = None) -> list | None:
         self.is_dryrun = parsed_args.dryrun
         self.log_info(f'Delete task: SD-WAN Manager URL: "{api.base_url}"')
 
@@ -58,21 +58,21 @@ class TaskDelete(Task):
                 else:
                     self.log_info('No WAN Edge template detachments needed')
 
-                # Deactivate vSmart policy
-                reqs = self.policy_deactivate(api, log_context='deactivating vSmart policy')
+                # Deactivate SD-WAN Controller (vSmart) policy
+                reqs = self.policy_deactivate(api, log_context='deactivating SD-WAN Controller policy')
                 if reqs:
                     self.log_debug(f'Deactivate requests processed: {reqs}')
                 else:
-                    self.log_info('No vSmart policy deactivate needed')
+                    self.log_info('No SD-WAN Controller policy deactivate needed')
 
-                # Detach vSmart templates
+                # Detach SD-WAN Controller (vSmart) templates
                 reqs = self.template_detach(api, template_index.filtered_iter(DeviceTemplateIndex.is_vsmart,
                                                                               DeviceTemplateIndex.is_attached),
-                                            log_context='template detaching vSmarts')
+                                            log_context='template detaching SD-WAN Controllers')
                 if reqs:
                     self.log_debug(f'Detach requests processed: {reqs}')
                 else:
-                    self.log_info('No vSmart template detachments needed')
+                    self.log_info('No SD-WAN Controller template detachments needed')
 
                 # Dissociate WAN Edge config-groups
                 if is_index_supported(ConfigGroupIndex, version=api.server_version):

@@ -2,8 +2,7 @@ import argparse
 from uuid import uuid4
 from copy import deepcopy
 from contextlib import suppress
-from typing import Union, Optional, NamedTuple, Annotated
-from collections.abc import Callable
+from typing import Any, Optional, NamedTuple, Annotated
 from pydantic import model_validator, BaseModel, field_validator, ValidationError, Field, ValidationInfo, ConfigDict
 import yaml
 from cisco_sdwan.__version__ import __doc__ as title
@@ -15,7 +14,7 @@ from cisco_sdwan.base.processor import StopProcessorException, ProcessorExceptio
 from cisco_sdwan.tasks.utils import (TaskOptions, TagOptions, existing_workdir_type, filename_type, ext_template_type,
                                      regex_type, existing_file_type)
 from cisco_sdwan.tasks.common import clean_dir, Task, TaskException, regex_filter
-from cisco_sdwan.tasks.models import const, TaskArgs, CatalogTag
+from cisco_sdwan.tasks.models import ConstCallable, TaskArgs, CatalogTag
 from cisco_sdwan.tasks.validators import (validate_workdir, validate_ext_template, validate_filename, validate_regex,
                                           validate_existing_file, validate_json)
 
@@ -118,7 +117,7 @@ class Processor:
 
         return ProcessorMatch(False)
 
-    def eval(self, config_obj: ConfigItem, new_name: str, new_id: str) -> tuple[dict, list[str]]:
+    def eval(self, config_obj: ConfigItem, new_name: str, new_id: str) -> tuple[dict[str, Any], list[str]]:
         new_payload = deepcopy(config_obj.data)
         trace_log: list[str] = []
 
@@ -149,7 +148,7 @@ class Processor:
 
 
 class AttachedProcessor(Processor):
-    def eval(self, config_obj: ConfigItem, new_name: str, new_id: str) -> tuple[dict, list[str]]:
+    def eval(self, config_obj: ConfigItem, new_name: str, new_id: str) -> tuple[dict[str, Any], list[str]]:
         new_payload = deepcopy(config_obj.data)
         trace_log: list[str] = []
 
@@ -157,7 +156,7 @@ class AttachedProcessor(Processor):
 
 
 class ValuesProcessor(Processor):
-    def eval(self, config_obj: ConfigItem, new_name: str, new_id: str) -> tuple[dict, list[str]]:
+    def eval(self, config_obj: ConfigItem, new_name: str, new_id: str) -> tuple[dict[str, Any], list[str]]:
         new_payload = deepcopy(config_obj.data)
         trace_log: list[str] = []
 
@@ -233,7 +232,7 @@ class TaskTransform(Task):
         return parsed_args.workdir is None
 
     @staticmethod
-    def _recipe_dict(parsed_args, replace_source: bool) -> dict:
+    def _recipe_dict(parsed_args: Any, replace_source: bool) -> dict[str, Any]:
         recipe_dict = {
             'tag': parsed_args.tag,
             'name_template': {
@@ -263,7 +262,7 @@ class TaskTransform(Task):
         else:
             return TransformRecipe.model_validate_json(parsed_args.from_json)
 
-    def runner(self, parsed_args, api: Optional[Rest] = None) -> Union[None, list]:
+    def runner(self, parsed_args, api: Optional[Rest] = None) -> list | None:
         if parsed_args.workdir is not None:
             source_info = f'Local workdir: "{parsed_args.workdir}"'
         else:
@@ -284,7 +283,7 @@ class TaskTransform(Task):
 
         return parsed_args.subtask_handler(self, parsed_args, backend, server_version)
 
-    def transform(self, parsed_args, backend: Union[Rest, str], server_version: Optional[str]) -> Union[None, list]:
+    def transform(self, parsed_args, backend: Rest | str, server_version: Optional[str]) -> list | None:
         # Load processors
         try:
             recipe = parsed_args.recipe_handler(parsed_args)
@@ -410,7 +409,7 @@ class TaskTransform(Task):
 
         return
 
-    def build_recipe(self, parsed_args, backend: Union[Rest, str], server_version: Optional[str]) -> Union[None, list]:
+    def build_recipe(self, parsed_args, backend: Rest | str, server_version: Optional[str]) -> list | None:
         try:
             tag_set = set()
             resources = []
@@ -462,8 +461,8 @@ class TaskTransform(Task):
 
         return
 
-    def retrieve(self, item_cls: type[ConfigItem], backend: Union[Rest, str],
-                 item_id: str, item_name: str, ext_name: bool) -> Union[ConfigItem, None]:
+    def retrieve(self, item_cls: type[ConfigItem], backend: Rest | str,
+                 item_id: str, item_name: str, ext_name: bool) -> ConfigItem | None:
 
         item = self.item_get(item_cls, backend, item_id, item_name, ext_name)
         if item is None:
@@ -492,7 +491,7 @@ class TaskTransform(Task):
 
         return item
 
-    def processor_eval(self, p: Processor, config_obj: ConfigItem, new_name: str, new_id: str) -> dict:
+    def processor_eval(self, p: Processor, config_obj: ConfigItem, new_name: str, new_id: str) -> dict[str, Any]:
         new_payload, trace_log = p.eval(config_obj, new_name, new_id)
         for trace in trace_log:
             self.log_debug(f'Processor {p.name}, {new_name}: {trace}')
@@ -501,7 +500,7 @@ class TaskTransform(Task):
 
 
 class TransformArgs(TaskArgs):
-    subtask_handler: const(Callable, TaskTransform.transform)
+    subtask_handler: ConstCallable = TaskTransform.transform
     output: str
     workdir: Optional[str] = None
     no_rollover: bool = False
@@ -512,7 +511,7 @@ class TransformArgs(TaskArgs):
 
 
 class TransformCopyArgs(TransformArgs):
-    recipe_handler: const(Callable, TaskTransform.copy_recipe)
+    recipe_handler: ConstCallable = TaskTransform.copy_recipe
     tag: CatalogTag
     regex: Optional[str] = None
     not_regex: Optional[str] = None
@@ -531,11 +530,11 @@ class TransformCopyArgs(TransformArgs):
 
 
 class TransformRenameArgs(TransformCopyArgs):
-    recipe_handler: const(Callable, TaskTransform.rename_recipe)
+    recipe_handler: ConstCallable = TaskTransform.rename_recipe
 
 
 class TransformRecipeArgs(TransformArgs):
-    recipe_handler: const(Callable, TaskTransform.load_recipe)
+    recipe_handler: ConstCallable = TaskTransform.load_recipe
     from_file: Optional[str] = None
     from_json: Optional[str] = None
 
@@ -552,7 +551,7 @@ class TransformRecipeArgs(TransformArgs):
 
 
 class TransformBuildRecipeArgs(TaskArgs):
-    subtask_handler: const(Callable, TaskTransform.build_recipe)
+    subtask_handler: ConstCallable = TaskTransform.build_recipe
     workdir: Optional[str] = None
     recipe_file: str
 

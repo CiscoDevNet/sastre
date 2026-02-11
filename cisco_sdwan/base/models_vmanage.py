@@ -5,7 +5,7 @@
  This module implements vManage API models
 """
 import re
-from typing import Optional, Any, Union
+from typing import Optional, Any
 from enum import Enum
 from collections.abc import Mapping, Sequence, Callable, Iterable
 from pathlib import Path
@@ -80,6 +80,38 @@ class DeviceTemplateAttach(ApiItem):
         }
 
 
+class TagAssociate(ApiItem):
+    api_path = ApiPath(None, 'v1/tags/associate', None, None)
+    id_tag = 'id'
+
+    @staticmethod
+    def api_params(tag_mappings: Iterable[tuple[str, list[str]]]) -> dict[str, Any]:
+        """
+        Build dictionary used to provide input parameters for api POST call
+        @param tag_mappings: An iterable of (<tag_id>, <device_id_list>) tuples. <device_id_list> is a list of device
+                             ids to be associated with this tag.
+        @return: Dictionary used to provide POST input parameters
+        """
+
+        def tag_entry(tag_id, device_id_list):
+            return {
+                "tagId": tag_id,
+                "objects": [
+                    {"id": device_id, "objectType": "DEVICE"} for device_id in device_id_list
+                ]
+            }
+
+        return {
+            "data": [
+                tag_entry(tag_id, device_id_list) for tag_id, device_id_list in tag_mappings
+            ]
+        }
+
+
+class TagDissociate(TagAssociate):
+    api_path = ApiPath(None, 'v1/tags/associate?operationType=DELETE', None, None)
+
+
 class DeviceTemplateCLIAttach(DeviceTemplateAttach):
     api_path = ApiPath(None, 'template/device/config/attachcli', None, None)
 
@@ -111,7 +143,7 @@ class PolicyVsmartStatus(ApiItem):
 
 
 class PolicyVsmartStatusException(Exception):
-    """ Exception indicating Vsmart status is not ready """
+    """ Exception indicating SD-WAN Controller (vSmart) status is not ready """
     pass
 
 
@@ -178,6 +210,7 @@ class DeviceBootstrap(ApiItem):
 
     @property
     def vbond(self) -> str:
+        """SD-WAN Validator address from bootstrap config"""
         return self.parse(r'- vbond : ([^$]+?)$')
 
     @property
@@ -248,14 +281,17 @@ class Inventory(IndexApiItem):
 
     @staticmethod
     def is_vsmart(device_entry: FilterEntry) -> bool:
+        """Filtered_iter filter selecting SD-WAN Controller devices (vsmart)"""
         return device_entry.type is not None and device_entry.type == 'vsmart'
 
     @staticmethod
     def is_vbond(device_entry: FilterEntry) -> bool:
+        """Filtered_iter filter selecting SD-WAN Validator devices (vbond)"""
         return device_entry.type is not None and device_entry.type == 'vbond'
 
     @staticmethod
     def is_vmanage(device_entry: FilterEntry) -> bool:
+        """Filtered_iter filter selecting SD-WAN Manager devices (vmanage)"""
         return device_entry.type is not None and device_entry.type == 'vmanage'
 
     @staticmethod
@@ -325,7 +361,7 @@ class DeviceConfig(ConfigItem):
 
     def save(self, node_dir, ext_name=False, item_name=None, item_id=None):
         """
-        Save data (i.e. self.data) to a json file
+        Save data (i.e. self.data) to a JSON file
 
         @param node_dir: String indicating directory under root_dir used for all files from a given vManage node.
         @param ext_name: True indicates that item_names need to be extended (with item_id) to make their filename
@@ -430,9 +466,9 @@ SOFT_EDGE_SET = {"vedge-CSR-1000v", "vedge-C8000V", "vedge-C8000V-SD-ROUTING", "
 
 
 class DeviceType(Enum):
-    vsmart = 'vsmart'
-    vmanage = 'vmanage'
-    vbond = 'vbond'
+    vsmart = 'vsmart'       # SD-WAN Controller
+    vmanage = 'vmanage'     # SD-WAN Manager
+    vbond = 'vbond'         # SD-WAN Validator
     vedge = 'vedge'
     cedge = 'cedge'
 
@@ -497,7 +533,7 @@ class DeviceTemplateValues(ConfigItem):
     store_path = ('device_templates', 'values')
 
     @staticmethod
-    def api_params(template_id: str, device_uuids: Iterable[str]) -> dict:
+    def api_params(template_id: str, device_uuids: Iterable[str]) -> dict[str, Any]:
         """
         Build dictionary used to provide input parameters for api POST call
         @param template_id: Template ID string
@@ -600,10 +636,12 @@ class DeviceTemplateIndex(IndexConfigItem):
 
     @staticmethod
     def is_vsmart(entry: FilterEntry) -> bool:
+        """Filtered_iter filter selecting SD-WAN Controller templates (vsmart)"""
         return entry.device_type is not None and entry.device_type == 'vsmart'
 
     @staticmethod
     def is_not_vsmart(entry: FilterEntry) -> bool:
+        """Filtered_iter filter excluding SD-WAN Controller templates (vsmart)"""
         return entry.device_type is not None and entry.device_type != 'vsmart'
 
     @staticmethod
@@ -735,7 +773,7 @@ class ConfigGroupIndex(IndexConfigItem):
 
 class NameValuePair(ConfigRequestModel):
     name: str
-    value: Any
+    value: Optional[Any] = None
 
 
 class DeviceValuesModel(ConfigRequestModel):
@@ -1011,7 +1049,7 @@ class ProfileSdwanService(FeatureProfile):
         PathKey("tracker", "lan/vpn"): ...,
         PathKey("tracker", "lan/vpn/interface/ethernet"): ApiPath(
             "v1/feature-profile/sdwan/service/{serviceId}/lan/vpn/{vpnId}/interface/ethernet/{ethId}/tracker"),
-        PathKey("objecttracker","objecttrackergroup"): ...,
+        PathKey("objecttracker", "objecttrackergroup"): ...,
         PathKey("objecttracker", "lan/vpn/interface/ethernet"): ...,
         PathKey("trackergroup", "lan/vpn"): ...,
         PathKey("trackergroup", "lan/vpn/interface/ethernet"): ApiPath(
@@ -1360,7 +1398,7 @@ class PolicyGroupIndex(IndexConfigItem):
 
 
 #
-# Policy vSmart
+# Policy vSmart (SD-WAN Controller)
 #
 
 class PolicyVsmart(ConfigItem):
@@ -2327,6 +2365,7 @@ class PolicyListScalableGroupTagIndex(PolicyListIndex):
 # Admin Settings
 #
 class SettingsVbond(AdminSettingsItem):
+    """SD-WAN Validator settings (Administration > Settings)"""
     setting = 'device'
     store_file = 'vbond.json'
 
@@ -2336,11 +2375,11 @@ class SettingsVbond(AdminSettingsItem):
         return len(domain_ip) > 0 and domain_ip != 'Not Configured'
 
     @property
-    def domain_ip(self) -> Union[str, None]:
+    def domain_ip(self) -> str | None:
         return self.data['domainIp'] if self.is_configured else None
 
     @property
-    def port(self) -> Union[str, None]:
+    def port(self) -> str | None:
         return self.data['port'] if self.is_configured else None
 
 
@@ -2349,7 +2388,7 @@ class SettingsOrganization(AdminSettingsItem):
     store_file = 'organization.json'
 
     @property
-    def organization(self) -> Union[str, None]:
+    def organization(self) -> str | None:
         return self.data.get('org')
 
     @property
@@ -2362,7 +2401,7 @@ class SettingsCertificate(AdminSettingsItem):
     store_file = 'certificate.json'
 
     @property
-    def signing(self) -> Union[str, None]:
+    def signing(self) -> str | None:
         return self.data.get('certificateSigning')
 
     @classmethod
@@ -2663,7 +2702,7 @@ class BulkAppRoute(BulkStatsItem):
     fields_to_avg = ('total', 'loss', 'latency', 'jitter')
 
     @staticmethod
-    def time_series_key(sample: namedtuple) -> str:
+    def time_series_key(sample: tuple[Any, ...]) -> str:
         return sample.name
 
 
@@ -2675,7 +2714,7 @@ class BulkInterfaceStats(BulkStatsItem):
     fields_to_avg = ('tx_kbps', 'rx_kbps', 'tx_pps', 'rx_pps')
 
     @staticmethod
-    def time_series_key(sample: namedtuple) -> str:
+    def time_series_key(sample: tuple[Any, ...]) -> str:
         return f"{sample.vdevice_name}_{sample.vpn_id}_{sample.interface}"
 
 

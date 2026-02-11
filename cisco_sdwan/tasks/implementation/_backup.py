@@ -1,5 +1,5 @@
 import argparse
-from typing import Union, Optional
+from typing import Optional
 from pydantic import model_validator, field_validator
 from functools import partial
 from uuid import uuid4
@@ -49,7 +49,7 @@ class TaskBackup(Task):
                                       'device configurations.')
         return task_parser.parse_args(task_args)
 
-    def runner(self, parsed_args, api: Optional[Rest] = None) -> Union[None, list]:
+    def runner(self, parsed_args, api: Optional[Rest] = None) -> list | None:
         if parsed_args.archive:
             self.log_info(
                 f'Backup task: SD-WAN Manager URL: "{api.base_url}" -> Local archive file: "{parsed_args.archive}"'

@@ -9,7 +9,7 @@ import re
 import argparse
 from datetime import date
 from getpass import getpass
-from typing import Optional, Union, Any
+from typing import Optional, Any
 from collections.abc import Callable
 from cisco_sdwan.base.catalog import catalog_tags, op_catalog_tags, op_catalog_commands, CATALOG_TAG_ALL, OpType
 from cisco_sdwan.tasks.common import Task
@@ -21,7 +21,7 @@ from cisco_sdwan.tasks.validators import (validate_workdir, validate_regex, vali
 DEFAULT_WORKDIR_FORMAT = 'backup_{address}_{date:%Y%m%d}'
 
 
-def default_workdir(address: Union[str, None]) -> str:
+def default_workdir(address: str | None) -> str:
     """
     Generate a default workdir name based on the provided SD-WAN Manager address and current date.
     

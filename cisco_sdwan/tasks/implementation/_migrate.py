@@ -1,5 +1,5 @@
 import argparse
-from typing import Union, Optional
+from typing import Optional
 from uuid import uuid4
 from contextlib import suppress
 from pydantic import field_validator
@@ -53,7 +53,7 @@ class TaskMigrate(Task):
     def is_api_required(parsed_args) -> bool:
         return parsed_args.workdir is None
 
-    def runner(self, parsed_args, api: Optional[Rest] = None) -> Union[None, list]:
+    def runner(self, parsed_args, api: Optional[Rest] = None) -> list | None:
         source_info = f'Local workdir: "{parsed_args.workdir}"' if api is None else f'SD-WAN Manager URL: "{api.base_url}"'
         self.log_info('Migrate task: %s %s -> %s Local output dir: "%s"', source_info, parsed_args.from_version,
                       parsed_args.to_version, parsed_args.output)

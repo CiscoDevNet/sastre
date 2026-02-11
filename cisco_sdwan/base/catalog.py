@@ -4,7 +4,7 @@
  cisco_sdwan.base.catalog
  This module implements vManage API Catalogs
 """
-from typing import NamedTuple, Union, Optional, Any
+from typing import NamedTuple, Optional, Any
 from collections.abc import Iterator
 from enum import Enum
 from .models_base import IndexConfigItem, ConfigItem, RealtimeItem, BulkStateItem, BulkStatsItem
@@ -19,7 +19,7 @@ class CatalogItem(NamedTuple):
     info: str
     index_cls: type
     item_cls: type
-    min_version: Union[str, None]
+    min_version: str | None
 
 
 _catalog: dict[type, CatalogItem] = dict()  # {<item_cls>: (<tag>, <info>, <index_cls>, <item_cls>, <min_version>), ...}
@@ -41,7 +41,7 @@ class OpCatalogItem(NamedTuple):
     selector: str
     info: str
     op_cls: type
-    min_version: Union[str, None]
+    min_version: str | None
 
 
 _op_catalog = dict()  # {<OpType>: [(<tag>, <selector>, <info>, <op_cls>, <min_version>), ...]}
@@ -251,7 +251,7 @@ def op_catalog_iter(op_type: OpType, *tags: str, version: Optional[str] = None) 
     )
 
 
-def op_catalog_tags(op_type: OpType) -> set:
+def op_catalog_tags(op_type: OpType) -> set[str]:
     """
     Return unique tags used by items registered with the operational-data catalog group
     @param op_type: OpType enum indicating type of operational-data
@@ -260,7 +260,7 @@ def op_catalog_tags(op_type: OpType) -> set:
     return {entry.tag for entry in _op_catalog.get(op_type, [])}
 
 
-def op_catalog_commands(op_type: OpType) -> set:
+def op_catalog_commands(op_type: OpType) -> set[str]:
     """
     Return set of commands registered with the operational-data catalog group. These are the combination of tags and
     selectors
