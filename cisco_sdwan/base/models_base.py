@@ -11,7 +11,8 @@ from pathlib import Path
 from itertools import zip_longest
 from collections import namedtuple
 from dataclasses import dataclass
-from typing import Union, Any, Optional, NamedTuple
+from typing import Any, Optional, NamedTuple
+from types import EllipsisType
 from collections.abc import Mapping, Sequence, Iterator, Generator, Callable
 from operator import attrgetter
 from datetime import datetime, timezone
@@ -119,7 +120,7 @@ class ApiPath:
         return f"{self.__class__.__name__}({self.get}, {self.post}, {self.put}, {self.delete}{path_vars})"
 
     @staticmethod
-    def discover_path_vars(path_template: str) -> tuple:
+    def discover_path_vars(path_template: str) -> tuple[str, ...]:
         # If no path variable is discovered, an empty tuple is returned
         return tuple(m.group(1) for m in re.finditer(r'{\s*([^}\s][^}]*?)\s*}', path_template))
 
@@ -150,7 +151,7 @@ class ApiPathGroup:
     references are registered using the optional parcel_reference_path_map.
     """
     def __init__(self, path_map: Mapping[str, ApiPath],
-                 parcel_reference_path_map: Optional[Mapping[PathKey, ApiPath]] = None) -> None:
+                 parcel_reference_path_map: Optional[Mapping[PathKey, ApiPath | EllipsisType]] = None) -> None:
         """
         @param path_map: Register parcel ApiPaths to a feature profile. Mapping of {<parcelType>: ApiPath, ... }
         @param parcel_reference_path_map: Register parcel reference ApiPaths to a feature profile. Mapping of
@@ -164,7 +165,7 @@ class ApiPathGroup:
         self._parent_types = {path_key.parent_parcel_type
                               for path_key in self._parcel_ref_map if path_key.parent_parcel_type is not None}
 
-    def api_path(self, key: PathKey) -> tuple[Union[ApiPath, None], bool]:
+    def api_path(self, key: PathKey) -> tuple[ApiPath | None, bool]:
         """
         Returns the api path associated with the provided key, along with whether this is a parcel reference or an
         actual parcel.
@@ -222,7 +223,7 @@ class OperationalItem:
     def field_names(self) -> tuple[str, ...]:
         return tuple(self._meta.keys())
 
-    def field_info(self, *field_names: str, info: str = 'title', default: Union[None, str] = 'N/A') -> tuple:
+    def field_info(self, *field_names: str, info: str = 'title', default: str | None = 'N/A') -> tuple[Any, ...]:
         """
         Retrieve metadata about one or more fields.
         @param field_names: One or more field names to retrieve metadata from.
@@ -235,7 +236,7 @@ class OperationalItem:
 
         return tuple(entry.get(info, default) for entry in default_getter(*field_names, default={})(self._meta))
 
-    def field_value_iter(self, *field_names: str, **conv_fn_map: Mapping[str, Callable]) -> Iterator[namedtuple]:
+    def field_value_iter(self, *field_names: str, **conv_fn_map: Mapping[str, Callable[..., Any]]) -> Iterator[tuple[Any, ...]]:
         """
         Iterate over entries of an operational item instance. Only fields/columns defined by field_names are yielded.
         Type conversion of one or more fields is supported by passing a callable that takes one argument (the field
@@ -324,7 +325,7 @@ class BulkStatsItem(OperationalItem):
         self._page_info = payload['pageInfo']
 
     @property
-    def next_page(self) -> Union[str, None]:
+    def next_page(self) -> str | None:
         return self._page_info['scrollId'] if self._page_info['hasMoreData'] else None
 
     def add_payload(self, payload: Mapping[str, Any]) -> None:
@@ -345,7 +346,7 @@ class BulkStatsItem(OperationalItem):
         return obj
 
     @staticmethod
-    def time_series_key(sample: namedtuple) -> str:
+    def time_series_key(sample: tuple[Any, ...]) -> str:
         """
         Default key used to split a BulkStatsItem into its different time series. Subclasses need to override this as
         needed for the particular endpoint in question
@@ -353,7 +354,9 @@ class BulkStatsItem(OperationalItem):
         return sample.vdevice_name
 
     @staticmethod
-    def last_n_secs(n_secs: int, sample_list: Sequence[namedtuple]) -> Iterator[namedtuple]:
+    def last_n_secs(n_secs: int, sample_list: Sequence[tuple[Any, ...]]) -> Iterator[tuple[Any, ...]]:
+        if not sample_list:
+            return
         yield sample_list[0]
 
         oldest_ts = sample_list[0].entry_time - n_secs * 1000
@@ -363,7 +366,7 @@ class BulkStatsItem(OperationalItem):
             yield sample
 
     @staticmethod
-    def average_fields(sample_list: Sequence[namedtuple], *fields_to_avg: str) -> dict:
+    def average_fields(sample_list: Sequence[tuple[Any, ...]], *fields_to_avg: str) -> dict[str, Any]:
         def average(values):
             avg = sum(values) / len(values)
             # If original values were integer, convert average back to integer
@@ -376,7 +379,7 @@ class BulkStatsItem(OperationalItem):
 
     # noinspection PyProtectedMember
     def aggregated_value_iter(self, interval_secs: int, *field_names: str,
-                              **conv_fn_map: Mapping[str, Callable]) -> Iterator[namedtuple]:
+                              **conv_fn_map: Mapping[str, Callable[..., Any]]) -> Iterator[tuple[Any, ...]]:
         """
         Iterate over aggregated values off the different time series from this BulkStatsItem. Time series are identified
         using time_series_key.
@@ -431,7 +434,7 @@ class BulkStateItem(OperationalItem):
         self._page_info = payload['pageInfo']
 
     @property
-    def next_page(self) -> Union[str, None]:
+    def next_page(self) -> str | None:
         return self._page_info['endId'] if self._page_info['moreEntries'] else None
 
     def add_payload(self, payload: Mapping[str, Any]) -> None:
@@ -503,7 +506,7 @@ class RecordItem(OperationalItem):
         }
 
     @property
-    def next_page(self) -> Union[datetime, None]:
+    def next_page(self) -> datetime | None:
         if 'endTime' not in self._page_info or self.page_item_count < RecordItem.QUERY_SIZE_MAX:
             return None
 
@@ -605,7 +608,7 @@ class IndexApiItem(ApiItem):
     # Extended_iter_fields should be defined in subclasses that use extended_iter, needs to be a tuple subclass.
     extended_iter_fields = None
 
-    def iter(self, *iter_fields: str, default: Any = None) -> Iterator:
+    def iter(self, *iter_fields: str, default: Any = None) -> Iterator[Any]:
         """
         Returns an iterator where each entry is the value of the respective field in iter_fields.
         @param default: Value to return for any field missing in an entry. Default is None.
@@ -616,7 +619,7 @@ class IndexApiItem(ApiItem):
     def __iter__(self):
         return self.iter(*self.iter_fields)
 
-    def extended_iter(self, default=None) -> Iterator:
+    def extended_iter(self, default: Any = None) -> Iterator[Any]:
         """
         Returns an iterator where each entry is composed of the combined fields of iter_fields and extended_iter_fields.
         None is returned on any fields that are missing in an entry
@@ -872,7 +875,7 @@ class IndexConfigItem(ConfigItem):
         }
         return cls(index_payload)
 
-    def iter(self, *iter_fields: str, default: Any = None) -> Iterator:
+    def iter(self, *iter_fields: str, default: Any = None) -> Iterator[Any]:
         """
         Returns an iterator where each entry is the value of the respective field in iter_fields.
         @param default: Value to return for any field missing in an entry. Default is None.
@@ -883,7 +886,7 @@ class IndexConfigItem(ConfigItem):
     def __iter__(self):
         return self.iter(*self.iter_fields)
 
-    def extended_iter(self, default=None) -> Iterator:
+    def extended_iter(self, default: Any = None) -> Iterator[Any]:
         """
         Returns an iterator where each entry is composed of the combined fields of iter_fields and extended_iter_fields.
         None is returned on any fields that are missing in an entry
@@ -948,7 +951,7 @@ class Config2Item(ConfigItem):
         exclude_set = self.skip_cmp_tag_set | {self.id_tag}
         put_model = self.put_model or self.post_model
 
-        local_cmp_dict = put_model(**self.data).model_dump(by_alias=True, exclude=exclude_set, exclude_defaults=True)
+        local_cmp_dict = put_model(**self.data).model_dump(by_alias=True, exclude=exclude_set, exclude_none=True)
         other_cmp_dict = {k: v for k, v in other.items() if k not in exclude_set}
 
         return sorted(json.dumps(local_cmp_dict)) == sorted(json.dumps(other_cmp_dict))
@@ -990,9 +993,9 @@ class Config2Item(ConfigItem):
         payload = op_model(**self.data)
 
         if id_mapping_dict is None:
-            return payload.model_dump(by_alias=True, exclude_defaults=True)
+            return payload.model_dump(by_alias=True, exclude_none=True)
 
-        return update_ids(id_mapping_dict, payload.model_dump(by_alias=True, exclude_defaults=True))
+        return update_ids(id_mapping_dict, payload.model_dump(by_alias=True, exclude_none=True))
 
 
 @dataclass
@@ -1000,7 +1003,7 @@ class ParcelInfo:
     api_path: ApiPath
     name: str
     payload: dict[str, Any]
-    target_id: Union[str, None]
+    target_id: str | None
     is_system: bool
     is_reference: bool
 
@@ -1067,7 +1070,7 @@ class FeatureProfile(Config2Item):
             root_parcel = ProfileParcelModel(**raw_parcel)
             eval_parcel(root_parcel, profile_id)
 
-            return root_parcel.model_dump(by_alias=True, exclude_defaults=True)
+            return root_parcel.model_dump(by_alias=True, exclude_none=True)
 
         self.data[self.parcels_tag] = [
             eval_root_parcel(raw_parcel) for raw_parcel in self.data.get(self.parcels_tag, [])
@@ -1137,7 +1140,7 @@ class FeatureProfile(Config2Item):
         new_element_id = yield ParcelInfo(
             api_path=api_path.resolve(*element_ids),
             name=parcel.payload.name,
-            payload=update_ids(combined_id_mapping, parcel_payload.model_dump(by_alias=True, exclude_defaults=True)),
+            payload=update_ids(combined_id_mapping, parcel_payload.model_dump(by_alias=True, exclude_none=True)),
             target_id=parcel.parcelId if is_target_parcel else None,
             is_system=parcel.is_system,
             is_reference=is_reference
@@ -1325,7 +1328,7 @@ class ExtendedTemplate:
         return result_name
 
 
-def default_getter(*fields: str, default: Any = None) -> Callable:
+def default_getter(*fields: str, default: Any = None) -> Callable[[Mapping[str, Any]], Any]:
     if len(fields) == 1:
         def getter_fn(obj):
             return obj.get(fields[0], default)

@@ -1,9 +1,8 @@
 import argparse
 from functools import partial
-from typing import Union, Optional
-from collections.abc import Mapping, Callable, Iterable
+from typing import Optional, Annotated
+from collections.abc import Mapping, Iterable
 from pydantic import Field, field_validator
-from typing_extensions import Annotated
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest, RestAPIException
 from cisco_sdwan.base.catalog import is_index_supported
@@ -12,7 +11,7 @@ from cisco_sdwan.base.models_vmanage import (DeviceTemplateIndex, ConfigGroupInd
 from cisco_sdwan.tasks.utils import (TaskOptions, existing_workdir_type, regex_type, default_workdir, ipv4_type,
                                      site_id_type, int_type)
 from cisco_sdwan.tasks.common import regex_search, Task, WaitActionsException, device_iter
-from cisco_sdwan.tasks.models import TaskArgs, const
+from cisco_sdwan.tasks.models import TaskArgs, ConstStr, ConstCallable
 from cisco_sdwan.tasks.validators import validate_regex, validate_workdir, validate_site_id, validate_ipv4
 
 # Default number of devices to include per attach/detach request. The value of 200 was adopted because it is what was
@@ -46,12 +45,12 @@ class TaskAttach(Task):
                                  device_sets=TaskAttach.edge_sets,
                                  set_title="WAN Edge")
 
-        vsmart_parser = sub_tasks.add_parser('vsmart', help='attach/deploy vSmarts')
+        vsmart_parser = sub_tasks.add_parser('vsmart', help='attach/deploy SD-WAN Controllers')
         vsmart_parser.set_defaults(template_filter=DeviceTemplateIndex.is_vsmart,
                                    device_sets=TaskAttach.vsmart_sets,
-                                   set_title="vSmart")
+                                   set_title="SD-WAN Controller")
         vsmart_parser.add_argument('--activate', action='store_true',
-                                   help='activate centralized policy after vSmart template attach/deploy')
+                                   help='activate centralized policy after SD-WAN Controller template attach/deploy')
 
         # Parameters common to all subtasks
         for sub_task in (edge_parser, vsmart_parser):
@@ -68,10 +67,10 @@ class TaskAttach(Task):
             sub_task.add_argument('--site', metavar='<id>', type=site_id_type, help='select devices with site ID')
             sub_task.add_argument('--system-ip', metavar='<ipv4>', type=ipv4_type, help='select device with system IP')
             sub_task.add_argument('--dryrun', action='store_true',
-                                  help='dry-run mode. Attach operations are listed but not is pushed to vManage.')
+                                  help='dry-run mode. Attach operations are listed but not pushed to SD-WAN Manager.')
             sub_task.add_argument('--batch', metavar='<size>', type=partial(int_type, 1, 9999),
                                   default=DEFAULT_BATCH_SIZE,
-                                  help='maximum number of devices to include per vManage attach request '
+                                  help='maximum number of devices to include per SD-WAN Manager attach request '
                                        '(default: %(default)s)')
 
         return task_parser.parse_args(task_args)
@@ -96,9 +95,9 @@ class TaskAttach(Task):
         deploy_set = set()
         return attach_set, deploy_set
 
-    def runner(self, parsed_args, api: Optional[Rest] = None) -> Union[None, list]:
+    def runner(self, parsed_args, api: Optional[Rest] = None) -> list | None:
         self.is_dryrun = parsed_args.dryrun
-        self.log_info(f'Attach task: Local workdir: "{parsed_args.workdir}" -> vManage URL: "{api.base_url}"')
+        self.log_info(f'Attach task: Local workdir: "{parsed_args.workdir}" -> SD-WAN Manager URL: "{api.base_url}"')
 
         attach_map, deploy_map = build_device_maps(
             device_iter(api, parsed_args.devices, parsed_args.reachable, parsed_args.site, parsed_args.system_ip,
@@ -116,7 +115,7 @@ class TaskAttach(Task):
                     raise StopIteration()
 
                 if not is_index_supported(ConfigGroupIndex, version=api.server_version):
-                    self.log_warning("Will skip deploy, target vManage does not support config-groups")
+                    self.log_warning("Will skip deploy, target SD-WAN Manager does not support config-groups")
                     raise StopIteration()
 
                 target_cfg_groups = {item_name: item_id for item_id, item_name in ConfigGroupIndex.get_raise(api)}
@@ -171,25 +170,23 @@ class TaskAttach(Task):
         if not attach_reqs:
             self.log_info(f"No {parsed_args.set_title} template attachments to process")
 
-        # vSmart policy activate
+        # SD-WAN Controller (vSmart) policy activate
         if parsed_args.device_sets is TaskAttach.vsmart_sets and parsed_args.activate:
             activate_reqs = 0
             try:
                 _, policy_name = PolicyVsmartIndex.load(parsed_args.workdir, raise_not_found=True).active_policy
                 target_policies = {item_name: item_id for item_id, item_name in PolicyVsmartIndex.get_raise(api)}
                 activate_reqs = self.policy_activate(api, target_policies.get(policy_name), policy_name,
-                                                     log_context="activating vSmart policy")
+                                                     log_context="activating SD-WAN Controller policy")
                 if activate_reqs:
                     self.log_debug(f'Activate requests processed: {activate_reqs}')
             except (RestAPIException, WaitActionsException) as ex:
-                self.log_error(f"Failed: vSmart policy activate: {ex}")
+                self.log_error(f"Failed: SD-WAN Controller policy activate: {ex}")
             except FileNotFoundError:
-                self.log_debug("Will skip vSmart policy activate, no local vSmart policy index")
+                self.log_debug("Will skip SD-WAN Controller policy activate, no local SD-WAN Controller policy index")
 
             if not activate_reqs:
-                self.log_info('No vSmart policy activate to process')
-
-        return
+                self.log_info('No SD-WAN Controller policy activate to process')
 
 
 @TaskOptions.register('detach')
@@ -208,10 +205,10 @@ class TaskDetach(Task):
                                  device_sets=TaskDetach.edge_sets,
                                  set_title="WAN Edge")
 
-        vsmart_parser = sub_tasks.add_parser('vsmart', help='detach/dissociate vSmarts')
+        vsmart_parser = sub_tasks.add_parser('vsmart', help='detach/dissociate SD-WAN Controllers')
         vsmart_parser.set_defaults(template_filter=DeviceTemplateIndex.is_vsmart,
                                    device_sets=TaskDetach.vsmart_sets,
-                                   set_title="vSmart")
+                                   set_title="SD-WAN Controller")
 
         # Parameters common to all subtasks
         for sub_task in (edge_parser, vsmart_parser):
@@ -227,10 +224,10 @@ class TaskDetach(Task):
             sub_task.add_argument('--site', metavar='<id>', type=site_id_type, help='select devices with site ID')
             sub_task.add_argument('--system-ip', metavar='<ipv4>', type=ipv4_type, help='select device with system IP')
             sub_task.add_argument('--dryrun', action='store_true',
-                                  help='dry-run mode. Attach operations are listed but nothing is pushed to vManage.')
+                                  help='dry-run mode. Detach operations are listed but not pushed to SD-WAN Manager.')
             sub_task.add_argument('--batch', metavar='<size>', type=partial(int_type, 1, 9999),
                                   default=DEFAULT_BATCH_SIZE,
-                                  help='maximum number of devices to include per vManage detach request '
+                                  help='maximum number of devices to include per SD-WAN Manager detach request '
                                        '(default: %(default)s)')
 
         return task_parser.parse_args(task_args)
@@ -255,9 +252,9 @@ class TaskDetach(Task):
         associated_set = set()
         return attached_set, associated_set
 
-    def runner(self, parsed_args, api: Optional[Rest] = None) -> Union[None, list]:
+    def runner(self, parsed_args, api: Optional[Rest] = None) -> list | None:
         self.is_dryrun = parsed_args.dryrun
-        self.log_info(f'Detach templates task: vManage URL: "{api.base_url}"')
+        self.log_info(f'Detach templates task: SD-WAN Manager URL: "{api.base_url}"')
 
         attached_map, associated_map = build_device_maps(
             device_iter(api, parsed_args.devices, parsed_args.reachable, parsed_args.site, parsed_args.system_ip,
@@ -275,13 +272,13 @@ class TaskDetach(Task):
                                                                                     DeviceTemplateIndex.is_attached)
                     if parsed_args.templates is None or regex_search(parsed_args.templates, t_name)
                 ]
-                # vSmart policy deactivate
+                # SD-WAN Controller (vSmart) policy deactivate
                 if parsed_args.device_sets is TaskDetach.vsmart_sets and selected_templates:
-                    deactivate_reqs = self.policy_deactivate(api, log_context='deactivating vSmart policy')
+                    deactivate_reqs = self.policy_deactivate(api, log_context='deactivating SD-WAN Controller policy')
                     if deactivate_reqs:
                         self.log_debug(f'Deactivate requests processed: {deactivate_reqs}')
                     else:
-                        self.log_info('No vSmart policy deactivate needed')
+                        self.log_info('No SD-WAN Controller policy deactivate needed')
                 # Detach templates
                 detach_reqs = self.template_detach(api, selected_templates, attached_map,
                                                    chunk_size=parsed_args.batch,
@@ -339,9 +336,9 @@ class AttachDetachArgs(TaskArgs):
 class AttachVsmartArgs(AttachDetachArgs):
     workdir: str
     activate: bool = False
-    template_filter: const(Callable, DeviceTemplateIndex.is_vsmart)
-    device_sets: const(Callable, TaskAttach.vsmart_sets)
-    set_title: const(str, 'vSmart')
+    template_filter: ConstCallable = DeviceTemplateIndex.is_vsmart
+    device_sets: ConstCallable = TaskAttach.vsmart_sets
+    set_title: ConstStr = 'SD-WAN Controller'
 
     # Validators
     _validate_workdir = field_validator('workdir')(validate_workdir)
@@ -349,21 +346,21 @@ class AttachVsmartArgs(AttachDetachArgs):
 
 class AttachEdgeArgs(AttachDetachArgs):
     workdir: str
-    template_filter: const(Callable, DeviceTemplateIndex.is_not_vsmart)
-    device_sets: const(Callable, TaskAttach.edge_sets)
-    set_title: const(str, 'WAN Edge')
+    template_filter: ConstCallable = DeviceTemplateIndex.is_not_vsmart
+    device_sets: ConstCallable = TaskAttach.edge_sets
+    set_title: ConstStr = 'WAN Edge'
 
     # Validators
     _validate_workdir = field_validator('workdir')(validate_workdir)
 
 
 class DetachVsmartArgs(AttachDetachArgs):
-    template_filter: const(Callable, DeviceTemplateIndex.is_vsmart)
-    device_sets: const(Callable, TaskDetach.vsmart_sets)
-    set_title: const(str, 'vSmart')
+    template_filter: ConstCallable = DeviceTemplateIndex.is_vsmart
+    device_sets: ConstCallable = TaskDetach.vsmart_sets
+    set_title: ConstStr = 'SD-WAN Controller'
 
 
 class DetachEdgeArgs(AttachDetachArgs):
-    template_filter: const(Callable, DeviceTemplateIndex.is_not_vsmart)
-    device_sets: const(Callable, TaskDetach.edge_sets)
-    set_title: const(str, 'WAN Edge')
+    template_filter: ConstCallable = DeviceTemplateIndex.is_not_vsmart
+    device_sets: ConstCallable = TaskDetach.edge_sets
+    set_title: ConstStr = 'WAN Edge'

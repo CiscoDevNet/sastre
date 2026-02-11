@@ -12,7 +12,7 @@ import json
 from pathlib import Path
 from shutil import rmtree
 from collections import namedtuple
-from typing import Union, Optional, Any, TypeVar
+from typing import Optional, Any, TypeVar
 from collections.abc import Sequence, Mapping, Iterator, Iterable
 from zipfile import ZipFile, ZIP_DEFLATED
 from pydantic import ValidationError
@@ -41,7 +41,7 @@ def regex_search(regex: str, *fields: str, inverse: bool = False) -> bool:
     return op_fn(inverse ^ bool(re.search(regex, match_field)) for match_field in fields)
 
 
-def regex_filter(regex: Union[str, None], not_regex: Union[str, None], node_name: str) -> bool:
+def regex_filter(regex: str | None, not_regex: str | None, node_name: str) -> bool:
     selected_regex = regex or not_regex
     return selected_regex is None or regex_search(selected_regex, node_name, inverse=regex is None)
 
@@ -182,7 +182,7 @@ class Table:
             yield border_line
 
     # noinspection PyProtectedMember
-    def dict(self) -> dict:
+    def dict(self) -> dict[str, Any]:
         table_dict = {
             "header": {
                 "name": self.name or "",
@@ -313,7 +313,7 @@ class Task:
     def is_api_required(parsed_args) -> bool:
         return True
 
-    def runner(self, parsed_args, api: Optional[Rest] = None) -> Union[None, list]:
+    def runner(self, parsed_args, api: Optional[Rest] = None) -> list | None:
         """
         Execute the task. If the task has some output to the user, that is returned via a list of objects. Objects in
         that list need to implement the __str__ method. If the task generates no output to the user None is returned.
@@ -323,7 +323,7 @@ class Task:
     def index_iter(self, backend, catalog_entry_iter):
         """
         Return an iterator of indexes loaded from backend. If backend is a Rest API instance, indexes are loaded
-        from remote vManage via API. Otherwise, items are loaded from local backup under the backend directory.
+        from remote SD-WAN Manager via API. Otherwise, items are loaded from local backup under the backend directory.
         @param backend: Rest api instance or directory name
         @param catalog_entry_iter: An iterator of CatalogEntry
         @return: Iterator of (<tag>, <info>, <index>, <item_cls>)
@@ -342,19 +342,19 @@ class Task:
         return ((tag, info, index, item_cls) for tag, info, index, item_cls in all_index_iter if index is not None)
 
     @staticmethod
-    def item_get(item_cls: type[T], backend: Union[Rest, str],
-                 item_id: str, item_name: str, ext_name: bool) -> Union[T, None]:
+    def item_get(item_cls: type[T], backend: Rest | str,
+                 item_id: str, item_name: str, ext_name: bool) -> T | None:
         if isinstance(backend, Rest):
             return item_cls.get(backend, item_id)
         else:
             return item_cls.load(backend, ext_name, item_name, item_id)
 
     @staticmethod
-    def index_get(index_cls: type[T], backend: Union[Rest, str]) -> Union[T, None]:
+    def index_get(index_cls: type[T], backend: Rest | str) -> T | None:
         return index_cls.get(backend) if isinstance(backend, Rest) else index_cls.load(backend)
 
     def template_attach_data(self, api: Rest, workdir: str, ext_name: bool, templates_iter: Iterable[tuple],
-                             target_uuid_set: Optional[set[str]] = None) -> tuple[list, bool]:
+                             target_uuid_set: Optional[set[str]] = None) -> tuple[list[Any], bool]:
         """
         Prepare data for template attach considering local backup as the source of truth (i.e. where input values are)
         @param api: Instance of Rest API
@@ -368,7 +368,7 @@ class Task:
         @return: Tuple containing attach data (<template input list>, <isEdited>)
         """
 
-        def load_template_input(template_name: str, saved_id: str, target_id: str) -> Union[list, None]:
+        def load_template_input(template_name: str, saved_id: str, target_id: str) -> list | None:
             if target_id is None:
                 self.log_debug(f'Skip {template_name}, saved template not on target node')
                 return None
@@ -410,9 +410,9 @@ class Task:
 
     @staticmethod
     def template_reattach_data(api: Rest, templates_iter: Iterable[tuple],
-                               filtered_uuid_set: Optional[set[str]] = None) -> tuple[list, bool]:
+                               filtered_uuid_set: Optional[set[str]] = None) -> tuple[list[Any], bool]:
         """
-        Prepare data for template reattach considering vManage as the source of truth (i.e. where input values are)
+        Prepare data for template reattach considering SD-WAN Manager as the source of truth (i.e. source of values)
         @param api: Instance of Rest API
         @param templates_iter: Iterable of (<template_name>, <target_template_id>)
         @param filtered_uuid_set: (optional) Set of device uuids on target node to include
@@ -503,7 +503,7 @@ class Task:
         return len(feature_based_reqs + cli_based_reqs)
 
     def cfg_group_deploy_data(self, api: Rest, workdir: str, ext_name: bool,
-                              cfg_group_iter: Iterable[tuple[str, str, Union[str, None]]],
+                              cfg_group_iter: Iterable[tuple[str, str, str | None]],
                               devices_map: Mapping[str, str]) -> Sequence[tuple[str, str, Sequence]]:
         """
         Prepare data for config-group deploy assuming local backup as source of truth. Associate devices and
@@ -576,7 +576,7 @@ class Task:
                     diff_uuids = diff_values.put_raise(api, configGroupId=config_grp_target_id)
                 except (RestAPIException, ValidationError) as ex:
                     # Pydantic validation error raised when the saved values fail local model validation.
-                    # RestAPIException when vManage validation fails.
+                    # RestAPIException when SD-WAN Manager validation fails.
                     self.log_error(f"Failed: Config-group {config_grp_name} push values: {ex}")
                     return []
             else:
@@ -706,7 +706,7 @@ class Task:
         for template_id, template_name in template_iter:
             devices_attached = DeviceTemplateAttached.get(api, template_id)
             if devices_attached is None:
-                self.log_warning(f'Failed to retrieve {template_name} attached devices from vManage')
+                self.log_warning(f'Failed to retrieve {template_name} attached devices from SD-WAN Manager')
                 continue
             for device_id, personality in devices_attached:
                 if device_id in devices_map:
@@ -762,7 +762,7 @@ class Task:
         for config_grp_id, config_grp_name in cfg_group_iter:
             devices_associated = ConfigGroupAssociated.get(api, configGroupId=config_grp_id)
             if devices_associated is None:
-                self.log_warning(f'Failed to retrieve {config_grp_name} associated devices from vManage')
+                self.log_warning(f'Failed to retrieve {config_grp_name} associated devices from SD-WAN Manager')
                 continue
             for device_id in devices_associated.filter(not_by_rule=True).uuids:
                 if device_id in devices_map:
@@ -782,7 +782,7 @@ class Task:
         # for config_grp_id, config_grp_name in cfg_group_iter:
         #     rules = ConfigGroupRules.get(api, configGroupId=config_grp_id)
         #     if rules is None:
-        #         self.log_warning(f'Failed to retrieve {config_grp_name} automated rules from vManage')
+        #         self.log_warning(f'Failed to retrieve {config_grp_name} automated rules from SD-WAN Manager')
         #         continue
         #     for rule_id in rules:
         #         delete_req_count += 1
@@ -818,12 +818,12 @@ class Task:
                 raise StopIteration()
             PolicyVsmartStatus.get_raise(api).raise_for_status()
         except (RestAPIException, PolicyVsmartStatusException):
-            self.log_debug('vSmarts not in vManage mode or otherwise not ready to have policy activated')
+            self.log_debug('SD-WAN Controllers not in vManage mode or otherwise not ready to have policy activated')
         except StopIteration:
             self.log_debug('No policy is active or policy not on target vManage')
         else:
             activate_reqs.append(...)
-            self.log_info(f'vSmart policy activate: {policy_name}')
+            self.log_info(f'SD-WAN Controller policy activate: {policy_name}')
 
             if not self.is_dryrun:
                 action_worker = PolicyVsmartActivate(
@@ -846,7 +846,7 @@ class Task:
         policy_id, policy_name = PolicyVsmartIndex.get_raise(api).active_policy
         if policy_id is not None and policy_name is not None:
             deactivate_reqs.append(...)
-            self.log_info(f'vSmart policy deactivate: {policy_name}')
+            self.log_info(f'SD-WAN Controller policy deactivate: {policy_name}')
 
             if not self.is_dryrun:
                 action_worker = PolicyVsmartDeactivate(
@@ -857,7 +857,7 @@ class Task:
 
         return len(deactivate_reqs)
 
-    def wait_actions(self, api: Rest, action_list: list[tuple], log_context: str, raise_on_failure: bool) -> bool:
+    def wait_actions(self, api: Rest, action_list: list[tuple[Any, ...]], log_context: str, raise_on_failure: bool) -> bool:
         """
         Wait for actions in action_list to complete
         @param api: Instance of Rest API
@@ -879,7 +879,7 @@ class Task:
             while True:
                 action = ActionStatus.get(api, action_worker.uuid)
                 if action is None:
-                    self.log_warning('Failed to retrieve action status from vManage')
+                    self.log_warning('Failed to retrieve action status from SD-WAN Manager')
                     result_list.append(False)
                     break
 
@@ -969,7 +969,7 @@ def device_iter(api: Rest,
     )
 
 
-def clean_dir(target_dir_name: str, max_saved: int = 99) -> Union[str, bool]:
+def clean_dir(target_dir_name: str, max_saved: int = 99) -> str | bool:
     """
     Clean target_dir_name directory if it exists. If max_saved is non-zero and target_dir_name exists, move it to a new
     directory name in sequence.

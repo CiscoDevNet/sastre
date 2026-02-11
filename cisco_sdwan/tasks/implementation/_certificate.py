@@ -1,13 +1,12 @@
 import argparse
-from typing import Union, Optional
-from collections.abc import Callable
+from typing import Optional
 from pydantic import field_validator, model_validator
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest, RestAPIException
 from cisco_sdwan.base.models_vmanage import EdgeCertificate, EdgeCertificateSync
 from cisco_sdwan.tasks.utils import TaskOptions, existing_workdir_type, regex_type, default_workdir
 from cisco_sdwan.tasks.common import regex_search, Task, WaitActionsException
-from cisco_sdwan.tasks.models import TaskArgs, const
+from cisco_sdwan.tasks.models import TaskArgs, ConstCallable
 from cisco_sdwan.tasks.validators import validate_regex, validate_workdir
 
 
@@ -46,7 +45,7 @@ class TaskCertificate(Task):
                                     'the hostname or chassis/uuid.')
             sub_task.add_argument('--dryrun', action='store_true',
                                   help='dry-run mode. List modifications that would be performed without pushing '
-                                       'changes to vManage.')
+                                       'changes to SD-WAN Manager.')
 
         return task_parser.parse_args(task_args)
 
@@ -71,16 +70,16 @@ class TaskCertificate(Task):
             for uuid, status, hostname, chassis, serial, state in target_certs.extended_iter()
         )
 
-    def runner(self, parsed_args, api: Optional[Rest] = None) -> Union[None, list]:
+    def runner(self, parsed_args, api: Optional[Rest] = None) -> list | None:
         self.is_dryrun = parsed_args.dryrun
         if parsed_args.source_iter is TaskCertificate.restore_iter:
-            start_msg = f'Restore status from workdir: "{parsed_args.workdir}" -> vManage URL: "{api.base_url}"'
+            start_msg = f'Restore status from workdir: "{parsed_args.workdir}" -> SD-WAN Manager URL: "{api.base_url}"'
         else:
-            start_msg = f'Set status to "{parsed_args.status}" -> vManage URL: "{api.base_url}"'
+            start_msg = f'Set status to "{parsed_args.status}" -> SD-WAN Manager URL: "{api.base_url}"'
         self.log_info(f'Certificate task: {start_msg}')
 
         try:
-            self.log_info('Loading WAN edge certificate list from target vManage', dryrun=False)
+            self.log_info('Loading WAN edge certificate list from target SD-WAN Manager', dryrun=False)
             target_certs = EdgeCertificate.get_raise(api)
 
             regex = parsed_args.regex or parsed_args.not_regex
@@ -100,7 +99,7 @@ class TaskCertificate(Task):
                 update_list.append((uuid, new_status))
 
             if len(update_list) > 0:
-                self.log_info('Send certificate status changes to vManage')
+                self.log_info('Send certificate status changes to SD-WAN Manager')
                 if not self.is_dryrun:
                     api.post(target_certs.status_post_data(*update_list), EdgeCertificate.api_path.post)
                     action_worker = EdgeCertificateSync(api.post({}, EdgeCertificateSync.api_path.post))
@@ -132,7 +131,7 @@ class CertificateArgs(TaskArgs):
 
 
 class CertificateRestoreArgs(CertificateArgs):
-    source_iter: const(Callable, TaskCertificate.restore_iter)
+    source_iter: ConstCallable = TaskCertificate.restore_iter
     workdir: str
 
     # Validators
@@ -140,7 +139,7 @@ class CertificateRestoreArgs(CertificateArgs):
 
 
 class CertificateSetArgs(CertificateArgs):
-    source_iter: const(Callable, TaskCertificate.set_iter)
+    source_iter: ConstCallable = TaskCertificate.set_iter
     status: str
 
     @field_validator('status')

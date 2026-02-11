@@ -1,5 +1,5 @@
 import argparse
-from typing import Union, Optional
+from typing import Optional
 from collections.abc import Callable
 from operator import itemgetter
 from functools import partial
@@ -9,7 +9,7 @@ from cisco_sdwan.base.rest_api import Rest
 from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL
 from cisco_sdwan.base.models_base import ExtendedTemplate
 from cisco_sdwan.base.models_vmanage import EdgeCertificate
-from cisco_sdwan.tasks.models import TableTaskArgs, CatalogTag, const
+from cisco_sdwan.tasks.models import TableTaskArgs, CatalogTag, ConstStr, ConstCallable
 from cisco_sdwan.tasks.utils import (TaskOptions, TagOptions, existing_workdir_type, filename_type, regex_type,
                                      ext_template_type)
 from cisco_sdwan.tasks.common import regex_filter, Task, Table, get_table_filters, export_json
@@ -63,7 +63,7 @@ class TaskList(Task):
         # Parameters common to all sub-tasks
         for sub_task in (config_parser, cert_parser, xform_parser):
             sub_task.add_argument('--workdir', metavar='<directory>', type=existing_workdir_type,
-                                  help='list will read from the specified directory instead of target vManage')
+                                  help='list will read from the specified directory instead of target SD-WAN Manager')
             sub_task.add_argument('--exclude', metavar='<regex>', type=regex_type,
                                   help='exclude table rows matching the regular expression')
             sub_task.add_argument('--include', metavar='<regex>', type=regex_type,
@@ -79,8 +79,8 @@ class TaskList(Task):
     def is_api_required(parsed_args) -> bool:
         return parsed_args.workdir is None
 
-    def runner(self, parsed_args, api: Optional[Rest] = None) -> Union[None, list]:
-        source_info = f'Local workdir: "{parsed_args.workdir}"' if api is None else f'vManage URL: "{api.base_url}"'
+    def runner(self, parsed_args, api: Optional[Rest] = None) -> list | None:
+        source_info = f'Local workdir: "{parsed_args.workdir}"' if api is None else f'SD-WAN Manager URL: "{api.base_url}"'
         self.log_info(f'List {parsed_args.subtask_info} task: {source_info}')
 
         result_table: Table = parsed_args.subtask_handler(self, parsed_args, api)
@@ -172,19 +172,19 @@ class ListArgs(TableTaskArgs):
 
 
 class ListConfigArgs(ListArgs):
-    subtask_info: const(str, 'configuration')
-    subtask_handler: const(Callable, TaskList.config_table)
+    subtask_info: ConstStr = 'configuration'
+    subtask_handler: ConstCallable = TaskList.config_table
     tags: list[CatalogTag]
 
 
 class ListCertificateArgs(ListArgs):
-    subtask_info: const(str, 'certificate')
-    subtask_handler: const(Callable, TaskList.cert_table)
+    subtask_info: ConstStr = 'certificate'
+    subtask_handler: ConstCallable = TaskList.cert_table
 
 
 class ListTransformArgs(ListArgs):
-    subtask_info: const(str, 'transform')
-    subtask_handler: const(Callable, TaskList.xform_table)
+    subtask_info: ConstStr = 'transform'
+    subtask_handler: ConstCallable = TaskList.xform_table
     tags: list[CatalogTag]
     regex: Optional[str] = None
     not_regex: Optional[str] = None

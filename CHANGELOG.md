@@ -1,5 +1,21 @@
-Sastre 1.26 [July 7, 2025]
+Sastre 1.27 [February 11, 2026]
 ================================
+
+#### Improvements:
+- Added support for backup/restore/deletion of tags. Note: Device tag association will come in the next release.
+- Added new show realtime bfd summary command
+- Added support for API key based SD-WAN manager authentication.
+
+#### Fixes:
+- Embedded-security profiles did not support all parcels available in 20.15. This is now fixed.
+- Fix for config-group deployment error with optional variables. 
+
+#### Changes:
+- Updated minimum Python version to 3.10 (from 3.9). As Python 3.9 is now EOL.
+
+
+Sastre 1.26 [July 7, 2025]
+==========================
 
 #### Improvements:
 - vManage 20.15 support, included support for the following API endpoints:

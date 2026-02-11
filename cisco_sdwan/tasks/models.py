@@ -1,5 +1,5 @@
-from typing import Optional, Any
-from typing_extensions import Annotated
+from collections.abc import Callable
+from typing import Optional, Annotated
 from pydantic import BaseModel, field_validator, Field, AfterValidator, ConfigDict, ValidationInfo
 from cisco_sdwan.base.catalog import OpType, CATALOG_TAG_ALL, op_catalog_tags, op_catalog_commands, catalog_tags
 from cisco_sdwan.tasks.utils import OpCmdOptions
@@ -46,16 +46,13 @@ def validate_workdir_conditional(workdir: str, info: ValidationInfo) -> str:
     return workdir
 
 
-def const(field_type: type[Any], default_value: Any) -> Annotated[type[Any], ...]:
-    """
-    Defines a model field as constant. That is, it cannot be set to any value other than the default value.
-    """
-    # noinspection PyUnusedLocal
-    def validate(value):
-        raise ValueError('This is a constant field and cannot be explicitly set or modified')
+# noinspection PyUnusedLocal
+def no_change(value):
+    raise ValueError('This is a constant field and cannot be explicitly set or modified')
 
-    return Annotated[field_type, Field(default_value, frozen=True), AfterValidator(validate)]
 
+ConstStr = Annotated[str, Field(frozen=True), AfterValidator(no_change)]
+ConstCallable = Annotated[Callable, Field(frozen=True), AfterValidator(no_change)]
 
 # Models
 IPv4AddressStr = Annotated[str, Field(pattern=r'\d+(?:\.\d+){3}$')]

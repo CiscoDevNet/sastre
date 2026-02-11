@@ -1,7 +1,6 @@
 import argparse
-from typing import Any, NamedTuple, Union, Optional
+from typing import Any, NamedTuple, Optional, Annotated
 from collections.abc import Callable, Sequence
-from typing_extensions import Annotated
 from pathlib import Path
 from functools import partial
 from concurrent import futures
@@ -17,7 +16,7 @@ from cisco_sdwan.base.models_vmanage import Device, Alarm, Event, get_device_typ
 from cisco_sdwan.tasks.utils import (regex_type, ipv4_type, site_id_type, filename_type, int_type, OpCmdOptions,
                                      TaskOptions, RTCmdSemantics, StateCmdSemantics, StatsCmdSemantics)
 from cisco_sdwan.tasks.common import regex_search, Task, Table, get_table_filters, filtered_tables, export_json
-from cisco_sdwan.tasks.models import TableTaskArgs, validate_op_cmd, const, IPv4AddressStr
+from cisco_sdwan.tasks.models import TableTaskArgs, validate_op_cmd, ConstStr, ConstCallable, IPv4AddressStr
 from cisco_sdwan.tasks.validators import validate_site_id, validate_regex
 
 THREAD_POOL_SIZE = 10
@@ -37,7 +36,7 @@ def retrieve_rt_task(api_obj: Rest, rt_cls: type[RealtimeItem], device: DeviceIn
     return device, rt_cls.get(api_obj, device.system_ip)
 
 
-def table_fields(op_cls: type[OperationalItem], detail: bool, simple: bool) -> tuple:
+def table_fields(op_cls: type[OperationalItem], detail: bool, simple: bool) -> tuple[str, ...]:
     if detail and op_cls.fields_ext is not None:
         return op_cls.fields_std + op_cls.fields_ext
 
@@ -67,8 +66,8 @@ class TaskShow(Task):
         dev_parser.set_defaults(subtask_info='devices')
 
         rt_parser = sub_tasks.add_parser('realtime', aliases=['rt'],
-                                         help='realtime commands. Slower, but up-to-date data. vManage collect data '
-                                              'from devices in realtime.')
+                                         help='realtime commands. Slower, but up-to-date data. SD-WAN Manager collects '
+                                              'data from devices in realtime.')
         rt_parser.set_defaults(subtask_handler=TaskShow.realtime)
         rt_parser.set_defaults(subtask_info='realtime')
 
@@ -87,11 +86,11 @@ class TaskShow(Task):
         stats_parser.add_argument('--hours', metavar='<hours>', type=partial(int_type, 0, 9999), default=0,
                                   help='query statistics from <hours> ago (default: %(default)s, i.e. now)')
 
-        alarms_parser = sub_tasks.add_parser('alarms', help='display vManage alarms')
+        alarms_parser = sub_tasks.add_parser('alarms', help='display SD-WAN Manager alarms')
         alarms_parser.set_defaults(subtask_info='alarms')
         alarms_parser.set_defaults(subtask_op_cls=Alarm)
 
-        events_parser = sub_tasks.add_parser('events', help='display vManage events')
+        events_parser = sub_tasks.add_parser('events', help='display SD-WAN Manager events')
         events_parser.set_defaults(subtask_info='events')
         events_parser.set_defaults(subtask_op_cls=Event)
 
@@ -143,8 +142,8 @@ class TaskShow(Task):
 
         return task_parser.parse_args(task_args)
 
-    def runner(self, parsed_args, api: Optional[Rest] = None) -> Union[None, list]:
-        self.log_info(f'Show {parsed_args.subtask_info} task: vManage URL: "{api.base_url}"')
+    def runner(self, parsed_args, api: Optional[Rest] = None) -> list | None:
+        self.log_info(f'Show {parsed_args.subtask_info} task: SD-WAN Manager URL: "{api.base_url}"')
 
         filters = get_table_filters(exclude_regex=parsed_args.exclude, include_regex=parsed_args.include)
         result_tables = filtered_tables(parsed_args.subtask_handler(self, parsed_args, api), *filters)
@@ -357,13 +356,13 @@ class ShowArgs(TableTaskArgs):
 
 
 class ShowDevicesArgs(ShowArgs):
-    subtask_info: const(str, 'devices')
-    subtask_handler: const(Callable, TaskShow.devices)
+    subtask_info: ConstStr = 'devices'
+    subtask_handler: ConstCallable = TaskShow.devices
 
 
 class ShowRealtimeArgs(ShowArgs):
-    subtask_info: const(str, 'realtime')
-    subtask_handler: const(Callable, TaskShow.realtime)
+    subtask_info: ConstStr = 'realtime'
+    subtask_handler: ConstCallable = TaskShow.realtime
     cmd: list[str]
     detail: bool = False
     simple: bool = False
@@ -376,8 +375,8 @@ class ShowRealtimeArgs(ShowArgs):
 
 
 class ShowStateArgs(ShowArgs):
-    subtask_info: const(str, 'state')
-    subtask_handler: const(Callable, TaskShow.bulk_state)
+    subtask_info: ConstStr = 'state'
+    subtask_handler: ConstCallable = TaskShow.bulk_state
     cmd: list[str]
     detail: bool = False
     simple: bool = False
@@ -390,8 +389,8 @@ class ShowStateArgs(ShowArgs):
 
 
 class ShowStatisticsArgs(ShowArgs):
-    subtask_info: const(str, 'statistics')
-    subtask_handler: const(Callable, TaskShow.bulk_stats)
+    subtask_info: ConstStr = 'statistics'
+    subtask_handler: ConstCallable = TaskShow.bulk_stats
     cmd: list[str]
     detail: bool = False
     simple: bool = False
@@ -407,7 +406,7 @@ class ShowStatisticsArgs(ShowArgs):
 
 class ShowRecordsArgs(TableTaskArgs):
     subtask_info: str
-    subtask_handler: const(Callable, TaskShow.records)
+    subtask_handler: ConstCallable = TaskShow.records
     subtask_op_cls: Callable
     max: Annotated[int, Field(ge=1, lt=1000000)] = 100
     days: Annotated[int, Field(ge=0, lt=10000)] = 0
@@ -424,10 +423,10 @@ class ShowRecordsArgs(TableTaskArgs):
 
 
 class ShowAlarmsArgs(ShowRecordsArgs):
-    subtask_info: const(str, 'alarms')
-    subtask_op_cls: const(Callable, Alarm)
+    subtask_info: ConstStr = 'alarms'
+    subtask_op_cls: ConstCallable = Alarm
 
 
 class ShowEventsArgs(ShowRecordsArgs):
-    subtask_info: const(str, 'events')
-    subtask_op_cls: const(Callable, Event)
+    subtask_info: ConstStr = 'events'
+    subtask_op_cls: ConstCallable = Event

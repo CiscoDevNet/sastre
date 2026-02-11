@@ -1,7 +1,6 @@
 import argparse
 from getpass import getpass
-from typing import Union, Optional
-from collections.abc import Callable
+from typing import Optional
 from pydantic import field_validator, ValidationError
 import yaml
 from cisco_sdwan.__version__ import __doc__ as title
@@ -9,7 +8,7 @@ from cisco_sdwan.base.rest_api import Rest, RestAPIException
 from cisco_sdwan.base.models_vmanage import EncryptText
 from cisco_sdwan.tasks.utils import TaskOptions, existing_file_type
 from cisco_sdwan.tasks.common import Task, Table, TaskException
-from cisco_sdwan.tasks.models import const, TaskArgs
+from cisco_sdwan.tasks.models import ConstCallable, TaskArgs
 from ._transform import TransformRecipe, RecipeException, RECIPE_VALUE_CHANGE_ME
 
 
@@ -32,8 +31,8 @@ class TaskEncrypt(Task):
         values_parser = sub_tasks.add_parser('values', help='encrypt provided list of clear text values')
         values_parser.set_defaults(subtask_handler=TaskEncrypt.values)
         values_parser.add_argument('values', metavar='<value>', nargs='*',
-                                   help='one or more clear text values to be encrypted by vManage. If no value is '
-                                        'provided, enter interactive mode.')
+                                   help='one or more clear text values to be encrypted by SD-WAN Manager. '
+                                        'If no value is provided, enter interactive mode.')
 
         recipe_parser = sub_tasks.add_parser('recipe',
                                              help='interactively encrypt based on recipe (from transform build-recipe)')
@@ -43,12 +42,12 @@ class TaskEncrypt(Task):
 
         return task_parser.parse_args(task_args)
 
-    def runner(self, parsed_args, api: Optional[Rest] = None) -> Union[None, list]:
-        self.log_info(f'Encrypt task: vManage URL: "{api.base_url}"')
+    def runner(self, parsed_args, api: Optional[Rest] = None) -> list | None:
+        self.log_info(f'Encrypt task: SD-WAN Manager URL: "{api.base_url}"')
 
         return parsed_args.subtask_handler(self, parsed_args, api)
 
-    def recipe(self, parsed_args, api: Rest) -> Union[None, list]:
+    def recipe(self, parsed_args, api: Rest) -> list | None:
         try:
             recipe = TransformRecipe.parse_yaml(parsed_args.recipe_file)
         except (ValidationError, RecipeException) as ex:
@@ -88,7 +87,7 @@ class TaskEncrypt(Task):
 
         return
 
-    def values(self, parsed_args, api: Rest) -> Union[None, list]:
+    def values(self, parsed_args, api: Rest) -> list | None:
         # Interactive mode
         if not parsed_args.values:
             print('Interactive mode, press <ENTER> on empty value or ^C to quit.')
@@ -122,7 +121,7 @@ class TaskEncrypt(Task):
 
         return result_tables
 
-    def encrypt_text(self, input_value: str, api: Rest) -> Union[None, str]:
+    def encrypt_text(self, input_value: str, api: Rest) -> str | None:
         try:
             result = EncryptText(api.post(EncryptText.api_params(input_value), EncryptText.api_path.post))
         except RestAPIException as ex:
@@ -138,7 +137,7 @@ class TaskEncrypt(Task):
 
 class EncryptArgs(TaskArgs):
     # Only have TaskEncrypt.values subtask because interactive mode should not be called programmatically
-    subtask_handler: const(Callable, TaskEncrypt.values)
+    subtask_handler: ConstCallable = TaskEncrypt.values
     values: list[str]
 
     # Validators

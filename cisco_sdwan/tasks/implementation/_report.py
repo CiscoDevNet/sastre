@@ -4,16 +4,15 @@ import re
 import yaml
 from datetime import date
 from difflib import unified_diff, HtmlDiff
-from typing import Union, Optional, Any, NamedTuple
-from collections.abc import Iterator, Callable
-from typing_extensions import Annotated
+from typing import Optional, Any, NamedTuple, Annotated
+from collections.abc import Iterator
 from pydantic import field_validator, model_validator, BaseModel, ValidationError, Field, ConfigDict
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest
 from cisco_sdwan.base.catalog import CATALOG_TAG_ALL, ordered_tags
 from cisco_sdwan.tasks.utils import TaskOptions, existing_workdir_type, filename_type, existing_file_type
 from cisco_sdwan.tasks.common import Task, Table, TaskException
-from cisco_sdwan.tasks.models import TaskArgs, const
+from cisco_sdwan.tasks.models import TaskArgs, ConstCallable
 from cisco_sdwan.tasks.validators import validate_existing_file, validate_filename, validate_workdir, validate_json
 from ._list import TaskList, ListConfigArgs, ListCertificateArgs
 from ._show_template import TaskShowTemplate, ShowTemplateValuesArgs, ShowTemplateRefArgs
@@ -220,7 +219,7 @@ class TaskReport(Task):
                                    default=f'report_{date.today():%Y%m%d}.txt',
                                    help='report filename (default: %(default)s)')
         create_parser.add_argument('--workdir', metavar='<directory>', type=existing_workdir_type,
-                                   help='report from the specified directory instead of target vManage')
+                                   help='report from the specified directory instead of target SD-WAN Manager')
         create_parser.add_argument('--diff', metavar='<filename>', type=existing_file_type,
                                    help='generate diff between the specified previous report and the current report')
         create_parser.add_argument('--save-json', metavar='<filename>', type=filename_type,
@@ -249,11 +248,11 @@ class TaskReport(Task):
     def is_api_required(parsed_args) -> bool:
         return parsed_args.subtask_handler is TaskReport.subtask_create and parsed_args.workdir is None
 
-    def runner(self, parsed_args, api: Optional[Rest] = None) -> Union[None, list]:
+    def runner(self, parsed_args, api: Optional[Rest] = None) -> list | None:
         return parsed_args.subtask_handler(self, parsed_args, api)
 
-    def subtask_create(self, parsed_args, api: Optional[Rest]) -> Union[None, list]:
-        source_info = f'Local workdir: "{parsed_args.workdir}"' if api is None else f'vManage URL: "{api.base_url}"'
+    def subtask_create(self, parsed_args, api: Optional[Rest]) -> list | None:
+        source_info = f'Local workdir: "{parsed_args.workdir}"' if api is None else f'SD-WAN Manager URL: "{api.base_url}"'
         self.log_info(f'Report create task: {source_info} -> "{parsed_args.file}"')
 
         self.log_info("Loading report specification")
@@ -287,7 +286,7 @@ class TaskReport(Task):
         return result
 
     # noinspection PyUnusedLocal
-    def subtask_diff(self, parsed_args, api: Optional[Rest]) -> Union[None, list]:
+    def subtask_diff(self, parsed_args, api: Optional[Rest]) -> list | None:
         self.log_info(f'Report diff task: "{parsed_args.report_a}" <-> "{parsed_args.report_b}"')
         report_a = Report.load(parsed_args.report_a)
         self.log_info(f'Loaded report "{parsed_args.report_a}"')
@@ -322,7 +321,7 @@ class TaskReport(Task):
         """
         An iterator over the different sections of the report, including task and arguments for the task.
         @param report_spec: report specification to use for generating this report
-        @param has_api_session: whether the report is running with a vManage session or offline (i.e. off a backup)
+        @param has_api_session: whether the report is running with a SD-WAN Manager session or from a backup
         @param workdir: workdir value, if provided to the report task.
         @return: an iterator of (<description>, <task class>, <task args>)
         """
@@ -422,7 +421,7 @@ def diff_txt_iter(a: Report, b: Report) -> Iterator[str]:
 
 
 class ReportCreateArgs(TaskArgs):
-    subtask_handler: const(Callable, TaskReport.subtask_create)
+    subtask_handler: ConstCallable = TaskReport.subtask_create
     file: Annotated[str, Field(validate_default=True)] = None
     workdir: Optional[str] = None
     diff: Optional[str] = None
@@ -451,7 +450,7 @@ class ReportCreateArgs(TaskArgs):
 
 
 class ReportDiffArgs(TaskArgs):
-    subtask_handler: const(Callable, TaskReport.subtask_diff)
+    subtask_handler: ConstCallable = TaskReport.subtask_diff
     report_a: Optional[str] = None
     report_b: Optional[str] = None
     save_html: Optional[str] = None

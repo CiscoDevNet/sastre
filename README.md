@@ -5,7 +5,7 @@
 Sastre provides functions to assist with managing configuration elements and visualize information from Cisco SD-WAN deployments. 
 
 Some use-cases include:
-- Transfer configuration from one vManage to another. Lab or proof-of-concept environment to production, on-prem to cloud environments as examples.
+- Transfer configuration from one SD-WAN Manager to another. Lab or proof-of-concept environment to production, on-prem to cloud environments as examples.
 - Backup, restore and delete configuration items. Tags and regular expressions can be used to select all or a subset of items.
 - Visualize operational data across multiple devices. For instance, display status of control connections from multiple devices in a single table.
 
@@ -15,8 +15,8 @@ Sastre can also be used as an SDK to other applications, further information is 
 
 Support enquires can be sent to sastre-support@cisco.com.
 
-Note on vManage release support:
-- Sastre 1.26 officially supports up to vManage 20.15. Newer vManage releases normally work without problems, just lacking support to the newer features added to that particular vManage release.
+Note on SD-WAN Manager release support:
+- Sastre 1.27 officially supports up to SD-WAN Manager 20.15. Newer SD-WAN Manager releases normally work without problems, just lacking support to the newer features added to that particular SD-WAN Manager release.
 
 ## Sastre and Sastre-Pro
 
@@ -33,22 +33,22 @@ The command line is structured as a set of base parameters, the task specificati
 sdwan <base parameters> <task> <task-specific parameters>
 ```
 
-Base parameters define global options such as verbosity level, vManage credentials, etc.
+Base parameters define global options such as verbosity level, SD-WAN Manager credentials, etc.
 
 Task indicates the operation to be performed. The following tasks are currently available: 
-- Backup: Save vManage configuration items to a local backup.
-- Restore: Restore configuration items from a local backup to vManage.
-- Delete: Delete configuration items on vManage.
-- Migrate: Migrate configuration items from a vManage release to another. Currently, only 18.4, 19.2 or 19.3 to 20.1 is supported. Minor revision numbers (e.g. 20.1.1) are not relevant for the template migration.
-- Encrypt: Encrypt values using target vManage keys. Used to generate CRYPT_CLUSTER encrypted values, which can only be decrypted by the target vManage.
+- Backup: Save SD-WAN Manager configuration items to a local backup.
+- Restore: Restore configuration items from a local backup to SD-WAN Manager.
+- Delete: Delete configuration items on SD-WAN Manager.
+- Migrate: Migrate configuration items from a SD-WAN Manager release to another. Currently, only 18.4, 19.2 or 19.3 to 20.1 is supported. Minor revision numbers (e.g. 20.1.1) are not relevant for the template migration.
+- Encrypt: Encrypt values using target SD-WAN Manager keys. Used to generate CRYPT_CLUSTER encrypted values, which can only be decrypted by the target SD-WAN Manager.
 - Transform: Modify configuration items. Currently, copy, rename and crypt-update operations are supported. 
 - Attach: Attach WAN Edges/vSmarts to templates. Allows further customization on top of the functionality available via "restore --attach".
 - Detach: Detach WAN Edges/vSmarts from templates. Allows further customization on top of the functionality available via "delete --detach".
 - Certificate: Restore device certificate validity status from a backup or set to a desired value (i.e. valid, invalid or staging).
-- List: List configuration items or device certificate information from vManage or a local backup.
-- Show-template: Show details about device templates on vManage or from a local backup.
+- List: List configuration items or device certificate information from SD-WAN Manager or a local backup.
+- Show-template: Show details about device templates on SD-WAN Manager or from a local backup.
 - Report: Generate a customizable report file containing the output of multiple commands. Also provide option to generate a diff between reports.
-- Show: Run vManage real-time, state or statistics commands; collecting data from one or more devices. Query vManage alarms and events.
+- Show: Run SD-WAN Manager real-time, state or statistics commands; collecting data from one or more devices. Query SD-WAN Manager alarms and events.
 
 Task-specific parameters are provided after the task argument, customizing the task behavior. For instance, whether to execute a restore task in dry-run mode or the destination directory for a backup task. 
 
@@ -61,7 +61,7 @@ Notes:
 
 ```
 % sdwan --help
-usage: sdwan [-h] [-a <vmanage-ip>] [-u <user>] [-p <password>] [--tenant <tenant>] [--pid <pid>] [--port <port>] [--timeout <timeout>] [--verbose] [--debug] [--version] <task> ...
+usage: sdwan [-h] [-a <manager-ip>] [-u <user>] [-p <password>] [--apikey <api-key>] [--tenant <tenant>] [--port <port>] [--timeout <timeout>] [--verbose] [--debug] [--version] <task> ...
 
 Sastre - Cisco-SDWAN Automation Toolset
 
@@ -71,30 +71,33 @@ positional arguments:
 
 options:
   -h, --help            show this help message and exit
-  -a <vmanage-ip>, --address <vmanage-ip>
-                        vManage IP address, can also be defined via VMANAGE_IP environment variable. If neither is provided user is prompted for the address.
+  -a <manager-ip>, --address <manager-ip>
+                        SD-WAN Manager IP address, can also be defined via VMANAGE_IP environment variable. If neither is provided user is prompted for the address.
   -u <user>, --user <user>
                         username, can also be defined via VMANAGE_USER environment variable. If neither is provided user is prompted for username.
   -p <password>, --password <password>
                         password, can also be defined via VMANAGE_PASSWORD environment variable. If neither is provided user is prompted for password.
+  --apikey <api-key>    SD-WAN Manager API key, can also be defined via VMANAGE_APIKEY environment variable.
   --tenant <tenant>     tenant name, when using provider accounts in multi-tenant deployments.
-  --pid <pid>           CX project id, can also be defined via CX_PID environment variable. This is collected for AIDE reporting purposes. Use 0 if not applicable.
-  --port <port>         vManage port number, can also be defined via VMANAGE_PORT environment variable (default: 443)
-  --timeout <timeout>   REST API timeout (default: 300)
+  --port <port>         port number, can also be defined via VMANAGE_PORT environment variable (default: 443)
+  --timeout <timeout>   REST API timeout (default: 300s)
   --verbose             increase output verbosity
   --debug               include additional API call details to the log files
   --version             show program's version number and exit
 ```
 
-vManage address (-a/--address), username (-u/--user), password (-p/--password) and port (--port) can also be provided via environment variables:
+SD-WAN Manager address (-a/--address), username (-u/--user), password (-p/--password), API key (--apikey) and port (--port) can also be provided via environment variables:
 - VMANAGE_IP
 - VMANAGE_USER
 - VMANAGE_PASSWORD
+- VMANAGE_APIKEY
 - VMANAGE_PORT
 
-A good approach to reduce the number of parameters that need to be provided at execution time is to create rc text files exporting those environment variables for a particular vManage. This is demonstrated in the [Getting Started](#getting-started) section below.
+A good approach to reduce the number of parameters that need to be provided at execution time is to create rc text files exporting those environment variables for a particular SD-WAN Manager. This is demonstrated in the [Getting Started](#getting-started) section below.
 
-For any of these arguments, vManage address, user, password and CX pid; user is prompted for a value if they are not provided via the environment variables or command line arguments.
+Username/password authentication takes precedence over API key. When an API key is provided (via --apikey or VMANAGE_APIKEY), along with username and password, Sastre uses username/password authentication instead of API key.
+
+For any of these arguments, SD-WAN Manager address, username and password; user is prompted for a value if they are not provided via the environment variables or command line arguments. However, when an API key is provided the user will not be prompted for username/password.
 
 ### Task-specific parameters
 
@@ -129,9 +132,9 @@ options:
 ```
 
 #### Important concepts:
-- vManage URL: Constructed from the provided vManage IP address and TCP port (default 443). All operations target this vManage.
-- Workdir: Defines the location (in the local machine) where vManage data files are located. By default, it follows the format "backup_\<vmanage-ip\>_\<yyyymmdd\>". The --workdir parameter can be used to specify a different location.  Workdir is under a 'data' directory. This 'data' directory is relative to the directory where Sastre is run.
-- Tag: vManage configuration items are grouped by tags, such as policy_apply, policy_definition, policy_list, template_device, etc. The special tag 'all' is used to refer to all configuration elements. Depending on the task, one or more tags can be specified in order to select groups of configuration elements.
+- SD-WAN Manager URL: Constructed from the provided SD-WAN Manager IP address and TCP port (default 443). All operations target this SD-WAN Manager.
+- Workdir: Defines the location (in the local machine) where SD-WAN Manager data files are located. By default, it follows the format "backup_\<vmanage-ip\>_\<yyyymmdd\>". The --workdir parameter can be used to specify a different location.  Workdir is under a 'data' directory. This 'data' directory is relative to the directory where Sastre is run.
+- Tag: SD-WAN Manager configuration items are grouped by tags, such as policy_apply, policy_definition, policy_list, template_device, etc. The special tag 'all' is used to refer to all configuration elements. Depending on the task, one or more tags can be specified in order to select groups of configuration elements.
 
 #### Common behavior of "table" tasks:
 
@@ -159,7 +162,7 @@ Create a directory to serve as root for backup files, log files and rc files:
     
 When Sastre is executed, data/ and logs/ directories are created as needed to store backup files and application logs. These are created under the directory where Sastre is run.
 
-Create a rc-example.sh file to include vManage details and source that file:
+Create a rc-example.sh file to include SD-WAN Manager details and source that file:
 ```
 % cat <<EOF > rc-example.sh
 export VMANAGE_IP='198.18.1.10'
@@ -170,10 +173,10 @@ EOF
 
 Note that in this example the password was not defined, the user will be prompted for a password.
 
-Test vManage credentials by running a simple query listing configured device templates:
+Test SD-WAN Manager credentials by running a simple query listing configured device templates:
 ```
 % sdwan list configuration template_device
-vManage password: 
+SD-WAN Manager password: 
 +============================================================================================+
 | Name            | ID                                   | Tag             | Type            |
 +============================================================================================+
@@ -185,7 +188,7 @@ vManage password:
 +-----------------+--------------------------------------+-----------------+-----------------+
 ```
 
-Any of those vManage parameters can be provided via command line as well:
+Any of those SD-WAN Manager parameters can be provided via command line as well:
 ```
 % sdwan -p admin list configuration template_device
 ```
@@ -193,8 +196,8 @@ Any of those vManage parameters can be provided via command line as well:
 Perform a backup:
 ```
 % sdwan --verbose backup all
-INFO: Starting backup: vManage URL: "https://198.18.1.10" -> Local workdir: "backup_198.18.1.10_20210927"
-INFO: Saved vManage server information
+INFO: Starting backup: SD-WAN Manager URL: "https://198.18.1.10" -> Local workdir: "backup_198.18.1.10_20210927"
+INFO: Saved SD-WAN Manager server information
 INFO: Saved WAN edge certificates
 INFO: Saved device template index
 <snip>
@@ -222,8 +225,8 @@ backup_198.18.1.10_20210927
 
 ```
 % sdwan --verbose backup all --workdir my_custom_directory
-INFO: Starting backup: vManage URL: "https://198.18.1.10" -> Local workdir: "my_custom_directory"
-INFO: Saved vManage server information
+INFO: Starting backup: SD-WAN Manager URL: "https://198.18.1.10" -> Local workdir: "my_custom_directory"
+INFO: Saved SD-WAN Manager server information
 INFO: Saved WAN edge certificates
 INFO: Saved device template index
 <snip>
@@ -239,8 +242,8 @@ INFO: Task completed successfully
 
 ```
 % sdwan --verbose backup all --archive my_backup_file.zip
-INFO: Backup task: vManage URL: "https://198.18.1.10" -> Local archive file: "my_backup_file.zip"
-INFO: Saved vManage server information
+INFO: Backup task: SD-WAN Manager URL: "https://198.18.1.10" -> Local archive file: "my_backup_file.zip"
+INFO: Saved SD-WAN Manager server information
 INFO: Saved WAN edge certificates
 INFO: Saved device template index
 <snip>
@@ -261,8 +264,8 @@ my_backup_file.zip
 
 ```
 % sdwan --verbose restore all        
-INFO: Starting restore: Local workdir: "backup_10.85.136.253_20200617" -> vManage URL: "https://10.85.136.253"
-INFO: Loading existing items from target vManage
+INFO: Starting restore: Local workdir: "backup_10.85.136.253_20200617" -> SD-WAN Manager URL: "https://10.85.136.253"
+INFO: Loading existing items from target SD-WAN Manager
 INFO: Identifying items to be pushed
 INFO: Inspecting template_device items
 INFO: Inspecting template_feature items
@@ -274,7 +277,7 @@ INFO: Inspecting policy_customapp items
 INFO: Inspecting policy_definition items
 INFO: Inspecting policy_profile items
 INFO: Inspecting policy_list items
-INFO: Pushing items to vManage
+INFO: Pushing items to SD-WAN Manager
 INFO: Done: Create data-ipv6-prefix list mgmt_prefixes_ipv6
 INFO: Done: Create SLA-class list Realtime_Full_Mesh
 INFO: Done: Create SLA-class list Best_Effort
@@ -289,8 +292,8 @@ INFO: Task completed successfully
 
 ```
 % sdwan --verbose restore all --workdir my_custom_directory
-INFO: Starting restore: Local workdir: "my_custom_directory" -> vManage URL: "https://10.85.136.253"
-INFO: Loading existing items from target vManage
+INFO: Starting restore: Local workdir: "my_custom_directory" -> SD-WAN Manager URL: "https://10.85.136.253"
+INFO: Loading existing items from target SD-WAN Manager
 INFO: Identifying items to be pushed
 INFO: Inspecting template_device items
 INFO: Inspecting template_feature items
@@ -302,9 +305,9 @@ INFO: Task completed successfully
 
 ```
 % sdwan --verbose restore all --archive my_backup_file.zip 
-INFO: Restore task: Local archive file: "my_backup_file.zip" -> vManage URL: "https://198.18.1.10"
+INFO: Restore task: Local archive file: "my_backup_file.zip" -> SD-WAN Manager URL: "https://198.18.1.10"
 INFO: Loaded archive file "my_backup_file.zip"
-INFO: Loading existing items from target vManage
+INFO: Loading existing items from target SD-WAN Manager
 INFO: Identifying items to be pushed
 INFO: Inspecting config_group items
 INFO: Inspecting feature_profile items
@@ -317,8 +320,8 @@ INFO: Task completed successfully
     
 ```
 % sdwan --verbose restore all --attach
-INFO: Starting restore: Local workdir: "backup_10.85.136.253_20200617" -> vManage URL: "https://10.85.136.253"
-INFO: Loading existing items from target vManage
+INFO: Starting restore: Local workdir: "backup_10.85.136.253_20200617" -> SD-WAN Manager URL: "https://10.85.136.253"
+INFO: Loading existing items from target SD-WAN Manager
 <snip>
 INFO: Attaching WAN Edge templates
 INFO: Waiting...
@@ -341,18 +344,18 @@ INFO: Task completed successfully
 ```
 
 #### Overwriting items with the --update option:
-- By default, when an item from the backup has the same name as an existing item on vManage it will be skipped by restore.
-- For instance, if a device template is modified on vManage, restoring from a backup taken before the modification will skip that item.
+- By default, when an item from the backup has the same name as an existing item on SD-WAN Manager it will be skipped by restore.
+- For instance, if a device template is modified on SD-WAN Manager, restoring from a backup taken before the modification will skip that item.
 - With the --update option, items with the same name are updated with the info found in the backup.
-- Sastre only update items when there are differences between the backup and vManage content.
+- Sastre only update items when there are differences between the backup and SD-WAN Manager content.
 - If the item is associated with attached templates or activated policies, all necessary re-attach/re-activate actions are automatically performed.
 - Currently, the --update option does not inspect changes to template values. 
 
 Example:
 ```
 % sdwan --verbose restore all --workdir state_b --update
-INFO: Starting restore: Local workdir: "state_b" -> vManage URL: "https://10.85.136.253"
-INFO: Loading existing items from target vManage
+INFO: Starting restore: Local workdir: "state_b" -> SD-WAN Manager URL: "https://10.85.136.253"
+INFO: Loading existing items from target SD-WAN Manager
 INFO: Identifying items to be pushed
 INFO: Inspecting template_device items
 INFO: Inspecting template_feature items
@@ -361,7 +364,7 @@ INFO: Inspecting policy_vedge items
 INFO: Inspecting policy_security items
 INFO: Inspecting policy_definition items
 INFO: Inspecting policy_list items
-INFO: Pushing items to vManage
+INFO: Pushing items to SD-WAN Manager
 INFO: Done: Create community list LOCAL_DC_PREFIXES
 INFO: Done: Create community list REMAINING_PREFIXES
 INFO: Updating SLA-class list Best_Effort requires reattach of affected templates
@@ -376,12 +379,12 @@ INFO: Done: Update device template DC_BASIC
 INFO: Task completed successfully
 ```
 
-### Deleting vManage items:
+### Deleting SD-WAN Manager items:
 
 Dry-run, just list without deleting items matching the specified tag and regular expression:
 ```
 % sdwan --verbose delete all --regex '^DC' --dryrun
-INFO: Starting delete, DRY-RUN mode: vManage URL: "https://10.85.136.253"
+INFO: Starting delete, DRY-RUN mode: SD-WAN Manager URL: "https://10.85.136.253"
 INFO: Inspecting template_device items
 INFO: DRY-RUN: Delete device template DC_BASIC
 INFO: DRY-RUN: Delete device template DC_ADVANCED
@@ -397,7 +400,7 @@ INFO: Task completed successfully
 Deleting items:
 ```
 % sdwan --verbose delete all --regex '^DC'
-INFO: Starting delete: vManage URL: "https://10.85.136.253"
+INFO: Starting delete: SD-WAN Manager URL: "https://10.85.136.253"
 INFO: Inspecting template_device items
 INFO: Done: Delete device template DC_BASIC
 INFO: Done: Delete device template DC_ADVANCED
@@ -416,7 +419,7 @@ The --detach option performs the necessary template detach and vSmart policy dea
 
 ```
 % sdwan --verbose delete all --detach
-INFO: Starting delete: vManage URL: "https://10.85.136.253"
+INFO: Starting delete: SD-WAN Manager URL: "https://10.85.136.253"
 INFO: Detaching WAN Edge templates
 INFO: Waiting...
 INFO: Completed BRANCH_BASIC
@@ -436,14 +439,14 @@ INFO: Done: Delete device template vManage_template
 INFO: Task completed successfully
 ```
 
-### Listing items from vManage or from a backup:
+### Listing items from SD-WAN Manager or from a backup:
 
-The list task can be used to show items from a target vManage, or a backup directory. Matching criteria can contain item tag(s) and regular expression.
+The list task can be used to show items from a target SD-WAN Manager, or a backup directory. Matching criteria can contain item tag(s) and regular expression.
 
-List device templates and feature templates from target vManage:
+List device templates and feature templates from target SD-WAN Manager:
 ```
 % sdwan --verbose list configuration template_device template_feature
-INFO: Starting list configuration: vManage URL: "https://198.18.1.10"
+INFO: Starting list configuration: SD-WAN Manager URL: "https://198.18.1.10"
 INFO: List criteria matched 45 items
 +========================================================================================================+
 | Name                      | ID                                   | Tag              | Type             |
@@ -457,10 +460,10 @@ INFO: List criteria matched 45 items
 INFO: Task completed successfully
 ```
  
-List all items from target vManage with name starting with 'DC':
+List all items from target SD-WAN Manager with name starting with 'DC':
 ```
 % sdwan --verbose list configuration all --include '^DC'                                  
-INFO: List configuration task: vManage URL: "https://198.18.1.10"
+INFO: List configuration task: SD-WAN Manager URL: "https://198.18.1.10"
 INFO: Selection matched 9 items
 +============================================================================================================+
 | Name                         | ID                                   | Tag              | Type              |
@@ -495,7 +498,7 @@ INFO: Task completed successfully
 List also allows displaying device certificate information:
 ```
 % sdwan --verbose list certificate                     
-INFO: List certificate task: vManage URL: "https://198.18.1.10"
+INFO: List certificate task: SD-WAN Manager URL: "https://198.18.1.10"
 INFO: Selection matched 5 items
 +================================================================================================================================+
 | Hostname   | Chassis                                  | Serial                           | State                      | Status |
@@ -509,10 +512,10 @@ INFO: Selection matched 5 items
 INFO: Task completed successfully
 ```
 
-Similar to the list task, show-template tasks can be used to display items from a target vManage or backup. With show-template values, additional details about the selected items are displayed. A regular expression can be used to select which device templates to inspect. If the inspected templates have devices attached their values are displayed.
+Similar to the list task, show-template tasks can be used to display items from a target SD-WAN Manager or backup. With show-template values, additional details about the selected items are displayed. A regular expression can be used to select which device templates to inspect. If the inspected templates have devices attached their values are displayed.
 ```
 % sdwan --verbose show-template values --templates '^DC'
-INFO: Show-template values task: vManage URL: "https://198.18.1.10"
+INFO: Show-template values task: SD-WAN Manager URL: "https://198.18.1.10"
 INFO: Inspecting device template DC-vEdges values
 *** Template DC-vEdges, device DC1-VEDGE1 ***
 +====================================================================================================================================================+
@@ -583,15 +586,15 @@ INFO: Task completed successfully
 Restore certificate validity status from a backup:
 ```
 % sdwan --verbose certificate restore --workdir test
-INFO: Starting certificate: Restore status workdir: "test" > vManage URL: "https://198.18.1.10"
-INFO: Loading WAN edge certificate list from target vManage
+INFO: Starting certificate: Restore status workdir: "test" > SD-WAN Manager URL: "https://198.18.1.10"
+INFO: Loading WAN edge certificate list from target SD-WAN Manager
 INFO: Identifying items to be pushed
 INFO: Will update DC1-VEDGE1 status: valid -> staging
 INFO: Will update 52c7911f-c5b0-45df-b826-3155809a2a1a status: valid -> invalid
 INFO: Will update DC1-VEDGE2 status: valid -> staging
 INFO: Will update BR1-CEDGE2 status: valid -> staging
 INFO: Will update BR1-CEDGE1 status: valid -> staging
-INFO: Pushing certificate status changes to vManage
+INFO: Pushing certificate status changes to SD-WAN Manager
 INFO: Certificate sync with controllers
 INFO: Waiting...
 INFO: Completed certificate sync with controllers
@@ -601,15 +604,15 @@ INFO: Task completed successfully
 Set certificate validity status to a desired value:
 ```
 % sdwan --verbose certificate set valid             
-INFO: Starting certificate: Set status to "valid" > vManage URL: "https://198.18.1.10"
-INFO: Loading WAN edge certificate list from target vManage
+INFO: Starting certificate: Set status to "valid" > SD-WAN Manager URL: "https://198.18.1.10"
+INFO: Loading WAN edge certificate list from target SD-WAN Manager
 INFO: Identifying items to be pushed
 INFO: Will update DC1-VEDGE1 status: staging -> valid
 INFO: Will update 52c7911f-c5b0-45df-b826-3155809a2a1a status: invalid -> valid
 INFO: Will update DC1-VEDGE2 status: staging -> valid
 INFO: Will update BR1-CEDGE2 status: staging -> valid
 INFO: Will update BR1-CEDGE1 status: staging -> valid
-INFO: Pushing certificate status changes to vManage
+INFO: Pushing certificate status changes to SD-WAN Manager
 INFO: Certificate sync with controllers
 INFO: Waiting...
 INFO: Completed certificate sync with controllers
@@ -618,13 +621,13 @@ INFO: Task completed successfully
 
 ### Migrating templates from pre-20.1 to post-20.1
 - Template migration from pre-20.1 to post-20.1 format is supported. Maintenance numbers are not relevant to the migration. That is, 20.1 and 20.1.1 can be specified without any difference in terms of template migration.
-- The source of templates can be a live vManage or a backup. The destination is always a local directory. A restore task is then used to push migrated items to the target vManage.
+- The source of templates can be a live SD-WAN Manager or a backup. The destination is always a local directory. A restore task is then used to push migrated items to the target SD-WAN Manager.
 - Device attachments and template values are currently not handled by the migrate task. For instance, devices attached to a device template are left on that same template even when a new migrated template is created. 
 
-Migrating off a live vManage:
+Migrating off a live SD-WAN Manager:
 ```
 % sdwan --verbose migrate all dcloud_migrated    
-INFO: Starting migrate: vManage URL: "https://198.18.1.10" 18.4 -> 20.1 Local output dir: "dcloud_migrated"
+INFO: Starting migrate: SD-WAN Manager URL: "https://198.18.1.10" 18.4 -> 20.1 Local output dir: "dcloud_migrated"
 INFO: Loaded template migration recipes
 INFO: Inspecting policy_list items
 INFO: Saved VPN list index
@@ -729,12 +732,12 @@ The attach and detach tasks expose a number of knobs to select templates and dev
 
 When multiple filters are defined, the result is an AND of all filters. Dry-run can be used to validate the expected outcome.
 
-The number of devices to include per attach/detach request (to vManage) can be defined with the --batch option.
+The number of devices to include per attach/detach request (to SD-WAN Manager) can be defined with the --batch option.
 
 Using dry-run mode to validate what templates and devices would be included with the attach task:
 ```
 % sdwan --verbose attach edge --workdir dcloud_base --dryrun
-INFO: Starting attach templates, DRY-RUN mode: Local workdir: "dcloud_base" -> vManage URL: "https://198.18.1.10"
+INFO: Starting attach templates, DRY-RUN mode: Local workdir: "dcloud_base" -> SD-WAN Manager URL: "https://198.18.1.10"
 INFO: DRY-RUN: Template attach: DC-vEdges (DC1-VEDGE1, DC1-VEDGE2), migrated_CSR_BranchType1Template-CSR (BR1-CEDGE2, BR1-CEDGE1)
 INFO: Task completed successfully
 ```
@@ -742,7 +745,7 @@ INFO: Task completed successfully
 Selecting devices to include in the attach task:
 ```
 % sdwan --verbose attach edge --workdir dcloud_base --templates 'DC' --devices 'VEDGE2'       
-INFO: Starting attach templates: Local workdir: "dcloud_base" -> vManage URL: "https://198.18.1.10"
+INFO: Starting attach templates: Local workdir: "dcloud_base" -> SD-WAN Manager URL: "https://198.18.1.10"
 INFO: Template attach: DC-vEdges (DC1-VEDGE2)
 INFO: Attaching WAN Edges
 INFO: Waiting...
@@ -756,7 +759,7 @@ INFO: Task completed successfully
 Selecting vsmart/edge from input yml file to attach devices to templates
 ```
 % sdwan --verbose attach edge --attach-file path/to/attach_file.yml       
-INFO: Attach task source: Attach file: "path/to/attach_file.yml" -> vManage URL: "https://198.18.1.10"
+INFO: Attach task source: Attach file: "path/to/attach_file.yml" -> SD-WAN Manager URL: "https://198.18.1.10"
 INFO: No WAN Edge config-group deployments to process
 INFO: Template attach: DC-vEdges (DC1-VEDGE2)
 INFO: Template attaching WAN Edge
@@ -891,7 +894,7 @@ INFO: Task completed successfully
 
 ### Verifying device operational data
 
-The show task provides commands to display operational data from devices, and vManage alarms and events.
+The show task provides commands to display operational data from devices, and SD-WAN Manager alarms and events.
 
 Show devices, realtime, state and statistics share the same set of options to filter devices to display:
   - --regex <regex> - Regular expression matching device name, type or model to display
@@ -984,7 +987,7 @@ Verifying app-route data:
 Verifying app-route data from 4 days ago:
 ```
 % sdwan --verbose show statistics app-route --days 4 --reachable --regex 'pEdge[3-4]' 
-INFO: Starting show statistics: vManage URL: "https://10.122.41.140"
+INFO: Starting show statistics: SD-WAN Manager URL: "https://10.122.41.140"
 INFO: Query timestamp: 2021-04-26 15:36:12 UTC
 INFO: Retrieving application-aware route statistics from 2 devices
 *** Application-aware route statistics ***
@@ -1006,10 +1009,10 @@ INFO: Retrieving application-aware route statistics from 2 devices
 INFO: Task completed successfully
 ```
 
-Checking vManage alarms:
+Checking SD-WAN Manager alarms:
 ```
 % sdwan --verbose show alarms --days 1
-INFO: Show alarms task: vManage URL: "https://198.18.1.10"
+INFO: Show alarms task: SD-WAN Manager URL: "https://198.18.1.10"
 INFO: Records query: 2022-02-16 18:05:20 UTC -> 2022-02-17 19:05:20 UTC
 +================================================================================================================================================================+
 | Date & Time             | Devices    | Severity | Type                      | Message                                                                 | Active |
@@ -1030,7 +1033,7 @@ INFO: Task completed successfully
 
 ### Renaming configuration items
 
-The transform task allows copying or renaming configuration items, including templates with attachments, activated policies and their dependencies. Transform task also supports updating vManage-encrypted values, allowing configuration items with values containing a CRYPT_CLUSTER prefix to be transferred to a different vManage.
+The transform task allows copying or renaming configuration items, including templates with attachments, activated policies and their dependencies. Transform task also supports updating SD-WAN Manager-encrypted values, allowing configuration items with values containing a CRYPT_CLUSTER prefix to be transferred to a different SD-WAN Manager.
 ```
 % sdwan --verbose transform -h       
 usage: sdwan transform [-h] {rename,copy,recipe,build-recipe} ...
@@ -1047,10 +1050,10 @@ transform options:
     rename              rename configuration items
     copy                copy configuration items
     recipe              transform using custom recipe
-    build-recipe        generate recipe file for updating vManage-encrypted fields
+    build-recipe        generate recipe file for updating SD-WAN Manager-encrypted fields
 ```
 
-Transform can read from a live vManage or from a backup directory (when --workdir is specified). It always save the processed items to the provided output directory. Then restore/attach tasks can be used to push those changes to vManage.
+Transform can read from a live SD-WAN Manager or from a backup directory (when --workdir is specified). It always save the processed items to the provided output directory. Then restore/attach tasks can be used to push those changes to SD-WAN Manager.
 
 Naming the new or renamed items can be done in a couple of ways:
 - Name template: A name_regex expression defines how to build the new name based on the old name. This method is available via CLI or custom recipe.
@@ -1068,8 +1071,8 @@ Renaming a feature-template using name template via transform rename:
 +------------------------+--------------------------------------+------------------+------------------+
 
 % sdwan --verbose transform rename template_feature --regex '^Logging' '{name (Logging_Template)_cEdge}_v01' cleaned_configs
-INFO: Transform task: vManage URL: "https://198.18.1.10" -> Local output dir: "cleaned_configs"
-INFO: Saved vManage server information
+INFO: Transform task: SD-WAN Manager URL: "https://198.18.1.10" -> Local output dir: "cleaned_configs"
+INFO: Saved SD-WAN Manager server information
 INFO: Inspecting policy_list items
 INFO: Inspecting policy_profile items
 INFO: Inspecting policy_definition items
@@ -1085,12 +1088,12 @@ INFO: Inspecting template_device items
 INFO: Task completed successfully
 ```
 
-Push changes to vManage using the restore task:
+Push changes to SD-WAN Manager using the restore task:
 - Note that --update option is used. This is so device template changes are detected and updated accordingly, with template reattach triggered as needed.
 ```
 % sdwan --verbose restore all --update --workdir cleaned_configs                         
-INFO: Restore task: Local workdir: "cleaned_configs" -> vManage URL: "https://198.18.1.10"
-INFO: Loading existing items from target vManage
+INFO: Restore task: Local workdir: "cleaned_configs" -> SD-WAN Manager URL: "https://198.18.1.10"
+INFO: Loading existing items from target SD-WAN Manager
 INFO: Identifying items to be pushed
 INFO: Inspecting template_device items
 INFO: Inspecting template_feature items
@@ -1102,7 +1105,7 @@ INFO: Inspecting policy_customapp items
 INFO: Inspecting policy_definition items
 INFO: Inspecting policy_profile items
 INFO: Inspecting policy_list items
-INFO: Pushing items to vManage
+INFO: Pushing items to SD-WAN Manager
 INFO: Done: Create feature template Logging_Template_v01
 INFO: Updating device template BranchType1Template-cEdge requires reattach
 INFO: Template attach: BranchType1Template-cEdge (BR1-CEDGE2, BR1-CEDGE1)
@@ -1134,7 +1137,7 @@ name_map:
 ...
 
 % sdwan --verbose transform recipe --from-file recipe.yaml test-transform
-INFO: Transform task: vManage URL: "https://198.18.1.10" -> Local output dir: "test-transform"
+INFO: Transform task: SD-WAN Manager URL: "https://198.18.1.10" -> Local output dir: "test-transform"
 << snip >>
 INFO: Matched feature template All-VPN0-TEMPLATE_cEdge
 INFO: Replacing feature template: All-VPN0-TEMPLATE_cEdge -> VPN0-TEMPLATE_cEdge
@@ -1142,19 +1145,19 @@ INFO: Inspecting template_device items
 INFO: Task completed successfully
 ```
 
-Push changes to vManage using the restore task:
+Push changes to SD-WAN Manager using the restore task:
 ```
 % sdwan --verbose restore all --workdir test-transform --update             
-INFO: Restore task: Local workdir: "test-transform" -> vManage URL: "https://198.18.1.10"
+INFO: Restore task: Local workdir: "test-transform" -> SD-WAN Manager URL: "https://198.18.1.10"
 << snip >>
 INFO: Task completed successfully
 ```
 
-### Updating vManage-Encrypted values in configuration items
+### Updating SD-WAN Manager-Encrypted values in configuration items
 
-Transform task also supports updating vManage-encrypted values, allowing configuration items with values containing a CRYPT_CLUSTER prefix to be transferred to a different vManage.
+Transform task also supports updating SD-WAN Manager-encrypted values, allowing configuration items with values containing a CRYPT_CLUSTER prefix to be transferred to a different SD-WAN Manager.
 
-The first step is to find out the vManage-encrypted values present on vManage or a backup. This is accomplished with the transform build-recipe task.
+The first step is to find out the SD-WAN Manager-encrypted values present on SD-WAN Manager or a backup. This is accomplished with the transform build-recipe task.
 
 Generate a recipe skeleton for the transform task:
 ```
@@ -1180,7 +1183,7 @@ INFO: Recipe file saved as "recipe.yml"
 INFO: Task completed successfully
 ```
 
-The generated recipe file contains all the current vManage-encrypted values found:
+The generated recipe file contains all the current SD-WAN Manager-encrypted values found:
 ```                                                        
 % cat recipe.yml 
 tag: all
@@ -1205,14 +1208,14 @@ crypt_updates:
     to_value: < CHANGE ME >
 ```
 
-Entries with a '< CHANGE ME >' placeholder need to be replaced with new values encrypted by the target vManage where you need to restore this backup to. This is done using the encrypt task.
+Entries with a '< CHANGE ME >' placeholder need to be replaced with new values encrypted by the target SD-WAN Manager where you need to restore this backup to. This is done using the encrypt task.
 
-Using the encrypt recipe task, Sastre will update the recipe file by requesting a new clear text value for each '< CHANGE ME >' entry, requesting the target vManage to encrypt it and update the corresponding to_value field with the new encrypted value.
+Using the encrypt recipe task, Sastre will update the recipe file by requesting a new clear text value for each '< CHANGE ME >' entry, requesting the target SD-WAN Manager to encrypt it and update the corresponding to_value field with the new encrypted value.
 
 Update '< CHANGE ME >' entries in the recipe file:
 ```
 % sdwan --verbose encrypt recipe recipe.yml 
-INFO: Encrypt task: vManage URL: "https://198.18.133.200:8443"
+INFO: Encrypt task: SD-WAN Manager URL: "https://198.18.133.200:8443"
 Interactive update of recipe file "recipe.yml", press <ENTER> on empty value or ^C to abort without saving.
 
 Resource VIP23-SIG-Credentials, from_value: $CRYPT_CLUSTER$ToFuObeWUxN4nDPeds7FYA==$7Pzo514ANxdOCusPP+ZDth43Pp9S57xtjR1ofNjcszoKHhZ+zgAVbxUoN5rC7Pcz
@@ -1338,12 +1341,12 @@ INFO: Inspecting config_group items
 INFO: Task completed successfully
 ```
 
-The final step is to restore 'dcloud-clean-mar4-transformed' to vManage:
+The final step is to restore 'dcloud-clean-mar4-transformed' to SD-WAN Manager:
 ```
 % sdwan --verbose restore all --workdir dcloud-clean-mar4-transformed --update
-INFO: Restore task: Local workdir: "dcloud-clean-mar4-transformed" -> vManage URL: "https://198.18.133.200:8443"
+INFO: Restore task: Local workdir: "dcloud-clean-mar4-transformed" -> SD-WAN Manager URL: "https://198.18.133.200:8443"
 <snip>
-INFO: Pushing items to vManage
+INFO: Pushing items to SD-WAN Manager
 INFO: Done: Update feature template VIP23-SIG-Credentials
 INFO: Done: Create feature template VPN0-TEMPLATE_cEdge
 INFO: Done: Create feature template Banner-dCloud_cEdge
@@ -1426,33 +1429,33 @@ The --verbose flag controls the severity of messages printed to the terminal. If
 
 ### Restore behavior
 
-By default, restore will skip items with the same name. If an existing item on vManage has the same name as an item in the backup this item is skipped from restore.
+By default, restore will skip items with the same name. If an existing item on SD-WAN Manager has the same name as an item in the backup this item is skipped from restore.
 
-Any references/dependencies on that item are properly updated. For instance, if a feature template is not pushed to vManage because an item with the same name is already present, device templates being pushed will now point to the feature template which is already on vManage.
+Any references/dependencies on that item are properly updated. For instance, if a feature template is not pushed to SD-WAN Manager because an item with the same name is already present, device templates being pushed will now point to the feature template which is already on SD-WAN Manager.
 
 **Restore with --update:**
 
 Adding the --update option to restore modifies this behavior. In this case, Sastre will update existing items containing the same name as in the backup, but only if their content is different.
 
-When an existing vManage item is modified, device templates may need to be reattached or vSmart policies may need to be re-activated. This is handled as follows:
+When an existing SD-WAN Manager item is modified, device templates may need to be reattached or vSmart policies may need to be re-activated. This is handled as follows:
 - Updating items associated with an active vSmart policy may require this policy to be re-activated. In this case, Sastre will request the policy reactivate automatically.
 - On updates to master templates (e.g. device template) containing attached devices, Sastre will re-attach the device templates.
 - On Updates to child templates (e.g. feature template) associated with master templates containing attached devices, Sastre will re-attach the affected master template(s).
-- In all re-attach cases, Sastre will use the existing attachment values on vManage to feed the attach request.
+- In all re-attach cases, Sastre will use the existing attachment values on SD-WAN Manager to feed the attach request.
 
-The implication is that if modified templates define new variables re-attach will fail, because not all variables would have values assigned. In this case, the recommended procedure is to detach the master template (e.g. using detach task), re-run "restore --update", then re-attach the device-template from vManage, where one would be able to supply any missing variable values.
+The implication is that if modified templates define new variables re-attach will fail, because not all variables would have values assigned. In this case, the recommended procedure is to detach the master template (e.g. using detach task), re-run "restore --update", then re-attach the device-template from SD-WAN Manager, where one would be able to supply any missing variable values.
 
 **Factory default items:**
 
-If a factory-default item in the backup is a dependency (referenced by other items) that is missing on the target vManage, it is converted to a non-default item and pushed to vManage. 
+If a factory-default item in the backup is a dependency (referenced by other items) that is missing on the target SD-WAN Manager, it is converted to a non-default item and pushed to SD-WAN Manager. 
 
-A WARNING message is displayed when this condition happens. The user may want to review the corresponding templates/policies and update them to reference newer versions or equivalent factory-defaults that may be available on vManage. 
+A WARNING message is displayed when this condition happens. The user may want to review the corresponding templates/policies and update them to reference newer versions or equivalent factory-defaults that may be available on SD-WAN Manager. 
 
 ## Installing
 
-Sastre requires Python 3.9 or newer. This can be verified by pasting the following to a terminal window:
+Sastre requires Python 3.10 or newer. This can be verified by pasting the following to a terminal window:
 ```
-% python3 -c "import sys;assert sys.version_info>(3,9)" && echo "ALL GOOD"
+% python3 -c "import sys;assert sys.version_info>(3,10)" && echo "ALL GOOD"
 ```
 
 If 'ALL GOOD' is printed it means Python requirements are met. If not, download and install the latest 3.x version at Python.org (https://www.python.org/downloads/).
@@ -1563,12 +1566,12 @@ Ensure you are within the directory cloned from GitHub:
 Then proceed as follows to build the docker container:
 ```
 % docker build -t sastre .
-Sending build context to Docker daemon    220MB
-Step 1/12 : ARG http_proxy
-Step 2/12 : ARG https_proxy
-Step 3/12 : ARG no_proxy
-Step 4/12 : FROM python:3.9-alpine
- ---> 77a605933afb
+[+] Building 12.7s (12/12) FINISHED                                                docker:desktop-linux
+ => [internal] load build definition from Dockerfile                               0.0s
+ => => transferring dockerfile: 970B                                               0.0s
+ => [internal] load metadata for docker.io/library/python:3.14-alpine              1.2s
+ => [internal] load .dockerignore                                                  0.0s
+ => => transferring context: 2B
 <snip>
 ```
 
@@ -1583,31 +1586,32 @@ docker run -it --rm --hostname sastre \
  --mount type=bind,source="$(pwd)"/sastre-volume,target=/shared-data \
  sastre:latest
 
-usage: sdwan [-h] [-a <vmanage-ip>] [-u <user>] [-p <password>] [--tenant <tenant>] [--port <port>] [--timeout <timeout>] [--verbose] [--version] <task> ...
+usage: sdwan [-h] [-a <manager-ip>] [-u <user>] [-p <password>] [--apikey <api-key>] [--tenant <tenant>] [--port <port>] [--timeout <timeout>] [--verbose] [--version] <task> ...
 
-Sastre - Automation Tools for Cisco SD-WAN Powered by Viptela
+Sastre - Cisco-SDWAN Automation Toolset
 
 positional arguments:
-  <task>                task to be performed (backup, restore, delete, migrate)
+  <task>                task to be performed (backup, restore, delete, migrate, attach, detach, certificate, transform, list, show-template, show, report, encrypt)
   <arguments>           task parameters, if any
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
-  -a <vmanage-ip>, --address <vmanage-ip>
-                        vManage IP address, can also be defined via VMANAGE_IP environment variable. If neither is provided user is prompted for the address.
+  -a <manager-ip>, --address <manager-ip>
+                        SD-WAN Manager IP address, can also be defined via VMANAGE_IP environment variable. If neither is provided user is prompted for the address.
   -u <user>, --user <user>
                         username, can also be defined via VMANAGE_USER environment variable. If neither is provided user is prompted for username.
   -p <password>, --password <password>
                         password, can also be defined via VMANAGE_PASSWORD environment variable. If neither is provided user is prompted for password.
+  --apikey <api-key>    SD-WAN Manager API key, can also be defined via VMANAGE_APIKEY environment variable.
   --tenant <tenant>     tenant name, when using provider accounts in multi-tenant deployments.
-  --port <port>         vManage port number, can also be defined via VMANAGE_PORT environment variable (default: 443)
-  --timeout <timeout>   REST API timeout (default: 300)
+  --port <port>         port number, can also be defined via VMANAGE_PORT environment variable (default: 443)
+  --timeout <timeout>   REST API timeout (default: 300s)
   --verbose             increase output verbosity
   --version             show program's version number and exit
 sastre:/shared-data#
 
 sastre:/shared-data# sdwan --version
-Sastre Version 1.11. Catalog: 63 configuration items, 12 realtime items.
+Sastre Version 1.27. Catalog: 63 configuration items, 12 realtime items.
 
 sastre:/shared-data#
 ```
@@ -1618,8 +1622,8 @@ Notes:
 - Sastre data/ and logs/ directories are created under /shared-data.
 - A sample dcloud-lab.sh is copied to /shared-data/rc if no /shared-data/rc directory is present.
 - Directory structure:
-    - /shared-data/data - Used as the vManage backup data repository
+    - /shared-data/data - Used as the SD-WAN Manager backup data repository
     - /shared-data/logs - Where the logs are saved
     - /shared-data/rc - Used to store 'rc' files defining environment variables used by Sastre: VMANAGE_IP, VMANAGE_USER, etc.
-- The suggested docker run command above bind-mounts the /shared-data volume, i.e. it is mapped to a host system directory. This facilitates transferring of data to/from the container (e.g. vManage backups). The host directory is relative to the location where the docker run command is executed.
+- The suggested docker run command above bind-mounts the /shared-data volume, i.e. it is mapped to a host system directory. This facilitates transferring of data to/from the container (e.g. SD-WAN Manager backups). The host directory is relative to the location where the docker run command is executed.
 - Docker run will spin-up the container and open an interactive session to it using the ash shell. Sdwan commands (e.g. sdwan backup all, etc.) can be executed at this point. Typing 'exit' will leave the ash shell, stop and remove the container. Everything under data, rc and logs is persisted to the corresponding host system directories.
