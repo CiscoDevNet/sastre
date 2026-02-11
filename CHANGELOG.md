@@ -1,8 +1,8 @@
-Sastre 1.27 [XXX, 2026]
+Sastre 1.27 [February 11, 2026]
 ================================
 
 #### Improvements:
-- Added support for device tags.
+- Added support for backup/restore/deletion of tags. Note: Device tag association will come in the next release.
 - Added new show realtime bfd summary command
 - Added support for API key based SD-WAN manager authentication.
 
@@ -15,7 +15,7 @@ Sastre 1.27 [XXX, 2026]
 
 
 Sastre 1.26 [July 7, 2025]
-================================
+==========================
 
 #### Improvements:
 - vManage 20.15 support, included support for the following API endpoints:
