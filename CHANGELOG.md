@@ -8,6 +8,7 @@ Sastre 1.27 [XXX, 2026]
 
 #### Fixes:
 - Embedded-security profiles did not support all parcels available in 20.15. This is now fixed.
+- Fix for config-group deployment error with optional variables. 
 
 #### Changes:
 - Updated minimum Python version to 3.10 (from 3.9). As Python 3.9 is now EOL.

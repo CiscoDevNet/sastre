@@ -80,6 +80,38 @@ class DeviceTemplateAttach(ApiItem):
         }
 
 
+class TagAssociate(ApiItem):
+    api_path = ApiPath(None, 'v1/tags/associate', None, None)
+    id_tag = 'id'
+
+    @staticmethod
+    def api_params(tag_mappings: Iterable[tuple[str, list[str]]]) -> dict[str, Any]:
+        """
+        Build dictionary used to provide input parameters for api POST call
+        @param tag_mappings: An iterable of (<tag_id>, <device_id_list>) tuples. <device_id_list> is a list of device
+                             ids to be associated with this tag.
+        @return: Dictionary used to provide POST input parameters
+        """
+
+        def tag_entry(tag_id, device_id_list):
+            return {
+                "tagId": tag_id,
+                "objects": [
+                    {"id": device_id, "objectType": "DEVICE"} for device_id in device_id_list
+                ]
+            }
+
+        return {
+            "data": [
+                tag_entry(tag_id, device_id_list) for tag_id, device_id_list in tag_mappings
+            ]
+        }
+
+
+class TagDissociate(TagAssociate):
+    api_path = ApiPath(None, 'v1/tags/associate?operationType=DELETE', None, None)
+
+
 class DeviceTemplateCLIAttach(DeviceTemplateAttach):
     api_path = ApiPath(None, 'template/device/config/attachcli', None, None)
 
@@ -741,7 +773,7 @@ class ConfigGroupIndex(IndexConfigItem):
 
 class NameValuePair(ConfigRequestModel):
     name: str
-    value: Any
+    value: Optional[Any] = None
 
 
 class DeviceValuesModel(ConfigRequestModel):
