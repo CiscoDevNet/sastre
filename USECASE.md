@@ -3,7 +3,7 @@
 Sastre provides functions to assist with managing configuration elements and visualize information from Cisco SD-WAN deployments. 
 
 Some use-cases include:
-- Transfer configuration from one vManage to another. Lab or proof-of-concept environment to production, on-prem to cloud environments as examples.
+- Transfer configuration from one SD-WAN Manager to another. Lab or proof-of-concept environment to production, on-prem to cloud environments as examples.
 - Backup, restore and delete configuration items. Tags and regular expressions can be used to select all or a subset of items.
 - Copy and rename configuration items. 
 - Attach, detach templates.
