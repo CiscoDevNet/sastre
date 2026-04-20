@@ -17,7 +17,7 @@ from collections.abc import Sequence, Mapping, Iterator, Iterable
 from zipfile import ZipFile, ZIP_DEFLATED
 from pydantic import ValidationError
 from cisco_sdwan.base.rest_api import Rest, RestAPIException
-from cisco_sdwan.base.models_base import DATA_DIR
+from cisco_sdwan.base.models_base import DATA_DIR, ApiItem
 from cisco_sdwan.base.models_vmanage import (DeviceTemplate, DeviceTemplateValues, DeviceTemplateAttached,
                                              DeviceTemplateAttach, DeviceTemplateCLIAttach, DeviceModeCli,
                                              ActionStatus, PolicyVsmartStatus, PolicyVsmartStatusException,
@@ -245,8 +245,9 @@ class DryRunReport:
 # noinspection PyUnusedLocal,PyMethodMayBeStatic
 class Task:
     # Configuration parameters for wait_actions
-    ACTION_INTERVAL = 10  # seconds
-    ACTION_TIMEOUT = 1800  # 30 minutes
+    ACTION_INTERVAL = 10       # seconds
+    ACTION_INTERVAL_RAPID = 2  # seconds
+    ACTION_TIMEOUT = 1800      # 30 minutes
 
     SAVINGS_FACTOR = 1
     DRYRUN_LEVELS = {'info', 'warning', 'error', 'critical'}
@@ -313,7 +314,7 @@ class Task:
     def is_api_required(parsed_args) -> bool:
         return True
 
-    def runner(self, parsed_args, api: Optional[Rest] = None) -> list | None:
+    def runner(self, parsed_args, api: Optional[Rest] = None) -> Sequence | None:
         """
         Execute the task. If the task has some output to the user, that is returned via a list of objects. Objects in
         that list need to implement the __str__ method. If the task generates no output to the user None is returned.
@@ -857,24 +858,41 @@ class Task:
 
         return len(deactivate_reqs)
 
-    def wait_actions(self, api: Rest, action_list: list[tuple[Any, ...]], log_context: str, raise_on_failure: bool) -> bool:
+    def wait_actions(self, api: Rest, action_list: list[tuple[ApiItem, Optional[str]]], log_context: str,
+                     raise_on_failure: bool, rapid: bool = False) -> bool:
         """
-        Wait for actions in action_list to complete
-        @param api: Instance of Rest API
-        @param action_list: [(<action_worker>, <action_info>), ...]. Where <action_worker> is an instance of ApiItem and
-                            <action_info> is a str with information about the action. Action_info can be None, in which
-                            case no messages are logged for individual actions.
-        @param log_context: String providing context to log messages
-        @param raise_on_failure: If True, raise exception on action failures
-        @return: True if all actions completed with success. False otherwise.
-        """
+        Poll SD-WAN Manager until each tracked action completes or times out.
 
+        For each (action_worker, action_info) pair, status is fetched via ActionStatus.get using action_worker.uuid.
+        Polling uses ACTION_INTERVAL (or ACTION_INTERVAL_RAPID when rapid is True). A single time budget of
+        ACTION_TIMEOUT applies to the entire batch; once it is exhausted, any remaining actions are treated as timeout.
+        When action_info is not None, completion and failure details for that action are logged using it.
+
+        @param api: Rest API instance used to query action status.
+        @param action_list: List of (action_worker, action_info) tuples. action_worker must have an uuid attribute
+                            (e.g. ApiItem); action_info is a str describing the action for log messages, or None to
+                            skip per-action completion/failure logging.
+        @param log_context: Context string for log messages (e.g. "policy activation").
+        @param raise_on_failure: If True, raise WaitActionsException when any action fails or times out.
+        @param rapid: If True, use shorter poll interval (ACTION_INTERVAL_RAPID) for faster completion checks.
+        @return: True if every action completed successfully, or if action_list is empty; False if any failed,
+                 timed out, or could not be read.
+        @raises WaitActionsException: When raise_on_failure is True and at least one action failed or timed out.
+        """
         def upper_first(input_string):
-            return input_string[0].upper() + input_string[1:] if len(input_string) > 0 else ''
+            return input_string[:1].upper() + input_string[1:]
 
-        self.log_info(upper_first(log_context))
+        if not action_list:
+            self.log_debug(f'No actions to wait for: {log_context}')
+            return True
+
+        if log_context:
+            self.log_info(upper_first(log_context))
+
         result_list = []
+        action_interval = Task.ACTION_INTERVAL_RAPID if rapid else Task.ACTION_INTERVAL
         time_budget = Task.ACTION_TIMEOUT
+
         for action_worker, action_info in action_list:
             while True:
                 action = ActionStatus.get(api, action_worker.uuid)
@@ -893,10 +911,10 @@ class Task:
 
                     break
 
-                time_budget -= Task.ACTION_INTERVAL
+                time_budget -= action_interval
                 if time_budget > 0:
                     self.log_info('Waiting...')
-                    time.sleep(Task.ACTION_INTERVAL)
+                    time.sleep(action_interval)
                 else:
                     self.log_warning('Wait time limit expired')
                     result_list.append(False)

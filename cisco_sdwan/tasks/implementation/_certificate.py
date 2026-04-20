@@ -1,5 +1,6 @@
 import argparse
 from typing import Optional
+from collections.abc import Sequence
 from pydantic import field_validator, model_validator
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest, RestAPIException
@@ -70,7 +71,11 @@ class TaskCertificate(Task):
             for uuid, status, hostname, chassis, serial, state in target_certs.extended_iter()
         )
 
-    def runner(self, parsed_args, api: Optional[Rest] = None) -> list | None:
+    def runner(self, parsed_args, api: Optional[Rest] = None) -> Sequence | None:
+        if api is None:
+            self.log_critical('SD-WAN Manager connection is not available')
+            return
+
         self.is_dryrun = parsed_args.dryrun
         if parsed_args.source_iter is TaskCertificate.restore_iter:
             start_msg = f'Restore status from workdir: "{parsed_args.workdir}" -> SD-WAN Manager URL: "{api.base_url}"'

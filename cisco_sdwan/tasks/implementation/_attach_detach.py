@@ -1,7 +1,7 @@
 import argparse
 from functools import partial
 from typing import Optional, Annotated
-from collections.abc import Mapping, Iterable
+from collections.abc import Mapping, Iterable, Sequence
 from pydantic import Field, field_validator
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest, RestAPIException
@@ -95,7 +95,11 @@ class TaskAttach(Task):
         deploy_set = set()
         return attach_set, deploy_set
 
-    def runner(self, parsed_args, api: Optional[Rest] = None) -> list | None:
+    def runner(self, parsed_args, api: Optional[Rest] = None) -> Sequence | None:
+        if api is None:
+            self.log_critical('SD-WAN Manager connection is not available')
+            return
+
         self.is_dryrun = parsed_args.dryrun
         self.log_info(f'Attach task: Local workdir: "{parsed_args.workdir}" -> SD-WAN Manager URL: "{api.base_url}"')
 
@@ -252,7 +256,11 @@ class TaskDetach(Task):
         associated_set = set()
         return attached_set, associated_set
 
-    def runner(self, parsed_args, api: Optional[Rest] = None) -> list | None:
+    def runner(self, parsed_args, api: Optional[Rest] = None) -> Sequence | None:
+        if api is None:
+            self.log_critical('SD-WAN Manager connection is not available')
+            return
+
         self.is_dryrun = parsed_args.dryrun
         self.log_info(f'Detach templates task: SD-WAN Manager URL: "{api.base_url}"')
 

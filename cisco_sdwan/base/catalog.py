@@ -2,7 +2,7 @@
  Sastre - Cisco-SDWAN Automation Toolset
 
  cisco_sdwan.base.catalog
- This module implements vManage API Catalogs
+ This module implements SD-WAN Manager API Catalogs
 """
 from typing import NamedTuple, Optional, Any
 from collections.abc import Iterator
@@ -103,7 +103,7 @@ def register(tag: str, info: str, item_cls: type, min_version: Optional[str] = N
     @param tag: Tag string associated with this item. String 'all' is reserved and cannot be used.
     @param info: Item information used for logging purposes
     @param item_cls: The config item handler class, needs to be a subclass of ConfigItem
-    @param min_version: (optional) Minimum vManage version that supports this catalog item.
+    @param min_version: (optional) Minimum SD-WAN Manager version that supports this catalog item.
     @return: decorator
     """
 
@@ -137,9 +137,9 @@ def catalog_size() -> int:
 def catalog_iter(*tags: str, version: Optional[str] = None) -> Iterator[tuple[str, str, Any, Any]]:
     """
     Return an iterator of (<tag>, <info>, <index_cls>, <item_cls>) tuples matching the specified tag(s) and supported
-    by vManage version.
+    by SD-WAN Manager version.
     @param tags: tags indicating catalog entries to return
-    @param version: Target vManage version. Only returns catalog items supported by the target vManage.
+    @param version: Target SD-WAN Manager version. Only returns catalog items supported by the target SD-WAN Manager.
                     If not specified or None, version is not verified.
     @return: iterator of (<tag>, <info>, <index_cls>, <item_cls>) tuples from the catalog
     """
@@ -166,16 +166,18 @@ def catalog_tags() -> set[str]:
 
 def is_index_supported(index_cls: type, version: Optional[str] = None) -> bool:
     """
-    Indicates whether the provided index_cls is supported by a given vManage version
+    Indicates whether the provided index_cls is supported by a given SD-WAN Manager version
     @param index_cls: An index config item class.
-    @param version: Target vManage version. If None, always return true when index_cls is in the catalog
+    @param version: Target SD-WAN Manager version. If None, always return true when index_cls is in the catalog
     @return: True is index_cls is in the catalog and supported by the version provided, False otherwise.
     """
     catalog_entry = _catalog.get(index_cls)
     if catalog_entry is None:
         return False
 
-    return version is None or not is_version_newer(version, catalog_entry.min_version)
+    return (version is None or
+            catalog_entry.min_version is None or
+            not is_version_newer(version, catalog_entry.min_version))
 
 
 #
@@ -188,7 +190,7 @@ def op_register(tag: str, selector: str, info: str, min_version: Optional[str] =
     @param tag: Tag string associated with this item. String 'all' is reserved and cannot be used.
     @param selector: String used to further filter entries that match the tags.
     @param info: Item information used for logging purposes
-    @param min_version: (optional) Minimum vManage version that supports this catalog item.
+    @param min_version: (optional) Minimum SD-WAN Manager version that supports this catalog item.
     @return: decorator
     """
 
@@ -221,11 +223,11 @@ def op_catalog_size() -> int:
 def op_catalog_iter(op_type: OpType, *tags: str, version: Optional[str] = None) -> Iterator[tuple]:
     """
     Return an iterator of (<info>, <op_cls>) tuples matching the specified tag(s), selector and supported
-    by vManage version.
+    by SD-WAN Manager version.
     @param op_type: OpType enum indicating type of operational-data
     @param tags: Tags to filter catalog entries to return. If 2 or more tags are provided, the last one is considered
                  a selector.
-    @param version: Target vManage version. Only returns catalog items supported by the target vManage.
+    @param version: Target SD-WAN Manager version. Only returns catalog items supported by the target SD-WAN Manager.
                     If not specified or None, version is not verified.
     @return: iterator of (<info>, <op_cls>) tuples from the operational-data catalog
     """
