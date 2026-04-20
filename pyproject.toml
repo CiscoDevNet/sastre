@@ -47,3 +47,6 @@ path = "cisco_sdwan/__version__.py"
 include = [
     "/cisco_sdwan",
 ]
+
+[tool.hatch.build.targets.wheel]
+include = ["/cisco_sdwan"]

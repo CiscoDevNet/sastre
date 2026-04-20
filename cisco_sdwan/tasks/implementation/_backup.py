@@ -1,5 +1,6 @@
 import argparse
 from typing import Optional
+from collections.abc import Sequence
 from pydantic import model_validator, field_validator
 from functools import partial
 from uuid import uuid4
@@ -49,7 +50,11 @@ class TaskBackup(Task):
                                       'device configurations.')
         return task_parser.parse_args(task_args)
 
-    def runner(self, parsed_args, api: Optional[Rest] = None) -> list | None:
+    def runner(self, parsed_args, api: Optional[Rest] = None) -> Sequence | None:
+        if api is None:
+            self.log_critical('SD-WAN Manager connection is not available')
+            return
+
         if parsed_args.archive:
             self.log_info(
                 f'Backup task: SD-WAN Manager URL: "{api.base_url}" -> Local archive file: "{parsed_args.archive}"'
@@ -146,7 +151,7 @@ class TaskBackup(Task):
 
         return
 
-    def save_running_configs(self, api: Optional[Rest], workdir: str) -> None:
+    def save_running_configs(self, api: Rest, workdir: str) -> None:
         inventory_list = [(ControlInventory.get(api), 'controller')]
         if not api.is_provider or api.is_tenant_scope:
             inventory_list.append((EdgeInventory.get(api), 'WAN edge'))

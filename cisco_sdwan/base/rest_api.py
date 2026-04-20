@@ -188,9 +188,12 @@ class Rest:
         return response.json() if response.text else None
 
     @backoff_retry
-    def put(self, input_data: Mapping[str, Any], *path_entries: str) -> dict[str, Any] | None:
-        # With large input_data, vManage fails the put request if payload is encoded in compact form. Thus encoding
-        # with indent=1.
+    def put(self, input_data: Mapping[str, Any], *path_entries: str) -> dict[str, Any] | list[str] | None:
+        # Return type is a union because most endpoints return a JSON object (dict), but a few return a JSON array
+        # (list). Notably, ConfigGroupValues.put_raise consumes a list[str] from 20.12+ (pre-20.12 returned a list of
+        # dicts, normalized at that call site). Callers are expected to know which variant their endpoint produces.
+        # With large input_data, SD-WAN Manager fails the put request if payload is encoded in compact form. Thus
+        # encoding with indent=1.
         response = self.session.put(self._url(*path_entries), data=json.dumps(input_data, indent=1),
                                     timeout=self.timeout, verify=self.verify)
         raise_for_status(response)
@@ -234,7 +237,7 @@ def raise_for_status(response):
 
 def is_version_newer(version_1: str, version_2: str) -> bool:
     """
-    Indicates whether one vManage version is newer than another. Compares only the first 2 digits from version
+    Indicates whether one SD-WAN Manager version is newer than another. Compares only the first 2 digits from version
     because maintenance (i.e. 3rd digit) differences are not likely to create any incompatibility between REST API JSON
     payloads, thus not relevant in this context.
 
@@ -251,7 +254,7 @@ def is_version_newer(version_1: str, version_2: str) -> bool:
     return parse(version_2) > parse(version_1)
 
 
-def response_id(response_payload: Mapping[str, str]) -> str:
+def response_id(response_payload: Mapping[str, str] | None) -> str:
     """
     Extracts the first value in a response payload. Assumes that this first value contains the ID of the object
     just created by the post request.
@@ -260,6 +263,8 @@ def response_id(response_payload: Mapping[str, str]) -> str:
     """
     if response_payload is not None:
         for value in response_payload.values():
+            if value is None:
+                raise RestAPIException("Unexpected response ID value")
             return value
 
     raise RestAPIException("Unexpected response payload")
