@@ -10,7 +10,7 @@ import argparse
 from datetime import date
 from getpass import getpass
 from typing import Optional, Any
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 from cisco_sdwan.base.catalog import catalog_tags, op_catalog_tags, op_catalog_commands, CATALOG_TAG_ALL, OpType
 from cisco_sdwan.tasks.common import Task
 from cisco_sdwan.tasks.validators import (validate_workdir, validate_regex, validate_existing_file, validate_zip_file,
@@ -158,7 +158,7 @@ class OpCmdSemantics(argparse.Action):
     """
     # Using an action as opposed to a type check so that it can evaluate the full command line passed as opposed to
     # individual tokens.
-    op_type: Optional[OpType] = None
+    op_type: OpType
 
     def __call__(self, parser: argparse.ArgumentParser, namespace: argparse.Namespace, 
                  values: list[str], option_string: Optional[str] = None) -> None:
@@ -544,6 +544,10 @@ class PromptArg:
                 print(f'{ex} Please try again, or ^C to terminate.')
             else:
                 return value
+
+
+def count(noun: str, container: Collection) -> str:
+    return f"{len(container)} {noun}{'' if len(container) == 1 else 's'}"
 
 
 #

@@ -5,7 +5,7 @@ from zipfile import is_zipfile
 from cisco_sdwan.base.models_base import filename_safe, DATA_DIR, ExtendedTemplate
 
 
-def validate_regex(regex: str) -> str:
+def validate_regex(regex: str | None) -> str | None:
     if regex is not None:
         try:
             re.compile(regex)

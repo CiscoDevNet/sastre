@@ -2,7 +2,7 @@ import argparse
 from pathlib import Path
 from collections import namedtuple
 from typing import Optional
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from operator import itemgetter, attrgetter
 from functools import partial
 from pydantic import field_validator
@@ -69,7 +69,7 @@ class TaskShowTemplate(Task):
     def is_api_required(parsed_args) -> bool:
         return parsed_args.workdir is None
 
-    def runner(self, parsed_args, api: Optional[Rest] = None) -> list | None:
+    def runner(self, parsed_args, api: Optional[Rest] = None) -> Sequence | None:
         source_info = f'Local workdir: "{parsed_args.workdir}"' if api is None else f'SD-WAN Manager URL: "{api.base_url}"'
         self.log_info(f'Show-template {parsed_args.subtask_info} task: {source_info}')
 
@@ -83,7 +83,12 @@ class TaskShowTemplate(Task):
         if parsed_args.save_csv is not None:
             Path(parsed_args.save_csv).mkdir(parents=True, exist_ok=True)
             for table in result_tables:
+                if table.meta is None:
+                    self.log_warning(f'Table {table.name} cannot be saved as it has no filename')
+                    continue
+
                 table.save(Path(parsed_args.save_csv, table.meta))
+
             self.log_info(f"Tables exported as CSV files under directory '{parsed_args.save_csv}'")
 
         if parsed_args.save_json is not None:

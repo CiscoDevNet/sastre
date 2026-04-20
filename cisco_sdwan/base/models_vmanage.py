@@ -2,12 +2,12 @@
  Sastre - Cisco-SDWAN Automation Toolset
 
  cisco_sdwan.base.models_vmanage
- This module implements vManage API models
+ This module implements SD-WAN Manager API models
 """
 import re
 from typing import Optional, Any
 from enum import Enum
-from collections.abc import Mapping, Sequence, Callable, Iterable
+from collections.abc import Mapping, Sequence, Callable, Iterable, Iterator
 from pathlib import Path
 from collections import namedtuple
 from copy import deepcopy
@@ -82,10 +82,10 @@ class DeviceTemplateAttach(ApiItem):
 
 class TagAssociate(ApiItem):
     api_path = ApiPath(None, 'v1/tags/associate', None, None)
-    id_tag = 'id'
+    id_tag = 'taskId'
 
     @staticmethod
-    def api_params(tag_mappings: Iterable[tuple[str, list[str]]]) -> dict[str, Any]:
+    def device_api_params(tag_mappings: Iterable[tuple[str, Iterable[str]]]) -> dict[str, Any]:
         """
         Build dictionary used to provide input parameters for api POST call
         @param tag_mappings: An iterable of (<tag_id>, <device_id_list>) tuples. <device_id_list> is a list of device
@@ -487,8 +487,9 @@ class Tag(ConfigItem):
     store_path = ('tags',)
     id_tag = 'id'
     name_tag = 'name'
-    # Skipping compare for all keys from tag payload to prevent update operations, which is not supported by vManage.
-    skip_cmp_tag_set = {'description', 'type', 'tagAssociation'}
+    # Skipping compare for all keys from tag payload to prevent update operations, which is not supported by the
+    # SD-WAN manager. Exception is tagAssociation, which when different will trigger tag to device association.
+    skip_cmp_tag_set = {'description', 'type'}
 
     @staticmethod
     def delete_params(tag_id: str) -> dict[str, str]:
@@ -507,6 +508,9 @@ class Tag(ConfigItem):
         return {
             'data': [super().post_data(id_mapping_dict)]
         }
+
+    def device_associations(self) -> Iterator[str]:
+        return (entry['id'] for entry in self.data.get('tagAssociation', []) if entry.get('objectType', '') == 'DEVICE')
 
 
 @register('tag', 'tag', Tag)

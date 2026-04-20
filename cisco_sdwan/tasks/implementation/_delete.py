@@ -1,6 +1,6 @@
 import argparse
 from typing import Optional
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from contextlib import suppress
 from functools import partial
 from pydantic import model_validator, field_validator
@@ -8,7 +8,8 @@ from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.models_base import FeatureProfile, ModelException
 from cisco_sdwan.base.rest_api import Rest, RestAPIException
 from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL, ordered_tags, is_index_supported
-from cisco_sdwan.base.models_vmanage import DeviceTemplateIndex, ConfigGroupIndex, ProfileSdwanPolicy, Tag
+from cisco_sdwan.base.models_vmanage import (DeviceTemplateIndex, ConfigGroupIndex, ProfileSdwanPolicy, Tag,
+                                             TagDissociate)
 from cisco_sdwan.tasks.utils import TaskOptions, TagOptions, regex_type
 from cisco_sdwan.tasks.common import regex_filter, Task, WaitActionsException
 from cisco_sdwan.tasks.models import TaskArgs, CatalogTag
@@ -39,7 +40,11 @@ class TaskDelete(Task):
                                       f'{TagOptions.options()}. Special tag "{CATALOG_TAG_ALL}" selects all items.')
         return task_parser.parse_args(task_args)
 
-    def runner(self, parsed_args, api: Optional[Rest] = None) -> list | None:
+    def runner(self, parsed_args, api: Optional[Rest] = None) -> Sequence | None:
+        if api is None:
+            self.log_critical('SD-WAN Manager connection is not available')
+            return
+
         self.is_dryrun = parsed_args.dryrun
         self.log_info(f'Delete task: SD-WAN Manager URL: "{api.base_url}"')
 
@@ -110,7 +115,7 @@ class TaskDelete(Task):
 
                 if isinstance(item, ProfileSdwanPolicy):
                     # Special case for policy objects, which cannot be deleted, allowing deletion of its parcels only
-                    self.delete_linked_parcels(api, item, item_id, info, regex_filter_fn)
+                    self._delete_linked_parcels(api, item, item_id, info, regex_filter_fn)
                     continue
 
                 if item.is_readonly or item.is_system:
@@ -123,19 +128,35 @@ class TaskDelete(Task):
 
                 try:
                     if isinstance(item, Tag):
-                        # Special case for deleting tags, item id is passed as url parameter instead of in the path
-                        api.delete(item_cls.api_path.delete, **item_cls.delete_params(item_id))
+                        # Special case for tags
+                        # Dissociate devices first, then delete with item id passed as url param instead of in the path
+                        self._dissociate_tags(api, item, info)
+                        api.delete(item_cls.api_path.delete, **item.delete_params(item_id))
                     else:
                         api.delete(item_cls.api_path.delete, item_id)
-                except RestAPIException as ex:
+                except (RestAPIException, WaitActionsException) as ex:
                     self.log_warning(f'Failed: Delete {info} {item_name}: {ex}')
                 else:
                     self.log_info(f'Done: Delete {info} {item_name}')
 
         return
 
-    def delete_linked_parcels(self, api: Rest, target_profile: FeatureProfile, profile_id: str,
-                              info: str, filter_fn: Callable[[str], bool]) -> None:
+    def _dissociate_tags(self, api: Rest, item: Tag, info: str) -> None:
+        """Dissociate devices from a tag. No-op if the tag has no device associations."""
+        associations = list(item.device_associations())
+        if not associations:
+            return
+
+        action_worker = TagDissociate(api.post(
+            TagDissociate.device_api_params([(item.uuid, associations)]), TagDissociate.api_path.post)
+        )
+        self.wait_actions(
+            api, [(action_worker, ', '.join(associations))],
+            f'dissociating {info} {item.name} from devices', raise_on_failure=True, rapid=True
+        )
+
+    def _delete_linked_parcels(self, api: Rest, target_profile: FeatureProfile, profile_id: str,
+                               info: str, filter_fn: Callable[[str], bool]) -> None:
         parcel_coro = target_profile.associated_parcels(profile_id, target_profile=target_profile, delete_order=True)
 
         with suppress(StopIteration):
@@ -161,7 +182,11 @@ class TaskDelete(Task):
                         self.log_info(f'Delete {info} {target_profile.name} parcel {parcel_info.name}')
                         continue
 
-                    api.delete(parcel_info.api_path.delete, parcel_info.target_id)
+                    if parcel_id is None:
+                        self.log_warning(f'Skipped {info} {target_profile.name} parcel {parcel_info.name}, no UUID')
+                        continue
+
+                    api.delete(parcel_info.api_path.delete, parcel_id)
                     self.log_info(f'Done: Delete {info} {target_profile.name} parcel {parcel_info.name}')
                 except (ModelException, RestAPIException) as ex:
                     self.log_error(f'Failed: Delete {info} {target_profile.name} parcel: {ex}')
