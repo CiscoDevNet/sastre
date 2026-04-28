@@ -324,7 +324,12 @@ class TaskTransform(Task):
                     id_hint_map = {item_name: item_id for item_id, item_name in item_index}
 
                     for item_id, item_name in item_index:
-                        item = self.retrieve(item_cls, backend, item_id, item_name, item_index.need_extended_name)
+                        try:
+                            item = self.retrieve(item_cls, backend, item_id, item_name, item_index.need_extended_name)
+                        except ValueError as ex:
+                            self.log_error(f'Failed loading {info} {item_name}: {ex}')
+                            continue
+                            
                         if item is None:
                             self.log_error(f'Failed loading {info} {item_name}')
                             continue

@@ -104,7 +104,7 @@ class TaskShowTemplate(Task):
                 if (values := DeviceTemplateValues.load(parsed_args.workdir, ext_name, template_name, template_id)) is None:
                     self.log_debug(f'Skipped {template_name}. No template values file found.')
             else:
-                # Load from vManage via API
+                # Load from SD-WAN Manager via API
                 if (devices_attached := DeviceTemplateAttached.get(api, template_id)) is None:
                     self.log_error(f'Failed to retrieve {template_name} attached devices')
                     return None

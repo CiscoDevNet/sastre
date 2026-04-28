@@ -396,7 +396,7 @@ class DeviceConfigRFS(DeviceConfig):
         return '{safe_device_id}?type=RFS'.format(safe_device_id=quote_plus(device_id))
 
 
-# Set of device types that use cedge template class. Updated as of vManage 20.15
+# Set of device types that use cedge template class. Updated as of SD-WAN Manager 20.15
 CEDGE_SET = {
     "cellular-gateway-CG113-4GW6A", "cellular-gateway-CG113-4GW6B", "cellular-gateway-CG113-4GW6E",
     "cellular-gateway-CG113-4GW6H", "cellular-gateway-CG113-4GW6Q", "cellular-gateway-CG113-4GW6Z",
@@ -460,7 +460,7 @@ CEDGE_SET = {
     "vedge-nfvis-C8300-UCPE-1N20", "vedge-nfvis-CSP-5216", "vedge-nfvis-CSP-5228", "vedge-nfvis-CSP-5436",
     "vedge-nfvis-ENCS5400"
 }
-# Software devices. Updated as of vManage 20.12
+# Software devices. Updated as of SD-WAN Manager 20.12
 SOFT_EDGE_SET = {"vedge-CSR-1000v", "vedge-C8000V", "vedge-C8000V-SD-ROUTING", "vedge-cloud", "vmanage", "vsmart",
                  "vedge-ISRv"}
 
@@ -600,7 +600,7 @@ class DeviceTemplate(ConfigItem):
     type_tag = 'deviceType'
     post_filtered_tags = ('feature',)
     # templateClass, deviceRole, draftMode, templateId and copyEdited are new tags in 20.x+, adding to skip diff to not
-    # trigger updates when restore --update is done between pre 20.x workdir and post 20.x vManage.
+    # trigger updates when restore --update is done between pre 20.x workdir and post 20.x SD-WAN Manager.
     skip_cmp_tag_set = {'createdOn', 'createdBy', 'lastUpdatedBy', 'lastUpdatedOn', '@rid', 'owner', 'infoTag',
                         'templateAttached', 'templateConfigurationEdited', 'templateClass', 'deviceRole', 'draftMode',
                         'templateId', 'copyEdited'}
@@ -705,7 +705,7 @@ class FeatureTemplate(ConfigItem):
     name_tag = 'templateName'
     type_tag = 'templateType'
     # gTemplateClass is new in 20.x, adding skip diff to not trigger updates when restore --update is done between
-    # pre 20.x workdir and post 20.x vManage.
+    # pre 20.x workdir and post 20.x SD-WAN Manager.
     skip_cmp_tag_set = {'createdOn', 'createdBy', 'lastUpdatedBy', 'lastUpdatedOn', '@rid', 'owner', 'infoTag',
                         'devicesAttached', 'attachedMastersCount', 'gTemplateClass'}
 
@@ -1459,7 +1459,7 @@ class PolicySecurity(ConfigItem):
     name_tag = 'policyName'
     type_tag = 'policyType'
     # policyUseCase, policyMode are new tags in 20.x+, adding to skip diff to not trigger updates when restore --update
-    # is done between pre 20.x workdir and post 20.x vManage.
+    # is done between pre 20.x workdir and post 20.x SD-WAN Manager.
     skip_cmp_tag_set = {'policyUseCase', 'policyMode'}
 
 
@@ -1504,8 +1504,9 @@ class PolicyCustomApp(ConfigItem):
         """
         @param data: dict containing the information to be associated with this API item.
         """
-        # In 20.3.1 the payload returned by vManage contains a 'data' key with the policy definition in it. This is
-        # different from previous versions or other ConfigItems. Overwriting default __init__ to handle both options.
+        # In 20.3.1 the payload returned by SD-WAN Manager contains a 'data' key with the policy definition in it.
+        # This is different from previous versions or other ConfigItems. Overwriting default __init__ to handle both
+        # options.
         super().__init__(data.get('data', data))
 
 
@@ -1526,7 +1527,7 @@ class PolicyDef(ConfigItem):
     name_tag = 'name'
     type_tag = 'type'
     # mode is new tag in 20.x+, adding to skip diff to not trigger updates when restore --update is done between pre
-    # 20.x workdir and post 20.x vManage.
+    # 20.x workdir and post 20.x SD-WAN Manager.
     skip_cmp_tag_set = {'lastUpdated', 'referenceCount', 'references', 'activatedId', 'isActivatedByVsmart',
                         'owner', 'infoTag', 'mode'}
 

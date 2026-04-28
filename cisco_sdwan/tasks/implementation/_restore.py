@@ -131,7 +131,7 @@ class TaskRestore(Task):
                     continue
 
                 # Special treatment for policy objects. Since only one policy object is allowed, policy object parcels
-                # from the backup need to be merged into the policy object in the target vManage.
+                # from the backup need to be merged into the policy object in the target SD-WAN Manager.
                 if isinstance(index, ProfileSdwanPolicyIndex):
                     target_policy_obj_id = next(iter(target_item_map.values()), None)
                 else:

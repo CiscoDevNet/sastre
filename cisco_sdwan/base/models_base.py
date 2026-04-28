@@ -711,7 +711,7 @@ class ConfigItem(ApiItem):
         """
         Save data (i.e., self.data) to a JSON file
 
-        @param node_dir: String indicating a directory under root_dir used for all files from a given SD-WAN Manager node.
+        @param node_dir: String indicating a directory under root_dir used for all files from a given SD-WAN Manager.
         @param ext_name: True indicates that item_names need to be extended (with item_id) to make their
                          filename safe version unique. False otherwise.
         @param item_name: (Optional) Name of the item being saved. Variable used to build the filename.
@@ -1218,7 +1218,7 @@ class ServerInfo:
         """
         Factory method that loads data from a JSON file and returns a ServerInfo instance with that data
 
-        @param node_dir: String indicating a directory under root_dir used for all files from a given SD-WAN Manager node.
+        @param node_dir: String indicating a directory under root_dir used for all files from a given SD-WAN Manager.
         @return: ServerInfo object, or None if the file does not exist
         """
         dir_path = Path(cls.root_dir, node_dir)
@@ -1237,7 +1237,7 @@ class ServerInfo:
         """
         Save data (i.e., self.data) to a JSON file
 
-        @param node_dir: String indicating a directory under root_dir used for all files from a given SD-WAN Manager node.
+        @param node_dir: String indicating a directory under root_dir used for all files from a given SD-WAN Manager.
         @return: True indicates data has been saved. False indicates no data to save (and no file has been created).
         """
         dir_path = Path(self.root_dir, node_dir)
