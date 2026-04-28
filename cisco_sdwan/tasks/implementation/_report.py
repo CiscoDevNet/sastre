@@ -87,7 +87,7 @@ section_catalog: dict[tuple[str, ...], TaskMeta] = {
 
 def load_content_spec(spec_file: Optional[str], spec_json: Optional[str],
                       spec_default: Optional[dict] = None) -> ReportContentModel:
-    def load_yaml(filename):
+    def load_yaml(filename: str) -> Any:
         try:
             with open(filename) as yaml_file:
                 return yaml.safe_load(yaml_file)
@@ -96,7 +96,7 @@ def load_content_spec(spec_file: Optional[str], spec_json: Optional[str],
         except yaml.YAMLError as ex:
             raise TaskException(f'Report specification YAML syntax error: {ex}') from None
 
-    def load_json(json_str):
+    def load_json(json_str: str) -> Any:
         try:
             return json.loads(json_str)
         except json.JSONDecodeError as ex:
@@ -104,10 +104,16 @@ def load_content_spec(spec_file: Optional[str], spec_json: Optional[str],
 
     if spec_file:
         content_spec_dict = load_yaml(spec_file)
+        source_label = 'file'
     elif spec_json:
         content_spec_dict = load_json(spec_json)
+        source_label = 'JSON'
     else:
         content_spec_dict = spec_default
+        source_label = 'default'
+
+    if not isinstance(content_spec_dict, dict) or not content_spec_dict:
+        raise TaskException(f'Invalid report specification {source_label} contents')
 
     try:
         return ReportContentModel(**content_spec_dict)
@@ -125,7 +131,7 @@ class Report:
         self.section_json = []
         self.metadata = metadata
 
-    def add_section(self, section_name: str, subsection_list: list) -> None:
+    def add_section(self, section_name: str, subsection_list: Sequence) -> None:
         self.section_json.extend(json.loads(subsection.json()) for subsection in subsection_list)
         for subsection in subsection_list:
             if isinstance(subsection, Table):

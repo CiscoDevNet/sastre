@@ -127,7 +127,7 @@ class Rest:
         if token is not None:
             self.session.headers['X-XSRF-TOKEN'] = token
 
-        # Multi-tenant vManage with a provider account, insert vsessionid
+        # Multi-tenant SD-WAN Manager with a provider account, insert vsessionid
         if tenant_name is not None:
             if not self.is_multi_tenant or not self.is_provider:
                 raise BadTenantException('Tenant is only applicable to provider accounts in multi-tenant deployments')
@@ -178,8 +178,8 @@ class Rest:
 
     @backoff_retry
     def post(self, input_data: Mapping[str, Any], *path_entries: str) -> dict[str, Any] | None:
-        # With large input_data, vManage fails the post request if payload is encoded in compact form. Thus encoding
-        # with indent=1.
+        # With large input_data, SD-WAN Manager fails the post request if payload is encoded in compact form.
+        # Thus encoding with indent=1.
         response = self.session.post(self._url(*path_entries), data=json.dumps(input_data, indent=1),
                                      timeout=self.timeout, verify=self.verify)
         raise_for_status(response)
