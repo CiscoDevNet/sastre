@@ -1,9 +1,12 @@
-Sastre 1.28 [April 20, 2026]
+Sastre 1.28 [May x, 2026]
 ================================
 
 #### Improvements:
 - Added support for device tag association in the restore task. That is, devices in the backup that were associated with a tag and are present in SD-WAN Manager will be reassociated as part of the restore task. Note: Re-associating devices to a tag that already exists on the target requires the --update flag; otherwise, tag associations are only applied when the tag itself is newly created during restore.
 - Added support for device tag dissociation in the delete task. For tags selected for deletion, all associated devices will be dissociated first so that the tag can be deleted.
+
+#### Fixes:
+- When unsupported parcels are present, transform task can fail with a traceback and the whole task is aborted. This has been fixed, now the item is skipped with an error logged but the task itself continues.
 
 
 Sastre 1.27 [February 11, 2026]
