@@ -92,7 +92,6 @@ class TagAssociate(ApiItem):
                              ids to be associated with this tag.
         @return: Dictionary used to provide POST input parameters
         """
-
         def tag_entry(tag_id, device_id_list):
             return {
                 "tagId": tag_id,
@@ -110,6 +109,42 @@ class TagAssociate(ApiItem):
 
 class TagDissociate(TagAssociate):
     api_path = ApiPath(None, 'v1/tags/associate?operationType=DELETE', None, None)
+
+
+class RuleAssociate(ApiItem):
+    api_path = ApiPath(None, 'v1/rules/{ruleId}/associate', None, 'v1/rules/{ruleId}/associate')
+    id_tag = 'taskId'
+
+    @staticmethod
+    def cfg_group_api_params(config_group_ids: Iterable[str]) -> dict[str, Any]:
+        """
+        Build dictionary used to provide input parameters for api POST call
+        @param config_group_ids: An iterable of <config_group_id>.
+        @return: Dictionary used to provide POST input parameters
+        """
+        def rule_entry(config_group_id):
+            return {
+                "id": config_group_id,
+                "objectType": "CONFIG_GROUP"
+            }
+
+        return {
+            "data": [
+                rule_entry(config_group_id) for config_group_id in config_group_ids
+            ]
+        }
+
+    @staticmethod
+    def cfg_group_delete_params(config_group_id: str) -> dict[str, str]:
+        """
+        Build dictionary used to provide url parameters for api DELETE call
+        @param config_group_id: Config-group ID string
+        @return: Dictionary used to provide DELETE url parameters
+        """
+        return {
+            "objectId": config_group_id,
+            "objectType": "CONFIG_GROUP"
+        }
 
 
 class DeviceTemplateCLIAttach(DeviceTemplateAttach):
@@ -521,6 +556,72 @@ class TagIndex(IndexConfigItem):
 
 
 #
+# Rules
+#
+class Rule(ConfigItem):
+    api_path = ApiPath('v1/rules')
+    store_path = ('rules',)
+    id_tag = 'id'
+    name_tag = 'name'
+    skip_cmp_tag_set = {'name', 'description'}
+    post_filtered_tags = ('metaDataList', 'association')
+
+    # In 20.15 get rules contains 'matchType' key under 'matchCriteria', while put request requires 'match-type' instead
+    def __init__(self, data: dict[str, Any]):
+        match_criteria = data.get('matchCriteria', {})
+        if (match_type := match_criteria.pop('matchType', None)) is not None:
+            match_criteria['match-type'] = match_type
+        super().__init__(data)
+
+    @staticmethod
+    def delete_params(rule_id: str) -> dict[str, str]:
+        """
+        Build dictionary used to provide url parameters for api DELETE call
+        @param rule_id: Rule ID string
+        @return: Dictionary used to provide DELETE url parameters
+        """
+        return {
+            "ruleId": rule_id,
+        }
+
+    @staticmethod
+    def build_name(config_group_id: str) -> str:
+        return f'{config_group_id}_name'
+
+    def config_group_associations(self) -> Iterator[str]:
+        return (
+            entry['id'] for entry in self.data.get('association', []) if entry.get('objectType', '') == 'CONFIG_GROUP'
+        )
+
+    def update_name(self, id_mapping_dict: Mapping[str, str]) -> None:
+        """
+        Update the name for this Rule for the target SD-WAN manager. Rule names follow the format
+        <config_group uuid>_name. The new name is then constructed by replacing the old config-group UUID with the
+        new UUID of that same config-group on the target SD-WAN manager.
+        @param id_mapping_dict: {<old item id>: <new item id>} dict. Used to find the mapping of old config-group UUID
+                                and new config-group UUID.
+        """
+        match = re.match(r'(?P<uuid>[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12})_name', self.name,
+                         flags=re.IGNORECASE)
+        if not match:
+            raise ValueError('Invalid rule name')
+
+        saved_config_grp_id = match.group('uuid')
+        new_uuid = id_mapping_dict.get(saved_config_grp_id)
+        if new_uuid is None:
+            raise ValueError(f'Cannot determine new rule name, config-group ID not found: {saved_config_grp_id}')
+
+        self.data[self.name_tag] = self.build_name(new_uuid)
+
+
+@register('rule', 'rule', Rule, min_version='20.15')
+class RuleIndex(IndexConfigItem):
+    api_path = ApiPath('v1/rules', None, None, None)
+    store_file = 'rules.json'
+    iter_fields = IdName('id', 'name')
+
+
+#
 # Templates
 #
 # This is a special case handled under DeviceTemplate
@@ -887,47 +988,6 @@ class ConfigGroupAssociated(Config2Item):
         response = api.delete(ConfigGroupAssociated.api_path.resolve(**path_vars).delete, input_data=payload)
 
         return ConfigGroupAssociated.ActionWorker(uuid=response.get('parentTaskId'))
-
-
-class ConfigGroupRules(IndexConfigItem):
-    # api_path = ApiPath('tag/tagRules/{configGroupId}', 'tag/tagRules')
-    # TODO: Review post 20.13
-    api_path = ApiPath('v1/config-group/{configGroupId}/rules')
-    store_path = ('config_groups', 'tag_rules')
-    store_file = '{item_name}.json'
-    id_tag = 'tagId'
-    iter_fields = ('tagId',)
-
-    @staticmethod
-    def delete_raise(api: Rest, config_group_id: str, rule_id: str) -> None:
-        # 'tag/tagRules/{tag_rule_id}?configGroupId={config_group_id}'
-        api.delete(ConfigGroupRules.api_path.resolve(configGroupId=config_group_id).delete, rule_id,
-                   configGroupId=config_group_id)
-
-    def post_raise(self, api: Rest, config_group_id: str) -> list[str]:
-        filtered_keys = {
-            self.id_tag,
-        }
-        response_list = []
-        for rule in self.data:
-            post_data = {k: v for k, v in rule.items() if k not in filtered_keys}
-            post_data['configGroupId'] = config_group_id
-            response = api.post(post_data, ConfigGroupRules.api_path.resolve(configGroupId=config_group_id).post)
-            if response.get('isConflict'):
-                raise ValueError(f"The rule created conflicts with another rule for config-group {config_group_id}")
-            response_list.extend(
-                entry.get('chassisNumber') for entry in response.get('devices', {}).get('matchingDevices', [])
-            )
-
-        return response_list
-
-    def put_raise(self, api: Rest, config_group_id: str) -> None:
-        for rule in self.data:
-            put_data = {k: v for k, v in rule.items()}
-            put_data['configGroupId'] = config_group_id
-            response = api.put(put_data, ConfigGroupRules.api_path.resolve(configGroupId=config_group_id).put)
-            if response.get('isConflict'):
-                raise ValueError(f"The rule created conflicts with another rule for config-group {config_group_id}")
 
 
 class ConfigGroupDeploy(ApiItem):

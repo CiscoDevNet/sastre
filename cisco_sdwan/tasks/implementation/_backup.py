@@ -130,11 +130,9 @@ class TaskBackup(Task):
                     except RestAPIException as ex:
                         self.log_error(f'Failed backup {info} {item_name} values: {ex}')
 
-                # Special case for ConfigGroup, handle ConfigGroupAssociated, ConfigGroupValues, ConfigGroupRules
-                # TODO: Review post 20.13
+                # Special case for ConfigGroup, handle ConfigGroupAssociated, and ConfigGroupValues
                 if isinstance(item, ConfigGroup) and item.devices_associated:
                     for sub_item_info, sub_item_cls in (('associated devices', ConfigGroupAssociated),
-                                                        # ('automated rules', ConfigGroupRules),
                                                         ('values', ConfigGroupValues)):
                         sub_item = sub_item_cls.get(api, configGroupId=item_id)
                         if sub_item is None:

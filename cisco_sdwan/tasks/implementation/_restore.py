@@ -11,10 +11,11 @@ from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL, ordered_tags
 from cisco_sdwan.base.models_base import UpdateEval, ServerInfo, ModelException
 from cisco_sdwan.base.models_vmanage import (DeviceTemplateIndex, PolicyVsmartIndex, EdgeInventory, ControlInventory,
                                              CheckVBond, FeatureProfile, ConfigGroupIndex, ProfileSdwanPolicy,
-                                             ProfileSdwanPolicyIndex, Tag, TagAssociate)
+                                             ProfileSdwanPolicyIndex, Tag, TagAssociate, Rule, RuleIndex)
 from cisco_sdwan.tasks.utils import (TaskOptions, TagOptions, regex_type, default_workdir, existing_workdir_type,
                                      TrackedValidator, ConditionalValidator, zip_file_type, count)
-from cisco_sdwan.tasks.common import regex_filter, Task, WaitActionsException, clean_dir, archive_extract
+from cisco_sdwan.tasks.common import (regex_filter, Task, WaitActionsException, clean_dir, archive_extract,
+                                      loaded_index_items_iter)
 from cisco_sdwan.tasks.models import TaskArgs, CatalogTag, validate_workdir_conditional
 from cisco_sdwan.tasks.validators import validate_regex, validate_zip_file
 
@@ -58,13 +59,6 @@ class TaskRestore(Task):
         return task_parser.parse_args(task_args)
 
     def runner(self, parsed_args, api: Optional[Rest] = None) -> Sequence | None:
-        def load_items(index, item_cls):
-            item_iter = (
-                (item_id, item_cls.load(parsed_args.workdir, index.need_extended_name, item_name, item_id))
-                for item_id, item_name in index
-            )
-            return ((item_id, item_obj) for item_id, item_obj in item_iter if item_obj is not None)
-
         if api is None:
             self.log_critical('SD-WAN Manager connection is not available')
             return
@@ -119,7 +113,7 @@ class TaskRestore(Task):
 
             self.log_info(f'Inspecting {tag} items', dryrun=False)
             tag_iter = (
-                (info, index, load_items(index, item_cls))
+                (info, index, loaded_index_items_iter(parsed_args.workdir, index, item_cls))
                 for _, info, index, item_cls in self.index_iter(parsed_args.workdir,
                                                                 catalog_iter(tag, version=api.server_version))
             )
@@ -168,7 +162,9 @@ class TaskRestore(Task):
 
         if restore_list:
             self.log_info('Pushing items to SD-WAN Manager', dryrun=False)
-            self._restore_config_items(api, edge_inventory, restore_list, id_mapping, dependency_set, match_set)
+            self._restore_config_items(
+                api, edge_inventory, restore_list, id_mapping, dependency_set, match_set, parsed_args.update
+            )
         else:
             self.log_info('No items to push')
 
@@ -229,13 +225,26 @@ class TaskRestore(Task):
                     self.log_error(f'Failed: {common_log}{restore_reason}: {ex}')
 
     def _restore_config_items(self, api: Rest, edge_inventory: EdgeInventory, restore_list: Sequence[tuple],
-                              id_mapping: dict[str, str], dependency_set: set[str], match_set: set[str]) -> None:
+                              id_mapping: dict[str, str], dependency_set: set[str], match_set: set[str],
+                              is_update: bool) -> None:
+
         edge_set: set[str] = {uuid for uuid, _ in edge_inventory}
+        pushed_tags: list[tuple[str, str, set[str]]] = []
+
         # Items were added to restore_list following ordered_tags() order (i.e. higher level items before lower
         # level items). The reverse order needs to be followed on restore.
         for info, index, restore_item_list in reversed(restore_list):
             pushed_item_dict: dict[str, str] = {}
-            pushed_tags: dict[str, tuple[str, set[str]]] = {}
+
+            if isinstance(index, RuleIndex):
+                # Special case for Rules: rewrite name target UUIDs, then skip rules that already exist on the
+                # target unless --update is in effect.
+                try:
+                    restore_item_list = self._updated_restore_rule_list(api, restore_item_list, id_mapping, is_update)
+                except RestAPIException as ex:
+                    self.log_error(f'Failed: {info} pre-processing, could not retrieve target rules: {ex}')
+                    continue
+
             for item_id, item, target_id in restore_item_list:
                 op_info = 'Create' if target_id is None else 'Update'
                 reason = ' (dependency)' if item_id in dependency_set - match_set else ''
@@ -265,7 +274,7 @@ class TaskRestore(Task):
                         # Special case for Tags, capture associated WAN edges to re-associate later.
                         # Only consider WAN edges that are present in SD-WAN Manager
                         if isinstance(item, Tag) and (devices := edge_set & set(item.device_associations())):
-                            pushed_tags[item.name] = (item_id, devices)
+                            pushed_tags.append((item.name, item_id, devices))
                             self.log_info(
                                 f'{op_info} {info} {item.name}{reason}: {count("device", devices)} to associate'
                             )
@@ -312,7 +321,7 @@ class TaskRestore(Task):
                                 (edge_set & set(item.device_associations())) - set(target_item.device_associations())
                             )
                             if devices:
-                                pushed_tags[item.name] = (item_id, devices)
+                                pushed_tags.append((item.name, item_id, devices))
                                 self.log_info(
                                     f'{op_info} {info} {item.name}{reason}: {count("device", devices)} to associate'
                                 )
@@ -320,7 +329,12 @@ class TaskRestore(Task):
                             # Skipping further Tag processing because no other update operation is supported
                             continue
 
-                        put_eval = UpdateEval(api.put(update_data, item.api_path.put, target_id))
+                        if isinstance(item, Rule):
+                            # Rule updates don't allow the rule ID in the URL
+                            put_eval = UpdateEval(api.put(update_data, item.api_path.put))
+                        else:
+                            put_eval = UpdateEval(api.put(update_data, item.api_path.put, target_id))
+
                         if put_eval.need_reattach:
                             if put_eval.is_master:
                                 self.log_info(f'Updating {info} {item.name} requires reattach')
@@ -359,15 +373,40 @@ class TaskRestore(Task):
                 self.log_critical(f'Failed retrieving {info}: {ex}')
                 break
 
-            # Associate tags to devices
-            if pushed_tags:
-                self._associate_tags(api, pushed_tags, id_mapping, info)
+        if pushed_tags:
+            self._associate_tags(api, pushed_tags, id_mapping)
 
-    def _associate_tags(self, api: Rest, pushed_tags: dict[str, tuple[str, set[str]]], id_mapping: dict[str, str],
-                        info: str) -> None:
+    def _updated_restore_rule_list(self, api: Rest, restore_rule_list: list[tuple[str, Rule, str]],
+                                   id_mapping: dict[str, str], is_update: bool) -> list[tuple[str, Rule, str]]:
+        target_rules: dict[str, str] = {item_name: item_id for item_id, item_name in RuleIndex.get_raise(api)}
+        new_restore_rule_list = []
+        for item_id, item, _ in restore_rule_list:
+            try:
+                item.update_name(id_mapping)
+            except ValueError as ex:
+                self.log_error(f'Failed: rule {item.name} name rewrite: {ex}')
+                continue
+
+            target_id = target_rules.get(item.name)
+            if target_id is not None:
+                # Item already exists on target SD-WAN Manager, record item id from target
+                if item_id != target_id:
+                    id_mapping[item_id] = target_id
+
+                if not is_update:
+                    # Existing item on target SD-WAN Manager will be used, i.e., will not update it
+                    self.log_debug(f'Will skip rule {item.name}, item already on target SD-WAN Manager')
+                    continue
+
+            new_restore_rule_list.append((item_id, item, target_id))
+
+        return new_restore_rule_list
+
+    def _associate_tags(self, api: Rest, pushed_tags: list[tuple[str, str, set[str]]],
+                        id_mapping: dict[str, str]) -> None:
         tag_associations = {
             tag_name: (id_mapping.get(old_tag_id, old_tag_id), associated_devices)
-            for tag_name, (old_tag_id, associated_devices) in pushed_tags.items()
+            for tag_name, old_tag_id, associated_devices in pushed_tags
         }
 
         try:
@@ -376,11 +415,11 @@ class TaskRestore(Task):
                 TagAssociate.api_path.post)
             )
             self.wait_actions(
-                api, [(action_worker, ', '.join(tag_associations.keys()))], f'associating {info}s to devices',
+                api, [(action_worker, ', '.join(tag_associations.keys()))], 'associating tags to devices',
                 raise_on_failure=False, rapid=True
             )
         except RestAPIException as ex:
-            self.log_warning(f'Tag to device association failed for {info}: {ex}')
+            self.log_warning(f'Failed tag to device association: {ex}')
 
     def _restore_deployments(self, api: Rest, workdir: str, *, edge_inventory: EdgeInventory) -> None:
         saved_groups_index = ConfigGroupIndex.load(workdir)
