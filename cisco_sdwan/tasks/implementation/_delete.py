@@ -9,7 +9,7 @@ from cisco_sdwan.base.models_base import FeatureProfile, ModelException
 from cisco_sdwan.base.rest_api import Rest, RestAPIException
 from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL, ordered_tags, is_index_supported
 from cisco_sdwan.base.models_vmanage import (DeviceTemplateIndex, ConfigGroupIndex, ProfileSdwanPolicy, Tag,
-                                             TagDissociate)
+                                             TagDissociate, Rule)
 from cisco_sdwan.tasks.utils import TaskOptions, TagOptions, regex_type
 from cisco_sdwan.tasks.common import regex_filter, Task, WaitActionsException
 from cisco_sdwan.tasks.models import TaskArgs, CatalogTag
@@ -86,14 +86,14 @@ class TaskDelete(Task):
                     diss_reqs = self.cfg_group_dissociate(api, config_groups,
                                                           log_context='config-group dissociating WAN Edges')
                     if diss_reqs:
-                        self.log_debug(f'Dissociate requests processed: {diss_reqs}')
+                        self.log_debug(f'Static dissociate requests processed: {diss_reqs}')
 
-                    rule_reqs = self.cfg_group_rules_delete(api, config_groups)
+                    rule_reqs = self.cfg_group_rules_dissociate(api, config_groups)
                     if rule_reqs:
-                        self.log_debug(f'Automated rule delete requests processed: {rule_reqs}')
+                        self.log_debug(f'Rule dissociate requests processed: {rule_reqs}')
 
                     if not (diss_reqs + rule_reqs):
-                        self.log_info('No WAN Edge config-group dissociate or automated rule deletes needed')
+                        self.log_info('No WAN Edge static or rule-based config-group dissociates to process')
 
             except (RestAPIException, WaitActionsException) as ex:
                 self.log_critical(f'Detach failed: {ex}')
@@ -128,9 +128,11 @@ class TaskDelete(Task):
 
                 try:
                     if isinstance(item, Tag):
-                        # Special case for tags
-                        # Dissociate devices first, then delete with item id passed as url param instead of in the path
-                        self._dissociate_tags(api, item, info)
+                        # Special case for tags, dissociate devices first, then delete with item id passed as url param
+                        self._dissociate_tag(api, item, info)
+                        api.delete(item_cls.api_path.delete, **item.delete_params(item_id))
+                    elif isinstance(item, Rule):
+                        # Special case for rules, delete with item id passed as url param
                         api.delete(item_cls.api_path.delete, **item.delete_params(item_id))
                     else:
                         api.delete(item_cls.api_path.delete, item_id)
@@ -141,8 +143,8 @@ class TaskDelete(Task):
 
         return
 
-    def _dissociate_tags(self, api: Rest, item: Tag, info: str) -> None:
-        """Dissociate devices from a tag. No-op if the tag has no device associations."""
+    def _dissociate_tag(self, api: Rest, item: Tag, info: str) -> None:
+        """Dissociate tag from devices. No-op if the tag has no device associations."""
         associations = list(item.device_associations())
         if not associations:
             return
