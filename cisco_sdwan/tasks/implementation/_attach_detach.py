@@ -311,16 +311,16 @@ class TaskDetach(Task):
                                                       chunk_size=parsed_args.batch,
                                                       log_context=f"config-group dissociating {parsed_args.set_title}")
                 if diss_reqs:
-                    self.log_debug(f'Dissociate requests processed: {diss_reqs}')
+                    self.log_debug(f'Static dissociate requests processed: {diss_reqs}')
 
-                rule_reqs = self.cfg_group_rules_delete(api, selected_cfg_groups)
+                rule_reqs = self.cfg_group_rules_dissociate(api, selected_cfg_groups)
                 if rule_reqs:
-                    self.log_debug(f'Automated rule delete requests processed: {rule_reqs}')
+                    self.log_debug(f'Rule dissociate requests processed: {rule_reqs}')
             except (RestAPIException, WaitActionsException) as ex:
                 self.log_error(f'Failed: Config-group dissociate: {ex}')
 
         if not (diss_reqs + rule_reqs):
-            self.log_info(f'No {parsed_args.set_title} config-group dissociate or automated rule deletes to process')
+            self.log_info(f'No {parsed_args.set_title} static or rule-based config-group dissociates to process')
 
         return
 

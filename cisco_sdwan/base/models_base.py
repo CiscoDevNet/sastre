@@ -776,6 +776,8 @@ class ConfigItem(ApiItem):
             'lastUpdatedBy',
             'lastUpdatedOn'
         }
+        if self.post_filtered_tags is not None:
+            filtered_keys.update(self.post_filtered_tags)
         put_dict = {k: v for k, v in self.data.items() if k not in filtered_keys}
 
         if id_mapping_dict is None:
