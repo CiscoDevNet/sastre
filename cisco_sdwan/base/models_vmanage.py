@@ -595,21 +595,24 @@ class Rule(ConfigItem):
 
     def update_name(self, id_mapping_dict: Mapping[str, str]) -> None:
         """
-        Update the name for this Rule for the target SD-WAN manager. Rule names follow the format
-        <config_group uuid>_name. The new name is then constructed by replacing the old config-group UUID with the
-        new UUID of that same config-group on the target SD-WAN manager.
+        Update the name for this Rule for the target SD-WAN manager, when applicable. Rule names for config-group
+        associations follow the format <config_group uuid>_name. Other types of rules, such as topology association
+        rules follow a regular name (ex. hubRule_name). Only config-group association rule names need to be updated
+        because the config-group UUID will be different on the target SD-WAN manager.
+        The new name is then constructed by replacing the old config-group UUID with the new UUID of that same
+        config-group on the target SD-WAN manager.
         @param id_mapping_dict: {<old item id>: <new item id>} dict. Used to find the mapping of old config-group UUID
                                 and new config-group UUID.
         """
         match = re.match(r'(?P<uuid>[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12})_name', self.name,
                          flags=re.IGNORECASE)
         if not match:
-            raise ValueError('Invalid rule name')
+            # Not a config-group association rule, no-op in this case.
+            return
 
-        saved_config_grp_id = match.group('uuid')
-        new_uuid = id_mapping_dict.get(saved_config_grp_id)
+        new_uuid = id_mapping_dict.get(match.group('uuid'))
         if new_uuid is None:
-            raise ValueError(f'Cannot determine new rule name, config-group ID not found: {saved_config_grp_id}')
+            raise ValueError(f'Cannot determine new rule name, config-group ID not found: {match.group("uuid")}')
 
         self.data[self.name_tag] = self.build_name(new_uuid)
 
