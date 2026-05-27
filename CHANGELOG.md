@@ -8,7 +8,6 @@ Sastre 1.28 [May x, 2026]
 
 #### Fixes:
 - When unsupported parcels are present, transform task can fail with a traceback and the whole task is aborted. This has been fixed, now the item is skipped with an error logged but the task itself continues.
-- Restore skipped non-config-group rules (e.g. topology rules) with an invalid rule name error during rule name pre-processing. Only config-group association rules require a name rewrite on restore.
 
 
 Sastre 1.27 [February 11, 2026]
