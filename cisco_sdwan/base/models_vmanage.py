@@ -1273,6 +1273,20 @@ class ProfileSdwanCliIndex(FeatureProfileIndex):
     store_file = 'feature_profiles_sdwan_cli.json'
 
 
+class ProfileSdRoutingCli(FeatureProfile):
+    api_path = ApiPath('v1/feature-profile/sd-routing/cli')
+    store_path = ('feature_profiles', 'sd-routing', 'cli')
+    parcel_api_paths = ApiPathGroup({
+        "config": ApiPath("v1/feature-profile/sd-routing/cli/{cliId}/config")
+    })
+
+
+@register('feature_profile', 'SD-Routing CLI profile', ProfileSdRoutingCli, min_version='20.15')
+class ProfileSdRoutingCliIndex(FeatureProfileIndex):
+    api_path = ApiPath('v1/feature-profile/sd-routing/cli', None, None, None)
+    store_file = 'feature_profiles_sd-routing_cli.json'
+
+
 class ProfileSdwanOther(FeatureProfile):
     api_path = ApiPath('v1/feature-profile/sdwan/other')
     store_path = ('feature_profiles', 'sdwan', 'other')
@@ -1368,15 +1382,40 @@ class ProfileSdwanEmbeddedSecurityIndex(FeatureProfileIndex):
 # SD-Routing Feature Profiles
 #
 
+class ProfileSdRoutingSystem(FeatureProfile):
+    api_path = ApiPath('v1/feature-profile/sd-routing/system')
+    store_path = ('feature_profiles', 'sd-routing', 'system')
+    parcel_api_paths = ApiPathGroup({
+        "global": ApiPath("v1/feature-profile/sd-routing/system/{systemId}/global"),
+        "banner": ApiPath("v1/feature-profile/sd-routing/system/{systemId}/banner"),
+        "ntp-sd-routing": ApiPath("v1/feature-profile/sd-routing/system/{systemId}/ntp"),
+        "logging-sd-routing": ApiPath("v1/feature-profile/sd-routing/system/{systemId}/logging"),
+        "aaa-sd-routing": ApiPath("v1/feature-profile/sd-routing/system/{systemId}/aaa"),
+    })
+
+
+@register('feature_profile', 'SD-Routing system profile', ProfileSdRoutingSystem, min_version='20.15')
+class ProfileSdRoutingSystemIndex(FeatureProfileIndex):
+    api_path = ApiPath('v1/feature-profile/sd-routing/system', None, None, None)
+    store_file = 'feature_profiles_sd-routing_system.json'
+
+
 class ProfileSdRoutingService(FeatureProfile):
     api_path = ApiPath('/v1/feature-profile/sd-routing/service')
     store_path = ('feature_profiles', 'sd-routing', 'service')
 
-    parcel_names = ("multicloud-connection", )
+    parcel_names = ("multicloud-connection", "dhcp-server", "vrf")
 
-    parcel_api_paths = ApiPathGroup({
-        name: ApiPath(f"v1/feature-profile/sd-routing/service/{{serviceId}}/{name}") for name in parcel_names
-    })
+    parcel_api_paths = ApiPathGroup(
+        {name: ApiPath(f"v1/feature-profile/sd-routing/service/{{serviceId}}/{name}") for name in parcel_names} | {
+            "vrf/lan/interface/ethernet": ApiPath(
+                "v1/feature-profile/sd-routing/service/{serviceId}/vrf/{vrfId}/interface/ethernet"),
+        },
+        parcel_reference_path_map={
+            PathKey("dhcp-server", "vrf/lan/interface/ethernet"): ApiPath(
+                "v1/feature-profile/sd-routing/service/{serviceId}/vrf/{vrfId}/interface/ethernet/{ethId}/dhcp-server"),
+        }
+    )
 
 
 @register('feature_profile', 'SD-Routing service profile', ProfileSdRoutingService, min_version='20.15')
@@ -1389,11 +1428,14 @@ class ProfileSdRoutingTransport(FeatureProfile):
     api_path = ApiPath('/v1/feature-profile/sd-routing/transport')
     store_path = ('feature_profiles', 'sd-routing', 'transport')
 
-    parcel_names = ("multicloud-connection", )
+    parcel_names = ("multicloud-connection", "global-vrf")
 
-    parcel_api_paths = ApiPathGroup({
-        name: ApiPath(f"v1/feature-profile/sd-routing/transport/{{transportId}}/{name}") for name in parcel_names
-    })
+    parcel_api_paths = ApiPathGroup(
+        {name: ApiPath(f"v1/feature-profile/sd-routing/transport/{{transportId}}/{name}") for name in parcel_names} | {
+            "global-vrf/wan/interface/ethernet": ApiPath(
+                "v1/feature-profile/sd-routing/transport/{transportId}/global-vrf/{globalVrfId}/interface/ethernet"),
+        }
+    )
 
 
 @register('feature_profile', 'SD-Routing transport profile', ProfileSdRoutingTransport, min_version='20.15')
