@@ -1,4 +1,4 @@
-pydantic==2.12.5
+pydantic==2.13.4
 PyYAML==6.0.3
-requests==2.33.0
+requests==2.34.2
 urllib3==2.7.0
