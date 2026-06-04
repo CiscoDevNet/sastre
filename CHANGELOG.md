@@ -10,10 +10,11 @@ Sastre 1.28 [June x, 2026]
   - New SD-Routing transport profile parcels: global-vrf
   - New SD-Routing system profile parcels: global, banner, ntp-sd-routing, logging-sd-routing, aaa-sd-routing
   - New SD-Routing cli profile parcels: config
-  - Support for port-channel interfaces in transport profiles.
+  - [#76] Support for port-channel interfaces in transport profiles.
 
 #### Fixes:
 - When unsupported parcels are present, transform task can fail with a traceback and the whole task is aborted. This has been fixed, now the item is skipped with an error logged but the task itself continues.
+- [#98] Feature templates with multiline values (e.g. cli or banner) may fail to be restored on newer SDWAN Manager releases due to increased validation performed on the payload. Sastre now removes 'editedTemplateDefinition' key from feature templates during restore (PUT/POST calls).
 
 
 Sastre 1.27 [February 11, 2026]

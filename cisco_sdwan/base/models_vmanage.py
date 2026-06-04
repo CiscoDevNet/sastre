@@ -811,7 +811,8 @@ class FeatureTemplate(ConfigItem):
     # gTemplateClass is new in 20.x, adding skip diff to not trigger updates when restore --update is done between
     # pre 20.x workdir and post 20.x SD-WAN Manager.
     skip_cmp_tag_set = {'createdOn', 'createdBy', 'lastUpdatedBy', 'lastUpdatedOn', '@rid', 'owner', 'infoTag',
-                        'devicesAttached', 'attachedMastersCount', 'gTemplateClass'}
+                        'devicesAttached', 'attachedMastersCount', 'gTemplateClass', 'editedTemplateDefinition'}
+    post_filtered_tags = ('editedTemplateDefinition',)
 
     @property
     def device_types(self) -> set[str]:
