@@ -2645,6 +2645,13 @@ class DeviceControlConnections(RealtimeItem):
     fields_sub = ('local_color', 'remote_color')
 
 
+@op_register('control', 'wan-interfaces', 'Control WAN interfaces')
+class DeviceControlWAN(RealtimeItem):
+    api_path = ApiPath('device/control/waninterface', None, None, None)
+    fields_std = ('interface', 'color', 'private_ip', 'public_ip', 'admin_state', 'operation_state', 'carrier')
+    fields_ext = ('private_port', 'public_port')
+
+
 @op_register('control', 'local-properties', 'Control local-properties')
 class DeviceControlLocalProperties(RealtimeItem):
     api_path = ApiPath('device/control/localproperties', None, None, None)

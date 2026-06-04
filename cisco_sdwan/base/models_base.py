@@ -215,9 +215,21 @@ class OperationalItem:
         # Some SD-WAN Manager endpoints don't provide all properties in the 'columns' list, which is where 'title' is
         # defined. For those properties without a title, infer one based on the property name.
         self._meta = {attribute_safe(field['property']): field for field in payload['header']['fields']}
-        title_dict = {attribute_safe(field['property']): field['title'] for field in payload['header']['columns']}
+        title_dict = {
+            attribute_safe(field['property']): self.format_title(field['title'])
+            for field in payload['header']['columns']
+        }
         for field_property, field in self._meta.items():
             field['title'] = title_dict.get(field_property, field['property'].replace('_', ' ').title())
+
+    @staticmethod
+    def format_title(title: str) -> str:
+        # If it is a dotted string, keep the last segment only. Ex. device.control.dataControlWanInterface.interface
+        formatted = title.split('.')[-1]
+        # Replace camelCase with camel Case
+        formatted = re.sub(r'(?<=[a-z])(?=[A-Z])', ' ', formatted)
+
+        return f'{formatted[0].upper()}{formatted[1:]}' if formatted else formatted
 
     @property
     def field_names(self) -> tuple[str, ...]:
