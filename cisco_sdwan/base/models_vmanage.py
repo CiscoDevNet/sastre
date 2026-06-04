@@ -811,7 +811,8 @@ class FeatureTemplate(ConfigItem):
     # gTemplateClass is new in 20.x, adding skip diff to not trigger updates when restore --update is done between
     # pre 20.x workdir and post 20.x SD-WAN Manager.
     skip_cmp_tag_set = {'createdOn', 'createdBy', 'lastUpdatedBy', 'lastUpdatedOn', '@rid', 'owner', 'infoTag',
-                        'devicesAttached', 'attachedMastersCount', 'gTemplateClass'}
+                        'devicesAttached', 'attachedMastersCount', 'gTemplateClass', 'editedTemplateDefinition'}
+    post_filtered_tags = ('editedTemplateDefinition',)
 
     @property
     def device_types(self) -> set[str]:
@@ -2642,6 +2643,13 @@ class DeviceControlConnections(RealtimeItem):
     fields_std = ('system_ip', 'site_id', 'peer_type', 'local_color', 'remote_color', 'state')
     fields_ext = ('private_ip', 'private_port', 'public_ip', 'public_port', 'instance', 'protocol', 'domain_id')
     fields_sub = ('local_color', 'remote_color')
+
+
+@op_register('control', 'wan-interfaces', 'Control WAN interfaces')
+class DeviceControlWAN(RealtimeItem):
+    api_path = ApiPath('device/control/waninterface', None, None, None)
+    fields_std = ('interface', 'color', 'private_ip', 'public_ip', 'admin_state', 'operation_state', 'carrier')
+    fields_ext = ('private_port', 'public_port')
 
 
 @op_register('control', 'local-properties', 'Control local-properties')
