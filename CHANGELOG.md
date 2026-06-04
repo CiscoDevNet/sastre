@@ -11,6 +11,8 @@ Sastre 1.28 [June x, 2026]
   - New SD-Routing system profile parcels: global, banner, ntp-sd-routing, logging-sd-routing, aaa-sd-routing
   - New SD-Routing cli profile parcels: config
   - [#76] Support for port-channel interfaces in transport profiles.
+- New show realtime control wan-interfaces command.
+- Improved formatting of column titles in show command output tables. Titles from SD-WAN Manager are now normalized by keeping only the last segment of dotted property names (e.g. device.control.dataControlWanInterface.interface), splitting camelCase into separate words (e.g. privateIp becomes Private Ip), and capitalizing the leading character, while preserving existing acronyms.
 
 #### Fixes:
 - When unsupported parcels are present, transform task can fail with a traceback and the whole task is aborted. This has been fixed, now the item is skipped with an error logged but the task itself continues.
