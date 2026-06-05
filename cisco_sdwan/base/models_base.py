@@ -37,7 +37,7 @@ class UpdateEval:
         self.is_master = isinstance(data, dict) and 'data' in data
 
         # This is to homogenize the response payload variants
-        self.data = data.get('data') if self.is_master else data
+        self.data = data.get('data', {}) if self.is_master else data
 
     @property
     def need_reattach(self):
@@ -64,8 +64,7 @@ class ApiPath:
     """
     __slots__ = ('path_vars', 'get', 'post', 'put', 'delete')
 
-    def __init__(self, get: Optional[str], *other_ops: Optional[str],
-                 path_vars: Optional[Sequence[str]] = None) -> None:
+    def __init__(self, get: str | None, *other_ops: str | None, path_vars: Optional[Sequence[str]] = None) -> None:
         """
         @param get: URL path for get operations
         @param other_ops: URL path for post, put and delete operations, in this order. If an item is not specified,
@@ -73,6 +72,9 @@ class ApiPath:
         @param path_vars: Path variable names that may be present in defined paths. It is assumed that all methods have
                           the same path variables.
         """
+        if len(other_ops) > len(self.__slots__) - 2:
+            raise ValueError(f"Too many operations provided: {other_ops}")
+
         self.get = get
         last_op = other_ops[-1] if other_ops else get
         for field, value in zip_longest(self.__slots__[2:], other_ops, fillvalue=last_op):
@@ -542,7 +544,7 @@ class RecordItem(OperationalItem):
         return self._page_info['count']
 
     @classmethod
-    def get_raise(cls, api: Rest, *, start_time: datetime = None, end_time: datetime = None, max_records: int = 0):
+    def get_raise(cls, api: Rest, *, start_time: datetime, end_time: datetime, max_records: int):
         obj = cls(api.post(cls.query(start_time, end_time, max_records), cls.api_path.post))
         while True:
             next_page = obj.next_page

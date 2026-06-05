@@ -2577,12 +2577,28 @@ class EdgeCertificate(IndexConfigItem):
 
 
 #
+# Conversion functions
+#
+def datetime_format(timestamp: str | None, epoch_value_return: str = '') -> str:
+    if timestamp is None:
+        return ''
+
+    if timestamp == 0:
+        return epoch_value_return
+
+    return entry_time_parse(timestamp).strftime("%Y-%m-%d %H:%M:%S %Z")
+
+
+def string_strip(value: str | None) -> str:
+    if value is None:
+        return ''
+
+    return value.strip()
+
+
+#
 # Log items
 #
-def datetime_format(timestamp: Optional[str]) -> str:
-    return entry_time_parse(timestamp).strftime("%Y-%m-%d %H:%M:%S %Z") if timestamp is not None else ''
-
-
 class Alarm(RecordItem):
     api_path = ApiPath(None, 'alarms', None, None)
     fields_std = ('entry_time', 'severity', 'message')
@@ -2760,7 +2776,6 @@ class DeviceTunnelStats(RealtimeItem):
 class DeviceSoftware(RealtimeItem):
     api_path = ApiPath('device/software', None, None, None)
     fields_std = ('version', 'active', 'default')
-    fields_ext = ('confirmed',)
 
 
 @op_register('dpi', 'summary', 'DPI summary')
@@ -2795,6 +2810,12 @@ class HardwareInventory(RealtimeItem):
     api_path = ApiPath('device/hardware/inventory', None, None, None)
     fields_std = ('hw_type', 'hw_description')
     fields_ext = ('version', 'part_number', 'serial_number')
+
+    field_conversion_fns = {
+        'hw_description': string_strip,
+        'version': string_strip,
+        'part_number': string_strip
+    }
 
 
 @op_register('hardware', 'environment', 'hardware environment')
@@ -2863,6 +2884,10 @@ class BulkBfdSessions(BulkStateItem):
     fields_std = ('system_ip', 'site_id', 'local_color', 'color', 'state')
     fields_ext = ('src_ip', 'src_port', 'dst_ip', 'dst_port', 'transitions', 'uptime_date')
 
+    field_conversion_fns = {
+        'uptime_date': datetime_format
+    }
+
 
 @op_register('control', 'connections', 'Control connections')
 class BulkControlConnections(BulkStateItem):
@@ -2871,6 +2896,10 @@ class BulkControlConnections(BulkStateItem):
     fields_ext = ('private_ip', 'private_port', 'public_ip', 'public_port', 'instance', 'protocol', 'domain_id',
                   'uptime_date')
     fields_sub = ('local_color', 'remote_color')
+
+    field_conversion_fns = {
+        'uptime_date': datetime_format
+    }
 
 
 @op_register('control', 'local-properties', 'Control local-properties')
