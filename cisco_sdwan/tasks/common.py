@@ -17,12 +17,14 @@ from collections.abc import Sequence, Mapping, Iterator, Iterable
 from zipfile import ZipFile, ZIP_DEFLATED
 from pydantic import ValidationError
 from cisco_sdwan.base.rest_api import Rest, RestAPIException
-from cisco_sdwan.base.models_base import DATA_DIR
+from cisco_sdwan.base.models_base import DATA_DIR, ApiItem, ConfigItem, IndexConfigItem
+from cisco_sdwan.base.catalog import is_index_supported
 from cisco_sdwan.base.models_vmanage import (DeviceTemplate, DeviceTemplateValues, DeviceTemplateAttached,
                                              DeviceTemplateAttach, DeviceTemplateCLIAttach, DeviceModeCli,
                                              ActionStatus, PolicyVsmartStatus, PolicyVsmartStatusException,
                                              PolicyVsmartActivate, PolicyVsmartIndex, PolicyVsmartDeactivate,
-                                             Device, ConfigGroupDeploy, ConfigGroupAssociated, ConfigGroupValues)
+                                             Device, ConfigGroupDeploy, ConfigGroupAssociated, ConfigGroupValues,
+                                             Rule, RuleIndex, RuleAssociate)
 
 T = TypeVar('T')
 
@@ -245,8 +247,9 @@ class DryRunReport:
 # noinspection PyUnusedLocal,PyMethodMayBeStatic
 class Task:
     # Configuration parameters for wait_actions
-    ACTION_INTERVAL = 10  # seconds
-    ACTION_TIMEOUT = 1800  # 30 minutes
+    ACTION_INTERVAL = 10       # seconds
+    ACTION_INTERVAL_RAPID = 2  # seconds
+    ACTION_TIMEOUT = 1800      # 30 minutes
 
     SAVINGS_FACTOR = 1
     DRYRUN_LEVELS = {'info', 'warning', 'error', 'critical'}
@@ -313,7 +316,7 @@ class Task:
     def is_api_required(parsed_args) -> bool:
         return True
 
-    def runner(self, parsed_args, api: Optional[Rest] = None) -> list | None:
+    def runner(self, parsed_args, api: Optional[Rest] = None) -> Sequence | None:
         """
         Execute the task. If the task has some output to the user, that is returned via a list of objects. Objects in
         that list need to implement the __str__ method. If the task generates no output to the user None is returned.
@@ -539,25 +542,76 @@ class Task:
                           f"associate: {', '.join(devices_map.get(uuid) or uuid for uuid in diff_associated.uuids)}")
             return True
 
-        def restore_rules(config_grp_name: str, config_grp_saved_id: str, config_grp_target_id: str) -> bool:
-            # saved_rules = ConfigGroupRules.load(workdir, ext_name, config_grp_name, config_grp_saved_id)
-            # if saved_rules is None:
-            #     self.log_debug(f"Skip config-group {config_grp_name} restore rules, no ConfigGroupRules file")
-            #     return False
-            #
-            # if self.is_dryrun:
-            #     self.log_info(f"Config-group {config_grp_name}, associate (via automated rules): "
-            #                   "device list is unknown during dry-run")
-            #     return True
-            #
-            # matched_uuids = saved_rules.post_raise(api, config_grp_target_id)
-            # self.log_info(f"Config-group {config_grp_name}, associate (via automated rules): "
-            #               f"{', '.join(devices_map.get(uuid) or uuid for uuid in matched_uuids)}")
-            #
-            # return len(matched_uuids) > 0
+        def associate_rules(config_grp_name: str, config_grp_saved_id: str, config_grp_target_id: str) -> bool:
+            if not saved_rules or not target_rules:
+                return False
 
-            # TODO: Review post 20.15
-            return False
+            associate_requests: list[tuple[RuleAssociate, str]] = []
+            match_saved_rules = saved_rules.get(config_grp_saved_id, [])
+
+            num_associates = 0
+            for rule in match_saved_rules:
+                target_rule_name = rule.build_name(config_grp_target_id)
+                target_rule_id = next(iter(target_rules.get(target_rule_name, [])), None)
+                if target_rule_id is None:
+                    continue
+
+                self.log_info(f'Rule {target_rule_name}, associate config-group: {config_grp_name}')
+                num_associates += 1
+
+                if self.is_dryrun:
+                    continue
+
+                try:
+                    action_worker = RuleAssociate(api.post(
+                        RuleAssociate.cfg_group_api_params([config_grp_target_id]),
+                        RuleAssociate.api_path.resolve(ruleId=target_rule_id).post
+                    ))
+                    associate_requests.append(
+                        (action_worker, f"{target_rule_name} [{config_grp_target_id}]")
+                    )
+                except RestAPIException as ex:
+                    self.log_warning(f'Failed rule {target_rule_name} association: {ex}')
+
+            if associate_requests:
+                self.wait_actions(
+                    api, associate_requests, 'associating rules to config-groups', raise_on_failure=False, rapid=True
+                )
+
+            return num_associates > 0
+
+        def load_saved_rules() -> dict[str, list[Rule]] | None:
+            saved_rule_index = RuleIndex.load(workdir)
+            if saved_rule_index is None:
+                self.log_debug("Skip config-group to rule associate, no RuleIndex file")
+                return None
+
+            # rule_map is a dict where keys are associated config-group IDs and value contains a list of Rules that
+            # are associated with the config-group.
+            rule_map: dict[str, list[Rule]] = {}
+            for _, rule in loaded_index_items_iter(workdir, saved_rule_index, Rule):
+                for associated_cfg_group in rule.config_group_associations():
+                    rule_map.setdefault(associated_cfg_group, []).append(rule)
+
+            return rule_map
+
+        def get_target_rules() -> dict[str, list[str]] | None:
+            if not is_index_supported(RuleIndex, version=api.server_version):
+                self.log_debug("Skip config-group to rule associate, not supported by this SD-WAN Manager")
+                return None
+
+            target_rule_index = RuleIndex.get(api)
+            if target_rule_index is None:
+                self.log_error("Failed to retrieve rule index from SD-WAN manager")
+                return None
+
+            # Since rule name follows the format <config-group id>_name, multiple rules can have the same name
+            # rule_map is a dict with rule_name as key and the value being all rule_ids with the same name.
+            rule_map = {}
+            for rule_id, rule_name in target_rule_index:
+                rule_map.setdefault(rule_name, []).append(rule_id)
+
+            return rule_map
 
         def restore_values(config_grp_name: str, config_grp_saved_id: str, config_grp_target_id: str):
             saved_values = ConfigGroupValues.load(workdir, ext_name, config_grp_name, config_grp_saved_id)
@@ -587,16 +641,19 @@ class Task:
 
             return diff_uuids
 
+        saved_rules = load_saved_rules()
+        target_rules = get_target_rules() if saved_rules is not None else None
+
         deploy_data = []
         for group_name, saved_id, target_id in cfg_group_iter:
             if target_id is None:
                 self.log_debug(f'Skip {group_name}, saved config-group not on target node')
                 continue
 
-            rules_associates = restore_rules(group_name, saved_id, target_id)
+            rule_associates = associate_rules(group_name, saved_id, target_id)
             direct_associates = associate_devices(group_name, saved_id, target_id)
 
-            if not direct_associates and not rules_associates:
+            if not direct_associates and not rule_associates:
                 continue
 
             affected_uuids = restore_values(group_name, saved_id, target_id)
@@ -771,32 +828,47 @@ class Task:
 
         return len(dissociate_reqs)
 
-    def cfg_group_rules_delete(self, api: Rest, cfg_group_iter: Iterable[tuple[str, str]]) -> int:
+    def cfg_group_rules_dissociate(self, api: Rest, cfg_group_iter: Iterable[tuple[str, str]]) -> int:
         """
-        Delete config-group device association automated rules
+        Dissociate the provided config-groups from each rule that references them.
         @param api: Instance of Rest API
         @param cfg_group_iter: Iterable of (<group id>, <group name>) tuples containing config-groups to inspect
-        @return: Number of automated rules delete requests processed
+        @return: Number of rule/config-group dissociate requests processed
         """
         delete_req_count = 0
-        # for config_grp_id, config_grp_name in cfg_group_iter:
-        #     rules = ConfigGroupRules.get(api, configGroupId=config_grp_id)
-        #     if rules is None:
-        #         self.log_warning(f'Failed to retrieve {config_grp_name} automated rules from SD-WAN Manager')
-        #         continue
-        #     for rule_id in rules:
-        #         delete_req_count += 1
-        #         self.log_info(f'Config-group {config_grp_name} delete automated rule: {rule_id}')
-        #
-        #         if self.is_dryrun:
-        #             continue
-        #
-        #         try:
-        #             ConfigGroupRules.delete_raise(api, config_grp_id, rule_id)
-        #         except RestAPIException as ex:
-        #             self.log_error(f'Failed to delete config-group {config_grp_name} automated rule {rule_id}: {ex}')
+        if not is_index_supported(RuleIndex, version=api.server_version):
+            return delete_req_count
 
-        # TODO: Review post 20.15
+        cfg_group_map = {item_id: item_name for item_id, item_name in cfg_group_iter}
+        dissociate_requests: list[tuple[RuleAssociate, str]] = []
+
+        for rule_id, rule_name in RuleIndex.get_raise(api):
+            rule = Rule.get(api, rule_id)
+            if rule is None:
+                self.log_warning(f'Failed to retrieve {rule_name} rule from SD-WAN Manager')
+                continue
+
+            delete_path = RuleAssociate.api_path.resolve(ruleId=rule_id).delete
+            for cfg_group_id in (set(rule.config_group_associations()) & set(cfg_group_map.keys())):
+                delete_req_count += 1
+                self.log_info(
+                    f'Rule {rule_name}, dissociate config-group: {cfg_group_map.get(cfg_group_id, cfg_group_id)}'
+                )
+                if self.is_dryrun:
+                    continue
+
+                action_worker = RuleAssociate(
+                    api.delete(delete_path, **RuleAssociate.cfg_group_delete_params(cfg_group_id))
+                )
+                dissociate_requests.append((action_worker, cfg_group_id))
+
+        if dissociate_requests:
+            self.wait_actions(
+                api, dissociate_requests,
+                f'dissociating config-groups from rules: {", ".join(cfg_grp for _, cfg_grp in dissociate_requests)}',
+                raise_on_failure=True, rapid=True
+            )
+
         return delete_req_count
 
     def policy_activate(self, api: Rest, policy_id: Optional[str], policy_name: Optional[str], *,
@@ -818,9 +890,9 @@ class Task:
                 raise StopIteration()
             PolicyVsmartStatus.get_raise(api).raise_for_status()
         except (RestAPIException, PolicyVsmartStatusException):
-            self.log_debug('SD-WAN Controllers not in vManage mode or otherwise not ready to have policy activated')
+            self.log_debug('SD-WAN Controllers not in Manager mode or otherwise not ready to have policy activated')
         except StopIteration:
-            self.log_debug('No policy is active or policy not on target vManage')
+            self.log_debug('No policy is active or policy not on target SD-WAN Manager')
         else:
             activate_reqs.append(...)
             self.log_info(f'SD-WAN Controller policy activate: {policy_name}')
@@ -857,24 +929,41 @@ class Task:
 
         return len(deactivate_reqs)
 
-    def wait_actions(self, api: Rest, action_list: list[tuple[Any, ...]], log_context: str, raise_on_failure: bool) -> bool:
+    def wait_actions(self, api: Rest, action_list: list[tuple[ApiItem, Optional[str]]], log_context: str,
+                     raise_on_failure: bool, rapid: bool = False) -> bool:
         """
-        Wait for actions in action_list to complete
-        @param api: Instance of Rest API
-        @param action_list: [(<action_worker>, <action_info>), ...]. Where <action_worker> is an instance of ApiItem and
-                            <action_info> is a str with information about the action. Action_info can be None, in which
-                            case no messages are logged for individual actions.
-        @param log_context: String providing context to log messages
-        @param raise_on_failure: If True, raise exception on action failures
-        @return: True if all actions completed with success. False otherwise.
-        """
+        Poll SD-WAN Manager until each tracked action completes or times out.
 
+        For each (action_worker, action_info) pair, status is fetched via ActionStatus.get using action_worker.uuid.
+        Polling uses ACTION_INTERVAL (or ACTION_INTERVAL_RAPID when rapid is True). A single time budget of
+        ACTION_TIMEOUT applies to the entire batch; once it is exhausted, any remaining actions are treated as timeout.
+        When action_info is not None, completion and failure details for that action are logged using it.
+
+        @param api: Rest API instance used to query action status.
+        @param action_list: List of (action_worker, action_info) tuples. action_worker must have an uuid attribute
+                            (e.g. ApiItem); action_info is a str describing the action for log messages, or None to
+                            skip per-action completion/failure logging.
+        @param log_context: Context string for log messages (e.g. "policy activation").
+        @param raise_on_failure: If True, raise WaitActionsException when any action fails or times out.
+        @param rapid: If True, use shorter poll interval (ACTION_INTERVAL_RAPID) for faster completion checks.
+        @return: True if every action completed successfully, or if action_list is empty; False if any failed,
+                 timed out, or could not be read.
+        @raises WaitActionsException: When raise_on_failure is True and at least one action failed or timed out.
+        """
         def upper_first(input_string):
-            return input_string[0].upper() + input_string[1:] if len(input_string) > 0 else ''
+            return input_string[:1].upper() + input_string[1:]
 
-        self.log_info(upper_first(log_context))
+        if not action_list:
+            self.log_debug(f'No actions to wait for: {log_context}')
+            return True
+
+        if log_context:
+            self.log_info(upper_first(log_context))
+
         result_list = []
+        action_interval = Task.ACTION_INTERVAL_RAPID if rapid else Task.ACTION_INTERVAL
         time_budget = Task.ACTION_TIMEOUT
+
         for action_worker, action_info in action_list:
             while True:
                 action = ActionStatus.get(api, action_worker.uuid)
@@ -893,10 +982,10 @@ class Task:
 
                     break
 
-                time_budget -= Task.ACTION_INTERVAL
+                time_budget -= action_interval
                 if time_budget > 0:
                     self.log_info('Waiting...')
-                    time.sleep(Task.ACTION_INTERVAL)
+                    time.sleep(action_interval)
                 else:
                     self.log_warning('Wait time limit expired')
                     result_list.append(False)
@@ -1024,3 +1113,23 @@ def archive_extract(archive_filename: str, workdir: str) -> None:
     destination_dir = Path(DATA_DIR, workdir)
     with ZipFile(archive_filename, mode='r') as archive_file:
         archive_file.extractall(destination_dir)
+
+
+C = TypeVar('C', bound=ConfigItem)
+
+
+def loaded_index_items_iter(workdir: str, index: IndexConfigItem,
+                            item_cls: type[C]) -> Iterator[tuple[str, C]]:
+    """
+    Iterate over items listed in an index, loading each item from workdir and yielding only those
+    that were successfully loaded (i.e., non-None).
+    @param workdir: directory under DATA_DIR where item files are stored
+    @param index: IndexConfigItem instance providing (item_id, item_name) pairs to load
+    @param item_cls: ConfigItem subclass used to load each item from disk
+    @return: iterator of (item_id, item_obj) tuples for items that loaded successfully
+    """
+    item_iter = (
+        (item_id, item_cls.load(workdir, index.need_extended_name, item_name, item_id))
+        for item_id, item_name in index
+    )
+    return ((item_id, item_obj) for item_id, item_obj in item_iter if item_obj is not None)

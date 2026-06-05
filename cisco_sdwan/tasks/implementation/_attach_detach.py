@@ -1,7 +1,7 @@
 import argparse
 from functools import partial
 from typing import Optional, Annotated
-from collections.abc import Mapping, Iterable
+from collections.abc import Mapping, Iterable, Sequence
 from pydantic import Field, field_validator
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest, RestAPIException
@@ -95,7 +95,11 @@ class TaskAttach(Task):
         deploy_set = set()
         return attach_set, deploy_set
 
-    def runner(self, parsed_args, api: Optional[Rest] = None) -> list | None:
+    def runner(self, parsed_args, api: Optional[Rest] = None) -> Sequence | None:
+        if api is None:
+            self.log_critical('SD-WAN Manager connection is not available')
+            return
+
         self.is_dryrun = parsed_args.dryrun
         self.log_info(f'Attach task: Local workdir: "{parsed_args.workdir}" -> SD-WAN Manager URL: "{api.base_url}"')
 
@@ -252,7 +256,11 @@ class TaskDetach(Task):
         associated_set = set()
         return attached_set, associated_set
 
-    def runner(self, parsed_args, api: Optional[Rest] = None) -> list | None:
+    def runner(self, parsed_args, api: Optional[Rest] = None) -> Sequence | None:
+        if api is None:
+            self.log_critical('SD-WAN Manager connection is not available')
+            return
+
         self.is_dryrun = parsed_args.dryrun
         self.log_info(f'Detach templates task: SD-WAN Manager URL: "{api.base_url}"')
 
@@ -303,16 +311,16 @@ class TaskDetach(Task):
                                                       chunk_size=parsed_args.batch,
                                                       log_context=f"config-group dissociating {parsed_args.set_title}")
                 if diss_reqs:
-                    self.log_debug(f'Dissociate requests processed: {diss_reqs}')
+                    self.log_debug(f'Static dissociate requests processed: {diss_reqs}')
 
-                rule_reqs = self.cfg_group_rules_delete(api, selected_cfg_groups)
+                rule_reqs = self.cfg_group_rules_dissociate(api, selected_cfg_groups)
                 if rule_reqs:
-                    self.log_debug(f'Automated rule delete requests processed: {rule_reqs}')
+                    self.log_debug(f'Rule dissociate requests processed: {rule_reqs}')
             except (RestAPIException, WaitActionsException) as ex:
                 self.log_error(f'Failed: Config-group dissociate: {ex}')
 
         if not (diss_reqs + rule_reqs):
-            self.log_info(f'No {parsed_args.set_title} config-group dissociate or automated rule deletes to process')
+            self.log_info(f'No {parsed_args.set_title} static or rule-based config-group dissociates to process')
 
         return
 

@@ -5,7 +5,7 @@ import yaml
 from datetime import date
 from difflib import unified_diff, HtmlDiff
 from typing import Optional, Any, NamedTuple, Annotated
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from pydantic import field_validator, model_validator, BaseModel, ValidationError, Field, ConfigDict
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest
@@ -87,7 +87,7 @@ section_catalog: dict[tuple[str, ...], TaskMeta] = {
 
 def load_content_spec(spec_file: Optional[str], spec_json: Optional[str],
                       spec_default: Optional[dict] = None) -> ReportContentModel:
-    def load_yaml(filename):
+    def load_yaml(filename: str) -> Any:
         try:
             with open(filename) as yaml_file:
                 return yaml.safe_load(yaml_file)
@@ -96,7 +96,7 @@ def load_content_spec(spec_file: Optional[str], spec_json: Optional[str],
         except yaml.YAMLError as ex:
             raise TaskException(f'Report specification YAML syntax error: {ex}') from None
 
-    def load_json(json_str):
+    def load_json(json_str: str) -> Any:
         try:
             return json.loads(json_str)
         except json.JSONDecodeError as ex:
@@ -104,10 +104,16 @@ def load_content_spec(spec_file: Optional[str], spec_json: Optional[str],
 
     if spec_file:
         content_spec_dict = load_yaml(spec_file)
+        source_label = 'file'
     elif spec_json:
         content_spec_dict = load_json(spec_json)
+        source_label = 'JSON'
     else:
         content_spec_dict = spec_default
+        source_label = 'default'
+
+    if not isinstance(content_spec_dict, dict) or not content_spec_dict:
+        raise TaskException(f'Invalid report specification {source_label} contents')
 
     try:
         return ReportContentModel(**content_spec_dict)
@@ -125,7 +131,7 @@ class Report:
         self.section_json = []
         self.metadata = metadata
 
-    def add_section(self, section_name: str, subsection_list: list) -> None:
+    def add_section(self, section_name: str, subsection_list: Sequence) -> None:
         self.section_json.extend(json.loads(subsection.json()) for subsection in subsection_list)
         for subsection in subsection_list:
             if isinstance(subsection, Table):
@@ -248,10 +254,10 @@ class TaskReport(Task):
     def is_api_required(parsed_args) -> bool:
         return parsed_args.subtask_handler is TaskReport.subtask_create and parsed_args.workdir is None
 
-    def runner(self, parsed_args, api: Optional[Rest] = None) -> list | None:
+    def runner(self, parsed_args, api: Optional[Rest] = None) -> Sequence | None:
         return parsed_args.subtask_handler(self, parsed_args, api)
 
-    def subtask_create(self, parsed_args, api: Optional[Rest]) -> list | None:
+    def subtask_create(self, parsed_args, api: Optional[Rest]) -> Sequence | None:
         source_info = f'Local workdir: "{parsed_args.workdir}"' if api is None else f'SD-WAN Manager URL: "{api.base_url}"'
         self.log_info(f'Report create task: {source_info} -> "{parsed_args.file}"')
 
@@ -286,7 +292,7 @@ class TaskReport(Task):
         return result
 
     # noinspection PyUnusedLocal
-    def subtask_diff(self, parsed_args, api: Optional[Rest]) -> list | None:
+    def subtask_diff(self, parsed_args, api: Optional[Rest]) -> Sequence | None:
         self.log_info(f'Report diff task: "{parsed_args.report_a}" <-> "{parsed_args.report_b}"')
         report_a = Report.load(parsed_args.report_a)
         self.log_info(f'Loaded report "{parsed_args.report_a}"')
@@ -438,7 +444,7 @@ class ReportCreateArgs(TaskArgs):
     @field_validator('file', mode='before')
     @classmethod
     def validate_report_file(cls, v):
-        filename = (isinstance(v, str) and v) or f'report_{date.today():%Y%m%d}.txt'
+        filename = v if isinstance(v, str) and v else f'report_{date.today():%Y%m%d}.txt'
         return validate_filename(filename)
 
     @model_validator(mode='after')
