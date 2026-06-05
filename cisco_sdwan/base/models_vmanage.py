@@ -2585,8 +2585,8 @@ def datetime_format(timestamp: Optional[str]) -> str:
 
 class Alarm(RecordItem):
     api_path = ApiPath(None, 'alarms', None, None)
-    fields_std = ('entry_time', 'devices', 'severity', 'type', 'message', 'active')
-    fields_ext = ('acknowledged', 'uuid', 'cleared_time')
+    fields_std = ('entry_time', 'severity', 'message')
+    fields_ext = ('cleared_time', )
     field_conversion_fns = {
         'entry_time': datetime_format,
         'cleared_time': datetime_format
@@ -2629,8 +2629,7 @@ class BfdSessions(RealtimeItem):
 @op_register('bfd', 'summary', 'BFD summary')
 class BfdSummary(RealtimeItem):
     api_path = ApiPath('device/bfd/summary', None, None, None)
-    fields_std = ('vdevice_name', 'vdevice_host_name',  'bfd_sessions_total', 'bfd_sessions_up', 'bfd_sessions_max',
-                  'bfd_sessions_flap')
+    fields_std = ('vdevice_name', 'bfd_sessions_total', 'bfd_sessions_up', 'bfd_sessions_max', 'bfd_sessions_flap')
     fields_ext = ('poll_interval', 'lastupdated')
     field_conversion_fns = {
         'lastupdated': datetime_format
@@ -2640,7 +2639,7 @@ class BfdSummary(RealtimeItem):
 @op_register('control', 'connections', 'Control connections')
 class DeviceControlConnections(RealtimeItem):
     api_path = ApiPath('device/control/connections', None, None, None)
-    fields_std = ('system_ip', 'site_id', 'peer_type', 'local_color', 'remote_color', 'state')
+    fields_std = ('vdevice_name', 'system_ip', 'site_id', 'peer_type', 'local_color', 'remote_color', 'state')
     fields_ext = ('private_ip', 'private_port', 'public_ip', 'public_port', 'instance', 'protocol', 'domain_id')
     fields_sub = ('local_color', 'remote_color')
 
@@ -2648,7 +2647,8 @@ class DeviceControlConnections(RealtimeItem):
 @op_register('control', 'wan-interfaces', 'Control WAN interfaces')
 class DeviceControlWAN(RealtimeItem):
     api_path = ApiPath('device/control/waninterface', None, None, None)
-    fields_std = ('interface', 'color', 'private_ip', 'public_ip', 'admin_state', 'operation_state', 'carrier')
+    fields_std = ('vdevice_name', 'interface', 'color', 'private_ip', 'public_ip', 'admin_state', 'operation_state',
+                  'carrier')
     fields_ext = ('private_port', 'public_port')
 
 

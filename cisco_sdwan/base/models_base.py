@@ -207,7 +207,23 @@ class OperationalItem:
     fields_sub = None  # Tuple containing fields to subtract from fields_std as entries are iterated
     field_conversion_fns = {}
 
+    _FALLBACK_TITLE_SUBSTITUTIONS = {
+        'vdevice-name': 'System Ip'
+    }
+
     def __init__(self, payload: Mapping[str, Any]) -> None:
+        def format_title(title: str) -> str:
+            # If it is a dotted string, keep the last segment only. Ex. device.control.dataControlWanInterface.interface
+            formatted = title.split('.')[-1]
+            # Replace camelCase with camel Case
+            formatted = re.sub(r'(?<=[a-z])(?=[A-Z])', ' ', formatted)
+
+            return formatted.title()
+
+        def format_fallback_title(p_name: str) -> str:
+            substitution = self._FALLBACK_TITLE_SUBSTITUTIONS.get(p_name.lower())
+            return substitution if substitution is not None else p_name.replace('_', ' ').title()
+
         self.timestamp = payload['header']['generatedOn']
 
         self._data = payload['data']
@@ -216,20 +232,11 @@ class OperationalItem:
         # defined. For those properties without a title, infer one based on the property name.
         self._meta = {attribute_safe(field['property']): field for field in payload['header']['fields']}
         title_dict = {
-            attribute_safe(field['property']): self.format_title(field['title'])
+            attribute_safe(field['property']): format_title(field['title'])
             for field in payload['header']['columns']
         }
         for field_property, field in self._meta.items():
-            field['title'] = title_dict.get(field_property, field['property'].replace('_', ' ').title())
-
-    @staticmethod
-    def format_title(title: str) -> str:
-        # If it is a dotted string, keep the last segment only. Ex. device.control.dataControlWanInterface.interface
-        formatted = title.split('.')[-1]
-        # Replace camelCase with camel Case
-        formatted = re.sub(r'(?<=[a-z])(?=[A-Z])', ' ', formatted)
-
-        return f'{formatted[0].upper()}{formatted[1:]}' if formatted else formatted
+            field['title'] = title_dict.get(field_property, format_fallback_title(field['property']))
 
     @property
     def field_names(self) -> tuple[str, ...]:
