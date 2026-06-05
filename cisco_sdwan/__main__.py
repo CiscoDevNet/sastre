@@ -21,7 +21,7 @@ from .tasks.utils import TaskOptions, EnvVar, non_empty_type, PromptArg
 from .tasks.common import Task, TaskException
 from .tasks import implementation
 
-# SDWAN Manager REST API defaults
+# SD-WAN Manager REST API defaults
 VMANAGE_PORT = '443'
 REST_TIMEOUT = 300
 

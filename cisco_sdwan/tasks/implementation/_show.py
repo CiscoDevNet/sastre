@@ -142,7 +142,11 @@ class TaskShow(Task):
 
         return task_parser.parse_args(task_args)
 
-    def runner(self, parsed_args, api: Optional[Rest] = None) -> list | None:
+    def runner(self, parsed_args, api: Optional[Rest] = None) -> Sequence | None:
+        if api is None:
+            self.log_critical('SD-WAN Manager connection is not available')
+            return
+
         self.log_info(f'Show {parsed_args.subtask_info} task: SD-WAN Manager URL: "{api.base_url}"')
 
         filters = get_table_filters(exclude_regex=parsed_args.exclude, include_regex=parsed_args.include)
@@ -216,8 +220,8 @@ class TaskShow(Task):
 
             fields = table_fields(op_cls, parsed_args.detail, parsed_args.simple)
             node_data_dict = {}
-            for node_id, *node_data_sample in op_obj.field_value_iter(
-                    op_cls.field_node_id, *fields, **op_cls.field_conversion_fns):
+            for node_id, *node_data_sample in op_obj.field_value_iter(op_cls.field_node_id, *fields,
+                                                                      **op_cls.field_conversion_fns):
                 node_data_dict.setdefault(node_id, []).append(node_data_sample)
 
             table = self.build_table(info, op_obj.field_info(*fields), devices, node_data_dict)

@@ -1,5 +1,6 @@
 import argparse
 from typing import Optional
+from collections.abc import Sequence
 from pydantic import model_validator, field_validator
 from functools import partial
 from uuid import uuid4
@@ -49,7 +50,11 @@ class TaskBackup(Task):
                                       'device configurations.')
         return task_parser.parse_args(task_args)
 
-    def runner(self, parsed_args, api: Optional[Rest] = None) -> list | None:
+    def runner(self, parsed_args, api: Optional[Rest] = None) -> Sequence | None:
+        if api is None:
+            self.log_critical('SD-WAN Manager connection is not available')
+            return
+
         if parsed_args.archive:
             self.log_info(
                 f'Backup task: SD-WAN Manager URL: "{api.base_url}" -> Local archive file: "{parsed_args.archive}"'
@@ -125,11 +130,9 @@ class TaskBackup(Task):
                     except RestAPIException as ex:
                         self.log_error(f'Failed backup {info} {item_name} values: {ex}')
 
-                # Special case for ConfigGroup, handle ConfigGroupAssociated, ConfigGroupValues, ConfigGroupRules
-                # TODO: Review post 20.13
+                # Special case for ConfigGroup, handle ConfigGroupAssociated, and ConfigGroupValues
                 if isinstance(item, ConfigGroup) and item.devices_associated:
                     for sub_item_info, sub_item_cls in (('associated devices', ConfigGroupAssociated),
-                                                        # ('automated rules', ConfigGroupRules),
                                                         ('values', ConfigGroupValues)):
                         sub_item = sub_item_cls.get(api, configGroupId=item_id)
                         if sub_item is None:
@@ -146,7 +149,7 @@ class TaskBackup(Task):
 
         return
 
-    def save_running_configs(self, api: Optional[Rest], workdir: str) -> None:
+    def save_running_configs(self, api: Rest, workdir: str) -> None:
         inventory_list = [(ControlInventory.get(api), 'controller')]
         if not api.is_provider or api.is_tenant_scope:
             inventory_list.append((EdgeInventory.get(api), 'WAN edge'))

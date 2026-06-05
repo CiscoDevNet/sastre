@@ -1,6 +1,7 @@
 import argparse
 from getpass import getpass
 from typing import Optional
+from collections.abc import Sequence
 from pydantic import field_validator, ValidationError
 import yaml
 from cisco_sdwan.__version__ import __doc__ as title
@@ -42,12 +43,16 @@ class TaskEncrypt(Task):
 
         return task_parser.parse_args(task_args)
 
-    def runner(self, parsed_args, api: Optional[Rest] = None) -> list | None:
+    def runner(self, parsed_args, api: Optional[Rest] = None) -> Sequence | None:
+        if api is None:
+            self.log_critical('SD-WAN Manager connection is not available')
+            return
+
         self.log_info(f'Encrypt task: SD-WAN Manager URL: "{api.base_url}"')
 
         return parsed_args.subtask_handler(self, parsed_args, api)
 
-    def recipe(self, parsed_args, api: Rest) -> list | None:
+    def recipe(self, parsed_args, api: Rest) -> Sequence | None:
         try:
             recipe = TransformRecipe.parse_yaml(parsed_args.recipe_file)
         except (ValidationError, RecipeException) as ex:
@@ -87,7 +92,7 @@ class TaskEncrypt(Task):
 
         return
 
-    def values(self, parsed_args, api: Rest) -> list | None:
+    def values(self, parsed_args, api: Rest) -> Sequence | None:
         # Interactive mode
         if not parsed_args.values:
             print('Interactive mode, press <ENTER> on empty value or ^C to quit.')

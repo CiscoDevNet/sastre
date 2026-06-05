@@ -3,6 +3,7 @@ from uuid import uuid4
 from copy import deepcopy
 from contextlib import suppress
 from typing import Any, Optional, NamedTuple, Annotated
+from collections.abc import Sequence
 from pydantic import model_validator, BaseModel, field_validator, ValidationError, Field, ValidationInfo, ConfigDict
 import yaml
 from cisco_sdwan.__version__ import __doc__ as title
@@ -262,7 +263,7 @@ class TaskTransform(Task):
         else:
             return TransformRecipe.model_validate_json(parsed_args.from_json)
 
-    def runner(self, parsed_args, api: Optional[Rest] = None) -> list | None:
+    def runner(self, parsed_args, api: Optional[Rest] = None) -> Sequence | None:
         if parsed_args.workdir is not None:
             source_info = f'Local workdir: "{parsed_args.workdir}"'
         else:
@@ -283,7 +284,7 @@ class TaskTransform(Task):
 
         return parsed_args.subtask_handler(self, parsed_args, backend, server_version)
 
-    def transform(self, parsed_args, backend: Rest | str, server_version: Optional[str]) -> list | None:
+    def transform(self, parsed_args, backend: Rest | str, server_version: Optional[str]) -> Sequence | None:
         # Load processors
         try:
             recipe = parsed_args.recipe_handler(parsed_args)
@@ -323,7 +324,12 @@ class TaskTransform(Task):
                     id_hint_map = {item_name: item_id for item_id, item_name in item_index}
 
                     for item_id, item_name in item_index:
-                        item = self.retrieve(item_cls, backend, item_id, item_name, item_index.need_extended_name)
+                        try:
+                            item = self.retrieve(item_cls, backend, item_id, item_name, item_index.need_extended_name)
+                        except ValueError as ex:
+                            self.log_error(f'Failed loading {info} {item_name}: {ex}')
+                            continue
+                            
                         if item is None:
                             self.log_error(f'Failed loading {info} {item_name}')
                             continue
@@ -409,7 +415,7 @@ class TaskTransform(Task):
 
         return
 
-    def build_recipe(self, parsed_args, backend: Rest | str, server_version: Optional[str]) -> list | None:
+    def build_recipe(self, parsed_args, backend: Rest | str, server_version: Optional[str]) -> Sequence | None:
         try:
             tag_set = set()
             resources = []

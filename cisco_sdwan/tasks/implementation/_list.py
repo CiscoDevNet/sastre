@@ -1,6 +1,6 @@
 import argparse
 from typing import Optional
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from operator import itemgetter
 from functools import partial
 from pydantic import model_validator, field_validator
@@ -79,7 +79,7 @@ class TaskList(Task):
     def is_api_required(parsed_args) -> bool:
         return parsed_args.workdir is None
 
-    def runner(self, parsed_args, api: Optional[Rest] = None) -> list | None:
+    def runner(self, parsed_args, api: Optional[Rest] = None) -> Sequence | None:
         source_info = f'Local workdir: "{parsed_args.workdir}"' if api is None else f'SD-WAN Manager URL: "{api.base_url}"'
         self.log_info(f'List {parsed_args.subtask_info} task: {source_info}')
 

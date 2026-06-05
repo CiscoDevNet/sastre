@@ -2,12 +2,12 @@
  Sastre - Cisco-SDWAN Automation Toolset
 
  cisco_sdwan.base.models_vmanage
- This module implements vManage API models
+ This module implements SD-WAN Manager API models
 """
 import re
 from typing import Optional, Any
 from enum import Enum
-from collections.abc import Mapping, Sequence, Callable, Iterable
+from collections.abc import Mapping, Sequence, Callable, Iterable, Iterator
 from pathlib import Path
 from collections import namedtuple
 from copy import deepcopy
@@ -82,17 +82,16 @@ class DeviceTemplateAttach(ApiItem):
 
 class TagAssociate(ApiItem):
     api_path = ApiPath(None, 'v1/tags/associate', None, None)
-    id_tag = 'id'
+    id_tag = 'taskId'
 
     @staticmethod
-    def api_params(tag_mappings: Iterable[tuple[str, list[str]]]) -> dict[str, Any]:
+    def device_api_params(tag_mappings: Iterable[tuple[str, Iterable[str]]]) -> dict[str, Any]:
         """
         Build dictionary used to provide input parameters for api POST call
         @param tag_mappings: An iterable of (<tag_id>, <device_id_list>) tuples. <device_id_list> is a list of device
                              ids to be associated with this tag.
         @return: Dictionary used to provide POST input parameters
         """
-
         def tag_entry(tag_id, device_id_list):
             return {
                 "tagId": tag_id,
@@ -110,6 +109,42 @@ class TagAssociate(ApiItem):
 
 class TagDissociate(TagAssociate):
     api_path = ApiPath(None, 'v1/tags/associate?operationType=DELETE', None, None)
+
+
+class RuleAssociate(ApiItem):
+    api_path = ApiPath(None, 'v1/rules/{ruleId}/associate', None, 'v1/rules/{ruleId}/associate')
+    id_tag = 'taskId'
+
+    @staticmethod
+    def cfg_group_api_params(config_group_ids: Iterable[str]) -> dict[str, Any]:
+        """
+        Build dictionary used to provide input parameters for api POST call
+        @param config_group_ids: An iterable of <config_group_id>.
+        @return: Dictionary used to provide POST input parameters
+        """
+        def rule_entry(config_group_id):
+            return {
+                "id": config_group_id,
+                "objectType": "CONFIG_GROUP"
+            }
+
+        return {
+            "data": [
+                rule_entry(config_group_id) for config_group_id in config_group_ids
+            ]
+        }
+
+    @staticmethod
+    def cfg_group_delete_params(config_group_id: str) -> dict[str, str]:
+        """
+        Build dictionary used to provide url parameters for api DELETE call
+        @param config_group_id: Config-group ID string
+        @return: Dictionary used to provide DELETE url parameters
+        """
+        return {
+            "objectId": config_group_id,
+            "objectType": "CONFIG_GROUP"
+        }
 
 
 class DeviceTemplateCLIAttach(DeviceTemplateAttach):
@@ -396,7 +431,7 @@ class DeviceConfigRFS(DeviceConfig):
         return '{safe_device_id}?type=RFS'.format(safe_device_id=quote_plus(device_id))
 
 
-# Set of device types that use cedge template class. Updated as of vManage 20.15
+# Set of device types that use cedge template class. Updated as of SD-WAN Manager 20.15
 CEDGE_SET = {
     "cellular-gateway-CG113-4GW6A", "cellular-gateway-CG113-4GW6B", "cellular-gateway-CG113-4GW6E",
     "cellular-gateway-CG113-4GW6H", "cellular-gateway-CG113-4GW6Q", "cellular-gateway-CG113-4GW6Z",
@@ -460,7 +495,7 @@ CEDGE_SET = {
     "vedge-nfvis-C8300-UCPE-1N20", "vedge-nfvis-CSP-5216", "vedge-nfvis-CSP-5228", "vedge-nfvis-CSP-5436",
     "vedge-nfvis-ENCS5400"
 }
-# Software devices. Updated as of vManage 20.12
+# Software devices. Updated as of SD-WAN Manager 20.12
 SOFT_EDGE_SET = {"vedge-CSR-1000v", "vedge-C8000V", "vedge-C8000V-SD-ROUTING", "vedge-cloud", "vmanage", "vsmart",
                  "vedge-ISRv"}
 
@@ -487,8 +522,9 @@ class Tag(ConfigItem):
     store_path = ('tags',)
     id_tag = 'id'
     name_tag = 'name'
-    # Skipping compare for all keys from tag payload to prevent update operations, which is not supported by vManage.
-    skip_cmp_tag_set = {'description', 'type', 'tagAssociation'}
+    # Skipping compare for all keys from tag payload to prevent update operations, which is not supported by the
+    # SD-WAN manager. Exception is tagAssociation, which when different will trigger tag to device association.
+    skip_cmp_tag_set = {'description', 'type'}
 
     @staticmethod
     def delete_params(tag_id: str) -> dict[str, str]:
@@ -508,11 +544,83 @@ class Tag(ConfigItem):
             'data': [super().post_data(id_mapping_dict)]
         }
 
+    def device_associations(self) -> Iterator[str]:
+        return (entry['id'] for entry in self.data.get('tagAssociation', []) if entry.get('objectType', '') == 'DEVICE')
+
 
 @register('tag', 'tag', Tag)
 class TagIndex(IndexConfigItem):
     api_path = ApiPath('v1/tags', None, None, None)
     store_file = 'tags.json'
+    iter_fields = IdName('id', 'name')
+
+
+#
+# Rules
+#
+class Rule(ConfigItem):
+    api_path = ApiPath('v1/rules')
+    store_path = ('rules',)
+    id_tag = 'id'
+    name_tag = 'name'
+    skip_cmp_tag_set = {'name', 'description'}
+    post_filtered_tags = ('metaDataList', 'association')
+
+    # In 20.15 get rules contains 'matchType' key under 'matchCriteria', while put request requires 'match-type' instead
+    def __init__(self, data: dict[str, Any]):
+        match_criteria = data.get('matchCriteria', {})
+        if (match_type := match_criteria.pop('matchType', None)) is not None:
+            match_criteria['match-type'] = match_type
+        super().__init__(data)
+
+    @staticmethod
+    def delete_params(rule_id: str) -> dict[str, str]:
+        """
+        Build dictionary used to provide url parameters for api DELETE call
+        @param rule_id: Rule ID string
+        @return: Dictionary used to provide DELETE url parameters
+        """
+        return {
+            "ruleId": rule_id,
+        }
+
+    @staticmethod
+    def build_name(config_group_id: str) -> str:
+        return f'{config_group_id}_name'
+
+    def config_group_associations(self) -> Iterator[str]:
+        return (
+            entry['id'] for entry in self.data.get('association', []) if entry.get('objectType', '') == 'CONFIG_GROUP'
+        )
+
+    def update_name(self, id_mapping_dict: Mapping[str, str]) -> None:
+        """
+        Update the name for this Rule for the target SD-WAN manager, when applicable. Rule names for config-group
+        associations follow the format <config_group uuid>_name. Other types of rules, such as topology association
+        rules follow a regular name (ex. hubRule_name). Only config-group association rule names need to be updated
+        because the config-group UUID will be different on the target SD-WAN manager.
+        The new name is then constructed by replacing the old config-group UUID with the new UUID of that same
+        config-group on the target SD-WAN manager.
+        @param id_mapping_dict: {<old item id>: <new item id>} dict. Used to find the mapping of old config-group UUID
+                                and new config-group UUID.
+        """
+        match = re.match(r'(?P<uuid>[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12})_name', self.name,
+                         flags=re.IGNORECASE)
+        if not match:
+            # Not a config-group association rule, no-op in this case.
+            return
+
+        new_uuid = id_mapping_dict.get(match.group('uuid'))
+        if new_uuid is None:
+            raise ValueError(f'Cannot determine new rule name, config-group ID not found: {match.group("uuid")}')
+
+        self.data[self.name_tag] = self.build_name(new_uuid)
+
+
+@register('rule', 'rule', Rule, min_version='20.15')
+class RuleIndex(IndexConfigItem):
+    api_path = ApiPath('v1/rules', None, None, None)
+    store_file = 'rules.json'
     iter_fields = IdName('id', 'name')
 
 
@@ -596,7 +704,7 @@ class DeviceTemplate(ConfigItem):
     type_tag = 'deviceType'
     post_filtered_tags = ('feature',)
     # templateClass, deviceRole, draftMode, templateId and copyEdited are new tags in 20.x+, adding to skip diff to not
-    # trigger updates when restore --update is done between pre 20.x workdir and post 20.x vManage.
+    # trigger updates when restore --update is done between pre 20.x workdir and post 20.x SD-WAN Manager.
     skip_cmp_tag_set = {'createdOn', 'createdBy', 'lastUpdatedBy', 'lastUpdatedOn', '@rid', 'owner', 'infoTag',
                         'templateAttached', 'templateConfigurationEdited', 'templateClass', 'deviceRole', 'draftMode',
                         'templateId', 'copyEdited'}
@@ -701,9 +809,10 @@ class FeatureTemplate(ConfigItem):
     name_tag = 'templateName'
     type_tag = 'templateType'
     # gTemplateClass is new in 20.x, adding skip diff to not trigger updates when restore --update is done between
-    # pre 20.x workdir and post 20.x vManage.
+    # pre 20.x workdir and post 20.x SD-WAN Manager.
     skip_cmp_tag_set = {'createdOn', 'createdBy', 'lastUpdatedBy', 'lastUpdatedOn', '@rid', 'owner', 'infoTag',
-                        'devicesAttached', 'attachedMastersCount', 'gTemplateClass'}
+                        'devicesAttached', 'attachedMastersCount', 'gTemplateClass', 'editedTemplateDefinition'}
+    post_filtered_tags = ('editedTemplateDefinition',)
 
     @property
     def device_types(self) -> set[str]:
@@ -883,47 +992,6 @@ class ConfigGroupAssociated(Config2Item):
         response = api.delete(ConfigGroupAssociated.api_path.resolve(**path_vars).delete, input_data=payload)
 
         return ConfigGroupAssociated.ActionWorker(uuid=response.get('parentTaskId'))
-
-
-class ConfigGroupRules(IndexConfigItem):
-    # api_path = ApiPath('tag/tagRules/{configGroupId}', 'tag/tagRules')
-    # TODO: Review post 20.13
-    api_path = ApiPath('v1/config-group/{configGroupId}/rules')
-    store_path = ('config_groups', 'tag_rules')
-    store_file = '{item_name}.json'
-    id_tag = 'tagId'
-    iter_fields = ('tagId',)
-
-    @staticmethod
-    def delete_raise(api: Rest, config_group_id: str, rule_id: str) -> None:
-        # 'tag/tagRules/{tag_rule_id}?configGroupId={config_group_id}'
-        api.delete(ConfigGroupRules.api_path.resolve(configGroupId=config_group_id).delete, rule_id,
-                   configGroupId=config_group_id)
-
-    def post_raise(self, api: Rest, config_group_id: str) -> list[str]:
-        filtered_keys = {
-            self.id_tag,
-        }
-        response_list = []
-        for rule in self.data:
-            post_data = {k: v for k, v in rule.items() if k not in filtered_keys}
-            post_data['configGroupId'] = config_group_id
-            response = api.post(post_data, ConfigGroupRules.api_path.resolve(configGroupId=config_group_id).post)
-            if response.get('isConflict'):
-                raise ValueError(f"The rule created conflicts with another rule for config-group {config_group_id}")
-            response_list.extend(
-                entry.get('chassisNumber') for entry in response.get('devices', {}).get('matchingDevices', [])
-            )
-
-        return response_list
-
-    def put_raise(self, api: Rest, config_group_id: str) -> None:
-        for rule in self.data:
-            put_data = {k: v for k, v in rule.items()}
-            put_data['configGroupId'] = config_group_id
-            response = api.put(put_data, ConfigGroupRules.api_path.resolve(configGroupId=config_group_id).put)
-            if response.get('isConflict'):
-                raise ValueError(f"The rule created conflicts with another rule for config-group {config_group_id}")
 
 
 class ConfigGroupDeploy(ApiItem):
@@ -1180,6 +1248,7 @@ class ProfileSdwanTransport(FeatureProfile):
         PathKey("ipv6-acl", "wan/vpn/interface/dsl-pppoe"): ...,
         PathKey("ipv6-acl", "wan/vpn/interface/dsl-pppoa"): ...,
         PathKey("ipv6-acl", "wan/vpn/interface/ethpppoe"): ...,
+        PathKey("wan/vpn/interface/ethernet", "wan/vpn/interface/ethernet"): ...,
     } | {
         PathKey(policy_obj_parcel, "route-policy"): ...
         for policy_obj_parcel in ProfileSdwanPolicy.ordered_parcel_names
@@ -1301,14 +1370,38 @@ class ProfileSdwanEmbeddedSecurityIndex(FeatureProfileIndex):
 # SD-Routing Feature Profiles
 #
 
+class ProfileSdRoutingSystem(FeatureProfile):
+    api_path = ApiPath('v1/feature-profile/sd-routing/system')
+    store_path = ('feature_profiles', 'sd-routing', 'system')
+    parcel_api_paths = ApiPathGroup({
+        "global": ApiPath("v1/feature-profile/sd-routing/system/{systemId}/global"),
+        "banner": ApiPath("v1/feature-profile/sd-routing/system/{systemId}/banner"),
+        "ntp-sd-routing": ApiPath("v1/feature-profile/sd-routing/system/{systemId}/ntp"),
+        "logging-sd-routing": ApiPath("v1/feature-profile/sd-routing/system/{systemId}/logging"),
+        "aaa-sd-routing": ApiPath("v1/feature-profile/sd-routing/system/{systemId}/aaa"),
+    })
+
+
+@register('feature_profile', 'SD-Routing system profile', ProfileSdRoutingSystem, min_version='20.15')
+class ProfileSdRoutingSystemIndex(FeatureProfileIndex):
+    api_path = ApiPath('v1/feature-profile/sd-routing/system', None, None, None)
+    store_file = 'feature_profiles_sd-routing_system.json'
+
+
 class ProfileSdRoutingService(FeatureProfile):
     api_path = ApiPath('/v1/feature-profile/sd-routing/service')
     store_path = ('feature_profiles', 'sd-routing', 'service')
 
-    parcel_names = ("multicloud-connection", )
+    parcel_names = ("multicloud-connection", "dhcp-server", "vrf")
 
     parcel_api_paths = ApiPathGroup({
+        "vrf/lan/interface/ethernet": ApiPath(
+            "v1/feature-profile/sd-routing/service/{serviceId}/vrf/{vrfId}/interface/ethernet"),
+    } | {
         name: ApiPath(f"v1/feature-profile/sd-routing/service/{{serviceId}}/{name}") for name in parcel_names
+    }, parcel_reference_path_map={
+        PathKey("dhcp-server", "vrf/lan/interface/ethernet"): ApiPath(
+            "v1/feature-profile/sd-routing/service/{serviceId}/vrf/{vrfId}/interface/ethernet/{ethId}/dhcp-server"),
     })
 
 
@@ -1322,9 +1415,12 @@ class ProfileSdRoutingTransport(FeatureProfile):
     api_path = ApiPath('/v1/feature-profile/sd-routing/transport')
     store_path = ('feature_profiles', 'sd-routing', 'transport')
 
-    parcel_names = ("multicloud-connection", )
+    parcel_names = ("multicloud-connection", "global-vrf")
 
     parcel_api_paths = ApiPathGroup({
+        "global-vrf/wan/interface/ethernet": ApiPath(
+            "v1/feature-profile/sd-routing/transport/{transportId}/global-vrf/{globalVrfId}/interface/ethernet"),
+    } | {
         name: ApiPath(f"v1/feature-profile/sd-routing/transport/{{transportId}}/{name}") for name in parcel_names
     })
 
@@ -1333,6 +1429,20 @@ class ProfileSdRoutingTransport(FeatureProfile):
 class ProfileSdRoutingTransportIndex(FeatureProfileIndex):
     api_path = ApiPath('/v1/feature-profile/sd-routing/transport', None, None, None)
     store_file = 'feature_profiles_sd-routing_transport.json'
+
+
+class ProfileSdRoutingCli(FeatureProfile):
+    api_path = ApiPath('v1/feature-profile/sd-routing/cli')
+    store_path = ('feature_profiles', 'sd-routing', 'cli')
+    parcel_api_paths = ApiPathGroup({
+        "config": ApiPath("v1/feature-profile/sd-routing/cli/{cliId}/config")
+    })
+
+
+@register('feature_profile', 'SD-Routing CLI profile', ProfileSdRoutingCli, min_version='20.15')
+class ProfileSdRoutingCliIndex(FeatureProfileIndex):
+    api_path = ApiPath('v1/feature-profile/sd-routing/cli', None, None, None)
+    store_file = 'feature_profiles_sd-routing_cli.json'
 
 
 #
@@ -1455,7 +1565,7 @@ class PolicySecurity(ConfigItem):
     name_tag = 'policyName'
     type_tag = 'policyType'
     # policyUseCase, policyMode are new tags in 20.x+, adding to skip diff to not trigger updates when restore --update
-    # is done between pre 20.x workdir and post 20.x vManage.
+    # is done between pre 20.x workdir and post 20.x SD-WAN Manager.
     skip_cmp_tag_set = {'policyUseCase', 'policyMode'}
 
 
@@ -1500,8 +1610,9 @@ class PolicyCustomApp(ConfigItem):
         """
         @param data: dict containing the information to be associated with this API item.
         """
-        # In 20.3.1 the payload returned by vManage contains a 'data' key with the policy definition in it. This is
-        # different from previous versions or other ConfigItems. Overwriting default __init__ to handle both options.
+        # In 20.3.1 the payload returned by SD-WAN Manager contains a 'data' key with the policy definition in it.
+        # This is different from previous versions or other ConfigItems. Overwriting default __init__ to handle both
+        # options.
         super().__init__(data.get('data', data))
 
 
@@ -1522,7 +1633,7 @@ class PolicyDef(ConfigItem):
     name_tag = 'name'
     type_tag = 'type'
     # mode is new tag in 20.x+, adding to skip diff to not trigger updates when restore --update is done between pre
-    # 20.x workdir and post 20.x vManage.
+    # 20.x workdir and post 20.x SD-WAN Manager.
     skip_cmp_tag_set = {'lastUpdated', 'referenceCount', 'references', 'activatedId', 'isActivatedByVsmart',
                         'owner', 'infoTag', 'mode'}
 
@@ -2466,16 +2577,32 @@ class EdgeCertificate(IndexConfigItem):
 
 
 #
+# Conversion functions
+#
+def datetime_format(timestamp: str | None, epoch_value_return: str = '') -> str:
+    if timestamp is None:
+        return ''
+
+    if timestamp == 0:
+        return epoch_value_return
+
+    return entry_time_parse(timestamp).strftime("%Y-%m-%d %H:%M:%S %Z")
+
+
+def string_strip(value: str | None) -> str:
+    if value is None:
+        return ''
+
+    return value.strip()
+
+
+#
 # Log items
 #
-def datetime_format(timestamp: Optional[str]) -> str:
-    return entry_time_parse(timestamp).strftime("%Y-%m-%d %H:%M:%S %Z") if timestamp is not None else ''
-
-
 class Alarm(RecordItem):
     api_path = ApiPath(None, 'alarms', None, None)
-    fields_std = ('entry_time', 'devices', 'severity', 'type', 'message', 'active')
-    fields_ext = ('acknowledged', 'uuid', 'cleared_time')
+    fields_std = ('entry_time', 'severity', 'message')
+    fields_ext = ('cleared_time', )
     field_conversion_fns = {
         'entry_time': datetime_format,
         'cleared_time': datetime_format
@@ -2518,8 +2645,7 @@ class BfdSessions(RealtimeItem):
 @op_register('bfd', 'summary', 'BFD summary')
 class BfdSummary(RealtimeItem):
     api_path = ApiPath('device/bfd/summary', None, None, None)
-    fields_std = ('vdevice_name', 'vdevice_host_name',  'bfd_sessions_total', 'bfd_sessions_up', 'bfd_sessions_max',
-                  'bfd_sessions_flap')
+    fields_std = ('vdevice_name', 'bfd_sessions_total', 'bfd_sessions_up', 'bfd_sessions_max', 'bfd_sessions_flap')
     fields_ext = ('poll_interval', 'lastupdated')
     field_conversion_fns = {
         'lastupdated': datetime_format
@@ -2529,9 +2655,17 @@ class BfdSummary(RealtimeItem):
 @op_register('control', 'connections', 'Control connections')
 class DeviceControlConnections(RealtimeItem):
     api_path = ApiPath('device/control/connections', None, None, None)
-    fields_std = ('system_ip', 'site_id', 'peer_type', 'local_color', 'remote_color', 'state')
+    fields_std = ('vdevice_name', 'system_ip', 'site_id', 'peer_type', 'local_color', 'remote_color', 'state')
     fields_ext = ('private_ip', 'private_port', 'public_ip', 'public_port', 'instance', 'protocol', 'domain_id')
     fields_sub = ('local_color', 'remote_color')
+
+
+@op_register('control', 'wan-interfaces', 'Control WAN interfaces')
+class DeviceControlWAN(RealtimeItem):
+    api_path = ApiPath('device/control/waninterface', None, None, None)
+    fields_std = ('vdevice_name', 'interface', 'color', 'private_ip', 'public_ip', 'admin_state', 'operation_state',
+                  'carrier')
+    fields_ext = ('private_port', 'public_port')
 
 
 @op_register('control', 'local-properties', 'Control local-properties')
@@ -2642,7 +2776,6 @@ class DeviceTunnelStats(RealtimeItem):
 class DeviceSoftware(RealtimeItem):
     api_path = ApiPath('device/software', None, None, None)
     fields_std = ('version', 'active', 'default')
-    fields_ext = ('confirmed',)
 
 
 @op_register('dpi', 'summary', 'DPI summary')
@@ -2677,6 +2810,12 @@ class HardwareInventory(RealtimeItem):
     api_path = ApiPath('device/hardware/inventory', None, None, None)
     fields_std = ('hw_type', 'hw_description')
     fields_ext = ('version', 'part_number', 'serial_number')
+
+    field_conversion_fns = {
+        'hw_description': string_strip,
+        'version': string_strip,
+        'part_number': string_strip
+    }
 
 
 @op_register('hardware', 'environment', 'hardware environment')
@@ -2745,6 +2884,10 @@ class BulkBfdSessions(BulkStateItem):
     fields_std = ('system_ip', 'site_id', 'local_color', 'color', 'state')
     fields_ext = ('src_ip', 'src_port', 'dst_ip', 'dst_port', 'transitions', 'uptime_date')
 
+    field_conversion_fns = {
+        'uptime_date': datetime_format
+    }
+
 
 @op_register('control', 'connections', 'Control connections')
 class BulkControlConnections(BulkStateItem):
@@ -2753,6 +2896,10 @@ class BulkControlConnections(BulkStateItem):
     fields_ext = ('private_ip', 'private_port', 'public_ip', 'public_port', 'instance', 'protocol', 'domain_id',
                   'uptime_date')
     fields_sub = ('local_color', 'remote_color')
+
+    field_conversion_fns = {
+        'uptime_date': datetime_format
+    }
 
 
 @op_register('control', 'local-properties', 'Control local-properties')

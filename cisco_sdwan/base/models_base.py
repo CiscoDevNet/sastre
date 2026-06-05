@@ -2,7 +2,7 @@
  Sastre - Cisco-SDWAN Automation Toolset
 
  cisco_sdwan.base.models_base
- This module implements vManage base API models
+ This module implements SD-WAN Manager base API models
 """
 import json
 import re
@@ -37,7 +37,7 @@ class UpdateEval:
         self.is_master = isinstance(data, dict) and 'data' in data
 
         # This is to homogenize the response payload variants
-        self.data = data.get('data') if self.is_master else data
+        self.data = data.get('data', {}) if self.is_master else data
 
     @property
     def need_reattach(self):
@@ -64,8 +64,7 @@ class ApiPath:
     """
     __slots__ = ('path_vars', 'get', 'post', 'put', 'delete')
 
-    def __init__(self, get: Optional[str], *other_ops: Optional[str],
-                 path_vars: Optional[Sequence[str]] = None) -> None:
+    def __init__(self, get: str | None, *other_ops: str | None, path_vars: Optional[Sequence[str]] = None) -> None:
         """
         @param get: URL path for get operations
         @param other_ops: URL path for post, put and delete operations, in this order. If an item is not specified,
@@ -73,6 +72,9 @@ class ApiPath:
         @param path_vars: Path variable names that may be present in defined paths. It is assumed that all methods have
                           the same path variables.
         """
+        if len(other_ops) > len(self.__slots__) - 2:
+            raise ValueError(f"Too many operations provided: {other_ops}")
+
         self.get = get
         last_op = other_ops[-1] if other_ops else get
         for field, value in zip_longest(self.__slots__[2:], other_ops, fillvalue=last_op):
@@ -150,7 +152,7 @@ class ApiPathGroup:
     ApiPathGroup is used on feature profiles and contains mapping of parcelType to ApiPath. ApiPaths relative to parcel
     references are registered using the optional parcel_reference_path_map.
     """
-    def __init__(self, path_map: Mapping[str, ApiPath],
+    def __init__(self, path_map: Mapping[str, ApiPath | EllipsisType],
                  parcel_reference_path_map: Optional[Mapping[PathKey, ApiPath | EllipsisType]] = None) -> None:
         """
         @param path_map: Register parcel ApiPaths to a feature profile. Mapping of {<parcelType>: ApiPath, ... }
@@ -165,7 +167,7 @@ class ApiPathGroup:
         self._parent_types = {path_key.parent_parcel_type
                               for path_key in self._parcel_ref_map if path_key.parent_parcel_type is not None}
 
-    def api_path(self, key: PathKey) -> tuple[ApiPath | None, bool]:
+    def api_path(self, key: PathKey) -> tuple[ApiPath | EllipsisType | None, bool]:
         """
         Returns the api path associated with the provided key, along with whether this is a parcel reference or an
         actual parcel.
@@ -207,17 +209,36 @@ class OperationalItem:
     fields_sub = None  # Tuple containing fields to subtract from fields_std as entries are iterated
     field_conversion_fns = {}
 
+    _FALLBACK_TITLE_SUBSTITUTIONS = {
+        'vdevice-name': 'System Ip'
+    }
+
     def __init__(self, payload: Mapping[str, Any]) -> None:
+        def format_title(title: str) -> str:
+            # If it is a dotted string, keep the last segment only. Ex. device.control.dataControlWanInterface.interface
+            formatted = title.split('.')[-1]
+            # Replace camelCase with camel Case
+            formatted = re.sub(r'(?<=[a-z])(?=[A-Z])', ' ', formatted)
+
+            return formatted.title()
+
+        def format_fallback_title(p_name: str) -> str:
+            substitution = self._FALLBACK_TITLE_SUBSTITUTIONS.get(p_name.lower())
+            return substitution if substitution is not None else p_name.replace('_', ' ').title()
+
         self.timestamp = payload['header']['generatedOn']
 
         self._data = payload['data']
 
-        # Some vManage endpoints don't provide all properties in the 'columns' list, which is where 'title' is
+        # Some SD-WAN Manager endpoints don't provide all properties in the 'columns' list, which is where 'title' is
         # defined. For those properties without a title, infer one based on the property name.
         self._meta = {attribute_safe(field['property']): field for field in payload['header']['fields']}
-        title_dict = {attribute_safe(field['property']): field['title'] for field in payload['header']['columns']}
+        title_dict = {
+            attribute_safe(field['property']): format_title(field['title'])
+            for field in payload['header']['columns']
+        }
         for field_property, field in self._meta.items():
-            field['title'] = title_dict.get(field_property, field['property'].replace('_', ' ').title())
+            field['title'] = title_dict.get(field_property, format_fallback_title(field['property']))
 
     @property
     def field_names(self) -> tuple[str, ...]:
@@ -236,7 +257,8 @@ class OperationalItem:
 
         return tuple(entry.get(info, default) for entry in default_getter(*field_names, default={})(self._meta))
 
-    def field_value_iter(self, *field_names: str, **conv_fn_map: Mapping[str, Callable[..., Any]]) -> Iterator[tuple[Any, ...]]:
+    def field_value_iter(self, *field_names: str,
+                         **conv_fn_map: Mapping[str, Callable[..., Any]]) -> Iterator[tuple[Any, ...]]:
         """
         Iterate over entries of an operational item instance. Only fields/columns defined by field_names are yielded.
         Type conversion of one or more fields is supported by passing a callable that takes one argument (the field
@@ -286,7 +308,7 @@ class OperationalItem:
 
 class RealtimeItem(OperationalItem):
     """
-    RealtimeItem represents a vManage realtime monitoring API element defined by an ApiPath with a GET path.
+    RealtimeItem represents an SD-WAN Manager realtime monitoring API element defined by an ApiPath with a GET path.
     An instance of this class can be created to retrieve and parse realtime endpoints.
     """
     api_params = ('deviceId',)
@@ -311,8 +333,8 @@ class RealtimeItem(OperationalItem):
 
 class BulkStatsItem(OperationalItem):
     """
-    BulkStatsItem represents a vManage bulk statistics API element defined by an ApiPath with a GET path. It supports
-    vManage pagination protocol internally, abstracting it from the user.
+    BulkStatsItem represents an SD-WAN Manager bulk statistics API element defined by an ApiPath with a GET path.
+    It supports SD-WAN Manager pagination protocol internally, abstracting it from the user.
     An instance of this class can be created to retrieve and parse bulk statistics endpoints.
     """
     api_params = ('endDate', 'startDate', 'count', 'timeZone')
@@ -422,8 +444,8 @@ class BulkStatsItem(OperationalItem):
 
 class BulkStateItem(OperationalItem):
     """
-    BulkStateItem represents a vManage bulk state API element defined by an ApiPath with a GET path. It supports
-    vManage pagination protocol internally, abstracting it from the user.
+    BulkStateItem represents an SD-WAN Manager bulk state API element defined by an ApiPath with a GET path. It supports
+    SD-WAN Manager pagination protocol internally, abstracting it from the user.
     An instance of this class can be created to retrieve and parse bulk state endpoints.
     """
     api_params = ('count',)
@@ -522,7 +544,7 @@ class RecordItem(OperationalItem):
         return self._page_info['count']
 
     @classmethod
-    def get_raise(cls, api: Rest, *, start_time: datetime = None, end_time: datetime = None, max_records: int = 0):
+    def get_raise(cls, api: Rest, *, start_time: datetime, end_time: datetime, max_records: int):
         obj = cls(api.post(cls.query(start_time, end_time, max_records), cls.api_path.post))
         while True:
             next_page = obj.next_page
@@ -541,8 +563,8 @@ def attribute_safe(raw_attribute):
 
 class ApiItem:
     """
-    ApiItem represents a vManage API element defined by an ApiPath with GET, POST, PUT and DELETE paths. An instance
-    of this class can be created to store the contents of that vManage API element (self.data field).
+    ApiItem represents an SD-WAN Manager API element defined by an ApiPath with GET, POST, PUT and DELETE paths.
+    An instance of this class can be created to store the contents of that SD-WAN Manager API element (self.data field).
     """
     api_path = None  # An ApiPath instance
     id_tag = None
@@ -680,7 +702,7 @@ class ConfigItem(ApiItem):
         """
         Factory method that loads data from a JSON file and returns a ConfigItem instance with that data
 
-        @param node_dir: String indicating a directory under root_dir used for all files from a given vManage node.
+        @param node_dir: String indicating a directory under root_dir used for all files from an SD-WAN Manager node.
         @param ext_name: True indicates that item_names need to be extended (with item_id) to make their
                          filename safe version unique. False otherwise.
         @param item_name: (Optional) Name of the item being loaded. Variable used to build the filename.
@@ -710,7 +732,7 @@ class ConfigItem(ApiItem):
         """
         Save data (i.e., self.data) to a JSON file
 
-        @param node_dir: String indicating a directory under root_dir used for all files from a given vManage node.
+        @param node_dir: String indicating a directory under root_dir used for all files from a given SD-WAN Manager.
         @param ext_name: True indicates that item_names need to be extended (with item_id) to make their
                          filename safe version unique. False otherwise.
         @param item_name: (Optional) Name of the item being saved. Variable used to build the filename.
@@ -775,6 +797,8 @@ class ConfigItem(ApiItem):
             'lastUpdatedBy',
             'lastUpdatedOn'
         }
+        if self.post_filtered_tags is not None:
+            filtered_keys.update(self.post_filtered_tags)
         put_dict = {k: v for k, v in self.data.items() if k not in filtered_keys}
 
         if id_mapping_dict is None:
@@ -799,7 +823,7 @@ class ConfigItem(ApiItem):
     @property
     def crypt_cluster_values(self) -> Iterator[str]:
         """
-        Extracts values that have been encrypted by vManage. That is, with a $CRYPT_CLUSTER$ prefix.
+        Extracts values that have been encrypted by SD-WAN Manager. That is, with a $CRYPT_CLUSTER$ prefix.
         """
         yield from re.findall(r'\$CRYPT_CLUSTER\$.+?(?=["\s\\])', json.dumps(self.data))
 
@@ -940,7 +964,7 @@ class ProfileParcelReferenceModel(ConfigRequestModel):
 
 class Config2Item(ConfigItem):
     """
-    Config2Item is a specialized ConfigItem to support vManage Config 2.0 elements
+    Config2Item is a specialized ConfigItem to support SD-WAN Manager Config 2.0 elements
 
     """
     post_model: Callable[..., ConfigRequestModel] = None
@@ -1100,7 +1124,7 @@ class FeatureProfile(Config2Item):
         for root_parcel in sorted(self.parsed_parcels, key=self.parcel_sort_key, reverse=delete_order):
             target_root_parcel = target_parcels_dict.get(root_parcel.payload.name)
             if target_root_parcel is not None:
-                # Using the parcel with the same name on target vManage, update uuids
+                # Using the parcel with the same name on target SD-WAN Manager, update uuids
                 self._id_mapping[root_parcel.parcelId] = target_root_parcel.parcelId
 
             # Traverse parcel tree under this root parcel
@@ -1202,7 +1226,7 @@ class ServerInfo:
 
     def __init__(self, **kwargs):
         """
-        @param kwargs: key-value pairs of information about the vManage server
+        @param kwargs: key-value pairs of information about the SD-WAN Manager server
         """
         self.data = kwargs
 
@@ -1217,7 +1241,7 @@ class ServerInfo:
         """
         Factory method that loads data from a JSON file and returns a ServerInfo instance with that data
 
-        @param node_dir: String indicating directory under root_dir used for all files from a given vManage node.
+        @param node_dir: String indicating a directory under root_dir used for all files from a given SD-WAN Manager.
         @return: ServerInfo object, or None if the file does not exist
         """
         dir_path = Path(cls.root_dir, node_dir)
@@ -1236,7 +1260,7 @@ class ServerInfo:
         """
         Save data (i.e., self.data) to a JSON file
 
-        @param node_dir: String indicating directory under root_dir used for all files from a given vManage node.
+        @param node_dir: String indicating a directory under root_dir used for all files from a given SD-WAN Manager.
         @return: True indicates data has been saved. False indicates no data to save (and no file has been created).
         """
         dir_path = Path(self.root_dir, node_dir)
