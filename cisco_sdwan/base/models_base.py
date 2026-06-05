@@ -37,7 +37,7 @@ class UpdateEval:
         self.is_master = isinstance(data, dict) and 'data' in data
 
         # This is to homogenize the response payload variants
-        self.data = data.get('data') if self.is_master else data
+        self.data = data.get('data', {}) if self.is_master else data
 
     @property
     def need_reattach(self):
@@ -64,8 +64,7 @@ class ApiPath:
     """
     __slots__ = ('path_vars', 'get', 'post', 'put', 'delete')
 
-    def __init__(self, get: Optional[str], *other_ops: Optional[str],
-                 path_vars: Optional[Sequence[str]] = None) -> None:
+    def __init__(self, get: str | None, *other_ops: str | None, path_vars: Optional[Sequence[str]] = None) -> None:
         """
         @param get: URL path for get operations
         @param other_ops: URL path for post, put and delete operations, in this order. If an item is not specified,
@@ -73,6 +72,9 @@ class ApiPath:
         @param path_vars: Path variable names that may be present in defined paths. It is assumed that all methods have
                           the same path variables.
         """
+        if len(other_ops) > len(self.__slots__) - 2:
+            raise ValueError(f"Too many operations provided: {other_ops}")
+
         self.get = get
         last_op = other_ops[-1] if other_ops else get
         for field, value in zip_longest(self.__slots__[2:], other_ops, fillvalue=last_op):
@@ -207,7 +209,23 @@ class OperationalItem:
     fields_sub = None  # Tuple containing fields to subtract from fields_std as entries are iterated
     field_conversion_fns = {}
 
+    _FALLBACK_TITLE_SUBSTITUTIONS = {
+        'vdevice-name': 'System Ip'
+    }
+
     def __init__(self, payload: Mapping[str, Any]) -> None:
+        def format_title(title: str) -> str:
+            # If it is a dotted string, keep the last segment only. Ex. device.control.dataControlWanInterface.interface
+            formatted = title.split('.')[-1]
+            # Replace camelCase with camel Case
+            formatted = re.sub(r'(?<=[a-z])(?=[A-Z])', ' ', formatted)
+
+            return formatted.title()
+
+        def format_fallback_title(p_name: str) -> str:
+            substitution = self._FALLBACK_TITLE_SUBSTITUTIONS.get(p_name.lower())
+            return substitution if substitution is not None else p_name.replace('_', ' ').title()
+
         self.timestamp = payload['header']['generatedOn']
 
         self._data = payload['data']
@@ -216,20 +234,11 @@ class OperationalItem:
         # defined. For those properties without a title, infer one based on the property name.
         self._meta = {attribute_safe(field['property']): field for field in payload['header']['fields']}
         title_dict = {
-            attribute_safe(field['property']): self.format_title(field['title'])
+            attribute_safe(field['property']): format_title(field['title'])
             for field in payload['header']['columns']
         }
         for field_property, field in self._meta.items():
-            field['title'] = title_dict.get(field_property, field['property'].replace('_', ' ').title())
-
-    @staticmethod
-    def format_title(title: str) -> str:
-        # If it is a dotted string, keep the last segment only. Ex. device.control.dataControlWanInterface.interface
-        formatted = title.split('.')[-1]
-        # Replace camelCase with camel Case
-        formatted = re.sub(r'(?<=[a-z])(?=[A-Z])', ' ', formatted)
-
-        return f'{formatted[0].upper()}{formatted[1:]}' if formatted else formatted
+            field['title'] = title_dict.get(field_property, format_fallback_title(field['property']))
 
     @property
     def field_names(self) -> tuple[str, ...]:
@@ -535,7 +544,7 @@ class RecordItem(OperationalItem):
         return self._page_info['count']
 
     @classmethod
-    def get_raise(cls, api: Rest, *, start_time: datetime = None, end_time: datetime = None, max_records: int = 0):
+    def get_raise(cls, api: Rest, *, start_time: datetime, end_time: datetime, max_records: int):
         obj = cls(api.post(cls.query(start_time, end_time, max_records), cls.api_path.post))
         while True:
             next_page = obj.next_page

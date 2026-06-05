@@ -1,4 +1,4 @@
-Sastre 1.28 [June x, 2026]
+Sastre 1.28 [June 4, 2026]
 ================================
 
 #### Improvements:
