@@ -1,9 +1,12 @@
+from typing import Callable
 import argparse
 from typing import Optional
 from collections.abc import Sequence
-from pydantic import model_validator, field_validator
+from typing import Annotated
+from pydantic import model_validator, field_validator, Field
 from functools import partial
 from uuid import uuid4
+from concurrent import futures
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest, RestAPIException
 from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL
@@ -11,11 +14,64 @@ from cisco_sdwan.base.models_base import ServerInfo, ModelException
 from cisco_sdwan.base.models_vmanage import (DeviceConfig, DeviceConfigRFS, DeviceTemplate, DeviceTemplateAttached,
                                              DeviceTemplateValues, EdgeInventory, ControlInventory, EdgeCertificate,
                                              ConfigGroup, ConfigGroupValues, ConfigGroupAssociated)
-from cisco_sdwan.tasks.utils import TaskOptions, TagOptions, filename_type, regex_type, default_workdir
+from cisco_sdwan.tasks.utils import TaskOptions, TagOptions, filename_type, regex_type, default_workdir, int_type
 from cisco_sdwan.tasks.common import regex_filter, clean_dir, Task, archive_create
 from cisco_sdwan.tasks.models import TaskArgs, CatalogTag
 from cisco_sdwan.tasks.validators import validate_regex, validate_filename
 
+
+def backup_catalog_item(api: Rest, workdir: str, info: str, item_cls: type, item_id: str, item_name: str, need_extended_name: bool):
+    try:
+        item = item_cls.get_raise(api, item_id)
+        if item.save(workdir, need_extended_name, item_name, item_id):
+            result = [('info', f'Done {info} {item_name}')]
+        else:
+            result = []
+    except (RestAPIException, ModelException, ValueError) as ex:
+        return [('error', f'Failed backup {info} {item_name}: {ex}')]
+
+    # Special case for DeviceTemplate, handle DeviceTemplateAttached and DeviceTemplateValues
+    if isinstance(item, DeviceTemplate):
+        devices_attached = DeviceTemplateAttached.get(api, item_id)
+        if devices_attached is None:
+            result.append(('error', f'Failed backup {info} {item_name} attached devices'))
+        else:
+            if devices_attached.save(workdir, need_extended_name, item_name, item_id):
+                result.append(('info', f'Done {info} {item_name} attached devices'))
+                try:
+                    uuid_list = [uuid for uuid, _ in devices_attached]
+                    if uuid_list:
+                        values = DeviceTemplateValues(api.post(DeviceTemplateValues.api_params(item_id, uuid_list),
+                                                               DeviceTemplateValues.api_path.post))
+                        if values.save(workdir, need_extended_name, item_name, item_id):
+                            result.append(('info', f'Done {info} {item_name} values'))
+                except RestAPIException as ex:
+                    result.append(('error', f'Failed backup {info} {item_name} values: {ex}'))
+            else:
+                result.append(('debug', f'Skipped {info} {item_name} attached devices, none found'))
+
+    # Special case for ConfigGroup, handle ConfigGroupAssociated, and ConfigGroupValues
+    if isinstance(item, ConfigGroup) and item.devices_associated:
+        for sub_item_info, sub_item_cls in (('associated devices', ConfigGroupAssociated),
+                                            ('values', ConfigGroupValues)):
+            sub_item = sub_item_cls.get(api, configGroupId=item_id)
+            if sub_item is None:
+                result.append(('error', f'Failed backup {info} {item_name} {sub_item_info}'))
+                continue
+            if sub_item.save(workdir, need_extended_name, item_name, item_id):
+                result.append(('info', f'Done {info} {item_name} {sub_item_info}'))
+
+    return result
+
+
+def backup_device_config(api: Rest, workdir: str, config_type: str, uuid: str, hostname: str, device_config_cls: type):
+    item = device_config_cls.get(api, device_config_cls.api_params(uuid))
+    if item is None:
+        return [('error', f'Failed backup {config_type} device configuration {hostname}')]
+    if item.save(workdir, item_name=hostname, item_id=uuid):
+        return [('info', f'Done {config_type} device configuration {hostname}')]
+    return []
+    
 
 @TaskOptions.register('backup')
 class TaskBackup(Task):
@@ -38,6 +94,8 @@ class TaskBackup(Task):
         task_parser.add_argument('--save-running', action='store_true',
                                  help='include the running config from each node to the backup. This is useful for '
                                       'reference or documentation purposes. It is not needed by the restore task.')
+        task_parser.add_argument('--workers', metavar='<threads>', type=partial(int_type, 1, 99), default=1,
+                                 help='maximum number of threads/workers to use for parallel backup (default: %(default)s)')
         mutex_regex = task_parser.add_mutually_exclusive_group()
         mutex_regex.add_argument('--regex', metavar='<regex>', type=regex_type,
                                  help='regular expression matching item names to backup, within selected tags.')
@@ -78,7 +136,7 @@ class TaskBackup(Task):
             self.log_info('Saved SD-WAN Manager server information')
 
         if parsed_args.save_running:
-            self.save_running_configs(api, parsed_args.workdir)
+            self.save_running_configs(api, parsed_args.workdir, parsed_args.workers, regex_filter_fn)
 
         # Backup items not registered to the catalog, but to be included when the tag is 'all'
         if CATALOG_TAG_ALL in parsed_args.tags:
@@ -97,49 +155,21 @@ class TaskBackup(Task):
             if item_index.save(parsed_args.workdir):
                 self.log_info(f'Saved {info} index')
 
-            matched_item_iter = (
+            matched_item_iter = [
                 (item_id, item_name) for item_id, item_name in item_index if regex_filter_fn(item_name)
-            )
-            for item_id, item_name in matched_item_iter:
-                try:
-                    item = item_cls.get_raise(api, item_id)
-                    if item.save(parsed_args.workdir, item_index.need_extended_name, item_name, item_id):
-                        self.log_info(f'Done {info} {item_name}')
-                except (RestAPIException, ModelException, ValueError) as ex:
-                    self.log_error(f'Failed backup {info} {item_name}: {ex}')
-                    continue
+            ]
+            if not matched_item_iter:
+                continue
 
-                # Special case for DeviceTemplate, handle DeviceTemplateAttached and DeviceTemplateValues
-                if isinstance(item, DeviceTemplate):
-                    devices_attached = DeviceTemplateAttached.get(api, item_id)
-                    if devices_attached is None:
-                        self.log_error(f'Failed backup {info} {item_name} attached devices')
-                        continue
-                    if devices_attached.save(parsed_args.workdir, item_index.need_extended_name, item_name, item_id):
-                        self.log_info(f'Done {info} {item_name} attached devices')
-                    else:
-                        self.log_debug(f'Skipped {info} {item_name} attached devices, none found')
-                        continue
-
-                    try:
-                        uuid_list = [uuid for uuid, _ in devices_attached]
-                        values = DeviceTemplateValues(api.post(DeviceTemplateValues.api_params(item_id, uuid_list),
-                                                               DeviceTemplateValues.api_path.post))
-                        if values.save(parsed_args.workdir, item_index.need_extended_name, item_name, item_id):
-                            self.log_info(f'Done {info} {item_name} values')
-                    except RestAPIException as ex:
-                        self.log_error(f'Failed backup {info} {item_name} values: {ex}')
-
-                # Special case for ConfigGroup, handle ConfigGroupAssociated, and ConfigGroupValues
-                if isinstance(item, ConfigGroup) and item.devices_associated:
-                    for sub_item_info, sub_item_cls in (('associated devices', ConfigGroupAssociated),
-                                                        ('values', ConfigGroupValues)):
-                        sub_item = sub_item_cls.get(api, configGroupId=item_id)
-                        if sub_item is None:
-                            self.log_error(f'Failed backup {info} {item_name} {sub_item_info}')
-                            continue
-                        if sub_item.save(parsed_args.workdir, item_index.need_extended_name, item_name, item_id):
-                            self.log_info(f'Done {info} {item_name} {sub_item_info}')
+            with futures.ThreadPoolExecutor(max_workers=parsed_args.workers) as executor:
+                job_futures = [
+                    executor.submit(backup_catalog_item, api, parsed_args.workdir, info, item_cls, item_id, item_name,
+                                    item_index.need_extended_name)
+                    for item_id, item_name in matched_item_iter
+                ]
+                for future in futures.as_completed(job_futures):
+                    for level, msg in future.result():
+                        getattr(self, f"log_{level}")(msg)
 
         if parsed_args.archive:
             archive_create(parsed_args.archive, parsed_args.workdir)
@@ -149,7 +179,7 @@ class TaskBackup(Task):
 
         return
 
-    def save_running_configs(self, api: Rest, workdir: str) -> None:
+    def save_running_configs(self, api: Rest, workdir: str, workers: int = 1, regex_filter_fn: Callable[[str], bool]=None) -> None:
         inventory_list = [(ControlInventory.get(api), 'controller')]
         if not api.is_provider or api.is_tenant_scope:
             inventory_list.append((EdgeInventory.get(api), 'WAN edge'))
@@ -159,18 +189,21 @@ class TaskBackup(Task):
                 self.log_error(f'Failed retrieving {info} inventory')
                 continue
 
-            for uuid, _, hostname, _ in inventory.extended_iter():
-                if hostname is None:
-                    self.log_debug(f'Skipping {uuid}, no hostname')
-                    continue
-
-                for item, config_type in ((DeviceConfig.get(api, DeviceConfig.api_params(uuid)), 'CFS'),
-                                          (DeviceConfigRFS.get(api, DeviceConfigRFS.api_params(uuid)), 'RFS')):
-                    if item is None:
-                        self.log_error(f'Failed backup {config_type} device configuration {hostname}')
+            job_futures = []
+            with futures.ThreadPoolExecutor(max_workers=workers) as executor:
+                for uuid, _, hostname, _ in inventory.extended_iter():
+                    if hostname is None:
+                        self.log_debug(f'Skipping {uuid}, no hostname')
                         continue
-                    if item.save(workdir, item_name=hostname, item_id=uuid):
-                        self.log_info(f'Done {config_type} device configuration {hostname}')
+                    if regex_filter_fn and not regex_filter_fn(hostname):
+                        continue
+
+                    job_futures.append(executor.submit(backup_device_config, api, workdir, 'CFS', uuid, hostname, DeviceConfig))
+                    job_futures.append(executor.submit(backup_device_config, api, workdir, 'RFS', uuid, hostname, DeviceConfigRFS))
+                
+                for future in futures.as_completed(job_futures):
+                    for level, msg in future.result():
+                        getattr(self, f"log_{level}")(msg)
 
 
 class BackupArgs(TaskArgs):
@@ -180,6 +213,7 @@ class BackupArgs(TaskArgs):
     not_regex: Optional[str] = None
     no_rollover: bool = False
     save_running: bool = False
+    workers: Annotated[int, Field(ge=1, lt=100)] = 1
     tags: list[CatalogTag]
 
     # Validators

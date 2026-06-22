@@ -6,6 +6,7 @@
 """
 import json
 import requests
+from requests.adapters import HTTPAdapter
 import functools
 import logging
 from urllib3 import disable_warnings
@@ -80,6 +81,9 @@ class Rest:
         logging.getLogger(__name__).debug('Using API key to authenticate with SD-WAN Manager')
 
         session = requests.Session()
+        adapter = HTTPAdapter(pool_connections=100, pool_maxsize=100)
+        session.mount('http://', adapter)
+        session.mount('https://', adapter)
         session.headers.update({
             "Authorization": f"Bearer {apikey}",
             'Content-Type': 'application/json'
@@ -99,6 +103,9 @@ class Rest:
         logging.getLogger(__name__).debug('Using username/password credentials to authenticate with SD-WAN Manager')
 
         session = requests.Session()
+        adapter = HTTPAdapter(pool_connections=100, pool_maxsize=100)
+        session.mount('http://', adapter)
+        session.mount('https://', adapter)
         auth_data = {
             'j_username': username,
             'j_password': password
