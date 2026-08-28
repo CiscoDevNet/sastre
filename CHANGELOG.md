@@ -1,3 +1,10 @@
+Sastre 1.29 [tbd, 2026]
+================================
+
+#### Fixes:
+- When updating an existing item, restore task can fail with a traceback and the whole task is aborted if SD-WAN Manager returns an empty response payload to the update (PUT) request. This has been fixed, now the item is logged as failed but the task itself continues. This condition only happens with restore --update.
+
+
 Sastre 1.28 [June 4, 2026]
 ================================
 

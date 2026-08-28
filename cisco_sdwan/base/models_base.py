@@ -31,7 +31,7 @@ IdName = namedtuple('IdName', ['id', 'name'])
 
 
 class UpdateEval:
-    def __init__(self, data):
+    def __init__(self, data: dict[str, Any] | list[str]):
         self.is_policy = isinstance(data, list)
         # Master template updates (PUT requests) return a dict containing a 'data' key. Non-master templates don't.
         self.is_master = isinstance(data, dict) and 'data' in data
