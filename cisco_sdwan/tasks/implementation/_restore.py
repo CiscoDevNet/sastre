@@ -331,9 +331,14 @@ class TaskRestore(Task):
 
                         if isinstance(item, Rule):
                             # Rule updates don't allow the rule ID in the URL
-                            put_eval = UpdateEval(api.put(update_data, item.api_path.put))
+                            put_response = api.put(update_data, item.api_path.put)
                         else:
-                            put_eval = UpdateEval(api.put(update_data, item.api_path.put, target_id))
+                            put_response = api.put(update_data, item.api_path.put, target_id)
+
+                        if put_response is None:
+                            raise RestAPIException(f'Empty response payload [PUT {item.api_path.put}]')
+
+                        put_eval = UpdateEval(put_response)
 
                         if put_eval.need_reattach:
                             if put_eval.is_master:
