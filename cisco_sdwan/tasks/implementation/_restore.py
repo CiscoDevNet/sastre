@@ -5,10 +5,11 @@ from functools import partial
 from pydantic import model_validator, field_validator
 from uuid import uuid4
 from contextlib import suppress
+from time import sleep
 from cisco_sdwan.__version__ import __doc__ as title
 from cisco_sdwan.base.rest_api import Rest, RestAPIException, is_version_newer, response_id
 from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL, ordered_tags, is_index_supported
-from cisco_sdwan.base.models_base import UpdateEval, ServerInfo, ModelException
+from cisco_sdwan.base.models_base import UpdateEval, ServerInfo, ModelException, IndexConfigItem
 from cisco_sdwan.base.models_vmanage import (DeviceTemplateIndex, PolicyVsmartIndex, EdgeInventory, ControlInventory,
                                              CheckVBond, FeatureProfile, ConfigGroupIndex, ProfileSdwanPolicy,
                                              ProfileSdwanPolicyIndex, Tag, TagAssociate, Rule, RuleIndex)
@@ -18,6 +19,11 @@ from cisco_sdwan.tasks.common import (regex_filter, Task, WaitActionsException, 
                                       loaded_index_items_iter)
 from cisco_sdwan.tasks.models import TaskArgs, CatalogTag, validate_workdir_conditional
 from cisco_sdwan.tasks.validators import validate_regex, validate_zip_file
+
+
+# Parameters for the retry mechanism during id_mapping updates after items are restored
+ID_MAPPING_MAX_ATTEMPTS = 5
+ID_MAPPING_INITIAL_WAIT_SEC = 1
 
 
 @TaskOptions.register('restore')
@@ -370,16 +376,34 @@ class TaskRestore(Task):
                     self.log_info(f'Done: {op_info} {info} {item.name}{reason}')
 
             # Read new ids from target and update id_mapping
-            try:
-                new_target_item_map = {item_name: item_id for item_id, item_name in index.get_raise(api)}
-                for item_name, old_item_id in pushed_item_dict.items():
-                    id_mapping[old_item_id] = new_target_item_map[item_name]
-            except RestAPIException as ex:
-                self.log_critical(f'Failed retrieving {info}: {ex}')
-                break
+            if pushed_item_dict:
+                try:
+                    self._update_id_mapping(api, index, info, pushed_item_dict, id_mapping)
+                except RestAPIException as ex:
+                    self.log_critical(f'Failed retrieving {info}: {ex}')
+                    break
 
         if pushed_tags:
             self._associate_tags(api, pushed_tags, id_mapping)
+
+    def _update_id_mapping(self, api: Rest, index: IndexConfigItem, info: str, pushed_item_dict: dict[str, str],
+                           id_mapping: dict[str, str]) -> None:
+        pending = dict(pushed_item_dict)  # {<item_name>: <old_item_id>}
+        for attempt in range(ID_MAPPING_MAX_ATTEMPTS):
+            target_item_map = {item_name: item_id for item_id, item_name in index.get_raise(api)}
+            for item_name in pending.keys() & target_item_map.keys():
+                id_mapping[pending.pop(item_name)] = target_item_map[item_name]
+
+            if not pending:
+                return
+
+            if attempt < ID_MAPPING_MAX_ATTEMPTS - 1:
+                wait_sec = (1 << attempt) * ID_MAPPING_INITIAL_WAIT_SEC
+                self.log_debug(f'Restored {info} not yet available on target: {", ".join(pending)}. '
+                               f'Retrying in {wait_sec}s')
+                sleep(wait_sec)
+
+        self.log_error(f'Failed: Restored {info} not found on target SD-WAN Manager: {", ".join(pending)}')
 
     def _updated_restore_rule_list(self, api: Rest, restore_rule_list: list[tuple[str, Rule, str]],
                                    id_mapping: dict[str, str], is_update: bool) -> list[tuple[str, Rule, str]]:

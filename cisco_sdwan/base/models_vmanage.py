@@ -431,56 +431,63 @@ class DeviceConfigRFS(DeviceConfig):
         return '{safe_device_id}?type=RFS'.format(safe_device_id=quote_plus(device_id))
 
 
-# Set of device types that use cedge template class. Updated as of SD-WAN Manager 20.15
+# Set of device types that use cedge template class. Updated as of SD-WAN Manager 20.18.3
 CEDGE_SET = {
     "cellular-gateway-CG113-4GW6A", "cellular-gateway-CG113-4GW6B", "cellular-gateway-CG113-4GW6E",
     "cellular-gateway-CG113-4GW6H", "cellular-gateway-CG113-4GW6Q", "cellular-gateway-CG113-4GW6Z",
     "cellular-gateway-CG113-W6A", "cellular-gateway-CG113-W6B", "cellular-gateway-CG113-W6E",
     "cellular-gateway-CG113-W6H", "cellular-gateway-CG113-W6Q", "cellular-gateway-CG113-W6Z",
-    "cellular-gateway-CG418-E", "cellular-gateway-CG522-E", "vedge-ASR-1001-HX", "vedge-ASR-1001-HX-SD-ROUTING",
-    "vedge-ASR-1001-X", "vedge-ASR-1002-HX", "vedge-ASR-1002-HX-SD-ROUTING", "vedge-ASR-1002-X", "vedge-ASR-1006-X",
-    "vedge-C1101-4P", "vedge-C1101-4P-SD-ROUTING", "vedge-C1101-4PLTEP", "vedge-C1101-4PLTEP-SD-ROUTING",
-    "vedge-C1101-4PLTEPW", "vedge-C1101-4PLTEPW-SD-ROUTING", "vedge-C1109-2PLTEGB", "vedge-C1109-2PLTEGB-SD-ROUTING",
-    "vedge-C1109-2PLTEUS", "vedge-C1109-2PLTEUS-SD-ROUTING", "vedge-C1109-2PLTEVZ", "vedge-C1109-2PLTEVZ-SD-ROUTING",
-    "vedge-C1109-4PLTE2P", "vedge-C1109-4PLTE2P-SD-ROUTING", "vedge-C1109-4PLTE2PW", "vedge-C1109-4PLTE2PW-SD-ROUTING",
-    "vedge-C1111-4P", "vedge-C1111-4P-SD-ROUTING", "vedge-C1111-4PLTEEA", "vedge-C1111-4PLTEEA-SD-ROUTING",
-    "vedge-C1111-4PLTELA", "vedge-C1111-4PLTELA-SD-ROUTING", "vedge-C1111-4PW", "vedge-C1111-4PW-SD-ROUTING",
-    "vedge-C1111-8P", "vedge-C1111-8P-SD-ROUTING", "vedge-C1111-8PLTEEA", "vedge-C1111-8PLTEEA-SD-ROUTING",
-    "vedge-C1111-8PLTEEAW", "vedge-C1111-8PLTEEAW-SD-ROUTING", "vedge-C1111-8PLTELA", "vedge-C1111-8PLTELA-SD-ROUTING",
-    "vedge-C1111-8PLTELAW", "vedge-C1111-8PLTELAW-SD-ROUTING", "vedge-C1111-8PW", "vedge-C1111-8PW-SD-ROUTING",
-    "vedge-C1111X-8P", "vedge-C1111X-8P-SD-ROUTING", "vedge-C1112-8P", "vedge-C1112-8P-SD-ROUTING",
-    "vedge-C1112-8PLTEEA", "vedge-C1112-8PLTEEA-SD-ROUTING", "vedge-C1112-8PLTEEAWE",
-    "vedge-C1112-8PLTEEAWE-SD-ROUTING", "vedge-C1112-8PWE", "vedge-C1112-8PWE-SD-ROUTING", "vedge-C1113-8P",
-    "vedge-C1113-8P-SD-ROUTING", "vedge-C1113-8PLTEEA", "vedge-C1113-8PLTEEA-SD-ROUTING", "vedge-C1113-8PLTEEAW",
-    "vedge-C1113-8PLTEEAW-SD-ROUTING", "vedge-C1113-8PLTELA", "vedge-C1113-8PLTELA-SD-ROUTING", "vedge-C1113-8PLTELAWZ",
-    "vedge-C1113-8PLTELAWZ-SD-ROUTING", "vedge-C1113-8PLTEW", "vedge-C1113-8PLTEW-SD-ROUTING", "vedge-C1113-8PM",
-    "vedge-C1113-8PM-SD-ROUTING", "vedge-C1113-8PMLTEEA", "vedge-C1113-8PMLTEEA-SD-ROUTING", "vedge-C1113-8PMWE",
-    "vedge-C1113-8PMWE-SD-ROUTING", "vedge-C1113-8PW", "vedge-C1113-8PW-SD-ROUTING", "vedge-C1116-4P",
-    "vedge-C1116-4P-SD-ROUTING", "vedge-C1116-4PLTEEA", "vedge-C1116-4PLTEEA-SD-ROUTING", "vedge-C1116-4PLTEEAWE",
-    "vedge-C1116-4PLTEEAWE-SD-ROUTING", "vedge-C1116-4PWE", "vedge-C1116-4PWE-SD-ROUTING", "vedge-C1117-4P",
-    "vedge-C1117-4P-SD-ROUTING", "vedge-C1117-4PLTEEA", "vedge-C1117-4PLTEEA-SD-ROUTING", "vedge-C1117-4PLTEEAW",
-    "vedge-C1117-4PLTEEAW-SD-ROUTING", "vedge-C1117-4PLTELA", "vedge-C1117-4PLTELA-SD-ROUTING", "vedge-C1117-4PLTELAWZ",
-    "vedge-C1117-4PLTELAWZ-SD-ROUTING", "vedge-C1117-4PM", "vedge-C1117-4PM-SD-ROUTING", "vedge-C1117-4PMLTEEA",
-    "vedge-C1117-4PMLTEEA-SD-ROUTING", "vedge-C1117-4PMLTEEAWE", "vedge-C1117-4PMLTEEAWE-SD-ROUTING",
-    "vedge-C1117-4PMWE", "vedge-C1117-4PMWE-SD-ROUTING", "vedge-C1117-4PW", "vedge-C1117-4PW-SD-ROUTING",
-    "vedge-C1118-8P", "vedge-C1118-8P-SD-ROUTING", "vedge-C1121-4P", "vedge-C1121-4P-SD-ROUTING", "vedge-C1121-4PLTEP",
-    "vedge-C1121-4PLTEP-SD-ROUTING", "vedge-C1121-8P", "vedge-C1121-8P-SD-ROUTING", "vedge-C1121-8PLTEP",
-    "vedge-C1121-8PLTEP-SD-ROUTING", "vedge-C1121-8PLTEPW", "vedge-C1121-8PLTEPW-SD-ROUTING", "vedge-C1121X-8P",
-    "vedge-C1121X-8P-SD-ROUTING", "vedge-C1121X-8PLTEP", "vedge-C1121X-8PLTEP-SD-ROUTING", "vedge-C1121X-8PLTEPW",
-    "vedge-C1121X-8PLTEPW-SD-ROUTING", "vedge-C1126-8PLTEP", "vedge-C1126-8PLTEP-SD-ROUTING", "vedge-C1126X-8PLTEP",
-    "vedge-C1126X-8PLTEP-SD-ROUTING", "vedge-C1127-8PLTEP", "vedge-C1127-8PLTEP-SD-ROUTING", "vedge-C1127-8PMLTEP",
-    "vedge-C1127-8PMLTEP-SD-ROUTING", "vedge-C1127X-8PLTEP", "vedge-C1127X-8PLTEP-SD-ROUTING", "vedge-C1127X-8PMLTEP",
-    "vedge-C1127X-8PMLTEP-SD-ROUTING", "vedge-C1128-8PLTEP", "vedge-C1128-8PLTEP-SD-ROUTING", "vedge-C1131-8PLTEPW",
-    "vedge-C1131-8PLTEPW-SD-ROUTING", "vedge-C1131-8PW", "vedge-C1131-8PW-SD-ROUTING", "vedge-C1131X-8PLTEPW",
-    "vedge-C1131X-8PLTEPW-SD-ROUTING", "vedge-C1131X-8PW", "vedge-C1131X-8PW-SD-ROUTING", "vedge-C1161-8P",
-    "vedge-C1161-8P-SD-ROUTING", "vedge-C1161-8PLTEP", "vedge-C1161-8PLTEP-SD-ROUTING", "vedge-C1161X-8P",
-    "vedge-C1161X-8P-SD-ROUTING", "vedge-C1161X-8PLTEP", "vedge-C1161X-8PLTEP-SD-ROUTING", "vedge-C8000V",
-    "vedge-C8000V-SD-ROUTING", "vedge-C8200-1N-4T", "vedge-C8200-1N-4T-SD-ROUTING", "vedge-C8200L-1N-4T",
-    "vedge-C8200L-1N-4T-SD-ROUTING", "vedge-C8300-1N1S-4T2X", "vedge-C8300-1N1S-4T2X-SD-ROUTING", "vedge-C8300-1N1S-6T",
-    "vedge-C8300-1N1S-6T-SD-ROUTING", "vedge-C8300-2N2S-4T2X", "vedge-C8300-2N2S-4T2X-SD-ROUTING",
-    "vedge-C8300-2N2S-6T", "vedge-C8300-2N2S-6T-SD-ROUTING", "vedge-C8500-12X", "vedge-C8500-12X-SD-ROUTING",
-    "vedge-C8500-12X4QC", "vedge-C8500-12X4QC-SD-ROUTING", "vedge-C8500-20X6C", "vedge-C8500-20X6C-SD-ROUTING",
-    "vedge-C8500L-8S4X", "vedge-C8500L-8S4X-SD-ROUTING", "vedge-CSR-1000v", "vedge-ESR-6300", "vedge-ESR-6300-LIC",
+    "cellular-gateway-CG418-E", "cellular-gateway-CG522-E", "vedge-ASR-1001-HX", "vedge-ASR-1001-X",
+    "vedge-ASR-1001-HX-SD-ROUTING", "vedge-ASR-1002-HX", "vedge-ASR-1002-HX-SD-ROUTING", "vedge-ASR-1002-X",
+    "vedge-ASR-1006-X", "vedge-C1100TG-1N24P32A-SD-ROUTING", "vedge-C1100TGX-1N24P32A-SD-ROUTING", "vedge-C1101-4P",
+    "vedge-C1101-4P-SD-ROUTING", "vedge-C1101-4PLTEP", "vedge-C1101-4PLTEP-SD-ROUTING", "vedge-C1101-4PLTEPW",
+    "vedge-C1101-4PLTEPW-SD-ROUTING", "vedge-C1109-2PLTEGB", "vedge-C1109-2PLTEGB-SD-ROUTING", "vedge-C1109-2PLTEUS",
+    "vedge-C1109-2PLTEUS-SD-ROUTING", "vedge-C1109-2PLTEVZ", "vedge-C1109-2PLTEVZ-SD-ROUTING", "vedge-C1109-4PLTE2P",
+    "vedge-C1109-4PLTE2P-SD-ROUTING", "vedge-C1109-4PLTE2PW", "vedge-C1109-4PLTE2PW-SD-ROUTING", "vedge-C1111-4P",
+    "vedge-C1111-4P-SD-ROUTING", "vedge-C1111-4PLTEEA", "vedge-C1111-4PLTEEA-SD-ROUTING", "vedge-C1111-4PLTELA",
+    "vedge-C1111-4PLTELA-SD-ROUTING", "vedge-C1111-4PW", "vedge-C1111-4PW-SD-ROUTING", "vedge-C1111-8P",
+    "vedge-C1111-8P-SD-ROUTING", "vedge-C1111-8PLTEEA", "vedge-C1111-8PLTEEA-SD-ROUTING", "vedge-C1111-8PLTEEAW",
+    "vedge-C1111-8PLTEEAW-SD-ROUTING", "vedge-C1111-8PLTELA", "vedge-C1111-8PLTELA-SD-ROUTING", "vedge-C1111-8PLTELAW",
+    "vedge-C1111-8PLTELAW-SD-ROUTING", "vedge-C1111-8PW", "vedge-C1111-8PW-SD-ROUTING", "vedge-C1111X-8P",
+    "vedge-C1111X-8P-SD-ROUTING", "vedge-C1112-8P", "vedge-C1112-8P-SD-ROUTING", "vedge-C1112-8PLTEEA",
+    "vedge-C1112-8PLTEEA-SD-ROUTING", "vedge-C1112-8PLTEEAWE", "vedge-C1112-8PLTEEAWE-SD-ROUTING", "vedge-C1112-8PWE",
+    "vedge-C1112-8PWE-SD-ROUTING", "vedge-C1113-8P", "vedge-C1113-8P-SD-ROUTING", "vedge-C1113-8PLTEEA",
+    "vedge-C1113-8PLTEEA-SD-ROUTING", "vedge-C1113-8PLTEEAW", "vedge-C1113-8PLTEEAW-SD-ROUTING", "vedge-C1113-8PLTELA",
+    "vedge-C1113-8PLTELA-SD-ROUTING", "vedge-C1113-8PLTELAWZ", "vedge-C1113-8PLTELAWZ-SD-ROUTING", "vedge-C1113-8PLTEW",
+    "vedge-C1113-8PLTEW-SD-ROUTING", "vedge-C1113-8PM", "vedge-C1113-8PM-SD-ROUTING", "vedge-C1113-8PMLTEEA",
+    "vedge-C1113-8PMLTEEA-SD-ROUTING", "vedge-C1113-8PMWE", "vedge-C1113-8PMWE-SD-ROUTING", "vedge-C1113-8PW",
+    "vedge-C1113-8PW-SD-ROUTING", "vedge-C1116-4P", "vedge-C1116-4P-SD-ROUTING", "vedge-C1116-4PLTEEA",
+    "vedge-C1116-4PLTEEA-SD-ROUTING", "vedge-C1116-4PLTEEAWE", "vedge-C1116-4PLTEEAWE-SD-ROUTING", "vedge-C1116-4PWE",
+    "vedge-C1116-4PWE-SD-ROUTING", "vedge-C1117-4P", "vedge-C1117-4P-SD-ROUTING", "vedge-C1117-4PLTEEA",
+    "vedge-C1117-4PLTEEA-SD-ROUTING", "vedge-C1117-4PLTEEAW", "vedge-C1117-4PLTEEAW-SD-ROUTING", "vedge-C1117-4PLTELA",
+    "vedge-C1117-4PLTELA-SD-ROUTING", "vedge-C1117-4PLTELAWZ", "vedge-C1117-4PLTELAWZ-SD-ROUTING", "vedge-C1117-4PM",
+    "vedge-C1117-4PM-SD-ROUTING", "vedge-C1117-4PMLTEEA", "vedge-C1117-4PMLTEEA-SD-ROUTING", "vedge-C1117-4PMLTEEAWE",
+    "vedge-C1117-4PMLTEEAWE-SD-ROUTING", "vedge-C1117-4PMWE", "vedge-C1117-4PMWE-SD-ROUTING", "vedge-C1117-4PW",
+    "vedge-C1117-4PW-SD-ROUTING", "vedge-C1118-8P", "vedge-C1118-8P-SD-ROUTING", "vedge-C1121-4P",
+    "vedge-C1121-4P-SD-ROUTING", "vedge-C1121-4PLTEP", "vedge-C1121-4PLTEP-SD-ROUTING", "vedge-C1121-8P",
+    "vedge-C1121-8P-SD-ROUTING", "vedge-C1121-8PLTEP", "vedge-C1121-8PLTEP-SD-ROUTING", "vedge-C1121-8PLTEPW",
+    "vedge-C1121-8PLTEPW-SD-ROUTING", "vedge-C1121X-8P", "vedge-C1121X-8P-SD-ROUTING", "vedge-C1121X-8PLTEP",
+    "vedge-C1121X-8PLTEP-SD-ROUTING", "vedge-C1121X-8PLTEPW", "vedge-C1121X-8PLTEPW-SD-ROUTING", "vedge-C1126-8PLTEP",
+    "vedge-C1126-8PLTEP-SD-ROUTING", "vedge-C1126X-8PLTEP", "vedge-C1126X-8PLTEP-SD-ROUTING", "vedge-C1127-8PLTEP",
+    "vedge-C1127-8PLTEP-SD-ROUTING", "vedge-C1127-8PMLTEP", "vedge-C1127-8PMLTEP-SD-ROUTING", "vedge-C1127X-8PLTEP",
+    "vedge-C1127X-8PLTEP-SD-ROUTING", "vedge-C1127X-8PMLTEP", "vedge-C1127X-8PMLTEP-SD-ROUTING", "vedge-C1128-8PLTEP",
+    "vedge-C1128-8PLTEP-SD-ROUTING", "vedge-C1131-8PLTEPW", "vedge-C1131-8PLTEPW-SD-ROUTING", "vedge-C1131-8PW",
+    "vedge-C1131-8PW-SD-ROUTING", "vedge-C1131X-8PLTEPW", "vedge-C1131X-8PLTEPW-SD-ROUTING", "vedge-C1131X-8PW",
+    "vedge-C1131X-8PW-SD-ROUTING", "vedge-C1161-8P", "vedge-C1161-8P-SD-ROUTING", "vedge-C1161-8PLTEP",
+    "vedge-C1161-8PLTEP-SD-ROUTING", "vedge-C1161X-8P", "vedge-C1161X-8P-SD-ROUTING", "vedge-C1161X-8PLTEP",
+    "vedge-C1161X-8PLTEP-SD-ROUTING", "vedge-C8000V", "vedge-C8000V-SD-ROUTING", "vedge-C8151-G2",
+    "vedge-C8151-G2-SD-ROUTING", "vedge-C8161-G2", "vedge-C8161-G2-SD-ROUTING", "vedge-C8200-1N-4T",
+    "vedge-C8200-1N-4T-SD-ROUTING", "vedge-C8200L-1N-4T", "vedge-C8200L-1N-4T-SD-ROUTING", "vedge-C8231-E-G2",
+    "vedge-C8231-E-G2-SD-ROUTING", "vedge-C8231-G2", "vedge-C8231-G2-SD-ROUTING", "vedge-C8235-E-G2",
+    "vedge-C8235-E-G2-SD-ROUTING", "vedge-C8235-G2", "vedge-C8235-G2-SD-ROUTING", "vedge-C8300-1N1S-4T2X",
+    "vedge-C8300-1N1S-4T2X-SD-ROUTING", "vedge-C8300-1N1S-6T", "vedge-C8300-1N1S-6T-SD-ROUTING",
+    "vedge-C8300-2N2S-4T2X", "vedge-C8300-2N2S-4T2X-SD-ROUTING", "vedge-C8300-2N2S-6T",
+    "vedge-C8300-2N2S-6T-SD-ROUTING", "vedge-C8355-G2", "vedge-C8355-G2-SD-ROUTING", "vedge-C8375-E-G2",
+    "vedge-C8375-E-G2-SD-ROUTING", "vedge-C8455-G2", "vedge-C8455-G2-SD-ROUTING", "vedge-C8475-G2",
+    "vedge-C8475-G2-SD-ROUTING", "vedge-C8500-12X", "vedge-C8500-12X-SD-ROUTING", "vedge-C8500-12X4QC",
+    "vedge-C8500-12X4QC-SD-ROUTING", "vedge-C8500-20X6C", "vedge-C8500-20X6C-SD-ROUTING", "vedge-C8500L-8S4X",
+    "vedge-C8500L-8S4X-SD-ROUTING", "vedge-C8550-G2", "vedge-C8550-G2-SD-ROUTING", "vedge-C8570-G2",
+    "vedge-C8570-G2-SD-ROUTING", "vedge-CSR-1000v", "vedge-ESR-6300", "vedge-ESR-6300-LIC",
     "vedge-ESR-6300-LIC-SD-ROUTING", "vedge-ESR-6300-NCP", "vedge-ESR-6300-NCP-SD-ROUTING", "vedge-ESR-6300-SD-ROUTING",
     "vedge-IR-1101", "vedge-IR-1101-SD-ROUTING", "vedge-IR-1821", "vedge-IR-1821-SD-ROUTING", "vedge-IR-1831",
     "vedge-IR-1831-SD-ROUTING", "vedge-IR-1833", "vedge-IR-1833-SD-ROUTING", "vedge-IR-1835",
@@ -493,9 +500,9 @@ CEDGE_SET = {
     "vedge-ISR1100-4GLTEGB-XE", "vedge-ISR1100-4GLTENA-XE", "vedge-ISR1100-6G-XE", "vedge-ISR1100X-4G-XE",
     "vedge-ISR1100X-6G-XE", "vedge-ISRv", "vedge-nfvis-C8200-UCPE", "vedge-nfvis-C8200-UCPEVM",
     "vedge-nfvis-C8300-UCPE-1N20", "vedge-nfvis-CSP-5216", "vedge-nfvis-CSP-5228", "vedge-nfvis-CSP-5436",
-    "vedge-nfvis-ENCS5400"
+    "vedge-nfvis-ENCS5400", "vedge-nfvis-UCSC-C220-M6S", "vedge-nfvis-UCSC-C240-M6S", "vedge-nfvis-UCSC-C240-M6SX"
 }
-# Software devices. Updated as of SD-WAN Manager 20.12
+# Software devices. Updated as of SD-WAN Manager 20.18.3
 SOFT_EDGE_SET = {"vedge-CSR-1000v", "vedge-C8000V", "vedge-C8000V-SD-ROUTING", "vedge-cloud", "vmanage", "vsmart",
                  "vedge-ISRv"}
 
@@ -845,6 +852,39 @@ class FeatureTemplateIndex(IndexConfigItem):
 
 
 #
+# Network Hierarchy
+#
+class NetworkHierarchy(ConfigItem):
+    api_path = ApiPath('v1/network-hierarchy')
+    store_path = ('network_hierarchy',)
+    id_tag = 'id'
+    name_tag = 'name'
+    skip_cmp_tag_set = {'name', 'uuid'}
+    post_filtered_tags = ('uuid', 'directChildCount', 'deviceCount')
+
+    @property
+    def is_global(self) -> bool:
+        return self.data.get('data', {}).get('label', '') == 'GLOBAL'
+
+    @property
+    def is_site(self) -> bool:
+        return self.data.get('data', {}).get('label', '') == 'SITE'
+
+    @property
+    def is_region(self) -> bool:
+        return self.data.get('data', {}).get('label', '') == 'REGION'
+
+    # TODO: Network hierarchy dependencies should be handled here, i.e. pools, collectors, etc.
+
+
+@register('network_hierarchy', 'network hierarchy', NetworkHierarchy, min_version='20.15')
+class NetworkHierarchyIndex(IndexConfigItem):
+    api_path = ApiPath('v1/network-hierarchy', None, None, None)
+    store_file = 'network_hierarchy.json'
+    iter_fields = IdName('id', 'name')
+
+
+#
 # Config Group
 #
 
@@ -1047,7 +1087,7 @@ class ProfileSdwanSystem(FeatureProfile):
 
     parcel_names = (
         "aaa", "global", "banner", "basic", "bfd", "logging", "ntp", "omp", "snmp", "perfmonitor", "mrf", "security",
-        "remote-access", "ipv4-device-access-policy", "ipv6-device-access-policy"
+        "remote-access", "ipv4-device-access-policy", "ipv6-device-access-policy", "ca-cert"
     )
     parcel_api_paths = ApiPathGroup({
         name: ApiPath(f"v1/feature-profile/sdwan/system/{{systemId}}/{name}") for name in parcel_names
@@ -1178,6 +1218,8 @@ class ProfileSdwanTransport(FeatureProfile):
             "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/interface/dsl-pppoa"),
         "wan/vpn/interface/dsl-pppoe": ApiPath(
             "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/interface/dsl-pppoe"),
+        "wan/vpn/interface/dsl-ipoe": ApiPath(
+            "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/interface/dsl-ipoe"),
         "management/vpn": ApiPath("v1/feature-profile/sdwan/transport/{transportId}/management/vpn"),
         "management/vpn/interface/ethernet": ApiPath(
             "v1/feature-profile/sdwan/transport/{transportId}/management/vpn/{vpnId}/interface/ethernet"),
@@ -1204,6 +1246,8 @@ class ProfileSdwanTransport(FeatureProfile):
             "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/interface/dsl-pppoe/{pppId}/tracker"),
         PathKey("tracker", "wan/vpn/interface/dsl-pppoa"): ApiPath(
             "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/interface/dsl-pppoa/{pppId}/tracker"),
+        PathKey("tracker", "wan/vpn/interface/dsl-ipoe"): ApiPath(
+            "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/interface/dsl-ipoe/{ipoeId}/tracker"),
         PathKey("tracker", "wan/vpn/interface/ethpppoe"): ApiPath(
             "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/interface/ethpppoe/{pppId}/tracker"),
         PathKey("tracker", "wan/vpn/interface/ipsec"): ApiPath(
@@ -1242,11 +1286,13 @@ class ProfileSdwanTransport(FeatureProfile):
         PathKey("ipv4-acl", "wan/vpn/interface/cellular"): ...,
         PathKey("ipv4-acl", "wan/vpn/interface/dsl-pppoe"): ...,
         PathKey("ipv4-acl", "wan/vpn/interface/dsl-pppoa"): ...,
+        PathKey("ipv4-acl", "wan/vpn/interface/dsl-ipoe"): ...,
         PathKey("ipv4-acl", "wan/vpn/interface/ethpppoe"): ...,
         PathKey("ipv6-acl", "wan/vpn/interface/ethernet"): ...,
         PathKey("ipv6-acl", "wan/vpn/interface/cellular"): ...,
         PathKey("ipv6-acl", "wan/vpn/interface/dsl-pppoe"): ...,
         PathKey("ipv6-acl", "wan/vpn/interface/dsl-pppoa"): ...,
+        PathKey("ipv6-acl", "wan/vpn/interface/dsl-ipoe"): ...,
         PathKey("ipv6-acl", "wan/vpn/interface/ethpppoe"): ...,
         PathKey("wan/vpn/interface/ethernet", "wan/vpn/interface/ethernet"): ...,
     } | {

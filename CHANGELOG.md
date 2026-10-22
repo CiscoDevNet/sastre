@@ -1,8 +1,14 @@
 Sastre 1.29 [tbd, 2026]
 ================================
 
+#### Improvements:
+- SD-WAN Manager 20.18 support, including support for the following API endpoints:
+  - New SD-WAN transport profile parcels: dsl-ipoe
+  - New SD-WAN system profile parcels: ca-cert
+
 #### Fixes:
 - When updating an existing item, restore task can fail with a traceback and the whole task is aborted if SD-WAN Manager returns an empty response payload to the update (PUT) request. This has been fixed, now the item is logged as failed but the task itself continues. This condition only happens with restore --update.
+- Restore task could fail to resolve references to newly created items when SD-WAN Manager does not list them immediately after creation. Restore now retries with exponential backoff and reports all items that could not be found.
 
 
 Sastre 1.28 [June 4, 2026]
@@ -12,7 +18,7 @@ Sastre 1.28 [June 4, 2026]
 - Added support for device tag association in the restore task. That is, devices in the backup that were associated with a tag and are present in SD-WAN Manager will be reassociated as part of the restore task. Note: Re-associating devices to a tag that already exists on the target requires the --update flag; otherwise, tag associations are only applied when the tag itself is newly created during restore.
 - Added support for device tag dissociation in the delete task. For tags selected for deletion, all associated devices will be dissociated first so that the tag can be deleted.
 - Added support for rules and rule/config-group association/dissociation.
-- SD-WAN Manager 20.15 support, included support for the following API endpoints:
+- SD-WAN Manager 20.15 support, including support for the following API endpoints:
   - New SD-Routing service profile parcels: dhcp-server, vrf
   - New SD-Routing transport profile parcels: global-vrf
   - New SD-Routing system profile parcels: global, banner, ntp-sd-routing, logging-sd-routing, aaa-sd-routing
@@ -46,7 +52,7 @@ Sastre 1.26 [July 7, 2025]
 ==========================
 
 #### Improvements:
-- SD-WAN Manager 20.15 support, included support for the following API endpoints:
+- SD-WAN Manager 20.15 support, including support for the following API endpoints:
   - New SDWAN policy-object parcels: ipv4-network-object-group, ipv4-service-object-group
   - New SDWAN service profile parcels: objecttracker, objecttrackergroup, dual-router-ha
   - New SDWAN transport profile parcels: ethpppoe, dsl-pppoa
@@ -68,7 +74,7 @@ Sastre 1.25 [March 5, 2025]
 ================================
 
 #### Improvements:
-- SD-WAN Manager 20.14 support, included support for the following API endpoints:
+- SD-WAN Manager 20.14 support, including support for the following API endpoints:
   - New SDWAN service profile parcels: ipv4-acl, ipv6-acl
   - New SDWAN transport profile parcels: ipv4-acl, ipv6-acl
 - [#44] Enhancements to show-template references task:
@@ -87,7 +93,7 @@ Sastre 1.24 [June 21, 2024]
 
 #### Improvements:
 - [#12] Starting on SD-WAN Manager 20.12, feature profile api get requests return parcels without data, parcels need to be retrieved individually.
-- 20.12/20.13 SD-WAN Manager support, included support for the following API endpoints:
+- 20.12/20.13 SD-WAN Manager support, including support for the following API endpoints:
   - New SDWAN service profile parcels: routing ospfv3 ipv4/ipv6, routing eigrp, interface gre, route-policy.
   - New SDWAN transport profile parcels: routing ospfv3 ipv4/ipv6, esimcellular-controller, esimcellular-profile, t1-e1-controller, interface serial, route-policy.
   - New SDWAN other profile parcels: cybervision.
@@ -127,7 +133,7 @@ Sastre 1.23 [March 8, 2024]
   - New transform build-recipe task.
   - Added support for new crypt_updates keyword in transform recipe files.
 - Migration to Pydantic 2.x
-- 20.11 SD-WAN Manager support, included support for the following API endpoints:
+- 20.11 SD-WAN Manager support, including support for the following API endpoints:
   - New SDWAN system profile parcels: mrf, security
   - New SDWAN service profile parcels: routing multicast, tracker, trackergroup, appqoe
   - New SDWAN transport profile parcels: routing ospf, trackergroup, ipv6-tracker, ipv6-trackergroup, interface gre, gps
@@ -175,7 +181,7 @@ Sastre 1.21 [December 19, 2022]
 ================================
 
 #### Enhancements:
-- [#170] 20.10 SD-WAN Manager support, included support for the following API endpoints:
+- [#170] 20.10 SD-WAN Manager support, including support for the following API endpoints:
   - Identity policy list, scalable group tag list
   - New SDWAN system profile parcels: perfmonitor
   - New SDWAN service profile parcels: interface ipsec
@@ -188,7 +194,7 @@ Sastre 1.20 [November 10, 2022]
 #### Enhancements:
 - [#42] Option --archive added to backup and restore tasks. Allowing backups to be saved as a zip file, and restore to read from a zip file.
 - [#164] Implemented adaptive mechanism in the REST API client, to backoff and retry when rate-limit signal (429) is received from SD-WAN Manager. 
-- [#157] 20.9 SD-WAN Manager support, included support for the following API endpoints:
+- [#157] 20.9 SD-WAN Manager support, including support for the following API endpoints:
   - Preferred color group policy list
   - SDWAN other profile and ThousandEyes parcel
   - New SDWAN system profile parcels: SNMP
@@ -204,7 +210,7 @@ Sastre 1.19 [August 16, 2022]
 ================================
 
 #### Enhancements:
-- [#145] 20.8 SD-WAN Manager support, included support for the following API endpoints:
+- [#145] 20.8 SD-WAN Manager support, including support for the following API endpoints:
   - Config-group, Config-group tag rules
   - SDWAN system, SDWAN service, SDWAN transport and SDWAN cli feature profiles and parcels
 - Attach vSmart task has new --activate option to activate the centralized policy after vSmart template is attached.
@@ -222,7 +228,7 @@ Sastre 1.18.3 [April 21, 2022]
 ================================
 
 #### Enhancements:
-- [#133] 20.7 SD-WAN Manager support, included support for the following API endpoints:
+- [#133] 20.7 SD-WAN Manager support, including support for the following API endpoints:
   - Policy lists: Region list
 
 
@@ -261,7 +267,7 @@ Sastre 1.17 [February 18, 2022]
 #### Enhancements:
 - New transform task, allowing renaming and copying of configuration items.
 - New show alarms and show events tasks, allowing retrieval of SD-WAN Manager alarms and events.
-- 20.5/20.6 SD-WAN Manager support, included support for the following API endpoints:
+- 20.5/20.6 SD-WAN Manager support, including support for the following API endpoints:
   - Policy definitions: Advanced inspection profile, Security group, VPNQoSMap.
 
 #### Behavior changes:
@@ -305,7 +311,7 @@ Sastre 1.15 [September 27, 2021]
 ================================
 
 #### Enhancements:
-- [#83] Initial support for the SD-WAN Manager 20.5.x, included the following API endpoints:
+- [#83] Initial support for the SD-WAN Manager 20.5.x, including the following API endpoints:
   - Policy lists: Expanded community, Geo location
 - [#94] Support for multi-tenant SD-WAN Manager deployment.
 - [#45] All tasks that provide table output (i.e. show, list, show-template) have been enhanced to allow exporting those 
@@ -330,7 +336,7 @@ Sastre 1.14 [July 13, 2021]
 ============================
 
 #### Enhancements:
-- [#55] Support for SD-WAN Manager 20.4.x and included new API endpoints:
+- [#55] Support for SD-WAN Manager 20.4.x and including new API endpoints:
     - Policy lists: Protocol, Port, App-Probe
     - Policy definitions: Rule Set
 - [#22] Most tasks with a --regex option now also include a --not-regex option. While --regex is used to select items to 
@@ -378,7 +384,7 @@ Sastre 1.11 [November 25, 2020]
 ============================
 
 #### Enhancements:
-- [#20] Validated support for SD-WAN Manager 20.3.x and included new API endpoints:
+- [#20] Validated support for SD-WAN Manager 20.3.x and including new API endpoints:
     - Policy lists: fax protocol, modem passthrough, trunk group
     - Policy definitions: PRI ISDN port
 - [#47] The data store location can now be customized via the SASTRE_ROOT_DIR environment variable. When SASTRE_ROOT_DIR is not set, the data store is data/ under the directory where Sastre is run. This is the default behavior, as in all previous releases. When SASTRE_ROOT_DIR is set, the data store becomes $SASTRE_ROOT_DIR/data/.
@@ -481,7 +487,7 @@ Sastre 0.36 [April 10, 2020]
 ============================
 
 #### Enhancements:
-- Validated support for SD-WAN Manager 20.1 and included new API endpoints:
+- Validated support for SD-WAN Manager 20.1 and including new API endpoints:
     - Policy lists: media profile, translation profile, translation rules, supervisory disconnect, FQDN
     - Policy definitions: Dial peer, SRST phone profile, FXS port, FXO port, FXS-DID port, SSL decryption, SSL UTD profile
     - Voice policies, custom application policies
