@@ -2625,7 +2625,7 @@ class EdgeCertificate(IndexConfigItem):
 #
 # Conversion functions
 #
-def datetime_format(timestamp: str | None, epoch_value_return: str = '') -> str:
+def datetime_format(timestamp: int | None, epoch_value_return: str = '') -> str:
     if timestamp is None:
         return ''
 
