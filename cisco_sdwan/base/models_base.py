@@ -481,7 +481,7 @@ class BulkStateItem(OperationalItem):
         return obj
 
 
-def entry_time_parse(timestamp: str) -> datetime:
+def entry_time_parse(timestamp: int | str) -> datetime:
     return datetime.fromtimestamp(float(timestamp) / 1000, tz=timezone.utc)
 
 
