@@ -69,7 +69,8 @@ _tag_dependency_list = [
     'policy_definition',
     'policy_list',
     'policy_customapp',
-    'tag'
+    'tag',
+    'network_hierarchy'
 ]
 
 
