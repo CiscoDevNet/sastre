@@ -12,7 +12,8 @@ from cisco_sdwan.base.catalog import catalog_iter, CATALOG_TAG_ALL, ordered_tags
 from cisco_sdwan.base.models_base import UpdateEval, ServerInfo, ModelException, IndexConfigItem
 from cisco_sdwan.base.models_vmanage import (DeviceTemplateIndex, PolicyVsmartIndex, EdgeInventory, ControlInventory,
                                              CheckVBond, FeatureProfile, ConfigGroupIndex, ProfileSdwanPolicy,
-                                             ProfileSdwanPolicyIndex, Tag, TagAssociate, Rule, RuleIndex)
+                                             ProfileSdwanPolicyIndex, Tag, TagAssociate, Rule, RuleIndex,
+                                             NetworkHierarchy, NetworkHierarchyIndex)
 from cisco_sdwan.tasks.utils import (TaskOptions, TagOptions, regex_type, default_workdir, existing_workdir_type,
                                      TrackedValidator, ConditionalValidator, zip_file_type, count)
 from cisco_sdwan.tasks.common import (regex_filter, Task, WaitActionsException, clean_dir, archive_extract,
@@ -101,10 +102,12 @@ class TaskRestore(Task):
 
         self.log_info('Loading existing items from target SD-WAN Manager', dryrun=False)
         # Index type is unique per catalog entry; hash(type(index)) is a stable key for the target's item name->id map
-        target_all_items_map = {
-            hash(type(index)): {item_name: item_id for item_id, item_name in index}
-            for _, _, index, item_cls in self.index_iter(api, catalog_iter(CATALOG_TAG_ALL, version=api.server_version))
-        }
+        target_all_items_map: dict[int, dict[str, str]] = {}
+        target_nh_global_id: str | None = None
+        for _, _, index, _ in self.index_iter(api, catalog_iter(CATALOG_TAG_ALL, version=api.server_version)):
+            target_all_items_map[hash(type(index))] = {item_name: item_id for item_id, item_name in index}
+            if isinstance(index, NetworkHierarchyIndex):
+                target_nh_global_id = index.global_node_id
 
         self.log_info('Identifying items to be pushed', dryrun=False)
         id_mapping = {}  # {<old_id>: <new_id>}, used to replace old (saved) item ids with new (target) ids
@@ -137,9 +140,34 @@ class TaskRestore(Task):
                 else:
                     target_policy_obj_id = None
 
+                # Special treatment for the network hierarchy global node, which is created by SD-WAN Manager and is
+                # thus matched by label, as its name may differ. Seeding id_mapping from the index, as opposed to when
+                # the global node shows up in loaded_items_iter, so that child nodes can still be restored when the
+                # global node item file is missing from the backup. Without the global node on both sides, parent
+                # references cannot be remapped, so no node is restored.
+                if isinstance(index, NetworkHierarchyIndex):
+                    saved_global_id = index.global_node_id
+                    if saved_global_id is None:
+                        self.log_warning(f'Will skip {info}, global node not found in the backup index')
+                        continue
+                    if target_nh_global_id is None:
+                        self.log_warning(f'Will skip {info}, no global node found on target SD-WAN Manager')
+                        continue
+                    if saved_global_id != target_nh_global_id:
+                        id_mapping[saved_global_id] = target_nh_global_id
+
                 restore_item_list = []
                 for item_id, item in loaded_items_iter:
-                    target_id = target_item_map.get(item.name) if target_policy_obj_id is None else target_policy_obj_id
+                    if target_policy_obj_id is not None:
+                        target_id = target_policy_obj_id
+                    elif isinstance(item, NetworkHierarchy) and item.is_global:
+                        # Global node is never pushed, even with --update, so the target's global node is preserved.
+                        # Its id_mapping entry is seeded from the index, above.
+                        self.log_debug(f'Will skip {info} {item.name}, global node already on target SD-WAN Manager')
+                        continue
+                    else:
+                        target_id = target_item_map.get(item.name)
+
                     if target_id is not None:
                         # Item already exists on target SD-WAN Manager, record item id from target
                         if item_id != target_id:
@@ -250,6 +278,10 @@ class TaskRestore(Task):
                 except RestAPIException as ex:
                     self.log_error(f'Failed: {info} pre-processing, could not retrieve target rules: {ex}')
                     continue
+            elif isinstance(index, NetworkHierarchyIndex):
+                # Special case for Network Hierarchy: parent nodes need to be created before their children
+                restore_item_list = NetworkHierarchyIndex.depth_sorted(restore_item_list,
+                                                                       NetworkHierarchyIndex.item_id_parent)
 
             for item_id, item, target_id in restore_item_list:
                 op_info = 'Create' if target_id is None else 'Update'
@@ -268,7 +300,16 @@ class TaskRestore(Task):
 
                         # Not using the id returned from post because post can return empty (e.g., local policies)
                         response = api.post(item.post_data(id_mapping), item.api_path.post)
-                        pushed_item_dict[item.name] = item_id
+                        if isinstance(item, NetworkHierarchy):
+                            # Items can reference other items in the same index, id_mapping is updated after each post
+                            if (new_uuid := item.created_id(response)) is not None:
+                                id_mapping[item_id] = new_uuid
+                            else:
+                                self.log_warning(f'{op_info} {info} {item.name}{reason}: new uuid not found in '
+                                                 'response, child nodes may fail to be created')
+                                pushed_item_dict[item.name] = item_id
+                        else:
+                            pushed_item_dict[item.name] = item_id
 
                         # Special case for FeatureProfiles, creating linked parcels
                         if isinstance(item, FeatureProfile):
