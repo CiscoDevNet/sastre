@@ -5,19 +5,24 @@
  This module implements SD-WAN Manager API models
 """
 import re
-from typing import Optional, Any
+from typing import Optional, Any, TypeVar
 from enum import Enum
 from collections.abc import Mapping, Sequence, Callable, Iterable, Iterator
 from pathlib import Path
 from collections import namedtuple
 from copy import deepcopy
+from functools import cached_property
+from operator import itemgetter
 from urllib.parse import quote_plus
 from pydantic import Field
 from .rest_api import Rest, RestAPIException
 from .catalog import register, op_register
 from .models_base import (ApiItem, IndexApiItem, ConfigItem, Config2Item, IndexConfigItem, RecordItem, RealtimeItem,
                           BulkStatsItem, BulkStateItem, ApiPath, PathKey, CliOrFeatureApiPath, ApiPathGroup, IdName,
-                          entry_time_parse, ConfigRequestModel, FeatureProfile, FeatureProfileIndex, AdminSettingsItem)
+                          entry_time_parse, ConfigRequestModel, FeatureProfile, FeatureProfileIndex, AdminSettingsItem,
+                          default_getter)
+
+_T = TypeVar('_T')
 
 
 #
@@ -859,20 +864,76 @@ class NetworkHierarchy(ConfigItem):
     store_path = ('network_hierarchy',)
     id_tag = 'id'
     name_tag = 'name'
+    data_tag = 'data'
+    parent_tag = 'parentUuid'
+    label_tag = 'label'
     skip_cmp_tag_set = {'name', 'uuid'}
     post_filtered_tags = ('uuid', 'directChildCount', 'deviceCount')
 
+    @classmethod
+    def entry_label(cls, entry: Mapping[str, Any]) -> str:
+        """
+        @param entry: A network hierarchy payload, either an item or an index entry
+        @return: Label of the node, or empty string when the node has no label
+        """
+        return (entry.get(cls.data_tag) or {}).get(cls.label_tag, '')
+
+    @classmethod
+    def entry_parent_id(cls, entry: Mapping[str, Any]) -> str | None:
+        """
+        @param entry: A network hierarchy payload, either an item or an index entry
+        @return: Id of the node's parent, or None if this is the root of the hierarchy
+        """
+        return (entry.get(cls.data_tag) or {}).get(cls.parent_tag)
+
+    @classmethod
+    def is_global_entry(cls, entry: Mapping[str, Any]) -> bool:
+        """
+        @param entry: A network hierarchy payload, either an item or an index entry
+        @return: True if the node is the global node (i.e. root of the hierarchy)
+        """
+        return cls.entry_label(entry) == 'GLOBAL'
+
+    @property
+    def parent_id(self) -> str | None:
+        """
+        @return: Id of this node's parent, or None if this is the root of the hierarchy
+        """
+        return self.entry_parent_id(self.data)
+
     @property
     def is_global(self) -> bool:
-        return self.data.get('data', {}).get('label', '') == 'GLOBAL'
+        return self.is_global_entry(self.data)
 
     @property
     def is_site(self) -> bool:
-        return self.data.get('data', {}).get('label', '') == 'SITE'
+        return self.entry_label(self.data) == 'SITE'
 
     @property
     def is_region(self) -> bool:
-        return self.data.get('data', {}).get('label', '') == 'REGION'
+        return self.entry_label(self.data) == 'REGION'
+
+    @property
+    def is_system(self) -> bool:
+        # Global node is created by SD-WAN Manager and cannot be deleted
+        return super().is_system or self.is_global
+
+    @staticmethod
+    def created_id(post_response: Any) -> str | None:
+        """
+        Extract the uuid of this item from a network hierarchy POST response
+        @param post_response: POST response payload. Sample: {"created": [{"name": "Site-Test1", "uuid": "3e7e..."}]}
+        @return: uuid of the created item, or None if not found in the response
+        """
+        if not isinstance(post_response, Mapping):
+            return None
+
+        # Only a single entry is created
+        entry = next(iter(post_response.get('created') or []), None)
+        if not isinstance(entry, Mapping):
+            return None
+
+        return entry.get('uuid') or None
 
     # TODO: Network hierarchy dependencies should be handled here, i.e. pools, collectors, etc.
 
@@ -882,6 +943,123 @@ class NetworkHierarchyIndex(IndexConfigItem):
     api_path = ApiPath('v1/network-hierarchy', None, None, None)
     store_file = 'network_hierarchy.json'
     iter_fields = IdName('id', 'name')
+
+    @property
+    def global_node_id(self) -> str | None:
+        """
+        @return: Id of the global node (i.e. root of the hierarchy), or None if not present
+        """
+        return next(
+            (entry.get(self.iter_fields.id) for entry in self.data if NetworkHierarchy.is_global_entry(entry)),
+            None
+        )
+
+    @staticmethod
+    def depth_map(id_parent_iter: Iterable[tuple[str | None, str | None]]) -> dict[str, int]:
+        """
+        Calculate the depth of each node in a network hierarchy, used as sort key to order nodes by their position
+        in the hierarchy
+        @param id_parent_iter: (<node id>, <parent node id>) tuples, parent id is None for the root of the hierarchy
+        @return: {<node id>: <depth>} dict, which may also contain parent ids that were only referenced and not
+                 provided. Depths are relative to the nodes provided, so a partial set of nodes still preserves the
+                 parent before child relationship.
+        """
+        parent_map = dict(id_parent_iter)  # {<node id>: <parent node id>}
+        depth_map: dict[str, int] = {}  # {<node id>: <depth>}
+
+        for node_id in parent_map:
+            # Walk up to the nearest ancestor of known depth. Ancestors is used as an ordered set, keeping the walk
+            # order while also providing a constant-time membership test. A parent reference loop is not reported,
+            # the walk just stops once it comes back to a node already visited, which then becomes the top of the walk.
+            ancestors: dict[str, None] = {}
+            current = node_id
+            while current is not None and current not in depth_map and current not in ancestors:
+                ancestors[current] = None
+                current = parent_map.get(current)
+
+            for depth, ancestor_id in enumerate(reversed(ancestors), start=depth_map.get(current, -1) + 1):
+                depth_map[ancestor_id] = depth
+
+        return depth_map
+
+    @classmethod
+    def depth_sorted(cls, entries: Sequence[_T], id_parent_fn: Callable[[_T], tuple[str | None, str | None]], *,
+                     children_first: bool = False) -> list[_T]:
+        """
+        Sort entries by their position in the network hierarchy, parent nodes before their children by default.
+        Entries at the same depth retain their relative order.
+        @param entries: Entries to sort, each one representing a node in the hierarchy
+        @param id_parent_fn: Callable returning the (<node id>, <parent node id>) tuple for an entry
+        @param children_first: When True, child nodes are placed before their parents
+        @return: List of sorted entries
+        """
+        id_parent_list = [id_parent_fn(entry) for entry in entries]
+        node_depth_map = cls.depth_map(id_parent_list)
+
+        # Sorting on the depth alone, as the entries themselves are not necessarily comparable. Entries without a
+        # node id get no depth assigned and sort as roots.
+        return [
+            entry for _, entry in sorted(
+                ((node_depth_map.get(node_id, 0), entry) for (node_id, _), entry in zip(id_parent_list, entries)),
+                key=itemgetter(0), reverse=children_first
+            )
+        ]
+
+    @classmethod
+    def entry_id_parent(cls, entry: Mapping[str, Any]) -> tuple[str | None, str | None]:
+        """
+        @param entry: An index entry
+        @return: (<node id>, <parent node id>) tuple for the entry
+        """
+        return entry.get(cls.iter_fields.id), NetworkHierarchy.entry_parent_id(entry)
+
+    @staticmethod
+    def item_id_parent(restore_entry: tuple[str, NetworkHierarchy, str | None]) -> tuple[str | None, str | None]:
+        """
+        @param restore_entry: A (<item id>, <item>, <id on target>) restore entry
+        @return: (<node id>, <parent node id>) tuple for the entry
+        """
+        item_id, item, _ = restore_entry
+        return item_id, item.parent_id
+
+    @cached_property
+    def depth_sorted_data(self) -> list[Mapping[str, Any]]:
+        """
+        @return: Index entries ordered by their position in the hierarchy, with child nodes before their parents
+        """
+        return self.depth_sorted(self.data, self.entry_id_parent, children_first=True)
+
+    def iter(self, *iter_fields: str, default: Any = None) -> Iterator[Any]:
+        """
+        Returns an iterator where each entry is the value of the respective field in iter_fields. Entries are ordered
+        by their position in the hierarchy, with child nodes before their parents. This allows restore to pick up
+        parent nodes as dependencies and delete to remove child nodes before their parents.
+        @param default: Value to return for any field missing in an entry. Default is None.
+        @return: Iterator of entries in the index object
+        """
+        entry_getter = default_getter(*iter_fields, default=default)
+        return (entry_getter(entry) for entry in self.depth_sorted_data)
+
+    @classmethod
+    def create(cls, item_list: Sequence[NetworkHierarchy], id_hint_dict: Mapping[str, str]):
+        def index_entry_dict(item_obj: NetworkHierarchy) -> dict[str, Any]:
+            entry_dict = {
+                key: item_obj.data.get(key, id_hint_dict.get(item_obj.name)) for key in cls.iter_fields
+            }
+            # Carry the node label and parent reference over, as they are needed to identify the global node and to
+            # order nodes by their position in the hierarchy
+            item_data = item_obj.data.get(NetworkHierarchy.data_tag) or {}
+            entry_dict[NetworkHierarchy.data_tag] = {
+                key: item_data[key] for key in (NetworkHierarchy.label_tag, NetworkHierarchy.parent_tag)
+                if key in item_data
+            }
+
+            return entry_dict
+
+        index_payload = {
+            'data': [index_entry_dict(item) for item in item_list]
+        }
+        return cls(index_payload)
 
 
 #

@@ -2,6 +2,7 @@ Sastre 1.29 [tbd, 2026]
 ================================
 
 #### Improvements:
+- Added support for backup/restore/deletion of network hierarchy nodes (SD-WAN Manager 20.15 and newer). On restore, nodes are pushed parent before child and their parent references are remapped to the ids on the target. The global node is never pushed, it is matched to the target global node so that nodes under it can be restored. On delete, child nodes are removed before their parents and the global node is skipped, as it cannot be deleted.
 - SD-WAN Manager 20.18 support, including support for the following API endpoints:
   - New SD-WAN transport profile parcels: dsl-ipoe
   - New SD-WAN system profile parcels: ca-cert
