@@ -5,19 +5,24 @@
  This module implements SD-WAN Manager API models
 """
 import re
-from typing import Optional, Any
+from typing import Optional, Any, TypeVar
 from enum import Enum
 from collections.abc import Mapping, Sequence, Callable, Iterable, Iterator
 from pathlib import Path
 from collections import namedtuple
 from copy import deepcopy
+from functools import cached_property
+from operator import itemgetter
 from urllib.parse import quote_plus
 from pydantic import Field
 from .rest_api import Rest, RestAPIException
 from .catalog import register, op_register
 from .models_base import (ApiItem, IndexApiItem, ConfigItem, Config2Item, IndexConfigItem, RecordItem, RealtimeItem,
                           BulkStatsItem, BulkStateItem, ApiPath, PathKey, CliOrFeatureApiPath, ApiPathGroup, IdName,
-                          entry_time_parse, ConfigRequestModel, FeatureProfile, FeatureProfileIndex, AdminSettingsItem)
+                          entry_time_parse, ConfigRequestModel, FeatureProfile, FeatureProfileIndex, AdminSettingsItem,
+                          default_getter)
+
+_T = TypeVar('_T')
 
 
 #
@@ -431,56 +436,63 @@ class DeviceConfigRFS(DeviceConfig):
         return '{safe_device_id}?type=RFS'.format(safe_device_id=quote_plus(device_id))
 
 
-# Set of device types that use cedge template class. Updated as of SD-WAN Manager 20.15
+# Set of device types that use cedge template class. Updated as of SD-WAN Manager 20.18.3
 CEDGE_SET = {
     "cellular-gateway-CG113-4GW6A", "cellular-gateway-CG113-4GW6B", "cellular-gateway-CG113-4GW6E",
     "cellular-gateway-CG113-4GW6H", "cellular-gateway-CG113-4GW6Q", "cellular-gateway-CG113-4GW6Z",
     "cellular-gateway-CG113-W6A", "cellular-gateway-CG113-W6B", "cellular-gateway-CG113-W6E",
     "cellular-gateway-CG113-W6H", "cellular-gateway-CG113-W6Q", "cellular-gateway-CG113-W6Z",
-    "cellular-gateway-CG418-E", "cellular-gateway-CG522-E", "vedge-ASR-1001-HX", "vedge-ASR-1001-HX-SD-ROUTING",
-    "vedge-ASR-1001-X", "vedge-ASR-1002-HX", "vedge-ASR-1002-HX-SD-ROUTING", "vedge-ASR-1002-X", "vedge-ASR-1006-X",
-    "vedge-C1101-4P", "vedge-C1101-4P-SD-ROUTING", "vedge-C1101-4PLTEP", "vedge-C1101-4PLTEP-SD-ROUTING",
-    "vedge-C1101-4PLTEPW", "vedge-C1101-4PLTEPW-SD-ROUTING", "vedge-C1109-2PLTEGB", "vedge-C1109-2PLTEGB-SD-ROUTING",
-    "vedge-C1109-2PLTEUS", "vedge-C1109-2PLTEUS-SD-ROUTING", "vedge-C1109-2PLTEVZ", "vedge-C1109-2PLTEVZ-SD-ROUTING",
-    "vedge-C1109-4PLTE2P", "vedge-C1109-4PLTE2P-SD-ROUTING", "vedge-C1109-4PLTE2PW", "vedge-C1109-4PLTE2PW-SD-ROUTING",
-    "vedge-C1111-4P", "vedge-C1111-4P-SD-ROUTING", "vedge-C1111-4PLTEEA", "vedge-C1111-4PLTEEA-SD-ROUTING",
-    "vedge-C1111-4PLTELA", "vedge-C1111-4PLTELA-SD-ROUTING", "vedge-C1111-4PW", "vedge-C1111-4PW-SD-ROUTING",
-    "vedge-C1111-8P", "vedge-C1111-8P-SD-ROUTING", "vedge-C1111-8PLTEEA", "vedge-C1111-8PLTEEA-SD-ROUTING",
-    "vedge-C1111-8PLTEEAW", "vedge-C1111-8PLTEEAW-SD-ROUTING", "vedge-C1111-8PLTELA", "vedge-C1111-8PLTELA-SD-ROUTING",
-    "vedge-C1111-8PLTELAW", "vedge-C1111-8PLTELAW-SD-ROUTING", "vedge-C1111-8PW", "vedge-C1111-8PW-SD-ROUTING",
-    "vedge-C1111X-8P", "vedge-C1111X-8P-SD-ROUTING", "vedge-C1112-8P", "vedge-C1112-8P-SD-ROUTING",
-    "vedge-C1112-8PLTEEA", "vedge-C1112-8PLTEEA-SD-ROUTING", "vedge-C1112-8PLTEEAWE",
-    "vedge-C1112-8PLTEEAWE-SD-ROUTING", "vedge-C1112-8PWE", "vedge-C1112-8PWE-SD-ROUTING", "vedge-C1113-8P",
-    "vedge-C1113-8P-SD-ROUTING", "vedge-C1113-8PLTEEA", "vedge-C1113-8PLTEEA-SD-ROUTING", "vedge-C1113-8PLTEEAW",
-    "vedge-C1113-8PLTEEAW-SD-ROUTING", "vedge-C1113-8PLTELA", "vedge-C1113-8PLTELA-SD-ROUTING", "vedge-C1113-8PLTELAWZ",
-    "vedge-C1113-8PLTELAWZ-SD-ROUTING", "vedge-C1113-8PLTEW", "vedge-C1113-8PLTEW-SD-ROUTING", "vedge-C1113-8PM",
-    "vedge-C1113-8PM-SD-ROUTING", "vedge-C1113-8PMLTEEA", "vedge-C1113-8PMLTEEA-SD-ROUTING", "vedge-C1113-8PMWE",
-    "vedge-C1113-8PMWE-SD-ROUTING", "vedge-C1113-8PW", "vedge-C1113-8PW-SD-ROUTING", "vedge-C1116-4P",
-    "vedge-C1116-4P-SD-ROUTING", "vedge-C1116-4PLTEEA", "vedge-C1116-4PLTEEA-SD-ROUTING", "vedge-C1116-4PLTEEAWE",
-    "vedge-C1116-4PLTEEAWE-SD-ROUTING", "vedge-C1116-4PWE", "vedge-C1116-4PWE-SD-ROUTING", "vedge-C1117-4P",
-    "vedge-C1117-4P-SD-ROUTING", "vedge-C1117-4PLTEEA", "vedge-C1117-4PLTEEA-SD-ROUTING", "vedge-C1117-4PLTEEAW",
-    "vedge-C1117-4PLTEEAW-SD-ROUTING", "vedge-C1117-4PLTELA", "vedge-C1117-4PLTELA-SD-ROUTING", "vedge-C1117-4PLTELAWZ",
-    "vedge-C1117-4PLTELAWZ-SD-ROUTING", "vedge-C1117-4PM", "vedge-C1117-4PM-SD-ROUTING", "vedge-C1117-4PMLTEEA",
-    "vedge-C1117-4PMLTEEA-SD-ROUTING", "vedge-C1117-4PMLTEEAWE", "vedge-C1117-4PMLTEEAWE-SD-ROUTING",
-    "vedge-C1117-4PMWE", "vedge-C1117-4PMWE-SD-ROUTING", "vedge-C1117-4PW", "vedge-C1117-4PW-SD-ROUTING",
-    "vedge-C1118-8P", "vedge-C1118-8P-SD-ROUTING", "vedge-C1121-4P", "vedge-C1121-4P-SD-ROUTING", "vedge-C1121-4PLTEP",
-    "vedge-C1121-4PLTEP-SD-ROUTING", "vedge-C1121-8P", "vedge-C1121-8P-SD-ROUTING", "vedge-C1121-8PLTEP",
-    "vedge-C1121-8PLTEP-SD-ROUTING", "vedge-C1121-8PLTEPW", "vedge-C1121-8PLTEPW-SD-ROUTING", "vedge-C1121X-8P",
-    "vedge-C1121X-8P-SD-ROUTING", "vedge-C1121X-8PLTEP", "vedge-C1121X-8PLTEP-SD-ROUTING", "vedge-C1121X-8PLTEPW",
-    "vedge-C1121X-8PLTEPW-SD-ROUTING", "vedge-C1126-8PLTEP", "vedge-C1126-8PLTEP-SD-ROUTING", "vedge-C1126X-8PLTEP",
-    "vedge-C1126X-8PLTEP-SD-ROUTING", "vedge-C1127-8PLTEP", "vedge-C1127-8PLTEP-SD-ROUTING", "vedge-C1127-8PMLTEP",
-    "vedge-C1127-8PMLTEP-SD-ROUTING", "vedge-C1127X-8PLTEP", "vedge-C1127X-8PLTEP-SD-ROUTING", "vedge-C1127X-8PMLTEP",
-    "vedge-C1127X-8PMLTEP-SD-ROUTING", "vedge-C1128-8PLTEP", "vedge-C1128-8PLTEP-SD-ROUTING", "vedge-C1131-8PLTEPW",
-    "vedge-C1131-8PLTEPW-SD-ROUTING", "vedge-C1131-8PW", "vedge-C1131-8PW-SD-ROUTING", "vedge-C1131X-8PLTEPW",
-    "vedge-C1131X-8PLTEPW-SD-ROUTING", "vedge-C1131X-8PW", "vedge-C1131X-8PW-SD-ROUTING", "vedge-C1161-8P",
-    "vedge-C1161-8P-SD-ROUTING", "vedge-C1161-8PLTEP", "vedge-C1161-8PLTEP-SD-ROUTING", "vedge-C1161X-8P",
-    "vedge-C1161X-8P-SD-ROUTING", "vedge-C1161X-8PLTEP", "vedge-C1161X-8PLTEP-SD-ROUTING", "vedge-C8000V",
-    "vedge-C8000V-SD-ROUTING", "vedge-C8200-1N-4T", "vedge-C8200-1N-4T-SD-ROUTING", "vedge-C8200L-1N-4T",
-    "vedge-C8200L-1N-4T-SD-ROUTING", "vedge-C8300-1N1S-4T2X", "vedge-C8300-1N1S-4T2X-SD-ROUTING", "vedge-C8300-1N1S-6T",
-    "vedge-C8300-1N1S-6T-SD-ROUTING", "vedge-C8300-2N2S-4T2X", "vedge-C8300-2N2S-4T2X-SD-ROUTING",
-    "vedge-C8300-2N2S-6T", "vedge-C8300-2N2S-6T-SD-ROUTING", "vedge-C8500-12X", "vedge-C8500-12X-SD-ROUTING",
-    "vedge-C8500-12X4QC", "vedge-C8500-12X4QC-SD-ROUTING", "vedge-C8500-20X6C", "vedge-C8500-20X6C-SD-ROUTING",
-    "vedge-C8500L-8S4X", "vedge-C8500L-8S4X-SD-ROUTING", "vedge-CSR-1000v", "vedge-ESR-6300", "vedge-ESR-6300-LIC",
+    "cellular-gateway-CG418-E", "cellular-gateway-CG522-E", "vedge-ASR-1001-HX", "vedge-ASR-1001-X",
+    "vedge-ASR-1001-HX-SD-ROUTING", "vedge-ASR-1002-HX", "vedge-ASR-1002-HX-SD-ROUTING", "vedge-ASR-1002-X",
+    "vedge-ASR-1006-X", "vedge-C1100TG-1N24P32A-SD-ROUTING", "vedge-C1100TGX-1N24P32A-SD-ROUTING", "vedge-C1101-4P",
+    "vedge-C1101-4P-SD-ROUTING", "vedge-C1101-4PLTEP", "vedge-C1101-4PLTEP-SD-ROUTING", "vedge-C1101-4PLTEPW",
+    "vedge-C1101-4PLTEPW-SD-ROUTING", "vedge-C1109-2PLTEGB", "vedge-C1109-2PLTEGB-SD-ROUTING", "vedge-C1109-2PLTEUS",
+    "vedge-C1109-2PLTEUS-SD-ROUTING", "vedge-C1109-2PLTEVZ", "vedge-C1109-2PLTEVZ-SD-ROUTING", "vedge-C1109-4PLTE2P",
+    "vedge-C1109-4PLTE2P-SD-ROUTING", "vedge-C1109-4PLTE2PW", "vedge-C1109-4PLTE2PW-SD-ROUTING", "vedge-C1111-4P",
+    "vedge-C1111-4P-SD-ROUTING", "vedge-C1111-4PLTEEA", "vedge-C1111-4PLTEEA-SD-ROUTING", "vedge-C1111-4PLTELA",
+    "vedge-C1111-4PLTELA-SD-ROUTING", "vedge-C1111-4PW", "vedge-C1111-4PW-SD-ROUTING", "vedge-C1111-8P",
+    "vedge-C1111-8P-SD-ROUTING", "vedge-C1111-8PLTEEA", "vedge-C1111-8PLTEEA-SD-ROUTING", "vedge-C1111-8PLTEEAW",
+    "vedge-C1111-8PLTEEAW-SD-ROUTING", "vedge-C1111-8PLTELA", "vedge-C1111-8PLTELA-SD-ROUTING", "vedge-C1111-8PLTELAW",
+    "vedge-C1111-8PLTELAW-SD-ROUTING", "vedge-C1111-8PW", "vedge-C1111-8PW-SD-ROUTING", "vedge-C1111X-8P",
+    "vedge-C1111X-8P-SD-ROUTING", "vedge-C1112-8P", "vedge-C1112-8P-SD-ROUTING", "vedge-C1112-8PLTEEA",
+    "vedge-C1112-8PLTEEA-SD-ROUTING", "vedge-C1112-8PLTEEAWE", "vedge-C1112-8PLTEEAWE-SD-ROUTING", "vedge-C1112-8PWE",
+    "vedge-C1112-8PWE-SD-ROUTING", "vedge-C1113-8P", "vedge-C1113-8P-SD-ROUTING", "vedge-C1113-8PLTEEA",
+    "vedge-C1113-8PLTEEA-SD-ROUTING", "vedge-C1113-8PLTEEAW", "vedge-C1113-8PLTEEAW-SD-ROUTING", "vedge-C1113-8PLTELA",
+    "vedge-C1113-8PLTELA-SD-ROUTING", "vedge-C1113-8PLTELAWZ", "vedge-C1113-8PLTELAWZ-SD-ROUTING", "vedge-C1113-8PLTEW",
+    "vedge-C1113-8PLTEW-SD-ROUTING", "vedge-C1113-8PM", "vedge-C1113-8PM-SD-ROUTING", "vedge-C1113-8PMLTEEA",
+    "vedge-C1113-8PMLTEEA-SD-ROUTING", "vedge-C1113-8PMWE", "vedge-C1113-8PMWE-SD-ROUTING", "vedge-C1113-8PW",
+    "vedge-C1113-8PW-SD-ROUTING", "vedge-C1116-4P", "vedge-C1116-4P-SD-ROUTING", "vedge-C1116-4PLTEEA",
+    "vedge-C1116-4PLTEEA-SD-ROUTING", "vedge-C1116-4PLTEEAWE", "vedge-C1116-4PLTEEAWE-SD-ROUTING", "vedge-C1116-4PWE",
+    "vedge-C1116-4PWE-SD-ROUTING", "vedge-C1117-4P", "vedge-C1117-4P-SD-ROUTING", "vedge-C1117-4PLTEEA",
+    "vedge-C1117-4PLTEEA-SD-ROUTING", "vedge-C1117-4PLTEEAW", "vedge-C1117-4PLTEEAW-SD-ROUTING", "vedge-C1117-4PLTELA",
+    "vedge-C1117-4PLTELA-SD-ROUTING", "vedge-C1117-4PLTELAWZ", "vedge-C1117-4PLTELAWZ-SD-ROUTING", "vedge-C1117-4PM",
+    "vedge-C1117-4PM-SD-ROUTING", "vedge-C1117-4PMLTEEA", "vedge-C1117-4PMLTEEA-SD-ROUTING", "vedge-C1117-4PMLTEEAWE",
+    "vedge-C1117-4PMLTEEAWE-SD-ROUTING", "vedge-C1117-4PMWE", "vedge-C1117-4PMWE-SD-ROUTING", "vedge-C1117-4PW",
+    "vedge-C1117-4PW-SD-ROUTING", "vedge-C1118-8P", "vedge-C1118-8P-SD-ROUTING", "vedge-C1121-4P",
+    "vedge-C1121-4P-SD-ROUTING", "vedge-C1121-4PLTEP", "vedge-C1121-4PLTEP-SD-ROUTING", "vedge-C1121-8P",
+    "vedge-C1121-8P-SD-ROUTING", "vedge-C1121-8PLTEP", "vedge-C1121-8PLTEP-SD-ROUTING", "vedge-C1121-8PLTEPW",
+    "vedge-C1121-8PLTEPW-SD-ROUTING", "vedge-C1121X-8P", "vedge-C1121X-8P-SD-ROUTING", "vedge-C1121X-8PLTEP",
+    "vedge-C1121X-8PLTEP-SD-ROUTING", "vedge-C1121X-8PLTEPW", "vedge-C1121X-8PLTEPW-SD-ROUTING", "vedge-C1126-8PLTEP",
+    "vedge-C1126-8PLTEP-SD-ROUTING", "vedge-C1126X-8PLTEP", "vedge-C1126X-8PLTEP-SD-ROUTING", "vedge-C1127-8PLTEP",
+    "vedge-C1127-8PLTEP-SD-ROUTING", "vedge-C1127-8PMLTEP", "vedge-C1127-8PMLTEP-SD-ROUTING", "vedge-C1127X-8PLTEP",
+    "vedge-C1127X-8PLTEP-SD-ROUTING", "vedge-C1127X-8PMLTEP", "vedge-C1127X-8PMLTEP-SD-ROUTING", "vedge-C1128-8PLTEP",
+    "vedge-C1128-8PLTEP-SD-ROUTING", "vedge-C1131-8PLTEPW", "vedge-C1131-8PLTEPW-SD-ROUTING", "vedge-C1131-8PW",
+    "vedge-C1131-8PW-SD-ROUTING", "vedge-C1131X-8PLTEPW", "vedge-C1131X-8PLTEPW-SD-ROUTING", "vedge-C1131X-8PW",
+    "vedge-C1131X-8PW-SD-ROUTING", "vedge-C1161-8P", "vedge-C1161-8P-SD-ROUTING", "vedge-C1161-8PLTEP",
+    "vedge-C1161-8PLTEP-SD-ROUTING", "vedge-C1161X-8P", "vedge-C1161X-8P-SD-ROUTING", "vedge-C1161X-8PLTEP",
+    "vedge-C1161X-8PLTEP-SD-ROUTING", "vedge-C8000V", "vedge-C8000V-SD-ROUTING", "vedge-C8151-G2",
+    "vedge-C8151-G2-SD-ROUTING", "vedge-C8161-G2", "vedge-C8161-G2-SD-ROUTING", "vedge-C8200-1N-4T",
+    "vedge-C8200-1N-4T-SD-ROUTING", "vedge-C8200L-1N-4T", "vedge-C8200L-1N-4T-SD-ROUTING", "vedge-C8231-E-G2",
+    "vedge-C8231-E-G2-SD-ROUTING", "vedge-C8231-G2", "vedge-C8231-G2-SD-ROUTING", "vedge-C8235-E-G2",
+    "vedge-C8235-E-G2-SD-ROUTING", "vedge-C8235-G2", "vedge-C8235-G2-SD-ROUTING", "vedge-C8300-1N1S-4T2X",
+    "vedge-C8300-1N1S-4T2X-SD-ROUTING", "vedge-C8300-1N1S-6T", "vedge-C8300-1N1S-6T-SD-ROUTING",
+    "vedge-C8300-2N2S-4T2X", "vedge-C8300-2N2S-4T2X-SD-ROUTING", "vedge-C8300-2N2S-6T",
+    "vedge-C8300-2N2S-6T-SD-ROUTING", "vedge-C8355-G2", "vedge-C8355-G2-SD-ROUTING", "vedge-C8375-E-G2",
+    "vedge-C8375-E-G2-SD-ROUTING", "vedge-C8455-G2", "vedge-C8455-G2-SD-ROUTING", "vedge-C8475-G2",
+    "vedge-C8475-G2-SD-ROUTING", "vedge-C8500-12X", "vedge-C8500-12X-SD-ROUTING", "vedge-C8500-12X4QC",
+    "vedge-C8500-12X4QC-SD-ROUTING", "vedge-C8500-20X6C", "vedge-C8500-20X6C-SD-ROUTING", "vedge-C8500L-8S4X",
+    "vedge-C8500L-8S4X-SD-ROUTING", "vedge-C8550-G2", "vedge-C8550-G2-SD-ROUTING", "vedge-C8570-G2",
+    "vedge-C8570-G2-SD-ROUTING", "vedge-CSR-1000v", "vedge-ESR-6300", "vedge-ESR-6300-LIC",
     "vedge-ESR-6300-LIC-SD-ROUTING", "vedge-ESR-6300-NCP", "vedge-ESR-6300-NCP-SD-ROUTING", "vedge-ESR-6300-SD-ROUTING",
     "vedge-IR-1101", "vedge-IR-1101-SD-ROUTING", "vedge-IR-1821", "vedge-IR-1821-SD-ROUTING", "vedge-IR-1831",
     "vedge-IR-1831-SD-ROUTING", "vedge-IR-1833", "vedge-IR-1833-SD-ROUTING", "vedge-IR-1835",
@@ -493,9 +505,9 @@ CEDGE_SET = {
     "vedge-ISR1100-4GLTEGB-XE", "vedge-ISR1100-4GLTENA-XE", "vedge-ISR1100-6G-XE", "vedge-ISR1100X-4G-XE",
     "vedge-ISR1100X-6G-XE", "vedge-ISRv", "vedge-nfvis-C8200-UCPE", "vedge-nfvis-C8200-UCPEVM",
     "vedge-nfvis-C8300-UCPE-1N20", "vedge-nfvis-CSP-5216", "vedge-nfvis-CSP-5228", "vedge-nfvis-CSP-5436",
-    "vedge-nfvis-ENCS5400"
+    "vedge-nfvis-ENCS5400", "vedge-nfvis-UCSC-C220-M6S", "vedge-nfvis-UCSC-C240-M6S", "vedge-nfvis-UCSC-C240-M6SX"
 }
-# Software devices. Updated as of SD-WAN Manager 20.12
+# Software devices. Updated as of SD-WAN Manager 20.18.3
 SOFT_EDGE_SET = {"vedge-CSR-1000v", "vedge-C8000V", "vedge-C8000V-SD-ROUTING", "vedge-cloud", "vmanage", "vsmart",
                  "vedge-ISRv"}
 
@@ -845,6 +857,212 @@ class FeatureTemplateIndex(IndexConfigItem):
 
 
 #
+# Network Hierarchy
+#
+class NetworkHierarchy(ConfigItem):
+    api_path = ApiPath('v1/network-hierarchy')
+    store_path = ('network_hierarchy',)
+    id_tag = 'id'
+    name_tag = 'name'
+    data_tag = 'data'
+    parent_tag = 'parentUuid'
+    label_tag = 'label'
+    skip_cmp_tag_set = {'name', 'uuid'}
+    post_filtered_tags = ('uuid', 'directChildCount', 'deviceCount')
+
+    @classmethod
+    def entry_label(cls, entry: Mapping[str, Any]) -> str:
+        """
+        @param entry: A network hierarchy payload, either an item or an index entry
+        @return: Label of the node, or empty string when the node has no label
+        """
+        return (entry.get(cls.data_tag) or {}).get(cls.label_tag, '')
+
+    @classmethod
+    def entry_parent_id(cls, entry: Mapping[str, Any]) -> str | None:
+        """
+        @param entry: A network hierarchy payload, either an item or an index entry
+        @return: Id of the node's parent, or None if this is the root of the hierarchy
+        """
+        return (entry.get(cls.data_tag) or {}).get(cls.parent_tag)
+
+    @classmethod
+    def is_global_entry(cls, entry: Mapping[str, Any]) -> bool:
+        """
+        @param entry: A network hierarchy payload, either an item or an index entry
+        @return: True if the node is the global node (i.e. root of the hierarchy)
+        """
+        return cls.entry_label(entry) == 'GLOBAL'
+
+    @property
+    def parent_id(self) -> str | None:
+        """
+        @return: Id of this node's parent, or None if this is the root of the hierarchy
+        """
+        return self.entry_parent_id(self.data)
+
+    @property
+    def is_global(self) -> bool:
+        return self.is_global_entry(self.data)
+
+    @property
+    def is_site(self) -> bool:
+        return self.entry_label(self.data) == 'SITE'
+
+    @property
+    def is_region(self) -> bool:
+        return self.entry_label(self.data) == 'REGION'
+
+    @property
+    def is_system(self) -> bool:
+        # Global node is created by SD-WAN Manager and cannot be deleted
+        return super().is_system or self.is_global
+
+    @staticmethod
+    def created_id(post_response: Any) -> str | None:
+        """
+        Extract the uuid of this item from a network hierarchy POST response
+        @param post_response: POST response payload. Sample: {"created": [{"name": "Site-Test1", "uuid": "3e7e..."}]}
+        @return: uuid of the created item, or None if not found in the response
+        """
+        if not isinstance(post_response, Mapping):
+            return None
+
+        # Only a single entry is created
+        entry = next(iter(post_response.get('created') or []), None)
+        if not isinstance(entry, Mapping):
+            return None
+
+        return entry.get('uuid') or None
+
+    # TODO: Network hierarchy dependencies should be handled here, i.e. pools, collectors, etc.
+
+
+@register('network_hierarchy', 'network hierarchy', NetworkHierarchy, min_version='20.15')
+class NetworkHierarchyIndex(IndexConfigItem):
+    api_path = ApiPath('v1/network-hierarchy', None, None, None)
+    store_file = 'network_hierarchy.json'
+    iter_fields = IdName('id', 'name')
+
+    @property
+    def global_node_id(self) -> str | None:
+        """
+        @return: Id of the global node (i.e. root of the hierarchy), or None if not present
+        """
+        return next(
+            (entry.get(self.iter_fields.id) for entry in self.data if NetworkHierarchy.is_global_entry(entry)),
+            None
+        )
+
+    @staticmethod
+    def depth_map(id_parent_iter: Iterable[tuple[str | None, str | None]]) -> dict[str, int]:
+        """
+        Calculate the depth of each node in a network hierarchy, used as sort key to order nodes by their position
+        in the hierarchy
+        @param id_parent_iter: (<node id>, <parent node id>) tuples, parent id is None for the root of the hierarchy
+        @return: {<node id>: <depth>} dict, which may also contain parent ids that were only referenced and not
+                 provided. Depths are relative to the nodes provided, so a partial set of nodes still preserves the
+                 parent before child relationship.
+        """
+        parent_map = dict(id_parent_iter)  # {<node id>: <parent node id>}
+        depth_map: dict[str, int] = {}  # {<node id>: <depth>}
+
+        for node_id in parent_map:
+            # Walk up to the nearest ancestor of known depth. Ancestors is used as an ordered set, keeping the walk
+            # order while also providing a constant-time membership test. A parent reference loop is not reported,
+            # the walk just stops once it comes back to a node already visited, which then becomes the top of the walk.
+            ancestors: dict[str, None] = {}
+            current = node_id
+            while current is not None and current not in depth_map and current not in ancestors:
+                ancestors[current] = None
+                current = parent_map.get(current)
+
+            for depth, ancestor_id in enumerate(reversed(ancestors), start=depth_map.get(current, -1) + 1):
+                depth_map[ancestor_id] = depth
+
+        return depth_map
+
+    @classmethod
+    def depth_sorted(cls, entries: Sequence[_T], id_parent_fn: Callable[[_T], tuple[str | None, str | None]], *,
+                     children_first: bool = False) -> list[_T]:
+        """
+        Sort entries by their position in the network hierarchy, parent nodes before their children by default.
+        Entries at the same depth retain their relative order.
+        @param entries: Entries to sort, each one representing a node in the hierarchy
+        @param id_parent_fn: Callable returning the (<node id>, <parent node id>) tuple for an entry
+        @param children_first: When True, child nodes are placed before their parents
+        @return: List of sorted entries
+        """
+        id_parent_list = [id_parent_fn(entry) for entry in entries]
+        node_depth_map = cls.depth_map(id_parent_list)
+
+        # Sorting on the depth alone, as the entries themselves are not necessarily comparable. Entries without a
+        # node id get no depth assigned and sort as roots.
+        return [
+            entry for _, entry in sorted(
+                ((node_depth_map.get(node_id, 0), entry) for (node_id, _), entry in zip(id_parent_list, entries)),
+                key=itemgetter(0), reverse=children_first
+            )
+        ]
+
+    @classmethod
+    def entry_id_parent(cls, entry: Mapping[str, Any]) -> tuple[str | None, str | None]:
+        """
+        @param entry: An index entry
+        @return: (<node id>, <parent node id>) tuple for the entry
+        """
+        return entry.get(cls.iter_fields.id), NetworkHierarchy.entry_parent_id(entry)
+
+    @staticmethod
+    def item_id_parent(restore_entry: tuple[str, NetworkHierarchy, str | None]) -> tuple[str | None, str | None]:
+        """
+        @param restore_entry: A (<item id>, <item>, <id on target>) restore entry
+        @return: (<node id>, <parent node id>) tuple for the entry
+        """
+        item_id, item, _ = restore_entry
+        return item_id, item.parent_id
+
+    @cached_property
+    def depth_sorted_data(self) -> list[Mapping[str, Any]]:
+        """
+        @return: Index entries ordered by their position in the hierarchy, with child nodes before their parents
+        """
+        return self.depth_sorted(self.data, self.entry_id_parent, children_first=True)
+
+    def iter(self, *iter_fields: str, default: Any = None) -> Iterator[Any]:
+        """
+        Returns an iterator where each entry is the value of the respective field in iter_fields. Entries are ordered
+        by their position in the hierarchy, with child nodes before their parents. This allows restore to pick up
+        parent nodes as dependencies and delete to remove child nodes before their parents.
+        @param default: Value to return for any field missing in an entry. Default is None.
+        @return: Iterator of entries in the index object
+        """
+        entry_getter = default_getter(*iter_fields, default=default)
+        return (entry_getter(entry) for entry in self.depth_sorted_data)
+
+    @classmethod
+    def create(cls, item_list: Sequence[NetworkHierarchy], id_hint_dict: Mapping[str, str]):
+        def index_entry_dict(item_obj: NetworkHierarchy) -> dict[str, Any]:
+            entry_dict = {
+                key: item_obj.data.get(key, id_hint_dict.get(item_obj.name)) for key in cls.iter_fields
+            }
+            # Carry the node label and parent reference over, as they are needed to identify the global node and to
+            # order nodes by their position in the hierarchy
+            item_data = item_obj.data.get(NetworkHierarchy.data_tag) or {}
+            entry_dict[NetworkHierarchy.data_tag] = {
+                key: item_data[key] for key in (NetworkHierarchy.label_tag, NetworkHierarchy.parent_tag)
+                if key in item_data
+            }
+
+            return entry_dict
+
+        index_payload = {
+            'data': [index_entry_dict(item) for item in item_list]
+        }
+        return cls(index_payload)
+
+
+#
 # Config Group
 #
 
@@ -1047,7 +1265,7 @@ class ProfileSdwanSystem(FeatureProfile):
 
     parcel_names = (
         "aaa", "global", "banner", "basic", "bfd", "logging", "ntp", "omp", "snmp", "perfmonitor", "mrf", "security",
-        "remote-access", "ipv4-device-access-policy", "ipv6-device-access-policy"
+        "remote-access", "ipv4-device-access-policy", "ipv6-device-access-policy", "ca-cert"
     )
     parcel_api_paths = ApiPathGroup({
         name: ApiPath(f"v1/feature-profile/sdwan/system/{{systemId}}/{name}") for name in parcel_names
@@ -1178,6 +1396,8 @@ class ProfileSdwanTransport(FeatureProfile):
             "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/interface/dsl-pppoa"),
         "wan/vpn/interface/dsl-pppoe": ApiPath(
             "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/interface/dsl-pppoe"),
+        "wan/vpn/interface/dsl-ipoe": ApiPath(
+            "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/interface/dsl-ipoe"),
         "management/vpn": ApiPath("v1/feature-profile/sdwan/transport/{transportId}/management/vpn"),
         "management/vpn/interface/ethernet": ApiPath(
             "v1/feature-profile/sdwan/transport/{transportId}/management/vpn/{vpnId}/interface/ethernet"),
@@ -1204,6 +1424,8 @@ class ProfileSdwanTransport(FeatureProfile):
             "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/interface/dsl-pppoe/{pppId}/tracker"),
         PathKey("tracker", "wan/vpn/interface/dsl-pppoa"): ApiPath(
             "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/interface/dsl-pppoa/{pppId}/tracker"),
+        PathKey("tracker", "wan/vpn/interface/dsl-ipoe"): ApiPath(
+            "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/interface/dsl-ipoe/{ipoeId}/tracker"),
         PathKey("tracker", "wan/vpn/interface/ethpppoe"): ApiPath(
             "v1/feature-profile/sdwan/transport/{transportId}/wan/vpn/{vpnId}/interface/ethpppoe/{pppId}/tracker"),
         PathKey("tracker", "wan/vpn/interface/ipsec"): ApiPath(
@@ -1242,11 +1464,13 @@ class ProfileSdwanTransport(FeatureProfile):
         PathKey("ipv4-acl", "wan/vpn/interface/cellular"): ...,
         PathKey("ipv4-acl", "wan/vpn/interface/dsl-pppoe"): ...,
         PathKey("ipv4-acl", "wan/vpn/interface/dsl-pppoa"): ...,
+        PathKey("ipv4-acl", "wan/vpn/interface/dsl-ipoe"): ...,
         PathKey("ipv4-acl", "wan/vpn/interface/ethpppoe"): ...,
         PathKey("ipv6-acl", "wan/vpn/interface/ethernet"): ...,
         PathKey("ipv6-acl", "wan/vpn/interface/cellular"): ...,
         PathKey("ipv6-acl", "wan/vpn/interface/dsl-pppoe"): ...,
         PathKey("ipv6-acl", "wan/vpn/interface/dsl-pppoa"): ...,
+        PathKey("ipv6-acl", "wan/vpn/interface/dsl-ipoe"): ...,
         PathKey("ipv6-acl", "wan/vpn/interface/ethpppoe"): ...,
         PathKey("wan/vpn/interface/ethernet", "wan/vpn/interface/ethernet"): ...,
     } | {
@@ -2579,7 +2803,7 @@ class EdgeCertificate(IndexConfigItem):
 #
 # Conversion functions
 #
-def datetime_format(timestamp: str | None, epoch_value_return: str = '') -> str:
+def datetime_format(timestamp: int | None, epoch_value_return: str = '') -> str:
     if timestamp is None:
         return ''
 
