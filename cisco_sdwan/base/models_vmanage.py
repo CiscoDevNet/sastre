@@ -1590,6 +1590,26 @@ class ProfileSdwanEmbeddedSecurityIndex(FeatureProfileIndex):
     store_file = 'feature_profiles_sdwan_embedded_security.json'
 
 
+class ProfileSdwanTopology(FeatureProfile):
+    api_path = ApiPath('v1/feature-profile/sdwan/topology')
+    store_path = ('feature_profiles', 'sdwan', 'topology')
+
+    parcel_api_paths = ApiPathGroup({
+        "custom-control": ApiPath("v1/feature-profile/sdwan/topology/{topologyId}/custom-control"),
+        "hubspoke": ApiPath("v1/feature-profile/sdwan/topology/{topologyId}/hubspoke"),
+        "mesh": ApiPath("v1/feature-profile/sdwan/topology/{topologyId}/mesh"),
+    }, parcel_reference_path_map={
+        PathKey(policy_obj_parcel, "custom-control"): ...
+        for policy_obj_parcel in ProfileSdwanPolicy.ordered_parcel_names
+    })
+
+
+@register('topology', 'SDWAN topology', ProfileSdwanTopology, min_version='20.15')
+class ProfileSdwanTopologyIndex(FeatureProfileIndex):
+    api_path = ApiPath('v1/feature-profile/sdwan/topology', None, None, None)
+    store_file = 'feature_profiles_sdwan_topology.json'
+
+
 #
 # SD-Routing Feature Profiles
 #
