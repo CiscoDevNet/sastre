@@ -6,6 +6,7 @@ Sastre 1.29 [tbd, 2026]
 - SD-WAN Manager 20.18 support, including support for the following API endpoints:
   - New SD-WAN transport profile parcels: dsl-ipoe
   - New SD-WAN system profile parcels: ca-cert
+  - New SD-WAN topology profile and the following parcels: custom-control, hubspoke and mesh
 
 #### Fixes:
 - When updating an existing item, restore task can fail with a traceback and the whole task is aborted if SD-WAN Manager returns an empty response payload to the update (PUT) request. This has been fixed, now the item is logged as failed but the task itself continues. This condition only happens with restore --update.
